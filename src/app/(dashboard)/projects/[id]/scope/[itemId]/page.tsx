@@ -68,9 +68,7 @@ interface DrawingRevision {
   cad_file_name: string | null;
   notes: string | null;
   created_at: string;
-  uploaded_by: {
-    name: string;
-  } | null;
+  uploaded_by: string | null;
 }
 
 const statusColors: Record<string, string> = {
@@ -170,7 +168,7 @@ export default async function ScopeItemDetailPage({
         .select(`
           id, revision, file_url, file_name, file_size,
           cad_file_url, cad_file_name, notes, created_at,
-          uploaded_by:users(name)
+          uploaded_by
         `)
         .eq("drawing_id", drawing.id)
         .order("created_at", { ascending: false });

@@ -34,9 +34,7 @@ interface DrawingRevision {
   cad_file_name: string | null;
   notes: string | null;
   created_at: string;
-  uploaded_by: {
-    name: string;
-  } | null;
+  uploaded_by: string | null;
 }
 
 interface DrawingsListProps {
@@ -125,8 +123,8 @@ export function DrawingsList({ revisions, currentRevision }: DrawingsListProps) 
               <TableCell className="text-sm text-muted-foreground">
                 {formatFileSize(revision.file_size)}
               </TableCell>
-              <TableCell className="text-sm">
-                {revision.uploaded_by?.name || "Unknown"}
+              <TableCell className="text-sm text-muted-foreground">
+                {revision.uploaded_by ? "User" : "-"}
               </TableCell>
               <TableCell className="text-sm text-muted-foreground">
                 {format(new Date(revision.created_at), "MMM d, yyyy HH:mm")}

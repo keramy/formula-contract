@@ -5,6 +5,17 @@ import { PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { ProjectsTable } from "./projects-table";
 import { ProjectsFilter } from "./projects-filter";
+import type { ProjectStatus } from "@/types/database";
+
+interface Project {
+  id: string;
+  project_code: string;
+  name: string;
+  status: string;
+  installation_date: string | null;
+  created_at: string;
+  client: { id: string; company_name: string } | null;
+}
 
 export default async function ProjectsPage({
   searchParams,
@@ -26,14 +37,15 @@ export default async function ProjectsPage({
 
   // Apply filters
   if (params.status && params.status !== "all") {
-    query = query.eq("status", params.status);
+    query = query.eq("status", params.status as ProjectStatus);
   }
 
   if (params.search) {
     query = query.or(`name.ilike.%${params.search}%,project_code.ilike.%${params.search}%`);
   }
 
-  const { data: projects, error } = await query;
+  const { data, error } = await query;
+  const projects = (data || []) as unknown as Project[];
 
   if (error) {
     console.error("Error fetching projects:", error);
@@ -60,7 +72,7 @@ export default async function ProjectsPage({
 
       {/* Projects Table */}
       <Suspense fallback={<div className="py-8 text-center text-muted-foreground">Loading projects...</div>}>
-        <ProjectsTable projects={projects || []} />
+        <ProjectsTable projects={projects} />
       </Suspense>
     </div>
   );

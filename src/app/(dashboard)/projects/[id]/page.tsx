@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { ScopeItemsTable } from "./scope-items-table";
-import { DownloadTemplateButton } from "@/components/scope-items";
+import { DownloadTemplateButton, ExcelImport } from "@/components/scope-items";
 
 interface ProjectClient {
   id: string;
@@ -253,6 +253,7 @@ export default async function ProjectDetailPage({
             </div>
             <div className="flex gap-2">
               <DownloadTemplateButton projectCode={project.project_code} />
+              <ExcelImport projectId={id} projectCode={project.project_code} />
               <Button asChild>
                 <Link href={`/projects/${id}/scope/new`}>
                   <PlusIcon className="size-4" />

@@ -62,6 +62,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       clients: {
         Row: {
@@ -100,6 +101,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       projects: {
         Row: {
@@ -165,6 +167,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       project_assignments: {
         Row: {
@@ -188,6 +191,7 @@ export interface Database {
           assigned_at?: string;
           assigned_by?: string | null;
         };
+        Relationships: [];
       };
       milestones: {
         Row: {
@@ -226,6 +230,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       scope_items: {
         Row: {
@@ -309,6 +314,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       drawings: {
         Row: {
@@ -359,6 +365,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       drawing_revisions: {
         Row: {
@@ -403,6 +410,7 @@ export interface Database {
           uploaded_by?: string | null;
           created_at?: string;
         };
+        Relationships: [];
       };
       materials: {
         Row: {
@@ -453,6 +461,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       item_materials: {
         Row: {
@@ -473,6 +482,7 @@ export interface Database {
           material_id?: string;
           created_at?: string;
         };
+        Relationships: [];
       };
       snagging: {
         Row: {
@@ -517,6 +527,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       reports: {
         Row: {
@@ -555,6 +566,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       report_lines: {
         Row: {
@@ -587,6 +599,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       notifications: {
         Row: {
@@ -637,6 +650,7 @@ export interface Database {
           email_sent?: boolean;
           created_at?: string;
         };
+        Relationships: [];
       };
       activity_log: {
         Row: {
@@ -669,6 +683,7 @@ export interface Database {
           details?: Json | null;
           created_at?: string;
         };
+        Relationships: [];
       };
     };
     Views: {};
