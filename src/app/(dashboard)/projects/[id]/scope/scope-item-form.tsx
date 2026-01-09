@@ -1,0 +1,453 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Card, CardContent } from "@/components/ui/card";
+import { Spinner } from "@/components/ui/spinner";
+import { ScopeItemImageUpload } from "@/components/scope-items";
+import {
+  scopeItemSchema,
+  safeValidate,
+  getFirstError,
+  parseOptionalNumber,
+  parseIntWithDefault,
+} from "@/lib/validations";
+import type { ScopeItemInsert, ScopeItemUpdate } from "@/types/database";
+
+interface ScopeItemFormProps {
+  projectId: string;
+  projectCurrency?: string;
+  initialData?: {
+    id: string;
+    item_code: string;
+    name: string;
+    description: string | null;
+    width: number | null;
+    depth: number | null;
+    height: number | null;
+    unit: string;
+    quantity: number;
+    unit_price: number | null;
+    item_path: string;
+    status: string;
+    notes: string | null;
+    images: string[] | null;
+  };
+}
+
+const currencySymbols: Record<string, string> = {
+  TRY: "₺",
+  USD: "$",
+  EUR: "€",
+};
+
+const currencyLabels: Record<string, string> = {
+  TRY: "Turkish Lira (₺)",
+  USD: "US Dollar ($)",
+  EUR: "Euro (€)",
+};
+
+export function ScopeItemForm({ projectId, projectCurrency = "TRY", initialData }: ScopeItemFormProps) {
+  const router = useRouter();
+  const isEditing = !!initialData;
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [currency, setCurrency] = useState(projectCurrency);
+  const [isCurrencyUpdating, setIsCurrencyUpdating] = useState(false);
+
+  const [formData, setFormData] = useState({
+    item_code: initialData?.item_code || "",
+    name: initialData?.name || "",
+    description: initialData?.description || "",
+    width: initialData?.width?.toString() || "",
+    depth: initialData?.depth?.toString() || "",
+    height: initialData?.height?.toString() || "",
+    unit: initialData?.unit || "pcs",
+    quantity: initialData?.quantity?.toString() || "1",
+    unit_price: initialData?.unit_price?.toString() || "",
+    item_path: initialData?.item_path || "production",
+    status: initialData?.status || "pending",
+    notes: initialData?.notes || "",
+  });
+  const [images, setImages] = useState<string[]>(initialData?.images || []);
+
+  const handleChange = (field: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    // Clear field error when user starts typing
+    if (fieldErrors[field]) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      });
+    }
+  };
+
+  const handleCurrencyChange = async (newCurrency: string) => {
+    setIsCurrencyUpdating(true);
+    try {
+      const supabase = createClient();
+      const { error: updateError } = await supabase
+        .from("projects")
+        .update({ currency: newCurrency as "TRY" | "USD" | "EUR" })
+        .eq("id", projectId);
+
+      if (updateError) throw updateError;
+      setCurrency(newCurrency);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update currency");
+    } finally {
+      setIsCurrencyUpdating(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setFieldErrors({});
+
+    // Prepare data for validation
+    const dataToValidate = {
+      item_code: formData.item_code,
+      name: formData.name,
+      description: formData.description || null,
+      width: parseOptionalNumber(formData.width),
+      depth: parseOptionalNumber(formData.depth),
+      height: parseOptionalNumber(formData.height),
+      unit: formData.unit,
+      quantity: parseIntWithDefault(formData.quantity, 1),
+      unit_price: parseOptionalNumber(formData.unit_price),
+      item_path: formData.item_path,
+      status: formData.status,
+      notes: formData.notes || null,
+      images: images.length > 0 ? images : null,
+    };
+
+    // Validate with Zod
+    const validation = safeValidate(scopeItemSchema, dataToValidate);
+    if (!validation.success) {
+      setFieldErrors(validation.errors);
+      setError(getFirstError(validation.errors));
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const supabase = createClient();
+
+      // Type-safe item data
+      const itemData: ScopeItemInsert = {
+        project_id: projectId,
+        item_code: validation.data.item_code,
+        name: validation.data.name,
+        description: validation.data.description,
+        width: validation.data.width,
+        depth: validation.data.depth,
+        height: validation.data.height,
+        unit: validation.data.unit,
+        quantity: validation.data.quantity,
+        unit_price: validation.data.unit_price,
+        item_path: validation.data.item_path,
+        status: validation.data.status,
+        notes: validation.data.notes,
+        images: validation.data.images,
+      };
+
+      if (isEditing) {
+        const updateData: ScopeItemUpdate = { ...itemData };
+        delete (updateData as Record<string, unknown>).project_id; // Don't update project_id
+
+        const { error } = await supabase
+          .from("scope_items")
+          .update(updateData)
+          .eq("id", initialData.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("scope_items")
+          .insert(itemData);
+        if (error) throw error;
+      }
+
+      router.push(`/projects/${projectId}`);
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred");
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardContent className="pt-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {error && (
+            <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+              {error}
+            </div>
+          )}
+
+          {/* Item Code & Name */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="item_code">Item Code *</Label>
+              <Input
+                id="item_code"
+                placeholder="e.g., ITEM-001"
+                value={formData.item_code}
+                onChange={(e) => handleChange("item_code", e.target.value)}
+                disabled={isLoading}
+                className={fieldErrors.item_code ? "border-destructive" : ""}
+              />
+              {fieldErrors.item_code && (
+                <p className="text-xs text-destructive">{fieldErrors.item_code}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="name">Item Name *</Label>
+              <Input
+                id="name"
+                placeholder="e.g., Reception Desk"
+                value={formData.name}
+                onChange={(e) => handleChange("name", e.target.value)}
+                disabled={isLoading}
+                className={fieldErrors.name ? "border-destructive" : ""}
+              />
+              {fieldErrors.name && (
+                <p className="text-xs text-destructive">{fieldErrors.name}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Description */}
+          <div className="space-y-2">
+            <Label htmlFor="description">Description</Label>
+            <Textarea
+              id="description"
+              placeholder="Item description..."
+              value={formData.description}
+              onChange={(e) => handleChange("description", e.target.value)}
+              disabled={isLoading}
+              rows={2}
+            />
+          </div>
+
+          {/* Dimensions */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="width">Width (cm)</Label>
+              <Input
+                id="width"
+                type="number"
+                step="0.01"
+                placeholder="0"
+                value={formData.width}
+                onChange={(e) => handleChange("width", e.target.value)}
+                disabled={isLoading}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="depth">Depth (cm)</Label>
+              <Input
+                id="depth"
+                type="number"
+                step="0.01"
+                placeholder="0"
+                value={formData.depth}
+                onChange={(e) => handleChange("depth", e.target.value)}
+                disabled={isLoading}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="height">Height (cm)</Label>
+              <Input
+                id="height"
+                type="number"
+                step="0.01"
+                placeholder="0"
+                value={formData.height}
+                onChange={(e) => handleChange("height", e.target.value)}
+                disabled={isLoading}
+              />
+            </div>
+          </div>
+
+          {/* Quantity & Pricing */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="quantity">Quantity *</Label>
+              <Input
+                id="quantity"
+                type="number"
+                min="1"
+                value={formData.quantity}
+                onChange={(e) => handleChange("quantity", e.target.value)}
+                required
+                disabled={isLoading}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="unit">Unit</Label>
+              <Select
+                value={formData.unit}
+                onValueChange={(value) => handleChange("unit", value)}
+                disabled={isLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pcs">Pieces (pcs)</SelectItem>
+                  <SelectItem value="set">Set</SelectItem>
+                  <SelectItem value="m">Meter (m)</SelectItem>
+                  <SelectItem value="m2">Square Meter (m2)</SelectItem>
+                  <SelectItem value="lot">Lot</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="currency">Currency</Label>
+              <Select
+                value={currency}
+                onValueChange={handleCurrencyChange}
+                disabled={isLoading || isCurrencyUpdating}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="TRY">{currencyLabels.TRY}</SelectItem>
+                  <SelectItem value="USD">{currencyLabels.USD}</SelectItem>
+                  <SelectItem value="EUR">{currencyLabels.EUR}</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Applies to all items</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="unit_price">Unit Price</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                  {currencySymbols[currency] || currency}
+                </span>
+                <Input
+                  id="unit_price"
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  className="pl-8"
+                  value={formData.unit_price}
+                  onChange={(e) => handleChange("unit_price", e.target.value)}
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Path & Status */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="item_path">Item Path *</Label>
+              <Select
+                value={formData.item_path}
+                onValueChange={(value) => handleChange("item_path", value)}
+                disabled={isLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="production">Production (requires drawings)</SelectItem>
+                  <SelectItem value="procurement">Procurement (order tracking)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="status">Status</Label>
+              <Select
+                value={formData.status}
+                onValueChange={(value) => handleChange("status", value)}
+                disabled={isLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="in_design">In Design</SelectItem>
+                  <SelectItem value="awaiting_approval">Awaiting Approval</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
+                  <SelectItem value="in_production">In Production</SelectItem>
+                  <SelectItem value="complete">Complete</SelectItem>
+                  <SelectItem value="on_hold">On Hold</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div className="space-y-2">
+            <Label htmlFor="notes">Notes</Label>
+            <Textarea
+              id="notes"
+              placeholder="Additional notes..."
+              value={formData.notes}
+              onChange={(e) => handleChange("notes", e.target.value)}
+              disabled={isLoading}
+              rows={3}
+            />
+          </div>
+
+          {/* Images */}
+          <div className="space-y-2">
+            <Label>Images</Label>
+            <ScopeItemImageUpload
+              images={images}
+              onChange={setImages}
+              disabled={isLoading}
+            />
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-3 pt-4">
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Spinner className="size-4" />
+                  {isEditing ? "Updating..." : "Creating..."}
+                </>
+              ) : isEditing ? (
+                "Update Item"
+              ) : (
+                "Create Item"
+              )}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.back()}
+              disabled={isLoading}
+            >
+              Cancel
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
