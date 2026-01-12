@@ -416,6 +416,7 @@ export interface Database {
         Row: {
           id: string;
           project_id: string;
+          material_code: string;
           name: string;
           specification: string | null;
           supplier: string | null;
@@ -432,6 +433,7 @@ export interface Database {
         Insert: {
           id?: string;
           project_id: string;
+          material_code: string;
           name: string;
           specification?: string | null;
           supplier?: string | null;
@@ -448,6 +450,7 @@ export interface Database {
         Update: {
           id?: string;
           project_id?: string;
+          material_code?: string;
           name?: string;
           specification?: string | null;
           supplier?: string | null;

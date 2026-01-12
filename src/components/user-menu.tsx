@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { SidebarMenuButton } from "@/components/ui/sidebar";
-import { ChevronDownIcon, SettingsIcon, LogOutIcon } from "lucide-react";
+import { ChevronDownIcon, UserIcon, LogOutIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 interface UserMenuProps {
@@ -64,9 +64,9 @@ export function UserMenu({ user }: UserMenuProps) {
         </div>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href="/settings">
-            <SettingsIcon className="size-4 mr-2" />
-            Settings
+          <Link href="/profile">
+            <UserIcon className="size-4 mr-2" />
+            Profile
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />

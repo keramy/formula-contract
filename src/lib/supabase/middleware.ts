@@ -1,6 +1,36 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+// Route permissions - which roles can access which routes
+const routePermissions: Record<string, string[]> = {
+  "/dashboard": ["admin", "pm", "production", "procurement", "management", "client"],
+  "/projects": ["admin", "pm", "production", "procurement", "management", "client"], // Clients see assigned projects
+  "/projects/new": ["admin", "pm"], // Only admin and PM can create projects
+  "/clients": ["admin", "pm"],
+  "/users": ["admin"],
+  "/reports": ["admin", "pm", "management", "client"], // Clients see their project reports
+  "/settings": ["admin"],
+  "/profile": ["admin", "pm", "production", "procurement", "management", "client"], // All users can access their profile
+};
+
+// Check if user role can access a path
+function canAccessRoute(pathname: string, role: string): boolean {
+  // Check exact match first
+  if (routePermissions[pathname]) {
+    return routePermissions[pathname].includes(role);
+  }
+
+  // Check parent paths (e.g., /projects/123 should check /projects)
+  for (const route of Object.keys(routePermissions).sort((a, b) => b.length - a.length)) {
+    if (pathname.startsWith(route + "/") || pathname === route) {
+      return routePermissions[route].includes(role);
+    }
+  }
+
+  // Default: allow if no specific rule
+  return true;
+}
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -41,9 +71,13 @@ export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isAuthPage = pathname.startsWith("/login") ||
                      pathname.startsWith("/forgot-password") ||
-                     pathname.startsWith("/reset-password");
+                     pathname.startsWith("/reset-password") ||
+                     pathname.startsWith("/setup-password") ||
+                     pathname.startsWith("/change-password");
   const isAuthCallback = pathname.startsWith("/auth/callback");
   const isPublicPage = pathname === "/";
+  const isSetupPassword = pathname.startsWith("/setup-password");
+  const isChangePassword = pathname.startsWith("/change-password");
 
   // Allow auth callback to pass through
   if (isAuthCallback) {
@@ -58,10 +92,57 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user && (pathname === "/login" || pathname === "/forgot-password")) {
-    // User is logged in, redirect to dashboard (but allow reset-password)
+    // User is logged in, redirect to dashboard (but allow reset-password and setup-password)
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);
+  }
+
+  // Allow authenticated users to access setup-password (for new invited users)
+  if (user && isSetupPassword) {
+    return supabaseResponse;
+  }
+
+  // Allow authenticated users to access change-password page
+  if (user && isChangePassword) {
+    return supabaseResponse;
+  }
+
+  // Check if user needs to change password - redirect to change-password page
+  if (user && !isAuthPage && !isPublicPage) {
+    const mustChangePassword = user.user_metadata?.must_change_password;
+    if (mustChangePassword) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/change-password";
+      return NextResponse.redirect(url);
+    }
+  }
+
+  // Check if authenticated user is deactivated or lacks permission
+  if (user && !isAuthPage && !isPublicPage) {
+    const { data: profile } = await supabase
+      .from("users")
+      .select("is_active, role")
+      .eq("id", user.id)
+      .single();
+
+    // If user profile exists and is deactivated, sign out and redirect
+    if (profile && !profile.is_active) {
+      // Sign out the deactivated user
+      await supabase.auth.signOut();
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.searchParams.set("error", "account_deactivated");
+      return NextResponse.redirect(url);
+    }
+
+    // Check role-based access
+    if (profile && !canAccessRoute(pathname, profile.role)) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/dashboard";
+      url.searchParams.set("error", "unauthorized");
+      return NextResponse.redirect(url);
+    }
   }
 
   return supabaseResponse;

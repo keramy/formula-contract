@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
+import { logActivity } from "@/lib/activity-log/actions";
+import { ACTIVITY_ACTIONS } from "@/lib/activity-log/constants";
 import {
   Dialog,
   DialogContent,
@@ -39,6 +41,9 @@ interface DrawingApprovalProps {
   drawingStatus: string;
   currentRevision: string | null;
   scopeItemId: string;
+  userRole?: string; // Pass user role to determine available actions
+  projectId?: string; // For activity logging
+  itemCode?: string; // For activity logging
 }
 
 export function DrawingApproval({
@@ -46,7 +51,13 @@ export function DrawingApproval({
   drawingStatus,
   currentRevision,
   scopeItemId,
+  userRole = "pm",
+  projectId,
+  itemCode,
 }: DrawingApprovalProps) {
+  const isClient = userRole === "client";
+  const canSendToClient = ["admin", "pm"].includes(userRole);
+  const canOverride = ["admin", "pm"].includes(userRole);
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -87,6 +98,17 @@ export function DrawingApproval({
         .from("scope_items")
         .update(scopeItemUpdate)
         .eq("id", scopeItemId);
+
+      // Log activity
+      if (projectId) {
+        await logActivity({
+          action: ACTIVITY_ACTIONS.DRAWING_SENT_TO_CLIENT,
+          entityType: "drawing",
+          entityId: drawingId,
+          projectId,
+          details: { item_code: itemCode, revision: currentRevision },
+        });
+      }
 
       setIsSendDialogOpen(false);
       router.refresh();
@@ -133,6 +155,25 @@ export function DrawingApproval({
         .from("scope_items")
         .update(scopeItemUpdate)
         .eq("id", scopeItemId);
+
+      // Log activity
+      if (projectId) {
+        const activityAction = approvalType === "rejected"
+          ? ACTIVITY_ACTIONS.DRAWING_REJECTED
+          : ACTIVITY_ACTIONS.DRAWING_APPROVED;
+        await logActivity({
+          action: activityAction,
+          entityType: "drawing",
+          entityId: drawingId,
+          projectId,
+          details: {
+            item_code: itemCode,
+            revision: currentRevision,
+            status: approvalType,
+            comments: clientComments || undefined,
+          },
+        });
+      }
 
       setIsApprovalDialogOpen(false);
       setClientComments("");
@@ -181,6 +222,21 @@ export function DrawingApproval({
         .update(scopeItemUpdate)
         .eq("id", scopeItemId);
 
+      // Log activity
+      if (projectId) {
+        await logActivity({
+          action: ACTIVITY_ACTIONS.DRAWING_PM_OVERRIDE,
+          entityType: "drawing",
+          entityId: drawingId,
+          projectId,
+          details: {
+            item_code: itemCode,
+            revision: currentRevision,
+            override_reason: overrideReason,
+          },
+        });
+      }
+
       setIsOverrideDialogOpen(false);
       setOverrideReason("");
       router.refresh();
@@ -191,10 +247,10 @@ export function DrawingApproval({
     }
   };
 
-  // Show different actions based on current status
-  const showSendToClient = drawingStatus === "uploaded";
+  // Show different actions based on current status and user role
+  const showSendToClient = drawingStatus === "uploaded" && canSendToClient;
   const showApprovalOptions = drawingStatus === "sent_to_client";
-  const showOverride = drawingStatus === "sent_to_client" || drawingStatus === "rejected";
+  const showOverride = (drawingStatus === "sent_to_client" || drawingStatus === "rejected") && canOverride;
 
   if (!currentRevision) {
     return null;
@@ -260,14 +316,18 @@ export function DrawingApproval({
               onClick={() => setApprovalType("approved")}
             >
               <CheckCircleIcon className="size-4" />
-              Record Approval
+              {isClient ? "Review Drawing" : "Record Approval"}
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Record Client Response</DialogTitle>
+              <DialogTitle>
+                {isClient ? "Review Drawing" : "Record Client Response"}
+              </DialogTitle>
               <DialogDescription>
-                Record the client's response for revision {currentRevision}.
+                {isClient
+                  ? `Please review revision ${currentRevision} and provide your approval or feedback.`
+                  : `Record the client's response for revision ${currentRevision}.`}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 pt-2">
@@ -299,10 +359,14 @@ export function DrawingApproval({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="comments">Client Comments</Label>
+                <Label htmlFor="comments">
+                  {isClient ? "Your Comments (optional)" : "Client Comments"}
+                </Label>
                 <Textarea
                   id="comments"
-                  placeholder="Enter any comments from the client..."
+                  placeholder={isClient
+                    ? "Add any comments or feedback about the drawing..."
+                    : "Enter any comments from the client..."}
                   value={clientComments}
                   onChange={(e) => setClientComments(e.target.value)}
                   rows={3}

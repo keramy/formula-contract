@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -12,10 +12,21 @@ import { Spinner } from "@/components/ui/spinner";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Check for error query parameter
+  useEffect(() => {
+    const errorParam = searchParams.get("error");
+    if (errorParam === "account_deactivated") {
+      setError("Your account has been deactivated. Please contact an administrator.");
+    } else if (errorParam === "auth_callback_error") {
+      setError("Authentication failed. Please try again.");
+    }
+  }, [searchParams]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -25,7 +36,7 @@ export default function LoginPage() {
     try {
       const supabase = createClient();
 
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -34,6 +45,21 @@ export default function LoginPage() {
         setError(signInError.message);
         setIsLoading(false);
         return;
+      }
+
+      // Update last login timestamp
+      if (data.user) {
+        await supabase
+          .from("users")
+          .update({ last_login_at: new Date().toISOString() })
+          .eq("id", data.user.id);
+
+        // Check if user needs to change password
+        if (data.user.user_metadata?.must_change_password) {
+          router.push("/change-password");
+          router.refresh();
+          return;
+        }
       }
 
       // Successful login - redirect to dashboard

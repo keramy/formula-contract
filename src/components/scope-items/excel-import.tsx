@@ -45,7 +45,8 @@ export function ExcelImport({ projectId, projectCode }: ExcelImportProps) {
 
   const [parseResult, setParseResult] = useState<ParseResult | null>(null);
   const [importResults, setImportResults] = useState<{
-    success: number;
+    inserted: number;
+    updated: number;
     failed: number;
     errors: string[];
   } | null>(null);
@@ -87,7 +88,8 @@ export function ExcelImport({ projectId, projectCode }: ExcelImportProps) {
     setError(null);
 
     const results = {
-      success: 0,
+      inserted: 0,
+      updated: 0,
       failed: 0,
       errors: [] as string[],
     };
@@ -95,34 +97,69 @@ export function ExcelImport({ projectId, projectCode }: ExcelImportProps) {
     try {
       const supabase = createClient();
 
-      // Import items one by one to handle errors gracefully
+      // Import items one by one with upsert logic
       for (const item of parseResult.items) {
         try {
-          const scopeItem: ScopeItemInsert = {
-            project_id: projectId,
-            item_code: item.item_code,
-            name: item.name,
-            description: item.description,
-            width: item.width,
-            depth: item.depth,
-            height: item.height,
-            unit: item.unit,
-            quantity: item.quantity,
-            unit_price: item.unit_price,
-            item_path: item.item_path,
-            status: item.status,
-            notes: item.notes,
-          };
-
-          const { error: insertError } = await supabase
+          // Check if item with same item_code exists in this project
+          const { data: existing } = await supabase
             .from("scope_items")
-            .insert(scopeItem);
+            .select("id")
+            .eq("project_id", projectId)
+            .eq("item_code", item.item_code)
+            .eq("is_deleted", false)
+            .single();
 
-          if (insertError) {
-            results.failed++;
-            results.errors.push(`${item.item_code}: ${insertError.message}`);
+          if (existing) {
+            // UPDATE existing item - preserve item_path, status, production_percentage
+            const { error: updateError } = await supabase
+              .from("scope_items")
+              .update({
+                name: item.name,
+                description: item.description,
+                width: item.width,
+                depth: item.depth,
+                height: item.height,
+                unit: item.unit,
+                quantity: item.quantity,
+                unit_price: item.unit_price,
+                notes: item.notes,
+              })
+              .eq("id", existing.id);
+
+            if (updateError) {
+              results.failed++;
+              results.errors.push(`${item.item_code}: ${updateError.message}`);
+            } else {
+              results.updated++;
+            }
           } else {
-            results.success++;
+            // INSERT new item
+            const scopeItem: ScopeItemInsert = {
+              project_id: projectId,
+              item_code: item.item_code,
+              name: item.name,
+              description: item.description,
+              width: item.width,
+              depth: item.depth,
+              height: item.height,
+              unit: item.unit,
+              quantity: item.quantity,
+              unit_price: item.unit_price,
+              item_path: item.item_path,
+              status: item.status,
+              notes: item.notes,
+            };
+
+            const { error: insertError } = await supabase
+              .from("scope_items")
+              .insert(scopeItem);
+
+            if (insertError) {
+              results.failed++;
+              results.errors.push(`${item.item_code}: ${insertError.message}`);
+            } else {
+              results.inserted++;
+            }
           }
         } catch (err) {
           results.failed++;
@@ -153,8 +190,8 @@ export function ExcelImport({ projectId, projectCode }: ExcelImportProps) {
       if (fileInputRef.current) fileInputRef.current.value = "";
     }, 200);
 
-    // Refresh page if items were imported
-    if (importResults && importResults.success > 0) {
+    // Refresh page if items were imported or updated
+    if (importResults && (importResults.inserted > 0 || importResults.updated > 0)) {
       router.refresh();
     }
   };
@@ -186,7 +223,7 @@ export function ExcelImport({ projectId, projectCode }: ExcelImportProps) {
             {step === "upload" && "Upload an Excel file (.xlsx) with scope items data"}
             {step === "preview" && `Found ${parseResult?.items.length || 0} items to import`}
             {step === "importing" && "Please wait while items are being imported"}
-            {step === "complete" && `Imported ${importResults?.success || 0} items`}
+            {step === "complete" && `${importResults?.inserted || 0} inserted, ${importResults?.updated || 0} updated`}
           </DialogDescription>
         </DialogHeader>
 
@@ -349,10 +386,14 @@ export function ExcelImport({ projectId, projectCode }: ExcelImportProps) {
               <p className="text-lg font-medium">Import Complete</p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div className="p-4 rounded-md bg-green-500/10 border border-green-500/20 text-center">
-                <p className="text-2xl font-bold text-green-600">{importResults.success}</p>
-                <p className="text-sm text-muted-foreground">Successfully imported</p>
+                <p className="text-2xl font-bold text-green-600">{importResults.inserted}</p>
+                <p className="text-sm text-muted-foreground">Inserted</p>
+              </div>
+              <div className="p-4 rounded-md bg-blue-500/10 border border-blue-500/20 text-center">
+                <p className="text-2xl font-bold text-blue-600">{importResults.updated}</p>
+                <p className="text-sm text-muted-foreground">Updated</p>
               </div>
               <div className="p-4 rounded-md bg-destructive/10 border border-destructive/20 text-center">
                 <p className="text-2xl font-bold text-destructive">{importResults.failed}</p>

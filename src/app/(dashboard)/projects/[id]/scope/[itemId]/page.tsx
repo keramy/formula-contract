@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { DrawingUpload, DrawingsList, DrawingApproval } from "@/components/drawings";
 import { ProductionProgressEditor } from "@/components/scope-items";
+import { ItemMaterialsSection } from "@/components/materials";
 
 interface ScopeItem {
   id: string;
@@ -71,6 +72,16 @@ interface DrawingRevision {
   uploaded_by: string | null;
 }
 
+interface Material {
+  id: string;
+  material_code: string;
+  name: string;
+  specification: string | null;
+  supplier: string | null;
+  images: string[] | null;
+  status: string;
+}
+
 const statusColors: Record<string, string> = {
   pending: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
   in_design: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
@@ -125,6 +136,41 @@ export default async function ScopeItemDetailPage({
   const { id: projectId, itemId } = await params;
   const supabase = await createClient();
 
+  // Get current user and role
+  const { data: { user } } = await supabase.auth.getUser();
+  let userRole = "pm";
+  if (user) {
+    const { data: profile } = await supabase
+      .from("users")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+    if (profile) {
+      userRole = profile.role;
+    }
+  }
+
+  // For client users, verify they have access to this project
+  if (userRole === "client" && user) {
+    const { data: assignment } = await supabase
+      .from("project_assignments")
+      .select("id")
+      .eq("project_id", projectId)
+      .eq("user_id", user.id)
+      .single();
+
+    if (!assignment) {
+      notFound(); // Client doesn't have access to this project
+    }
+  }
+
+  // Role-based permissions
+  const canEdit = ["admin", "pm"].includes(userRole);
+  const canUploadDrawings = ["admin", "pm", "production", "client"].includes(userRole); // Clients can upload drawings
+  const canApproveDrawings = ["admin", "pm", "client"].includes(userRole); // Clients can approve drawings
+  const canEditProgress = ["admin", "pm", "production"].includes(userRole);
+  const canManageMaterials = ["admin", "pm"].includes(userRole);
+
   // Fetch scope item with project info
   const { data, error } = await supabase
     .from("scope_items")
@@ -177,6 +223,28 @@ export default async function ScopeItemDetailPage({
     }
   }
 
+  // Fetch materials assigned to this item
+  const { data: itemMaterialsData } = await supabase
+    .from("item_materials")
+    .select("material_id")
+    .eq("item_id", itemId);
+
+  const assignedMaterialIds = (itemMaterialsData || []).map((im) => im.material_id);
+
+  // Fetch all materials in this project
+  const { data: allMaterialsData } = await supabase
+    .from("materials")
+    .select("id, material_code, name, specification, supplier, images, status")
+    .eq("project_id", projectId)
+    .eq("is_deleted", false)
+    .order("material_code");
+
+  const allMaterials = (allMaterialsData || []) as Material[];
+
+  // Split into assigned and available
+  const assignedMaterials = allMaterials.filter((m) => assignedMaterialIds.includes(m.id));
+  const availableMaterials = allMaterials.filter((m) => !assignedMaterialIds.includes(m.id));
+
   const formatCurrency = (value: number | null, currency: string) => {
     if (!value) return "-";
     const symbol = currencySymbols[currency] || currency;
@@ -218,12 +286,14 @@ export default async function ScopeItemDetailPage({
               </div>
             </div>
           </div>
-          <Button size="sm" asChild>
-            <Link href={`/projects/${projectId}/scope/${itemId}/edit`}>
-              <PencilIcon className="size-4" />
-              Edit
-            </Link>
-          </Button>
+          {canEdit && (
+            <Button size="sm" asChild>
+              <Link href={`/projects/${projectId}/scope/${itemId}/edit`}>
+                <PencilIcon className="size-4" />
+                Edit
+              </Link>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -313,11 +383,13 @@ export default async function ScopeItemDetailPage({
                     </Badge>
                   )}
                 </div>
-                <DrawingUpload
-                  scopeItemId={itemId}
-                  currentRevision={drawing?.current_revision || null}
-                  hasDrawing={!!drawing}
-                />
+                {canUploadDrawings && (
+                  <DrawingUpload
+                    scopeItemId={itemId}
+                    currentRevision={drawing?.current_revision || null}
+                    hasDrawing={!!drawing}
+                  />
+                )}
               </div>
               <CardDescription className="text-xs">
                 {drawing
@@ -327,12 +399,15 @@ export default async function ScopeItemDetailPage({
             </CardHeader>
             <CardContent className="px-4 pb-4 pt-0 space-y-3">
               {/* Approval Actions */}
-              {drawing && (
+              {drawing && canApproveDrawings && (
                 <DrawingApproval
                   drawingId={drawing.id}
                   drawingStatus={drawing.status}
                   currentRevision={drawing.current_revision}
                   scopeItemId={itemId}
+                  userRole={userRole}
+                  projectId={projectId}
+                  itemCode={scopeItem.item_code}
                 />
               )}
 
@@ -372,6 +447,13 @@ export default async function ScopeItemDetailPage({
             </CardContent>
           </Card>
         )}
+
+        {/* Materials Section */}
+        <ItemMaterialsSection
+          scopeItemId={itemId}
+          assignedMaterials={assignedMaterials}
+          availableMaterials={availableMaterials}
+        />
 
         {/* Description & Notes Combined */}
         {(scopeItem.description || scopeItem.notes) && (
