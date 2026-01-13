@@ -33,10 +33,10 @@ export interface Material {
 
 interface MaterialCardProps {
   material: Material;
-  onEdit: (material: Material) => void;
-  onDelete: (materialId: string) => void;
-  onApprove: (materialId: string) => void;
-  onReject: (materialId: string) => void;
+  onEdit?: (material: Material) => void;
+  onDelete?: (materialId: string) => void;
+  onApprove?: (materialId: string) => void;
+  onReject?: (materialId: string) => void;
   disabled?: boolean;
 }
 
@@ -122,7 +122,7 @@ export function MaterialCard({
 
             <div className="flex items-center gap-1">
               {/* Action buttons based on status - PM approval */}
-              {(material.status === "pending" || material.status === "rejected") && (
+              {(material.status === "pending" || material.status === "rejected") && onApprove && (
                 <>
                   <Button
                     variant="outline"
@@ -134,7 +134,7 @@ export function MaterialCard({
                     <CheckCircleIcon className="size-3 mr-1" />
                     Approve
                   </Button>
-                  {material.status === "pending" && (
+                  {material.status === "pending" && onReject && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -149,28 +149,34 @@ export function MaterialCard({
                 </>
               )}
 
-              {/* More actions dropdown */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon-sm" disabled={disabled}>
-                    <MoreHorizontalIcon className="size-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => onEdit(material)}>
-                    <PencilIcon className="size-4 mr-2" />
-                    Edit
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => onDelete(material.id)}
-                    className="text-destructive focus:text-destructive"
-                  >
-                    <TrashIcon className="size-4 mr-2" />
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {/* More actions dropdown - only show if edit or delete handlers exist */}
+              {(onEdit || onDelete) && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon-sm" disabled={disabled}>
+                      <MoreHorizontalIcon className="size-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {onEdit && (
+                      <DropdownMenuItem onClick={() => onEdit(material)}>
+                        <PencilIcon className="size-4 mr-2" />
+                        Edit
+                      </DropdownMenuItem>
+                    )}
+                    {onEdit && onDelete && <DropdownMenuSeparator />}
+                    {onDelete && (
+                      <DropdownMenuItem
+                        onClick={() => onDelete(material.id)}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        <TrashIcon className="size-4 mr-2" />
+                        Delete
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
           </div>
         </div>

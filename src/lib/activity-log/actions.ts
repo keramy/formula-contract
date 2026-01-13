@@ -32,7 +32,8 @@ export async function logActivity(data: {
     entity_type: data.entityType,
     entity_id: data.entityId || null,
     project_id: data.projectId || null,
-    details: data.details || null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    details: (data.details || null) as any,
   });
 
   if (error) {
@@ -84,7 +85,7 @@ export async function getActivityLogs(options?: {
     return [];
   }
 
-  return (data || []) as ActivityLog[];
+  return (data || []) as unknown as ActivityLog[];
 }
 
 export async function getRecentActivityLogs(limit = 20): Promise<ActivityLog[]> {
@@ -108,5 +109,5 @@ export async function getRecentActivityLogs(limit = 20): Promise<ActivityLog[]> 
     return [];
   }
 
-  return (data || []) as ActivityLog[];
+  return (data || []) as unknown as ActivityLog[];
 }

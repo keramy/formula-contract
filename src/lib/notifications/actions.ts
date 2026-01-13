@@ -42,7 +42,7 @@ export async function getNotifications(limit = 20): Promise<Notification[]> {
     return [];
   }
 
-  return (data || []) as Notification[];
+  return (data || []) as unknown as Notification[];
 }
 
 export async function getUnreadCount(): Promise<number> {

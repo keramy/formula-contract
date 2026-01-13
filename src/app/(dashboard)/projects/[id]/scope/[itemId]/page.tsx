@@ -14,8 +14,9 @@ import {
   ImageIcon,
 } from "lucide-react";
 import { DrawingUpload, DrawingsList, DrawingApproval } from "@/components/drawings";
-import { ProductionProgressEditor } from "@/components/scope-items";
+import { ProductionProgressEditor, InstallationStatusEditor, ProcurementStatusEditor } from "@/components/scope-items";
 import { ItemMaterialsSection } from "@/components/materials";
+import type { ProcurementStatus } from "@/types/database";
 
 interface ScopeItem {
   id: string;
@@ -33,6 +34,9 @@ interface ScopeItem {
   status: string;
   notes: string | null;
   production_percentage: number;
+  procurement_status: ProcurementStatus | null;
+  is_installed: boolean;
+  installed_at: string | null;
   images: string[] | null;
   project: {
     id: string;
@@ -170,13 +174,16 @@ export default async function ScopeItemDetailPage({
   const canApproveDrawings = ["admin", "pm", "client"].includes(userRole); // Clients can approve drawings
   const canEditProgress = ["admin", "pm", "production"].includes(userRole);
   const canManageMaterials = ["admin", "pm"].includes(userRole);
+  const canToggleInstallation = ["admin", "pm"].includes(userRole);
+  const canEditProcurement = ["admin", "pm", "procurement"].includes(userRole);
 
   // Fetch scope item with project info
   const { data, error } = await supabase
     .from("scope_items")
     .select(`
       id, item_code, name, description, width, depth, height, unit, quantity,
-      unit_price, total_price, item_path, status, notes, production_percentage, images,
+      unit_price, total_price, item_path, status, notes, production_percentage,
+      procurement_status, is_installed, installed_at, images,
       project:projects(id, name, project_code, currency)
     `)
     .eq("id", itemId)
@@ -328,17 +335,43 @@ export default async function ScopeItemDetailPage({
           </Card>
         </div>
 
-        {/* Dimensions - Inline */}
-        <Card className="p-4">
-          <div className="flex items-center gap-6 text-sm">
-            <span className="text-muted-foreground font-medium">Dimensions:</span>
-            <div className="flex gap-4">
-              <span><span className="text-muted-foreground">W:</span> {scopeItem.width ? `${scopeItem.width}cm` : "-"}</span>
-              <span><span className="text-muted-foreground">D:</span> {scopeItem.depth ? `${scopeItem.depth}cm` : "-"}</span>
-              <span><span className="text-muted-foreground">H:</span> {scopeItem.height ? `${scopeItem.height}cm` : "-"}</span>
+        {/* Dimensions & Installation Row */}
+        <div className="grid grid-cols-2 gap-4">
+          {/* Dimensions */}
+          <Card className="p-4">
+            <div className="flex items-center gap-6 text-sm">
+              <span className="text-muted-foreground font-medium">Dimensions:</span>
+              <div className="flex gap-4">
+                <span><span className="text-muted-foreground">W:</span> {scopeItem.width ? `${scopeItem.width}cm` : "-"}</span>
+                <span><span className="text-muted-foreground">D:</span> {scopeItem.depth ? `${scopeItem.depth}cm` : "-"}</span>
+                <span><span className="text-muted-foreground">H:</span> {scopeItem.height ? `${scopeItem.height}cm` : "-"}</span>
+              </div>
             </div>
-          </div>
-        </Card>
+          </Card>
+
+          {/* Installation Status */}
+          <Card className="p-4">
+            <div className="text-sm font-medium text-muted-foreground mb-2">Installation Status</div>
+            <InstallationStatusEditor
+              scopeItemId={scopeItem.id}
+              isInstalled={scopeItem.is_installed}
+              installedAt={scopeItem.installed_at}
+              readOnly={!canToggleInstallation}
+            />
+          </Card>
+        </div>
+
+        {/* Procurement Status - Only for procurement items */}
+        {scopeItem.item_path === "procurement" && (
+          <Card className="p-4">
+            <div className="text-sm font-medium text-muted-foreground mb-2">Procurement Status</div>
+            <ProcurementStatusEditor
+              scopeItemId={scopeItem.id}
+              currentStatus={scopeItem.procurement_status}
+              readOnly={!canEditProcurement}
+            />
+          </Card>
+        )}
 
         {/* Images */}
         {scopeItem.images && scopeItem.images.length > 0 && (

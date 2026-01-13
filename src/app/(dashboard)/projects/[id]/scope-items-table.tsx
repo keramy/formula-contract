@@ -50,6 +50,7 @@ import {
   ChevronDownIcon,
   XIcon,
   PackageIcon,
+  CheckCircle2Icon,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -64,6 +65,7 @@ interface ScopeItem {
   unit_price: number | null;
   total_price: number | null;
   production_percentage: number;
+  is_installed: boolean;
   images: string[] | null;
 }
 
@@ -374,6 +376,17 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
                   Set Quantity
                 </DropdownMenuItem>
 
+                <DropdownMenuSeparator />
+
+                <DropdownMenuItem onClick={() => bulkUpdate("is_installed", true)}>
+                  <CheckCircle2Icon className="size-4 mr-2 text-green-600" />
+                  Mark as Installed
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => bulkUpdate("is_installed", false)}>
+                  <XIcon className="size-4 mr-2" />
+                  Mark as Not Installed
+                </DropdownMenuItem>
+
                 {materials.length > 0 && (
                   <>
                     <DropdownMenuSeparator />
@@ -422,6 +435,7 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
               <TableHead className="text-right">Unit Price</TableHead>
               <TableHead className="text-right">Total</TableHead>
               <TableHead>Progress</TableHead>
+              <TableHead className="text-center">Installed</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -490,6 +504,13 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
                       {item.production_percentage}%
                     </span>
                   </div>
+                </TableCell>
+                <TableCell className="text-center">
+                  {item.is_installed ? (
+                    <CheckCircle2Icon className="size-5 text-green-600 mx-auto" />
+                  ) : (
+                    <span className="text-muted-foreground">-</span>
+                  )}
                 </TableCell>
                 <TableCell>
                   <DropdownMenu>

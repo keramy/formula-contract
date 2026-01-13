@@ -31,7 +31,7 @@ export default async function UsersPage({
   }
 
   if (params.role) {
-    query = query.eq("role", params.role);
+    query = query.eq("role", params.role as "admin" | "pm" | "production" | "procurement" | "management" | "client");
   }
 
   const { data: users, error } = await query;

@@ -1,4 +1,6 @@
 export { ProductionProgressEditor } from "./production-progress-editor";
+export { InstallationStatusEditor } from "./installation-status-editor";
+export { ProcurementStatusEditor } from "./procurement-status-editor";
 export { DownloadTemplateButton } from "./download-template-button";
 export { ScopeItemImageUpload } from "./scope-item-image-upload";
 export { ExcelImport } from "./excel-import";

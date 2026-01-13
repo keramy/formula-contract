@@ -18,6 +18,7 @@ import {
   AlertTriangleIcon,
   UsersIcon,
   ActivityIcon,
+  FileTextIcon,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ScopeItemsTable } from "./scope-items-table";
@@ -26,7 +27,9 @@ import { MaterialsOverview } from "./materials-overview";
 import { SnaggingOverview } from "./snagging-overview";
 import { MilestonesOverview } from "./milestones-overview";
 import { TeamOverview } from "./team-overview";
+import { ReportsOverview } from "./reports-overview";
 import { getProjectAssignments } from "./actions";
+import { getProjectReports } from "./reports/actions";
 import { DownloadTemplateButton, ExcelImport, ExcelExport } from "@/components/scope-items";
 import { ActivityFeed } from "@/components/activity-log/activity-feed";
 
@@ -65,6 +68,7 @@ interface ScopeItem {
   unit_price: number | null;
   total_price: number | null;
   production_percentage: number;
+  is_installed: boolean;
   notes: string | null;
   images: string[] | null;
 }
@@ -204,7 +208,7 @@ export default async function ProjectDetailPage({
   // Fetch scope items
   const { data: scopeItemsData } = await supabase
     .from("scope_items")
-    .select("id, item_code, name, description, width, depth, height, item_path, status, quantity, unit, unit_price, total_price, production_percentage, notes, images")
+    .select("id, item_code, name, description, width, depth, height, item_path, status, quantity, unit, unit_price, total_price, production_percentage, is_installed, notes, images")
     .eq("project_id", id)
     .eq("is_deleted", false)
     .order("item_code");
@@ -263,14 +267,14 @@ export default async function ProjectDetailPage({
     .select(`
       id, project_id, item_id, description, photos, is_resolved,
       resolved_at, resolved_by, resolution_notes, created_by, created_at,
-      item:scope_items(item_code, name),
+      item:scope_items!snagging_item_id_fkey(item_code, name),
       creator:users!snagging_created_by_fkey(name),
       resolver:users!snagging_resolved_by_fkey(name)
     `)
     .eq("project_id", id)
     .order("created_at", { ascending: false });
 
-  const snaggingItems = (snaggingData || []) as Snagging[];
+  const snaggingItems = (snaggingData || []) as unknown as Snagging[];
   const openSnaggingCount = snaggingItems.filter((s) => !s.is_resolved).length;
 
   // Fetch milestones
@@ -281,6 +285,9 @@ export default async function ProjectDetailPage({
     .order("due_date");
 
   const milestones = (milestonesData || []) as Milestone[];
+
+  // Fetch reports
+  const reports = await getProjectReports(id);
 
   // Fetch project assignments (team members)
   const assignments = await getProjectAssignments(id);
@@ -358,6 +365,15 @@ export default async function ProjectDetailPage({
             {milestones.length > 0 && (
               <Badge variant="secondary" className="ml-2 text-xs">
                 {milestones.filter(m => !m.is_completed).length}/{milestones.length}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="reports">
+            <FileTextIcon className="size-4 mr-1.5" />
+            Reports
+            {reports.length > 0 && (
+              <Badge variant="secondary" className="ml-2 text-xs">
+                {reports.length}
               </Badge>
             )}
           </TabsTrigger>
@@ -544,6 +560,15 @@ export default async function ProjectDetailPage({
           <MilestonesOverview
             projectId={id}
             milestones={milestones}
+          />
+        </TabsContent>
+
+        {/* Reports Tab */}
+        <TabsContent value="reports">
+          <ReportsOverview
+            projectId={id}
+            reports={reports}
+            userRole={userRole}
           />
         </TabsContent>
 
