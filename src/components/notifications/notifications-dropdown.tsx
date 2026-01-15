@@ -1,90 +1,70 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import { GradientIcon } from "@/components/ui/ui-helpers";
+import { cn } from "@/lib/utils";
 import {
   BellIcon,
   CheckIcon,
   FileIcon,
-  PackageIcon,
   FolderIcon,
   AlertCircleIcon,
   CheckCircleIcon,
   ClockIcon,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { type Notification } from "@/lib/notifications/actions";
 import {
-  getNotifications,
-  getUnreadCount,
-  markAsRead,
-  markAllAsRead,
-  type Notification,
-} from "@/lib/notifications/actions";
+  useNotifications,
+  useUnreadCount,
+  useMarkAsRead,
+  useMarkAllAsRead,
+} from "@/lib/react-query/notifications";
 
-const typeIcons: Record<string, React.ReactNode> = {
-  drawing_approved: <CheckCircleIcon className="size-4 text-green-500" />,
-  drawing_rejected: <AlertCircleIcon className="size-4 text-red-500" />,
-  drawing_uploaded: <FileIcon className="size-4 text-blue-500" />,
-  drawing_sent: <ClockIcon className="size-4 text-yellow-500" />,
-  material_approved: <CheckCircleIcon className="size-4 text-green-500" />,
-  material_rejected: <AlertCircleIcon className="size-4 text-red-500" />,
-  project_assigned: <FolderIcon className="size-4 text-purple-500" />,
-  milestone_due: <ClockIcon className="size-4 text-orange-500" />,
-  default: <BellIcon className="size-4 text-muted-foreground" />,
+type GradientColor = "coral" | "teal" | "violet" | "amber" | "rose" | "emerald" | "sky" | "slate";
+
+const typeConfig: Record<string, { icon: React.ReactNode; color: GradientColor }> = {
+  drawing_approved: { icon: <CheckCircleIcon className="size-3.5" />, color: "emerald" },
+  drawing_rejected: { icon: <AlertCircleIcon className="size-3.5" />, color: "rose" },
+  drawing_uploaded: { icon: <FileIcon className="size-3.5" />, color: "sky" },
+  drawing_sent: { icon: <ClockIcon className="size-3.5" />, color: "amber" },
+  material_approved: { icon: <CheckCircleIcon className="size-3.5" />, color: "teal" },
+  material_rejected: { icon: <AlertCircleIcon className="size-3.5" />, color: "rose" },
+  project_assigned: { icon: <FolderIcon className="size-3.5" />, color: "violet" },
+  milestone_due: { icon: <ClockIcon className="size-3.5" />, color: "coral" },
+  default: { icon: <BellIcon className="size-3.5" />, color: "slate" },
 };
 
 export function NotificationsDropdown() {
   const router = useRouter();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
 
-  // Fetch notifications when dropdown opens
-  useEffect(() => {
-    if (isOpen) {
-      loadNotifications();
+  // React Query hooks for notifications
+  const { data: notifications = [], isLoading, refetch } = useNotifications(20);
+  const { data: unreadCount = 0 } = useUnreadCount();
+  const markAsReadMutation = useMarkAsRead();
+  const markAllAsReadMutation = useMarkAllAsRead();
+
+  // Refetch notifications when dropdown opens
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open);
+    if (open) {
+      refetch();
     }
-  }, [isOpen]);
-
-  // Initial load of unread count
-  useEffect(() => {
-    loadUnreadCount();
-    // Refresh count every minute
-    const interval = setInterval(loadUnreadCount, 60000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const loadNotifications = async () => {
-    setIsLoading(true);
-    const data = await getNotifications(20);
-    setNotifications(data);
-    setIsLoading(false);
   };
 
-  const loadUnreadCount = async () => {
-    const count = await getUnreadCount();
-    setUnreadCount(count);
-  };
-
-  const handleMarkAsRead = async (notification: Notification) => {
+  const handleMarkAsRead = (notification: Notification) => {
     if (!notification.is_read) {
-      await markAsRead(notification.id);
-      setNotifications((prev) =>
-        prev.map((n) =>
-          n.id === notification.id ? { ...n, is_read: true } : n
-        )
-      );
-      setUnreadCount((prev) => Math.max(0, prev - 1));
+      markAsReadMutation.mutate(notification.id);
     }
 
     // Navigate to relevant page if there's a link
@@ -98,36 +78,45 @@ export function NotificationsDropdown() {
     }
   };
 
-  const handleMarkAllAsRead = async () => {
-    await markAllAsRead();
-    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
-    setUnreadCount(0);
+  const handleMarkAllAsRead = () => {
+    markAllAsReadMutation.mutate();
   };
 
-  const getIcon = (type: string) => {
-    return typeIcons[type] || typeIcons.default;
+  const getConfig = (type: string) => {
+    return typeConfig[type] || typeConfig.default;
   };
 
   return (
-    <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
+    <DropdownMenu open={isOpen} onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative hover:bg-violet-100/70 transition-colors"
+        >
           <BellIcon className="size-5" />
           {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 size-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center font-medium">
+            <span className="absolute -top-1 -right-1 size-5 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 text-white text-xs flex items-center justify-center font-bold shadow-lg shadow-violet-500/30">
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80">
-        <div className="flex items-center justify-between px-3 py-2">
-          <h4 className="font-semibold text-sm">Notifications</h4>
+      <DropdownMenuContent
+        align="end"
+        className="w-[360px] bg-white/95 backdrop-blur-lg border-0 shadow-xl shadow-gray-200/50 rounded-xl overflow-hidden"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-violet-50 to-purple-50 border-b border-violet-100/50">
+          <div className="flex items-center gap-2">
+            <GradientIcon icon={<BellIcon className="size-4" />} color="violet" size="sm" />
+            <h4 className="font-semibold text-sm">Notifications</h4>
+          </div>
           {unreadCount > 0 && (
             <Button
               variant="ghost"
               size="sm"
-              className="h-auto py-1 px-2 text-xs"
+              className="h-auto py-1 px-2 text-xs hover:bg-violet-100 text-violet-700"
               onClick={handleMarkAllAsRead}
             >
               <CheckIcon className="size-3 mr-1" />
@@ -135,58 +124,77 @@ export function NotificationsDropdown() {
             </Button>
           )}
         </div>
-        <DropdownMenuSeparator />
 
-        <ScrollArea className="h-[300px]">
+        <ScrollArea className="h-[340px]">
           {isLoading ? (
-            <div className="flex items-center justify-center py-8 text-muted-foreground text-sm">
-              Loading...
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground text-sm">
+              <div className="size-8 rounded-full border-2 border-violet-200 border-t-violet-500 animate-spin mb-3" />
+              <span>Loading notifications...</span>
             </div>
           ) : notifications.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <BellIcon className="size-8 text-muted-foreground mb-2" />
-              <p className="text-sm text-muted-foreground">No notifications yet</p>
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="p-4 rounded-full bg-gradient-to-br from-gray-100 to-gray-50 mb-3">
+                <BellIcon className="size-8 text-gray-400" />
+              </div>
+              <p className="text-sm font-medium text-muted-foreground">No notifications yet</p>
+              <p className="text-xs text-muted-foreground/70 mt-1">
+                You&apos;ll see updates here
+              </p>
             </div>
           ) : (
-            <div className="py-1">
-              {notifications.map((notification) => (
-                <button
-                  key={notification.id}
-                  onClick={() => handleMarkAsRead(notification)}
-                  className={`w-full text-left px-3 py-2 hover:bg-muted transition-colors ${
-                    !notification.is_read ? "bg-muted/50" : ""
-                  }`}
-                >
-                  <div className="flex gap-3">
-                    <div className="mt-0.5">{getIcon(notification.type)}</div>
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-sm ${!notification.is_read ? "font-medium" : ""}`}>
-                        {notification.title}
-                      </p>
-                      {notification.message && (
-                        <p className="text-xs text-muted-foreground line-clamp-2">
-                          {notification.message}
-                        </p>
-                      )}
-                      <div className="flex items-center gap-2 mt-1">
-                        {notification.project && (
-                          <span className="text-xs text-muted-foreground font-mono">
-                            {notification.project.project_code}
-                          </span>
-                        )}
-                        <span className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(new Date(notification.created_at), {
-                            addSuffix: true,
-                          })}
-                        </span>
-                      </div>
-                    </div>
-                    {!notification.is_read && (
-                      <div className="size-2 rounded-full bg-primary mt-2" />
+            <div className="py-2">
+              {notifications.map((notification) => {
+                const config = getConfig(notification.type);
+                return (
+                  <button
+                    key={notification.id}
+                    onClick={() => handleMarkAsRead(notification)}
+                    className={cn(
+                      "w-full text-left px-4 py-3 hover:bg-gray-50/80 transition-all duration-200 border-b border-gray-100/50 last:border-0",
+                      !notification.is_read && "bg-violet-50/50"
                     )}
-                  </div>
-                </button>
-              ))}
+                  >
+                    <div className="flex gap-3">
+                      <GradientIcon
+                        icon={config.icon}
+                        color={config.color}
+                        size="sm"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className={cn(
+                          "text-sm leading-snug",
+                          !notification.is_read ? "font-semibold text-foreground" : "text-muted-foreground"
+                        )}>
+                          {notification.title}
+                        </p>
+                        {notification.message && (
+                          <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                            {notification.message}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-2 mt-1.5">
+                          {notification.project && (
+                            <Badge
+                              variant="secondary"
+                              className="text-[10px] font-mono bg-violet-100 text-violet-700 hover:bg-violet-100 px-1.5 py-0"
+                            >
+                              {notification.project.project_code}
+                            </Badge>
+                          )}
+                          <span className="text-[11px] text-muted-foreground/70">
+                            {formatDistanceToNow(new Date(notification.created_at), {
+                              addSuffix: true,
+                            })}
+                          </span>
+                        </div>
+                      </div>
+                      {!notification.is_read && (
+                        <div className="size-2.5 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 mt-1.5 shrink-0 shadow-sm shadow-violet-400/50" />
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </ScrollArea>

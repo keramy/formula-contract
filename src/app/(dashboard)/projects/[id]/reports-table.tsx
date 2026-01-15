@@ -1,0 +1,452 @@
+"use client";
+
+import React, { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { format } from "date-fns";
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+// Note: Not using Collapsible due to table row structure - using manual state instead
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  ChevronRightIcon,
+  ChevronDownIcon,
+  ArrowUpDownIcon,
+  ArrowUpIcon,
+  ArrowDownIcon,
+  PencilIcon,
+  TrashIcon,
+} from "lucide-react";
+import { GlassCard, StatusBadge, GradientAvatar, EmptyState } from "@/components/ui/ui-helpers";
+import { ReportLineEditor } from "./report-line-editor";
+import { ReportPDFExport } from "@/components/reports/report-pdf-export";
+import {
+  deleteReport,
+  publishReport,
+  unpublishReport,
+  type Report,
+} from "./reports/actions";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+interface ReportsTableProps {
+  projectId: string;
+  projectName: string;
+  projectCode: string;
+  reports: Report[];
+  userRole?: string;
+  onEditReport: (report: Report) => void;
+}
+
+const REPORT_TYPE_LABELS: Record<string, string> = {
+  progress: "Progress",
+  weekly: "Weekly",
+  monthly: "Monthly",
+  milestone: "Milestone",
+  final: "Final",
+};
+
+const REPORT_TYPE_COLORS: Record<string, string> = {
+  progress: "bg-blue-100 text-blue-700",
+  weekly: "bg-teal-100 text-teal-700",
+  monthly: "bg-violet-100 text-violet-700",
+  milestone: "bg-amber-100 text-amber-700",
+  final: "bg-emerald-100 text-emerald-700",
+};
+
+type SortField = "report_type" | "is_published" | "created_at" | "updated_at" | "sections" | "creator";
+type SortDirection = "asc" | "desc";
+
+function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+export function ReportsTable({
+  projectId,
+  projectName,
+  projectCode,
+  reports,
+  userRole = "pm",
+  onEditReport,
+}: ReportsTableProps) {
+  const router = useRouter();
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [sortField, setSortField] = useState<SortField>("created_at");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [isLoading, setIsLoading] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteReportId, setDeleteReportId] = useState<string | null>(null);
+
+  const isClient = userRole === "client";
+  const canManageReports = ["admin", "pm"].includes(userRole);
+
+  // Sort reports
+  const sortedReports = useMemo(() => {
+    return [...reports].sort((a, b) => {
+      let comparison = 0;
+
+      switch (sortField) {
+        case "report_type":
+          comparison = a.report_type.localeCompare(b.report_type);
+          break;
+        case "is_published":
+          comparison = (a.is_published ? 1 : 0) - (b.is_published ? 1 : 0);
+          break;
+        case "created_at":
+          comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+          break;
+        case "updated_at":
+          comparison = new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime();
+          break;
+        case "sections":
+          comparison = (a.lines?.length || 0) - (b.lines?.length || 0);
+          break;
+        case "creator":
+          comparison = (a.creator?.name || "").localeCompare(b.creator?.name || "");
+          break;
+      }
+
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+  }, [reports, sortField, sortDirection]);
+
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("desc");
+    }
+  };
+
+  const toggleExpand = (reportId: string) => {
+    setExpandedIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(reportId)) {
+        newSet.delete(reportId);
+      } else {
+        newSet.add(reportId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleDeleteClick = (reportId: string) => {
+    setDeleteReportId(reportId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteReportId) return;
+
+    setIsLoading(true);
+    await deleteReport(deleteReportId);
+    setDeleteDialogOpen(false);
+    setDeleteReportId(null);
+    setIsLoading(false);
+    router.refresh();
+  };
+
+  const handlePublishToggle = async (report: Report) => {
+    setIsLoading(true);
+    if (report.is_published) {
+      await unpublishReport(report.id);
+    } else {
+      await publishReport(report.id);
+    }
+    setIsLoading(false);
+    router.refresh();
+  };
+
+  const SortHeader = ({
+    field,
+    children,
+    className = "",
+  }: {
+    field: SortField;
+    children: React.ReactNode;
+    className?: string;
+  }) => (
+    <TableHead className={className}>
+      <button
+        className="flex items-center gap-1 hover:text-foreground transition-colors"
+        onClick={() => toggleSort(field)}
+      >
+        {children}
+        {sortField === field ? (
+          sortDirection === "asc" ? (
+            <ArrowUpIcon className="size-3" />
+          ) : (
+            <ArrowDownIcon className="size-3" />
+          )
+        ) : (
+          <ArrowUpDownIcon className="size-3 opacity-50" />
+        )}
+      </button>
+    </TableHead>
+  );
+
+  if (reports.length === 0) {
+    return null; // Empty state handled by parent
+  }
+
+  return (
+    <TooltipProvider>
+      <GlassCard className="overflow-hidden">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="w-10"></TableHead>
+                <SortHeader field="report_type" className="w-28">
+                  Type
+                </SortHeader>
+                <SortHeader field="is_published" className="w-24">
+                  Status
+                </SortHeader>
+                <TableHead className="w-44">Shared With</TableHead>
+                <SortHeader field="sections" className="w-20 text-center">
+                  Sections
+                </SortHeader>
+                <SortHeader field="creator" className="w-32">
+                  Created By
+                </SortHeader>
+                <SortHeader field="created_at" className="w-28">
+                  Created
+                </SortHeader>
+                <SortHeader field="updated_at" className="w-40">
+                  Last Edited
+                </SortHeader>
+                <TableHead className="w-28 text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sortedReports.map((report) => {
+                const isExpanded = expandedIds.has(report.id);
+                const sharedUsers = report.shared_with || [];
+                const displayUsers = sharedUsers.slice(0, 3);
+                const remainingCount = sharedUsers.length - 3;
+
+                return (
+                  <React.Fragment key={report.id}>
+                    <TableRow className="group">
+                      {/* Expand Arrow */}
+                      <TableCell className="py-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-7"
+                          onClick={() => toggleExpand(report.id)}
+                        >
+                          {isExpanded ? (
+                            <ChevronDownIcon className="size-4" />
+                          ) : (
+                            <ChevronRightIcon className="size-4" />
+                          )}
+                        </Button>
+                      </TableCell>
+
+                        {/* Type */}
+                        <TableCell className="py-2">
+                          <span
+                            className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
+                              REPORT_TYPE_COLORS[report.report_type] || "bg-gray-100 text-gray-700"
+                            }`}
+                          >
+                            {REPORT_TYPE_LABELS[report.report_type] || report.report_type}
+                          </span>
+                        </TableCell>
+
+                        {/* Status */}
+                        <TableCell className="py-2">
+                          {report.is_published ? (
+                            <StatusBadge variant="success">Published</StatusBadge>
+                          ) : (
+                            <StatusBadge variant="warning">Draft</StatusBadge>
+                          )}
+                        </TableCell>
+
+                        {/* Shared With */}
+                        <TableCell className="py-2">
+                          <div className="flex items-center gap-1">
+                            {displayUsers.length > 0 ? (
+                              <>
+                                {displayUsers.map((user) => (
+                                  <Tooltip key={user.id}>
+                                    <TooltipTrigger asChild>
+                                      <div>
+                                        <GradientAvatar
+                                          name={user.name}
+                                          size="sm"
+                                        />
+                                      </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>{user.name}</p>
+                                      <p className="text-xs text-muted-foreground">{user.email}</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                ))}
+                                {remainingCount > 0 && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <div className="size-7 rounded-full bg-slate-200 flex items-center justify-center text-xs font-medium text-slate-600">
+                                        +{remainingCount}
+                                      </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      {sharedUsers.slice(3).map((u) => (
+                                        <p key={u.id}>{u.name}</p>
+                                      ))}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                )}
+                              </>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </div>
+                        </TableCell>
+
+                        {/* Sections */}
+                        <TableCell className="py-2 text-center">
+                          <span className="text-sm">{report.lines?.length || 0}</span>
+                        </TableCell>
+
+                        {/* Created By */}
+                        <TableCell className="py-2">
+                          <span className="text-sm">{report.creator?.name || "—"}</span>
+                        </TableCell>
+
+                        {/* Created */}
+                        <TableCell className="py-2">
+                          <span className="text-sm text-muted-foreground">
+                            {format(new Date(report.created_at), "MMM d, yyyy")}
+                          </span>
+                        </TableCell>
+
+                        {/* Last Edited */}
+                        <TableCell className="py-2">
+                          {report.updater?.name && report.updated_by !== report.created_by ? (
+                            <span className="text-sm text-muted-foreground">
+                              {report.updater.name} · {format(new Date(report.updated_at), "MMM d")}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+
+                        {/* Actions */}
+                        <TableCell className="py-2 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <ReportPDFExport
+                              report={report}
+                              projectName={projectName}
+                              projectCode={projectCode}
+                              variant="ghost"
+                              size="icon"
+                            />
+                            {canManageReports && (
+                              <>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="size-8 hover:bg-teal-50 hover:text-teal-600"
+                                  onClick={() => onEditReport(report)}
+                                >
+                                  <PencilIcon className="size-4" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="size-8 text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                                  onClick={() => handleDeleteClick(report.id)}
+                                >
+                                  <TrashIcon className="size-4" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </TableCell>
+                    </TableRow>
+
+                    {/* Expandable Content - shown when expanded */}
+                    {isExpanded && (
+                      <TableRow className="hover:bg-transparent">
+                        <TableCell colSpan={9} className="p-0">
+                          <div className="bg-slate-50/50 border-t border-b border-slate-100 px-4 py-4">
+                            <ReportLineEditor
+                              projectId={projectId}
+                              reportId={report.id}
+                              lines={report.lines || []}
+                              readOnly={isClient || !canManageReports}
+                            />
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      </GlassCard>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Report</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this report? This will also delete all report
+              content and photos. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              disabled={isLoading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isLoading ? (
+                <>
+                  <Spinner className="size-4 mr-2" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Report"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </TooltipProvider>
+  );
+}

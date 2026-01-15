@@ -261,6 +261,7 @@ CREATE TABLE activity_log (
 -- STEP 3: Create Indexes for Performance
 -- ============================================
 
+-- Basic indexes
 CREATE INDEX idx_projects_status ON projects(status) WHERE NOT is_deleted;
 CREATE INDEX idx_projects_client ON projects(client_id) WHERE NOT is_deleted;
 CREATE INDEX idx_scope_items_project ON scope_items(project_id) WHERE NOT is_deleted;
@@ -270,6 +271,49 @@ CREATE INDEX idx_materials_project ON materials(project_id) WHERE NOT is_deleted
 CREATE INDEX idx_notifications_user ON notifications(user_id, is_read);
 CREATE INDEX idx_activity_log_project ON activity_log(project_id);
 CREATE INDEX idx_activity_log_user ON activity_log(user_id);
+
+-- Composite indexes for common query patterns
+CREATE INDEX idx_scope_items_project_status_path ON scope_items(project_id, status, item_path) WHERE NOT is_deleted;
+CREATE INDEX idx_scope_items_project_progress ON scope_items(project_id, production_percentage) WHERE NOT is_deleted;
+CREATE INDEX idx_projects_updated_at ON projects(updated_at DESC) WHERE NOT is_deleted;
+CREATE INDEX idx_projects_created_at ON projects(created_at DESC) WHERE NOT is_deleted;
+
+-- Join optimization indexes
+CREATE INDEX idx_drawings_item_id ON drawings(item_id);
+CREATE INDEX idx_drawing_revisions_drawing_id ON drawing_revisions(drawing_id);
+CREATE INDEX idx_item_materials_item_id ON item_materials(item_id);
+CREATE INDEX idx_item_materials_material_id ON item_materials(material_id);
+
+-- Project assignments (critical for RLS performance)
+CREATE INDEX idx_project_assignments_user_id ON project_assignments(user_id);
+CREATE INDEX idx_project_assignments_project_id ON project_assignments(project_id);
+
+-- Milestones & timeline
+CREATE INDEX idx_milestones_project_due ON milestones(project_id, due_date);
+CREATE INDEX idx_milestones_due_date ON milestones(due_date) WHERE NOT is_completed;
+
+-- Notifications (user-specific queries)
+CREATE INDEX idx_notifications_user_unread ON notifications(user_id, created_at DESC) WHERE NOT is_read;
+CREATE INDEX idx_notifications_user_created ON notifications(user_id, created_at DESC);
+
+-- Activity log (recent activity queries)
+CREATE INDEX idx_activity_log_project_created ON activity_log(project_id, created_at DESC);
+CREATE INDEX idx_activity_log_entity ON activity_log(entity_type, entity_id);
+
+-- Reports
+CREATE INDEX idx_reports_project_published ON reports(project_id, is_published);
+CREATE INDEX idx_report_lines_report_order ON report_lines(report_id, line_order);
+
+-- Snagging
+CREATE INDEX idx_snagging_project_resolved ON snagging(project_id, is_resolved);
+
+-- Materials by status
+CREATE INDEX idx_materials_project_status ON materials(project_id, status) WHERE NOT is_deleted;
+
+-- Full-text search indexes
+CREATE INDEX idx_projects_search ON projects USING gin(to_tsvector('english', coalesce(name, '') || ' ' || coalesce(project_code, '')));
+CREATE INDEX idx_scope_items_search ON scope_items USING gin(to_tsvector('english', coalesce(name, '') || ' ' || coalesce(item_code, '')));
+CREATE INDEX idx_clients_search ON clients USING gin(to_tsvector('english', coalesce(company_name, '') || ' ' || coalesce(contact_person, '')));
 
 -- ============================================
 -- STEP 4: Create Updated_at Trigger

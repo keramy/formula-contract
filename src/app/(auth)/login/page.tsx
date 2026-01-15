@@ -3,12 +3,15 @@
 import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
+import { FormulaLoader } from "@/components/ui/formula-loader";
+import { GlassCard } from "@/components/ui/ui-helpers";
+import { AlertCircleIcon, ShieldAlertIcon } from "lucide-react";
+import { loginAction } from "../actions";
 
 function LoginForm() {
   const router = useRouter();
@@ -17,6 +20,7 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRateLimited, setIsRateLimited] = useState(false);
 
   // Check for error query parameter
   useEffect(() => {
@@ -31,35 +35,28 @@ function LoginForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setIsRateLimited(false);
     setIsLoading(true);
 
     try {
-      const supabase = createClient();
+      // Call server action (includes rate limiting)
+      const result = await loginAction(email, password);
 
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (signInError) {
-        setError(signInError.message);
+      if (!result.success) {
+        setError(result.error || "Login failed");
+        // Check if it's a rate limit error
+        if (result.resetIn && result.remaining === 0) {
+          setIsRateLimited(true);
+        }
         setIsLoading(false);
         return;
       }
 
-      // Update last login timestamp
-      if (data.user) {
-        await supabase
-          .from("users")
-          .update({ last_login_at: new Date().toISOString() })
-          .eq("id", data.user.id);
-
-        // Check if user needs to change password
-        if (data.user.user_metadata?.must_change_password) {
-          router.push("/change-password");
-          router.refresh();
-          return;
-        }
+      // Check if user needs to change password
+      if (result.mustChangePassword) {
+        router.push("/change-password");
+        router.refresh();
+        return;
       }
 
       // Successful login - redirect to dashboard
@@ -75,14 +72,16 @@ function LoginForm() {
     <div className="flex flex-col gap-8">
       {/* Logo */}
       <div className="flex flex-col items-center gap-2">
-        <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-primary text-primary-foreground font-bold text-xl">
+        <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-rose-500 text-white font-bold text-xl shadow-lg shadow-orange-500/30">
           FC
         </div>
-        <h1 className="text-xl font-semibold text-foreground">Formula Contract</h1>
+        <h1 className="text-xl font-semibold bg-gradient-to-r from-orange-600 to-rose-600 bg-clip-text text-transparent">
+          Formula Contract
+        </h1>
       </div>
 
       {/* Login Card */}
-      <Card className="border-border/50 shadow-sm">
+      <GlassCard className="w-full">
         <CardHeader className="text-center pb-2">
           <CardTitle className="text-lg">Welcome back</CardTitle>
           <CardDescription>Sign in to your account to continue</CardDescription>
@@ -91,7 +90,16 @@ function LoginForm() {
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             {/* Error Message */}
             {error && (
-              <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+              <div className={`p-3 rounded-lg text-sm flex items-center gap-2 ${
+                isRateLimited
+                  ? "bg-amber-50 border border-amber-200 text-amber-700"
+                  : "bg-rose-50 border border-rose-200 text-rose-700"
+              }`}>
+                {isRateLimited ? (
+                  <ShieldAlertIcon className="size-4 shrink-0" />
+                ) : (
+                  <AlertCircleIcon className="size-4 shrink-0" />
+                )}
                 {error}
               </div>
             )}
@@ -135,7 +143,11 @@ function LoginForm() {
             </div>
 
             {/* Submit Button */}
-            <Button type="submit" className="w-full mt-2" disabled={isLoading}>
+            <Button
+              type="submit"
+              className="w-full mt-2 bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600"
+              disabled={isLoading}
+            >
               {isLoading ? (
                 <>
                   <Spinner className="size-4" />
@@ -147,7 +159,7 @@ function LoginForm() {
             </Button>
           </form>
         </CardContent>
-      </Card>
+      </GlassCard>
 
       {/* Footer */}
       <p className="text-center text-sm text-muted-foreground">
@@ -160,18 +172,8 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="flex flex-col gap-8">
-        <div className="flex flex-col items-center gap-2">
-          <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-primary text-primary-foreground font-bold text-xl">
-            FC
-          </div>
-          <h1 className="text-xl font-semibold text-foreground">Formula Contract</h1>
-        </div>
-        <Card className="border-border/50 shadow-sm">
-          <CardContent className="flex items-center justify-center py-12">
-            <Spinner className="size-6" />
-          </CardContent>
-        </Card>
+      <div className="flex flex-col items-center justify-center gap-8">
+        <FormulaLoader />
       </div>
     }>
       <LoginForm />

@@ -1,10 +1,9 @@
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
-import { Button } from "@/components/ui/button";
-import { PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { ProjectsTable } from "./projects-table";
 import { ProjectsFilter } from "./projects-filter";
+import { ProjectsPageHeader } from "./projects-page-header";
 import type { ProjectStatus } from "@/types/database";
 
 interface Project {
@@ -71,12 +70,11 @@ export default async function ProjectsPage({
       // No assigned projects, return empty array
       return (
         <div className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-2xl font-semibold text-foreground">My Projects</h1>
-              <p className="text-muted-foreground">View your assigned projects</p>
-            </div>
-          </div>
+          <ProjectsPageHeader
+            title="My Projects"
+            subtitle="View your assigned projects"
+            canCreateProject={false}
+          />
           <div className="py-8 text-center text-muted-foreground">
             No projects assigned yet. Please contact your project manager.
           </div>
@@ -105,26 +103,13 @@ export default async function ProjectsPage({
   return (
     <div className="p-6">
       {/* Page Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground">
-            {userRole === "client" ? "My Projects" : "Projects"}
-          </h1>
-          <p className="text-muted-foreground">
-            {userRole === "client"
-              ? "View your assigned projects and track progress"
-              : "Manage your furniture manufacturing projects"}
-          </p>
-        </div>
-        {canCreateProject && (
-          <Button asChild>
-            <Link href="/projects/new">
-              <PlusIcon className="size-4" />
-              New Project
-            </Link>
-          </Button>
-        )}
-      </div>
+      <ProjectsPageHeader
+        title={userRole === "client" ? "My Projects" : "Projects"}
+        subtitle={userRole === "client"
+          ? "View your assigned projects and track progress"
+          : "Manage your furniture manufacturing projects"}
+        canCreateProject={canCreateProject}
+      />
 
       {/* Filters */}
       <ProjectsFilter />

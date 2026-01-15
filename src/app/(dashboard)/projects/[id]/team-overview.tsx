@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { GlassCard, GradientIcon, StatusBadge, GradientAvatar, EmptyState } from "@/components/ui/ui-helpers";
 import {
   Dialog,
   DialogContent,
@@ -60,22 +60,15 @@ interface TeamOverviewProps {
   canManageTeam: boolean;
 }
 
-const roleColors: Record<string, string> = {
-  admin: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-  pm: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-  production: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
-  procurement: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
-  management: "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400",
-  client: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-};
+type StatusVariant = "info" | "success" | "warning" | "default" | "danger";
 
-const roleLabels: Record<string, string> = {
-  admin: "Admin",
-  pm: "Project Manager",
-  production: "Production",
-  procurement: "Procurement",
-  management: "Management",
-  client: "Client",
+const roleConfig: Record<string, { variant: StatusVariant; label: string }> = {
+  admin: { variant: "danger", label: "Admin" },
+  pm: { variant: "info", label: "Project Manager" },
+  production: { variant: "info", label: "Production" },
+  procurement: { variant: "warning", label: "Procurement" },
+  management: { variant: "default", label: "Management" },
+  client: { variant: "success", label: "Client" },
 };
 
 export function TeamOverview({ projectId, assignments, canManageTeam }: TeamOverviewProps) {
@@ -167,16 +160,19 @@ export function TeamOverview({ projectId, assignments, canManageTeam }: TeamOver
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-medium">Project Team</h3>
-          <p className="text-sm text-muted-foreground">
-            {assignments.length} member{assignments.length !== 1 ? "s" : ""} assigned to this project
-          </p>
+        <div className="flex items-center gap-2">
+          <GradientIcon icon={<UsersIcon className="size-4" />} color="coral" size="sm" />
+          <div>
+            <h3 className="text-lg font-medium">Project Team</h3>
+            <p className="text-sm text-muted-foreground">
+              {assignments.length} member{assignments.length !== 1 ? "s" : ""} assigned to this project
+            </p>
+          </div>
         </div>
         {canManageTeam && (
           <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600">
                 <PlusIcon className="size-4" />
                 Add Member
               </Button>
@@ -190,7 +186,7 @@ export function TeamOverview({ projectId, assignments, canManageTeam }: TeamOver
               </DialogHeader>
               <div className="space-y-4 pt-4">
                 {error && (
-                  <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+                  <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-sm">
                     {error}
                   </div>
                 )}
@@ -212,17 +208,20 @@ export function TeamOverview({ projectId, assignments, canManageTeam }: TeamOver
                         <SelectValue placeholder="Select a user to add..." />
                       </SelectTrigger>
                       <SelectContent>
-                        {availableUsers.map((user) => (
-                          <SelectItem key={user.id} value={user.id}>
-                            <div className="flex items-center gap-2">
-                              <span>{user.name}</span>
-                              <span className="text-muted-foreground">({user.email})</span>
-                              <Badge variant="secondary" className={`text-xs ${roleColors[user.role] || ""}`}>
-                                {roleLabels[user.role] || user.role}
-                              </Badge>
-                            </div>
-                          </SelectItem>
-                        ))}
+                        {availableUsers.map((user) => {
+                          const config = roleConfig[user.role] || { variant: "default" as StatusVariant, label: user.role };
+                          return (
+                            <SelectItem key={user.id} value={user.id}>
+                              <div className="flex items-center gap-2">
+                                <span>{user.name}</span>
+                                <span className="text-muted-foreground">({user.email})</span>
+                                <StatusBadge variant={config.variant}>
+                                  {config.label}
+                                </StatusBadge>
+                              </div>
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                   )}
@@ -232,6 +231,7 @@ export function TeamOverview({ projectId, assignments, canManageTeam }: TeamOver
                   <Button
                     onClick={handleAssign}
                     disabled={isLoading || !selectedUserId}
+                    className="bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600"
                   >
                     {isLoading ? (
                       <>
@@ -258,66 +258,67 @@ export function TeamOverview({ projectId, assignments, canManageTeam }: TeamOver
 
       {/* Team Members by Role */}
       {assignments.length === 0 ? (
-        <Card className="p-8">
-          <div className="flex flex-col items-center justify-center text-center">
-            <div className="rounded-full bg-muted p-3 mb-4">
-              <UsersIcon className="size-6 text-muted-foreground" />
-            </div>
-            <p className="text-muted-foreground mb-4">
-              No team members assigned yet.
-            </p>
-            {canManageTeam && (
-              <Button onClick={() => setAddDialogOpen(true)}>
+        <GlassCard className="p-8">
+          <EmptyState
+            icon={<UsersIcon className="size-6" />}
+            title="No team members yet"
+            description="No team members assigned yet."
+            action={canManageTeam ? (
+              <Button
+                onClick={() => setAddDialogOpen(true)}
+                className="bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600"
+              >
                 <PlusIcon className="size-4" />
                 Add First Member
               </Button>
-            )}
-          </div>
-        </Card>
+            ) : undefined}
+          />
+        </GlassCard>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {Object.entries(groupedAssignments).map(([role, roleAssignments]) => (
-            <Card key={role}>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Badge variant="secondary" className={roleColors[role] || ""}>
-                    {roleLabels[role] || role}
-                  </Badge>
-                  <span className="text-muted-foreground font-normal">
-                    ({roleAssignments.length})
-                  </span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {roleAssignments.map((assignment) => (
-                  <div
-                    key={assignment.id}
-                    className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="size-8 rounded-full bg-muted flex items-center justify-center">
-                        <UserIcon className="size-4 text-muted-foreground" />
+          {Object.entries(groupedAssignments).map(([role, roleAssignments]) => {
+            const config = roleConfig[role] || { variant: "default" as StatusVariant, label: role };
+            return (
+              <GlassCard key={role}>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <StatusBadge variant={config.variant}>
+                      {config.label}
+                    </StatusBadge>
+                    <span className="text-muted-foreground font-normal">
+                      ({roleAssignments.length})
+                    </span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {roleAssignments.map((assignment) => (
+                    <div
+                      key={assignment.id}
+                      className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 transition-colors group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <GradientAvatar name={assignment.user.name} size="sm" />
+                        <div>
+                          <p className="text-sm font-medium">{assignment.user.name}</p>
+                          <p className="text-xs text-muted-foreground">{assignment.user.email}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-medium">{assignment.user.name}</p>
-                        <p className="text-xs text-muted-foreground">{assignment.user.email}</p>
-                      </div>
+                      {canManageTeam && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-8 text-muted-foreground hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => openRemoveDialog(assignment.user)}
+                        >
+                          <TrashIcon className="size-4" />
+                        </Button>
+                      )}
                     </div>
-                    {canManageTeam && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-8 text-muted-foreground hover:text-destructive"
-                        onClick={() => openRemoveDialog(assignment.user)}
-                      >
-                        <TrashIcon className="size-4" />
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          ))}
+                  ))}
+                </CardContent>
+              </GlassCard>
+            );
+          })}
         </div>
       )}
 

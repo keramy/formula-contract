@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { GlassCard, GradientIcon, EmptyState } from "@/components/ui/ui-helpers";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,6 +22,7 @@ import {
   ClockIcon,
   CheckCircleIcon,
   XCircleIcon,
+  AlertTriangleIcon,
 } from "lucide-react";
 import { MaterialCard, type Material } from "@/components/materials/material-card";
 import { MaterialFormDialog } from "@/components/materials/material-form-dialog";
@@ -141,25 +143,22 @@ export function MaterialsOverview({
 
   if (materials.length === 0 && scopeItems.length === 0) {
     return (
-      <Card>
+      <GlassCard>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <PackageIcon className="size-5" />
+            <GradientIcon icon={<PackageIcon className="size-4" />} color="teal" size="sm" />
             Materials
           </CardTitle>
           <CardDescription>Track material selections and approvals</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <div className="rounded-full bg-muted p-3 mb-4">
-              <PackageIcon className="size-6 text-muted-foreground" />
-            </div>
-            <p className="text-muted-foreground">
-              Add scope items first to start tracking materials.
-            </p>
-          </div>
+          <EmptyState
+            icon={<PackageIcon className="size-6" />}
+            title="No scope items yet"
+            description="Add scope items first to start tracking materials."
+          />
         </CardContent>
-      </Card>
+      </GlassCard>
     );
   }
 
@@ -167,11 +166,14 @@ export function MaterialsOverview({
     <div className="space-y-4">
       {/* Header with Excel buttons */}
       <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-medium">Materials</h3>
-          <p className="text-sm text-muted-foreground">
-            {materials.length} material{materials.length !== 1 ? "s" : ""} in this project
-          </p>
+        <div className="flex items-center gap-2">
+          <GradientIcon icon={<PackageIcon className="size-4" />} color="teal" size="sm" />
+          <div>
+            <h3 className="text-lg font-medium">Materials</h3>
+            <p className="text-sm text-muted-foreground">
+              {materials.length} material{materials.length !== 1 ? "s" : ""} in this project
+            </p>
+          </div>
         </div>
         <div className="flex gap-2">
           {canManageMaterials && (
@@ -193,7 +195,10 @@ export function MaterialsOverview({
             projectName={projectName}
           />
           {canManageMaterials && (
-            <Button onClick={handleAddMaterial}>
+            <Button
+              onClick={handleAddMaterial}
+              className="bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700"
+            >
               <PlusIcon className="size-4" />
               Add Material
             </Button>
@@ -203,49 +208,49 @@ export function MaterialsOverview({
 
       {/* Stats Cards - Updated for PM workflow */}
       <div className="grid grid-cols-4 gap-4">
-        <Card className="p-4">
+        <GlassCard hover="lift" className="p-4">
           <div className="flex items-center gap-2 text-muted-foreground mb-1">
-            <PackageIcon className="size-4" />
+            <GradientIcon icon={<PackageIcon className="size-3.5" />} color="teal" size="sm" />
             <span className="text-xs font-medium">Total</span>
           </div>
           <p className="text-2xl font-bold">{stats.total}</p>
-        </Card>
+        </GlassCard>
 
-        <Card className="p-4">
+        <GlassCard hover="lift" className="p-4">
           <div className="flex items-center gap-2 text-muted-foreground mb-1">
-            <ClockIcon className="size-4 text-yellow-500" />
+            <GradientIcon icon={<ClockIcon className="size-3.5" />} color="amber" size="sm" />
             <span className="text-xs font-medium">Pending</span>
           </div>
-          <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
-        </Card>
+          <p className="text-2xl font-bold text-amber-600">{stats.pending}</p>
+        </GlassCard>
 
-        <Card className="p-4">
+        <GlassCard hover="lift" className="p-4">
           <div className="flex items-center gap-2 text-muted-foreground mb-1">
-            <CheckCircleIcon className="size-4 text-green-500" />
+            <GradientIcon icon={<CheckCircleIcon className="size-3.5" />} color="emerald" size="sm" />
             <span className="text-xs font-medium">Approved</span>
           </div>
-          <p className="text-2xl font-bold text-green-600">{stats.approved}</p>
-        </Card>
+          <p className="text-2xl font-bold text-emerald-600">{stats.approved}</p>
+        </GlassCard>
 
-        <Card className="p-4">
+        <GlassCard hover="lift" className="p-4">
           <div className="flex items-center gap-2 text-muted-foreground mb-1">
-            <XCircleIcon className="size-4 text-red-500" />
+            <GradientIcon icon={<XCircleIcon className="size-3.5" />} color="rose" size="sm" />
             <span className="text-xs font-medium">Rejected</span>
           </div>
-          <p className="text-2xl font-bold text-red-600">{stats.rejected}</p>
-        </Card>
+          <p className="text-2xl font-bold text-rose-600">{stats.rejected}</p>
+        </GlassCard>
       </div>
 
       {/* Pending notice - remind PM to review */}
       {stats.pending > 0 && (
-        <Card className="p-4 border-yellow-200 bg-yellow-50 dark:bg-yellow-900/10 dark:border-yellow-800">
+        <div className="p-4 rounded-xl bg-amber-50 border border-amber-200">
           <div className="flex items-center gap-2">
-            <ClockIcon className="size-5 text-yellow-500" />
-            <span className="font-medium text-yellow-700 dark:text-yellow-400">
+            <AlertTriangleIcon className="size-5 text-amber-500" />
+            <span className="font-medium text-amber-700">
               {stats.pending} material{stats.pending !== 1 ? "s" : ""} pending approval
             </span>
           </div>
-        </Card>
+        </div>
       )}
 
       {/* Materials List */}
@@ -264,24 +269,24 @@ export function MaterialsOverview({
           ))}
         </div>
       ) : (
-        <Card className="p-8">
-          <div className="flex flex-col items-center justify-center text-center">
-            <div className="rounded-full bg-muted p-3 mb-4">
-              <PackageIcon className="size-6 text-muted-foreground" />
-            </div>
-            <p className="text-muted-foreground mb-4">
-              {isClient
-                ? "No materials added to this project yet."
-                : "No materials added yet. Add materials to track approvals."}
-            </p>
-            {canManageMaterials && (
-              <Button onClick={handleAddMaterial}>
+        <GlassCard className="p-8">
+          <EmptyState
+            icon={<PackageIcon className="size-6" />}
+            title="No materials yet"
+            description={isClient
+              ? "No materials added to this project yet."
+              : "No materials added yet. Add materials to track approvals."}
+            action={canManageMaterials ? (
+              <Button
+                onClick={handleAddMaterial}
+                className="bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700"
+              >
                 <PlusIcon className="size-4" />
                 Add First Material
               </Button>
-            )}
-          </div>
-        </Card>
+            ) : undefined}
+          />
+        </GlassCard>
       )}
 
       {/* Form Dialog */}

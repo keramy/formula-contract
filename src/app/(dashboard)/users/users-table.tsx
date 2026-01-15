@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -35,10 +34,12 @@ import {
   UsersIcon,
   SearchIcon,
   PlusIcon,
+  FilterIcon,
 } from "lucide-react";
 import { format } from "date-fns";
 import { UserFormDialog } from "./user-form-dialog";
 import { toggleUserActive } from "./actions";
+import { GlassCard, EmptyState, GradientAvatar, StatusBadge } from "@/components/ui/ui-helpers";
 
 interface User {
   id: string;
@@ -55,22 +56,15 @@ interface UsersTableProps {
   users: User[];
 }
 
-const roleColors: Record<string, string> = {
-  admin: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-  pm: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-  production: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
-  procurement: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
-  management: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  client: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
-};
+type RoleVariant = "danger" | "info" | "violet" | "coral" | "success" | "default";
 
-const roleLabels: Record<string, string> = {
-  admin: "Admin",
-  pm: "Project Manager",
-  production: "Production",
-  procurement: "Procurement",
-  management: "Management",
-  client: "Client",
+const roleConfig: Record<string, { variant: RoleVariant; label: string }> = {
+  admin: { variant: "danger", label: "Admin" },
+  pm: { variant: "info", label: "Project Manager" },
+  production: { variant: "violet", label: "Production" },
+  procurement: { variant: "coral", label: "Procurement" },
+  management: { variant: "success", label: "Management" },
+  client: { variant: "default", label: "Client" },
 };
 
 // Helper to determine user status
@@ -80,22 +74,12 @@ function getUserStatus(user: User): "pending" | "active" | "inactive" {
   return "active";
 }
 
-const statusConfig = {
-  pending: {
-    label: "Pending",
-    variant: "outline" as const,
-    className: "border-yellow-500/50 text-yellow-600 dark:text-yellow-400",
-  },
-  active: {
-    label: "Active",
-    variant: "default" as const,
-    className: "",
-  },
-  inactive: {
-    label: "Inactive",
-    variant: "secondary" as const,
-    className: "",
-  },
+type StatusVariant = "warning" | "success" | "default";
+
+const statusConfig: Record<string, { variant: StatusVariant; label: string }> = {
+  pending: { variant: "warning", label: "Pending" },
+  active: { variant: "success", label: "Active" },
+  inactive: { variant: "default", label: "Inactive" },
 };
 
 export function UsersTable({ users }: UsersTableProps) {
@@ -155,19 +139,19 @@ export function UsersTable({ users }: UsersTableProps) {
   if (users.length === 0 && !searchParams.get("search") && !searchParams.get("role")) {
     return (
       <>
-        <div className="flex flex-col items-center justify-center py-16 text-center border rounded-lg bg-muted/30">
-          <div className="rounded-full bg-muted p-4 mb-4">
-            <UsersIcon className="size-8 text-muted-foreground" />
-          </div>
-          <h3 className="font-semibold text-lg mb-1">No users found</h3>
-          <p className="text-sm text-muted-foreground max-w-sm mb-4">
-            Get started by adding your first team member.
-          </p>
-          <Button onClick={handleAddUser}>
-            <PlusIcon className="size-4" />
-            Add User
-          </Button>
-        </div>
+        <GlassCard>
+          <EmptyState
+            icon={<UsersIcon className="size-8" />}
+            title="No users found"
+            description="Get started by adding your first team member."
+            action={
+              <Button onClick={handleAddUser} className="bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600">
+                <PlusIcon className="size-4" />
+                Add User
+              </Button>
+            }
+          />
+        </GlassCard>
         <UserFormDialog
           open={dialogOpen}
           onOpenChange={setDialogOpen}
@@ -180,45 +164,49 @@ export function UsersTable({ users }: UsersTableProps) {
   return (
     <>
       {/* Filters */}
-      <div className="flex items-center gap-4 mb-4">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+        <div className="relative flex-1 max-w-md">
           <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
             placeholder="Search by name or email..."
             value={search}
             onChange={(e) => handleSearch(e.target.value)}
-            className="pl-9"
+            className="pl-9 bg-white/50 border-gray-200 focus:bg-white transition-colors"
           />
         </div>
-        <Select
-          value={searchParams.get("role") || "all"}
-          onValueChange={handleRoleFilter}
-        >
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Filter by role" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Roles</SelectItem>
-            <SelectItem value="admin">Admin</SelectItem>
-            <SelectItem value="pm">Project Manager</SelectItem>
-            <SelectItem value="production">Production</SelectItem>
-            <SelectItem value="procurement">Procurement</SelectItem>
-            <SelectItem value="management">Management</SelectItem>
-            <SelectItem value="client">Client</SelectItem>
-          </SelectContent>
-        </Select>
-        <Button onClick={handleAddUser}>
+        <div className="flex items-center gap-2">
+          <FilterIcon className="size-4 text-muted-foreground hidden sm:block" />
+          <Select
+            value={searchParams.get("role") || "all"}
+            onValueChange={handleRoleFilter}
+          >
+            <SelectTrigger className="w-[180px] bg-white/50 border-gray-200">
+              <SelectValue placeholder="Filter by role" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Roles</SelectItem>
+              {Object.entries(roleConfig).map(([value, config]) => (
+                <SelectItem key={value} value={value}>
+                  <StatusBadge variant={config.variant} dot>
+                    {config.label}
+                  </StatusBadge>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <Button onClick={handleAddUser} className="bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600">
           <PlusIcon className="size-4" />
           Add User
         </Button>
       </div>
 
       {/* Table */}
-      <div className="border rounded-lg">
+      <GlassCard className="py-0">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
+            <TableRow className="hover:bg-transparent border-b border-gray-100">
+              <TableHead className="py-4">User</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Role</TableHead>
               <TableHead>Status</TableHead>
@@ -234,68 +222,83 @@ export function UsersTable({ users }: UsersTableProps) {
                 </TableCell>
               </TableRow>
             ) : (
-              users.map((user) => (
-                <TableRow key={user.id} className={getUserStatus(user) === "inactive" ? "opacity-60" : ""}>
-                  <TableCell className="font-medium">{user.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{user.email}</TableCell>
-                  <TableCell>
-                    <Badge variant="secondary" className={roleColors[user.role]}>
-                      {roleLabels[user.role] || user.role}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {(() => {
-                      const status = getUserStatus(user);
-                      const config = statusConfig[status];
-                      return (
-                        <Badge variant={config.variant} className={config.className}>
-                          {config.label}
-                        </Badge>
-                      );
-                    })()}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {user.last_login_at
-                      ? format(new Date(user.last_login_at), "MMM d, yyyy")
-                      : "Never"}
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon-sm" disabled={isLoading}>
-                          <MoreHorizontalIcon className="size-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEditUser(user)}>
-                          <PencilIcon className="size-4 mr-2" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        {getUserStatus(user) !== "pending" && (
-                          <DropdownMenuItem onClick={() => handleToggleActive(user)}>
-                            {user.is_active ? (
-                              <>
-                                <UserXIcon className="size-4 mr-2" />
-                                Deactivate
-                              </>
-                            ) : (
-                              <>
-                                <UserCheckIcon className="size-4 mr-2" />
-                                Activate
-                              </>
-                            )}
+              users.map((user, index) => {
+                const userStatus = getUserStatus(user);
+                const statusConf = statusConfig[userStatus];
+                const roleConf = roleConfig[user.role] || { variant: "default" as RoleVariant, label: user.role };
+
+                return (
+                  <TableRow
+                    key={user.id}
+                    className={`group hover:bg-gray-50/50 border-b border-gray-50 last:border-0 ${userStatus === "inactive" ? "opacity-60" : ""}`}
+                  >
+                    <TableCell className="py-4">
+                      <div className="flex items-center gap-3">
+                        <GradientAvatar name={user.name} size="sm" colorIndex={(index + 4) % 8} />
+                        <span className="font-medium">{user.name}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                    <TableCell>
+                      <StatusBadge variant={roleConf.variant} dot>
+                        {roleConf.label}
+                      </StatusBadge>
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge variant={statusConf.variant} dot>
+                        {statusConf.label}
+                      </StatusBadge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {user.last_login_at
+                        ? format(new Date(user.last_login_at), "MMM d, yyyy")
+                        : "Never"}
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                            disabled={isLoading}
+                          >
+                            <MoreHorizontalIcon className="size-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          <DropdownMenuItem onClick={() => handleEditUser(user)} className="cursor-pointer">
+                            <PencilIcon className="size-4 mr-2" />
+                            Edit User
                           </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
+                          {userStatus !== "pending" && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleToggleActive(user)} className="cursor-pointer">
+                                {user.is_active ? (
+                                  <>
+                                    <UserXIcon className="size-4 mr-2" />
+                                    Deactivate
+                                  </>
+                                ) : (
+                                  <>
+                                    <UserCheckIcon className="size-4 mr-2" />
+                                    Activate
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
-      </div>
+      </GlassCard>
 
       {/* Form Dialog */}
       <UserFormDialog

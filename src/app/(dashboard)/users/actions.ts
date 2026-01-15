@@ -1,8 +1,11 @@
 "use server";
 
 import { createClient } from "@supabase/supabase-js";
+import { createClient as createServerClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { Resend } from "resend";
+import { checkUserCreationRateLimit } from "@/lib/rate-limit";
+import { sanitizeText } from "@/lib/sanitize";
 
 // Send welcome email to new user
 async function sendWelcomeEmail(
@@ -95,7 +98,25 @@ export async function inviteUser(data: {
   role: string;
 }): Promise<{ success: boolean; error?: string; tempPassword?: string; emailSent?: boolean }> {
   try {
+    // Get current user (admin) for rate limiting
+    const serverSupabase = await createServerClient();
+    const { data: { user: currentUser } } = await serverSupabase.auth.getUser();
+
+    if (!currentUser) {
+      return { success: false, error: "You must be logged in to create users" };
+    }
+
+    // Check rate limit for user creation (10 per hour per admin)
+    const rateLimit = checkUserCreationRateLimit(currentUser.id);
+    if (!rateLimit.success) {
+      return { success: false, error: rateLimit.error };
+    }
+
     const supabase = createAdminClient();
+
+    // Sanitize user inputs
+    const sanitizedName = sanitizeText(data.name);
+    const sanitizedPhone = data.phone ? sanitizeText(data.phone) : null;
 
     // Check if user already exists
     const { data: existingUser } = await supabase
@@ -117,7 +138,7 @@ export async function inviteUser(data: {
       password: tempPassword,
       email_confirm: true, // Skip email confirmation
       user_metadata: {
-        name: data.name,
+        name: sanitizedName,
         role: data.role,
         must_change_password: true, // Force password change on first login
       },
@@ -138,8 +159,8 @@ export async function inviteUser(data: {
       .insert({
         id: authData.user.id,
         email: data.email.toLowerCase(),
-        name: data.name,
-        phone: data.phone,
+        name: sanitizedName,
+        phone: sanitizedPhone,
         role: data.role,
         is_active: true,
       });
@@ -155,7 +176,7 @@ export async function inviteUser(data: {
     }
 
     // Send welcome email with credentials
-    const emailResult = await sendWelcomeEmail(data.email.toLowerCase(), data.name, tempPassword);
+    const emailResult = await sendWelcomeEmail(data.email.toLowerCase(), sanitizedName, tempPassword);
     if (!emailResult.success) {
       console.warn("Welcome email failed:", emailResult.error);
       // Don't fail the user creation if email fails
@@ -181,13 +202,17 @@ export async function updateUser(
   }
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    // Sanitize user inputs
+    const sanitizedName = sanitizeText(data.name);
+    const sanitizedPhone = data.phone ? sanitizeText(data.phone) : null;
+
     const supabase = createAdminClient();
 
     const { error } = await supabase
       .from("users")
       .update({
-        name: data.name,
-        phone: data.phone,
+        name: sanitizedName,
+        phone: sanitizedPhone,
         role: data.role,
       })
       .eq("id", userId);

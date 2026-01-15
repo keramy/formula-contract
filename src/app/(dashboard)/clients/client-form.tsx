@@ -7,8 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent } from "@/components/ui/card";
+import { CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
+import { GlassCard } from "@/components/ui/ui-helpers";
+import { AlertCircleIcon } from "lucide-react";
 import type { ClientInsert, ClientUpdate } from "@/types/database";
 
 interface ClientFormProps {
@@ -83,11 +85,12 @@ export function ClientForm({ initialData }: ClientFormProps) {
   };
 
   return (
-    <Card>
+    <GlassCard>
       <CardContent className="pt-6">
         <form onSubmit={handleSubmit} className="space-y-6">
           {error && (
-            <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+            <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-sm flex items-center gap-2">
+              <AlertCircleIcon className="size-4 shrink-0" />
               {error}
             </div>
           )}
@@ -170,7 +173,11 @@ export function ClientForm({ initialData }: ClientFormProps) {
 
           {/* Actions */}
           <div className="flex gap-3 pt-4">
-            <Button type="submit" disabled={isLoading}>
+            <Button
+              type="submit"
+              disabled={isLoading}
+              className="bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600"
+            >
               {isLoading ? (
                 <>
                   <Spinner className="size-4" />
@@ -193,6 +200,6 @@ export function ClientForm({ initialData }: ClientFormProps) {
           </div>
         </form>
       </CardContent>
-    </Card>
+    </GlassCard>
   );
 }

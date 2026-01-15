@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Toaster } from "sonner";
+import { ReactQueryProvider } from "@/lib/react-query/provider";
 import "@fontsource/inter/400.css";
 import "@fontsource/inter/500.css";
 import "@fontsource/inter/600.css";
@@ -19,7 +20,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="font-sans antialiased">
-        {children}
+        <ReactQueryProvider>
+          {children}
+        </ReactQueryProvider>
         <Toaster position="top-right" richColors />
       </body>
     </html>

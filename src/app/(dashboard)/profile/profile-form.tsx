@@ -3,13 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { GlassCard, GradientIcon, StatusBadge } from "@/components/ui/ui-helpers";
 import { UserIcon, CheckIcon } from "lucide-react";
 import { format } from "date-fns";
 
@@ -25,22 +25,15 @@ interface ProfileFormProps {
   };
 }
 
-const roleLabels: Record<string, string> = {
-  admin: "Administrator",
-  pm: "Project Manager",
-  production: "Production",
-  procurement: "Procurement",
-  management: "Management",
-  client: "Client",
-};
+type StatusVariant = "info" | "success" | "warning" | "default" | "danger";
 
-const roleColors: Record<string, string> = {
-  admin: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-  pm: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-  production: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
-  procurement: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
-  management: "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400",
-  client: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+const roleConfig: Record<string, { variant: StatusVariant; label: string }> = {
+  admin: { variant: "danger", label: "Administrator" },
+  pm: { variant: "info", label: "Project Manager" },
+  production: { variant: "info", label: "Production" },
+  procurement: { variant: "warning", label: "Procurement" },
+  management: { variant: "default", label: "Management" },
+  client: { variant: "success", label: "Client" },
 };
 
 export function ProfileForm({ userId, initialData }: ProfileFormProps) {
@@ -94,28 +87,30 @@ export function ProfileForm({ userId, initialData }: ProfileFormProps) {
     }
   };
 
+  const config = roleConfig[initialData.role] || { variant: "default" as StatusVariant, label: initialData.role };
+
   return (
-    <Card>
+    <GlassCard>
       <CardHeader>
         <div className="flex items-center gap-2">
-          <UserIcon className="size-5 text-muted-foreground" />
-          <CardTitle>Profile Information</CardTitle>
+          <GradientIcon icon={<UserIcon className="size-4" />} color="coral" size="sm" />
+          <CardTitle className="text-base">Profile Information</CardTitle>
         </div>
         <CardDescription>Update your personal information</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
+            <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-sm">
+              {error}
+            </div>
           )}
 
           {success && (
-            <Alert className="border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-900/20 dark:text-green-400">
+            <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm flex items-center gap-2">
               <CheckIcon className="size-4" />
-              <AlertDescription>Profile updated successfully!</AlertDescription>
-            </Alert>
+              Profile updated successfully!
+            </div>
           )}
 
           {/* Email (read-only) */}
@@ -126,7 +121,7 @@ export function ProfileForm({ userId, initialData }: ProfileFormProps) {
               type="email"
               value={initialData.email}
               disabled
-              className="bg-muted"
+              className="bg-gray-50"
             />
             <p className="text-xs text-muted-foreground">
               Email cannot be changed. Contact an administrator if needed.
@@ -162,9 +157,9 @@ export function ProfileForm({ userId, initialData }: ProfileFormProps) {
           <div className="space-y-2">
             <Label>Role</Label>
             <div>
-              <Badge variant="secondary" className={roleColors[initialData.role]}>
-                {roleLabels[initialData.role] || initialData.role}
-              </Badge>
+              <StatusBadge variant={config.variant}>
+                {config.label}
+              </StatusBadge>
             </div>
             <p className="text-xs text-muted-foreground">
               Your role is assigned by an administrator.
@@ -187,7 +182,11 @@ export function ProfileForm({ userId, initialData }: ProfileFormProps) {
 
           {/* Submit */}
           <div className="pt-4">
-            <Button type="submit" disabled={isLoading || !hasChanges}>
+            <Button
+              type="submit"
+              disabled={isLoading || !hasChanges}
+              className="bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600"
+            >
               {isLoading ? (
                 <>
                   <Spinner className="size-4" />
@@ -200,6 +199,6 @@ export function ProfileForm({ userId, initialData }: ProfileFormProps) {
           </div>
         </form>
       </CardContent>
-    </Card>
+    </GlassCard>
   );
 }

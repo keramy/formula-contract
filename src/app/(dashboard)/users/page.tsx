@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { UsersTable } from "./users-table";
+import { UsersPageHeader } from "./users-page-header";
 
 interface User {
   id: string;
@@ -43,10 +44,7 @@ export default async function UsersPage({
   return (
     <div className="p-6">
       {/* Page Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-foreground">Users</h1>
-        <p className="text-muted-foreground">Manage team members and permissions</p>
-      </div>
+      <UsersPageHeader />
 
       {/* Users Table */}
       <UsersTable users={(users || []) as User[]} />

@@ -3,8 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { GlassCard, GradientIcon, StatusBadge } from "@/components/ui/ui-helpers";
 import {
   ArrowLeftIcon,
   PencilIcon,
@@ -12,10 +12,17 @@ import {
   ShoppingCartIcon,
   FileIcon,
   ImageIcon,
+  PackageIcon,
+  RulerIcon,
+  DollarSignIcon,
+  CheckCircle2Icon,
+  TruckIcon,
+  StickyNoteIcon,
 } from "lucide-react";
 import { DrawingUpload, DrawingsList, DrawingApproval } from "@/components/drawings";
 import { ProductionProgressEditor, InstallationStatusEditor, ProcurementStatusEditor } from "@/components/scope-items";
 import { ItemMaterialsSection } from "@/components/materials";
+import { ScopeItemHeader } from "./scope-item-header";
 import type { ProcurementStatus } from "@/types/database";
 
 interface ScopeItem {
@@ -86,44 +93,26 @@ interface Material {
   status: string;
 }
 
-const statusColors: Record<string, string> = {
-  pending: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
-  in_design: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-  awaiting_approval: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
-  approved: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  in_production: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
-  complete: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
-  on_hold: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
-  cancelled: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+type StatusVariant = "info" | "success" | "warning" | "default" | "danger";
+
+const statusConfig: Record<string, { variant: StatusVariant; label: string }> = {
+  pending: { variant: "default", label: "Pending" },
+  in_design: { variant: "info", label: "In Design" },
+  awaiting_approval: { variant: "warning", label: "Awaiting Approval" },
+  approved: { variant: "success", label: "Approved" },
+  in_production: { variant: "info", label: "In Production" },
+  complete: { variant: "success", label: "Complete" },
+  on_hold: { variant: "warning", label: "On Hold" },
+  cancelled: { variant: "danger", label: "Cancelled" },
 };
 
-const statusLabels: Record<string, string> = {
-  pending: "Pending",
-  in_design: "In Design",
-  awaiting_approval: "Awaiting Approval",
-  approved: "Approved",
-  in_production: "In Production",
-  complete: "Complete",
-  on_hold: "On Hold",
-  cancelled: "Cancelled",
-};
-
-const drawingStatusColors: Record<string, string> = {
-  not_uploaded: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
-  uploaded: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-  sent_to_client: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
-  approved: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  rejected: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-  approved_with_comments: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
-};
-
-const drawingStatusLabels: Record<string, string> = {
-  not_uploaded: "Not Uploaded",
-  uploaded: "Uploaded",
-  sent_to_client: "Sent to Client",
-  approved: "Approved",
-  rejected: "Rejected",
-  approved_with_comments: "Approved with Comments",
+const drawingStatusConfig: Record<string, { variant: StatusVariant; label: string }> = {
+  not_uploaded: { variant: "default", label: "Not Uploaded" },
+  uploaded: { variant: "info", label: "Uploaded" },
+  sent_to_client: { variant: "warning", label: "Sent to Client" },
+  approved: { variant: "success", label: "Approved" },
+  rejected: { variant: "danger", label: "Rejected" },
+  approved_with_comments: { variant: "success", label: "Approved with Comments" },
 };
 
 const currencySymbols: Record<string, string> = {
@@ -261,63 +250,46 @@ export default async function ScopeItemDetailPage({
     }).format(value)}`;
   };
 
-  return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="mb-4">
-        <Button variant="ghost" size="sm" asChild className="mb-3 -ml-2">
-          <Link href={`/projects/${projectId}`}>
-            <ArrowLeftIcon className="size-4" />
-            Back to {scopeItem.project.name}
-          </Link>
-        </Button>
+  const itemStatusConfig = statusConfig[scopeItem.status] || { variant: "default" as StatusVariant, label: scopeItem.status };
 
-        <div className="flex items-start justify-between">
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-xl font-semibold text-foreground">{scopeItem.name}</h1>
-              <Badge variant="secondary" className={statusColors[scopeItem.status]}>
-                {statusLabels[scopeItem.status] || scopeItem.status}
-              </Badge>
-            </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span className="font-mono">{scopeItem.item_code}</span>
-              <span>•</span>
-              <div className="flex items-center gap-1">
-                {scopeItem.item_path === "production" ? (
-                  <FactoryIcon className="size-3.5 text-purple-500" />
-                ) : (
-                  <ShoppingCartIcon className="size-3.5 text-blue-500" />
-                )}
-                <span className="capitalize">{scopeItem.item_path}</span>
-              </div>
-            </div>
-          </div>
-          {canEdit && (
-            <Button size="sm" asChild>
-              <Link href={`/projects/${projectId}/scope/${itemId}/edit`}>
-                <PencilIcon className="size-4" />
-                Edit
-              </Link>
-            </Button>
-          )}
-        </div>
-      </div>
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50/50 via-white to-gray-50/50 p-6">
+      {/* Header */}
+      <ScopeItemHeader
+        projectId={projectId}
+        projectName={scopeItem.project.name}
+        itemId={itemId}
+        itemName={scopeItem.name}
+        itemCode={scopeItem.item_code}
+        itemPath={scopeItem.item_path}
+        status={scopeItem.status}
+        statusLabel={itemStatusConfig.label}
+        statusVariant={itemStatusConfig.variant}
+        canEdit={canEdit}
+      />
 
       {/* Compact Single Column Layout */}
       <div className="max-w-4xl space-y-4">
         {/* Progress & Pricing Row */}
         <div className="grid grid-cols-2 gap-4">
           {/* Progress */}
-          <Card className="p-4">
+          <GlassCard className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <GradientIcon icon={<FactoryIcon className="size-3.5" />} color="violet" size="sm" />
+              <span className="text-sm font-medium">Production Progress</span>
+            </div>
             <ProductionProgressEditor
               scopeItemId={scopeItem.id}
               initialValue={scopeItem.production_percentage}
             />
-          </Card>
+          </GlassCard>
 
           {/* Pricing */}
-          <Card className="p-4">
+          <GlassCard className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <GradientIcon icon={<DollarSignIcon className="size-3.5" />} color="teal" size="sm" />
+              <span className="text-sm font-medium">Pricing</span>
+            </div>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Quantity</span>
@@ -329,55 +301,62 @@ export default async function ScopeItemDetailPage({
               </div>
               <div className="border-t pt-2 flex justify-between">
                 <span className="font-medium">Total</span>
-                <span className="font-semibold font-mono">{formatCurrency(scopeItem.total_price, scopeItem.project.currency)}</span>
+                <span className="font-semibold font-mono text-teal-700">{formatCurrency(scopeItem.total_price, scopeItem.project.currency)}</span>
               </div>
             </div>
-          </Card>
+          </GlassCard>
         </div>
 
         {/* Dimensions & Installation Row */}
         <div className="grid grid-cols-2 gap-4">
           {/* Dimensions */}
-          <Card className="p-4">
-            <div className="flex items-center gap-6 text-sm">
-              <span className="text-muted-foreground font-medium">Dimensions:</span>
-              <div className="flex gap-4">
-                <span><span className="text-muted-foreground">W:</span> {scopeItem.width ? `${scopeItem.width}cm` : "-"}</span>
-                <span><span className="text-muted-foreground">D:</span> {scopeItem.depth ? `${scopeItem.depth}cm` : "-"}</span>
-                <span><span className="text-muted-foreground">H:</span> {scopeItem.height ? `${scopeItem.height}cm` : "-"}</span>
-              </div>
+          <GlassCard className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <GradientIcon icon={<RulerIcon className="size-3.5" />} color="amber" size="sm" />
+              <span className="text-sm font-medium">Dimensions</span>
             </div>
-          </Card>
+            <div className="flex gap-4 text-sm">
+              <span><span className="text-muted-foreground">W:</span> <span className="font-medium">{scopeItem.width ? `${scopeItem.width}cm` : "-"}</span></span>
+              <span><span className="text-muted-foreground">D:</span> <span className="font-medium">{scopeItem.depth ? `${scopeItem.depth}cm` : "-"}</span></span>
+              <span><span className="text-muted-foreground">H:</span> <span className="font-medium">{scopeItem.height ? `${scopeItem.height}cm` : "-"}</span></span>
+            </div>
+          </GlassCard>
 
           {/* Installation Status */}
-          <Card className="p-4">
-            <div className="text-sm font-medium text-muted-foreground mb-2">Installation Status</div>
+          <GlassCard className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <GradientIcon icon={<CheckCircle2Icon className="size-3.5" />} color="emerald" size="sm" />
+              <span className="text-sm font-medium">Installation Status</span>
+            </div>
             <InstallationStatusEditor
               scopeItemId={scopeItem.id}
               isInstalled={scopeItem.is_installed}
               installedAt={scopeItem.installed_at}
               readOnly={!canToggleInstallation}
             />
-          </Card>
+          </GlassCard>
         </div>
 
         {/* Procurement Status - Only for procurement items */}
         {scopeItem.item_path === "procurement" && (
-          <Card className="p-4">
-            <div className="text-sm font-medium text-muted-foreground mb-2">Procurement Status</div>
+          <GlassCard className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <GradientIcon icon={<TruckIcon className="size-3.5" />} color="sky" size="sm" />
+              <span className="text-sm font-medium">Procurement Status</span>
+            </div>
             <ProcurementStatusEditor
               scopeItemId={scopeItem.id}
               currentStatus={scopeItem.procurement_status}
               readOnly={!canEditProcurement}
             />
-          </Card>
+          </GlassCard>
         )}
 
         {/* Images */}
         {scopeItem.images && scopeItem.images.length > 0 && (
-          <Card className="p-4">
+          <GlassCard className="p-4">
             <div className="flex items-center gap-2 mb-3">
-              <ImageIcon className="size-4 text-muted-foreground" />
+              <GradientIcon icon={<ImageIcon className="size-3.5" />} color="rose" size="sm" />
               <span className="text-sm font-medium">Images</span>
               <span className="text-xs text-muted-foreground">({scopeItem.images.length})</span>
             </div>
@@ -388,7 +367,7 @@ export default async function ScopeItemDetailPage({
                   href={url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="relative size-24 rounded-md overflow-hidden border bg-muted hover:opacity-90 transition-opacity"
+                  className="relative size-24 rounded-lg overflow-hidden border-2 border-white shadow-md hover:shadow-lg hover:scale-105 transition-all"
                 >
                   <Image
                     src={url}
@@ -399,21 +378,23 @@ export default async function ScopeItemDetailPage({
                 </a>
               ))}
             </div>
-          </Card>
+          </GlassCard>
         )}
 
         {/* Drawings Section - Prominent for Production Items */}
         {scopeItem.item_path === "production" && (
-          <Card>
+          <GlassCard>
             <CardHeader className="py-3 px-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <FileIcon className="size-4 text-muted-foreground" />
+                  <GradientIcon icon={<FileIcon className="size-3.5" />} color="sky" size="sm" />
                   <CardTitle className="text-sm font-medium">Drawings</CardTitle>
                   {drawing && (
-                    <Badge variant="secondary" className={drawingStatusColors[drawing.status]}>
-                      {drawingStatusLabels[drawing.status] || drawing.status}
-                    </Badge>
+                    <StatusBadge
+                      variant={drawingStatusConfig[drawing.status]?.variant || "default"}
+                    >
+                      {drawingStatusConfig[drawing.status]?.label || drawing.status}
+                    </StatusBadge>
                   )}
                 </div>
                 {canUploadDrawings && (
@@ -446,16 +427,16 @@ export default async function ScopeItemDetailPage({
 
               {/* Approved By Info */}
               {drawing?.approved_by && (drawing.status === "approved" || drawing.status === "approved_with_comments") && !drawing.pm_override && (
-                <div className="p-2 rounded-md bg-green-50 border border-green-200 dark:bg-green-900/20 dark:border-green-800">
-                  <p className="text-xs font-medium text-green-800 dark:text-green-400">
-                    Approved by {drawing.approved_by.name}
+                <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200">
+                  <p className="text-xs font-medium text-emerald-700">
+                    ✓ Approved by {drawing.approved_by.name}
                   </p>
                 </div>
               )}
 
               {/* Client Comments */}
               {drawing?.client_comments && (
-                <div className="p-2 rounded-md bg-muted">
+                <div className="p-3 rounded-lg bg-gray-50 border border-gray-200">
                   <p className="text-xs font-medium mb-1">Client Comments</p>
                   <p className="text-xs text-muted-foreground">{drawing.client_comments}</p>
                 </div>
@@ -463,11 +444,11 @@ export default async function ScopeItemDetailPage({
 
               {/* PM Override Notice */}
               {drawing?.pm_override && (
-                <div className="p-2 rounded-md bg-yellow-50 border border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800">
-                  <p className="text-xs font-medium text-yellow-800 dark:text-yellow-400">
-                    PM Override by {drawing.pm_override_by?.name || "Unknown"}
+                <div className="p-3 rounded-lg bg-amber-50 border border-amber-200">
+                  <p className="text-xs font-medium text-amber-700">
+                    ⚠ PM Override by {drawing.pm_override_by?.name || "Unknown"}
                   </p>
-                  <p className="text-xs text-yellow-700 dark:text-yellow-500">
+                  <p className="text-xs text-amber-600 mt-1">
                     {drawing.pm_override_reason}
                   </p>
                 </div>
@@ -478,7 +459,7 @@ export default async function ScopeItemDetailPage({
                 currentRevision={drawing?.current_revision || null}
               />
             </CardContent>
-          </Card>
+          </GlassCard>
         )}
 
         {/* Materials Section */}
@@ -490,20 +471,26 @@ export default async function ScopeItemDetailPage({
 
         {/* Description & Notes Combined */}
         {(scopeItem.description || scopeItem.notes) && (
-          <Card className="p-4 space-y-3">
-            {scopeItem.description && (
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-1">Description</p>
-                <p className="text-sm">{scopeItem.description}</p>
-              </div>
-            )}
-            {scopeItem.notes && (
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-1">Notes</p>
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{scopeItem.notes}</p>
-              </div>
-            )}
-          </Card>
+          <GlassCard className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <GradientIcon icon={<StickyNoteIcon className="size-3.5" />} color="slate" size="sm" />
+              <span className="text-sm font-medium">Details</span>
+            </div>
+            <div className="space-y-3">
+              {scopeItem.description && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1">Description</p>
+                  <p className="text-sm">{scopeItem.description}</p>
+                </div>
+              )}
+              {scopeItem.notes && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1">Notes</p>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{scopeItem.notes}</p>
+                </div>
+              )}
+            </div>
+          </GlassCard>
         )}
       </div>
     </div>

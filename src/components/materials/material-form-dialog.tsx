@@ -19,7 +19,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { PlusIcon, XIcon, ImageIcon } from "lucide-react";
+import { GradientIcon } from "@/components/ui/ui-helpers";
+import { PlusIcon, XIcon, PackageIcon } from "lucide-react";
 
 interface ScopeItem {
   id: string;
@@ -232,7 +233,10 @@ export function MaterialFormDialog({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>{isEditing ? "Edit Material" : "Add Material"}</DialogTitle>
+          <div className="flex items-center gap-2">
+            <GradientIcon icon={<PackageIcon className="size-4" />} color="amber" size="sm" />
+            <DialogTitle>{isEditing ? "Edit Material" : "Add Material"}</DialogTitle>
+          </div>
           <DialogDescription>
             {isEditing
               ? "Update material details and assignments"
@@ -365,7 +369,11 @@ export function MaterialFormDialog({
           <Button variant="outline" onClick={handleClose} disabled={isLoading}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={isLoading || !materialCode.trim() || !name.trim()}>
+          <Button
+            onClick={handleSubmit}
+            disabled={isLoading || !materialCode.trim() || !name.trim()}
+            className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
+          >
             {isLoading && <Spinner className="size-4 mr-2" />}
             {isEditing ? "Save Changes" : "Add Material"}
           </Button>

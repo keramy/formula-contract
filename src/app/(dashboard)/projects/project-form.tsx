@@ -14,8 +14,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Card, CardContent } from "@/components/ui/card";
+import { CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
+import { GlassCard } from "@/components/ui/ui-helpers";
+import { AlertCircleIcon } from "lucide-react";
+import { sanitizeText } from "@/lib/sanitize";
 import type { ProjectStatus, Currency, ProjectInsert, ProjectUpdate } from "@/types/database";
 
 interface Client {
@@ -68,10 +71,11 @@ export function ProjectForm({ clients, initialData }: ProjectFormProps) {
     try {
       const supabase = createClient();
 
+      // Sanitize user inputs to prevent XSS
       const projectData: ProjectInsert = {
-        project_code: formData.project_code,
-        name: formData.name,
-        description: formData.description || null,
+        project_code: sanitizeText(formData.project_code),
+        name: sanitizeText(formData.name),
+        description: formData.description ? sanitizeText(formData.description) : null,
         client_id: formData.client_id || null,
         status: formData.status as ProjectStatus,
         installation_date: formData.installation_date || null,
@@ -104,11 +108,12 @@ export function ProjectForm({ clients, initialData }: ProjectFormProps) {
   };
 
   return (
-    <Card>
+    <GlassCard>
       <CardContent className="pt-6">
         <form onSubmit={handleSubmit} className="space-y-6">
           {error && (
-            <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+            <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-sm flex items-center gap-2">
+              <AlertCircleIcon className="size-4 shrink-0" />
               {error}
             </div>
           )}
@@ -239,7 +244,11 @@ export function ProjectForm({ clients, initialData }: ProjectFormProps) {
 
           {/* Actions */}
           <div className="flex gap-3 pt-4">
-            <Button type="submit" disabled={isLoading}>
+            <Button
+              type="submit"
+              disabled={isLoading}
+              className="bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600"
+            >
               {isLoading ? (
                 <>
                   <Spinner className="size-4" />
@@ -262,6 +271,6 @@ export function ProjectForm({ clients, initialData }: ProjectFormProps) {
           </div>
         </form>
       </CardContent>
-    </Card>
+    </GlassCard>
   );
 }

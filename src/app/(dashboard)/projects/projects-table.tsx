@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -18,8 +17,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontalIcon, EyeIcon, PencilIcon, ArchiveIcon, FolderKanbanIcon } from "lucide-react";
+import { MoreHorizontalIcon, EyeIcon, PencilIcon, ArchiveIcon, FolderKanbanIcon, ArrowRightIcon } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { GlassCard, StatusBadge, EmptyState, GradientAvatar } from "@/components/ui/ui-helpers";
 
 interface Project {
   id: string;
@@ -35,47 +35,40 @@ interface ProjectsTableProps {
   projects: Project[];
 }
 
-const statusColors: Record<string, string> = {
-  tender: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-  active: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  on_hold: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
-  completed: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
-  cancelled: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-};
+type StatusVariant = "info" | "success" | "warning" | "default" | "danger";
 
-const statusLabels: Record<string, string> = {
-  tender: "Tender",
-  active: "Active",
-  on_hold: "On Hold",
-  completed: "Completed",
-  cancelled: "Cancelled",
+const statusConfig: Record<string, { variant: StatusVariant; label: string }> = {
+  tender: { variant: "info", label: "Tender" },
+  active: { variant: "success", label: "Active" },
+  on_hold: { variant: "warning", label: "On Hold" },
+  completed: { variant: "default", label: "Completed" },
+  cancelled: { variant: "danger", label: "Cancelled" },
 };
 
 export function ProjectsTable({ projects }: ProjectsTableProps) {
   if (projects.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center border rounded-lg bg-muted/30">
-        <div className="rounded-full bg-muted p-4 mb-4">
-          <FolderKanbanIcon className="size-8 text-muted-foreground" />
-        </div>
-        <h3 className="font-semibold text-lg mb-1">No projects found</h3>
-        <p className="text-sm text-muted-foreground max-w-sm mb-4">
-          Get started by creating your first project to manage furniture manufacturing.
-        </p>
-        <Button asChild>
-          <Link href="/projects/new">Create Project</Link>
-        </Button>
-      </div>
+      <GlassCard>
+        <EmptyState
+          icon={<FolderKanbanIcon className="size-8" />}
+          title="No projects found"
+          description="Get started by creating your first project to manage furniture manufacturing."
+          action={
+            <Button asChild className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700">
+              <Link href="/projects/new">Create Project</Link>
+            </Button>
+          }
+        />
+      </GlassCard>
     );
   }
 
   return (
-    <div className="border rounded-lg">
+    <GlassCard className="py-0">
       <Table>
         <TableHeader>
-          <TableRow>
-            <TableHead>Code</TableHead>
-            <TableHead>Name</TableHead>
+          <TableRow className="hover:bg-transparent border-b border-gray-100">
+            <TableHead className="py-4">Project</TableHead>
             <TableHead>Client</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Created</TableHead>
@@ -83,60 +76,81 @@ export function ProjectsTable({ projects }: ProjectsTableProps) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {projects.map((project) => (
-            <TableRow key={project.id}>
-              <TableCell className="font-mono text-sm">{project.project_code}</TableCell>
-              <TableCell>
-                <Link
-                  href={`/projects/${project.id}`}
-                  className="font-medium hover:underline"
-                >
-                  {project.name}
-                </Link>
-              </TableCell>
-              <TableCell className="text-muted-foreground">
-                {project.client?.company_name || "-"}
-              </TableCell>
-              <TableCell>
-                <Badge variant="secondary" className={statusColors[project.status]}>
-                  {statusLabels[project.status] || project.status}
-                </Badge>
-              </TableCell>
-              <TableCell className="text-muted-foreground text-sm">
-                {formatDistanceToNow(new Date(project.created_at), { addSuffix: true })}
-              </TableCell>
-              <TableCell>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon-sm">
-                      <MoreHorizontalIcon className="size-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem asChild>
-                      <Link href={`/projects/${project.id}`}>
-                        <EyeIcon className="size-4 mr-2" />
-                        View
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href={`/projects/${project.id}/edit`}>
-                        <PencilIcon className="size-4 mr-2" />
-                        Edit
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-destructive focus:text-destructive">
-                      <ArchiveIcon className="size-4 mr-2" />
-                      Archive
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </TableCell>
-            </TableRow>
-          ))}
+          {projects.map((project, index) => {
+            const config = statusConfig[project.status] || { variant: "default" as StatusVariant, label: project.status };
+
+            return (
+              <TableRow
+                key={project.id}
+                className="group hover:bg-gray-50/50 border-b border-gray-50 last:border-0"
+              >
+                <TableCell className="py-4">
+                  <Link
+                    href={`/projects/${project.id}`}
+                    className="flex items-center gap-3 group/link"
+                  >
+                    <GradientAvatar name={project.name} size="sm" colorIndex={index % 8} />
+                    <div>
+                      <div className="font-medium group-hover/link:text-violet-600 transition-colors flex items-center gap-1">
+                        {project.name}
+                        <ArrowRightIcon className="size-3 opacity-0 -translate-x-1 group-hover/link:opacity-100 group-hover/link:translate-x-0 transition-all" />
+                      </div>
+                      <div className="text-xs text-muted-foreground font-mono">
+                        {project.project_code}
+                      </div>
+                    </div>
+                  </Link>
+                </TableCell>
+                <TableCell className="text-muted-foreground">
+                  {project.client?.company_name || (
+                    <span className="text-gray-400 italic">No client</span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <StatusBadge variant={config.variant} dot>
+                    {config.label}
+                  </StatusBadge>
+                </TableCell>
+                <TableCell className="text-muted-foreground text-sm">
+                  {formatDistanceToNow(new Date(project.created_at), { addSuffix: true })}
+                </TableCell>
+                <TableCell>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <MoreHorizontalIcon className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuItem asChild>
+                        <Link href={`/projects/${project.id}`} className="cursor-pointer">
+                          <EyeIcon className="size-4 mr-2" />
+                          View Details
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href={`/projects/${project.id}/edit`} className="cursor-pointer">
+                          <PencilIcon className="size-4 mr-2" />
+                          Edit Project
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem className="text-destructive focus:text-destructive cursor-pointer">
+                        <ArchiveIcon className="size-4 mr-2" />
+                        Archive
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
-    </div>
+    </GlassCard>
   );
 }

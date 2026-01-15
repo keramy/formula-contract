@@ -4,6 +4,13 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { logActivity } from "@/lib/activity-log/actions";
 import { ACTIVITY_ACTIONS } from "@/lib/activity-log/constants";
+import { sanitizeText, sanitizeHTML } from "@/lib/sanitize";
+
+export interface SharedUser {
+  id: string;
+  name: string;
+  email: string;
+}
 
 export interface Report {
   id: string;
@@ -14,10 +21,13 @@ export interface Report {
   share_with_client: boolean;
   share_internal: boolean;
   created_by: string | null;
+  updated_by: string | null;
   created_at: string;
   updated_at: string;
   creator?: { name: string } | null;
+  updater?: { name: string } | null;
   lines?: ReportLine[];
+  shared_with?: SharedUser[];
 }
 
 export interface ReportLine {
@@ -51,8 +61,9 @@ export async function getProjectReports(projectId: string): Promise<Report[]> {
     .from("reports")
     .select(`
       id, project_id, report_type, is_published, published_at,
-      share_with_client, share_internal, created_by, created_at, updated_at,
-      creator:users!reports_created_by_fkey(name)
+      share_with_client, share_internal, created_by, updated_by, created_at, updated_at,
+      creator:users!reports_created_by_fkey(name),
+      updater:users!reports_updated_by_fkey(name)
     `)
     .eq("project_id", projectId)
     .order("created_at", { ascending: false });
@@ -74,11 +85,22 @@ export async function getProjectReports(projectId: string): Promise<Report[]> {
 
   if (reports.length > 0) {
     const reportIds = reports.map(r => r.id);
+
+    // Fetch report lines
     const { data: linesData } = await supabase
       .from("report_lines")
       .select("id, report_id, line_order, title, description, photos, created_at, updated_at")
       .in("report_id", reportIds)
       .order("line_order", { ascending: true });
+
+    // Fetch shared users for each report
+    const { data: sharesData } = await supabase
+      .from("report_shares")
+      .select(`
+        report_id,
+        user:users(id, name, email)
+      `)
+      .in("report_id", reportIds);
 
     // Group lines by report_id
     const lines = (linesData || []) as unknown as ReportLine[];
@@ -90,9 +112,22 @@ export async function getProjectReports(projectId: string): Promise<Report[]> {
       return acc;
     }, {} as Record<string, ReportLine[]>);
 
-    // Attach lines to reports
+    // Group shared users by report_id
+    const sharesByReport = (sharesData || []).reduce((acc, share) => {
+      const reportId = share.report_id as string;
+      if (!acc[reportId]) {
+        acc[reportId] = [];
+      }
+      if (share.user) {
+        acc[reportId].push(share.user as unknown as SharedUser);
+      }
+      return acc;
+    }, {} as Record<string, SharedUser[]>);
+
+    // Attach lines and shared users to reports
     reports.forEach(report => {
       report.lines = linesByReport[report.id] || [];
+      report.shared_with = sharesByReport[report.id] || [];
     });
   }
 
@@ -110,8 +145,9 @@ export async function getReportDetail(reportId: string): Promise<Report | null> 
     .from("reports")
     .select(`
       id, project_id, report_type, is_published, published_at,
-      share_with_client, share_internal, created_by, created_at, updated_at,
-      creator:users!reports_created_by_fkey(name)
+      share_with_client, share_internal, created_by, updated_by, created_at, updated_at,
+      creator:users!reports_created_by_fkey(name),
+      updater:users!reports_updated_by_fkey(name)
     `)
     .eq("id", reportId)
     .single();
@@ -202,7 +238,11 @@ export async function updateReport(
 
   const { error } = await supabase
     .from("reports")
-    .update(data)
+    .update({
+      ...data,
+      updated_by: user.id,
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", reportId);
 
   if (error) {
@@ -349,13 +389,17 @@ export async function addReportLine(
     ? existingLines[0].line_order + 1
     : 1;
 
+  // Sanitize user inputs
+  const sanitizedTitle = sanitizeText(data.title);
+  const sanitizedDescription = data.description ? sanitizeHTML(data.description) : null;
+
   const { data: newLine, error } = await supabase
     .from("report_lines")
     .insert({
       report_id: reportId,
       line_order: nextOrder,
-      title: data.title,
-      description: data.description || null,
+      title: sanitizedTitle,
+      description: sanitizedDescription,
       photos: data.photos || [],
     })
     .select("id")
@@ -394,9 +438,21 @@ export async function updateReportLine(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { success: false, error: "Not authenticated" };
 
+  // Sanitize user inputs
+  const sanitizedData: { title?: string; description?: string; photos?: string[] } = {};
+  if (data.title !== undefined) {
+    sanitizedData.title = sanitizeText(data.title);
+  }
+  if (data.description !== undefined) {
+    sanitizedData.description = sanitizeHTML(data.description);
+  }
+  if (data.photos !== undefined) {
+    sanitizedData.photos = data.photos;
+  }
+
   const { error } = await supabase
     .from("report_lines")
-    .update(data)
+    .update(sanitizedData)
     .eq("id", lineId);
 
   if (error) {
@@ -497,4 +553,81 @@ export async function uploadReportPhoto(
     .getPublicUrl(data.path);
 
   return { success: true, url: publicUrl };
+}
+
+// Update report shares (replace all shares with new list)
+export async function updateReportShares(
+  reportId: string,
+  userIds: string[]
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "Not authenticated" };
+
+  // Get project ID for revalidation
+  const { data: report } = await supabase
+    .from("reports")
+    .select("project_id")
+    .eq("id", reportId)
+    .single();
+
+  // Delete existing shares
+  const { error: deleteError } = await supabase
+    .from("report_shares")
+    .delete()
+    .eq("report_id", reportId);
+
+  if (deleteError) {
+    console.error("Error deleting existing shares:", deleteError.message);
+    return { success: false, error: deleteError.message };
+  }
+
+  // Insert new shares if any
+  if (userIds.length > 0) {
+    const sharesToInsert = userIds.map(userId => ({
+      report_id: reportId,
+      user_id: userId,
+    }));
+
+    const { error: insertError } = await supabase
+      .from("report_shares")
+      .insert(sharesToInsert);
+
+    if (insertError) {
+      console.error("Error inserting shares:", insertError.message);
+      return { success: false, error: insertError.message };
+    }
+  }
+
+  if (report?.project_id) {
+    revalidatePath(`/projects/${report.project_id}`);
+  }
+
+  return { success: true };
+}
+
+// Get all users for sharing picker (project team members)
+export async function getProjectTeamMembers(
+  projectId: string
+): Promise<Array<{ id: string; name: string; email: string; role: string }>> {
+  const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  // Get project team members from project_assignments
+  const { data: teamData } = await supabase
+    .from("project_assignments")
+    .select(`
+      user:users(id, name, email, role)
+    `)
+    .eq("project_id", projectId);
+
+  if (!teamData) return [];
+
+  // Extract and return user data
+  return teamData
+    .filter(t => t.user)
+    .map(t => t.user as unknown as { id: string; name: string; email: string; role: string });
 }

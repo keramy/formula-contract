@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircleIcon, AlertCircleIcon, EyeIcon, EyeOffIcon } from "lucide-react";
+import { GlassCard } from "@/components/ui/ui-helpers";
+import { CheckCircleIcon, AlertCircleIcon, EyeIcon, EyeOffIcon, InfoIcon, ShieldAlertIcon } from "lucide-react";
+import { checkAuthStatusAction, updatePasswordAction } from "../actions";
 
 export default function ChangePasswordPage() {
   const router = useRouter();
@@ -20,27 +20,26 @@ export default function ChangePasswordPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [isRateLimited, setIsRateLimited] = useState(false);
 
   // Check if user is authenticated and needs to change password
   useEffect(() => {
     async function checkAuth() {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      const status = await checkAuthStatusAction();
 
-      if (!user) {
+      if (!status.isAuthenticated) {
         router.push("/login");
         return;
       }
 
       // Check if user actually needs to change password
-      const mustChangePassword = user.user_metadata?.must_change_password;
-      if (!mustChangePassword) {
+      if (!status.mustChangePassword) {
         // User doesn't need to change password, redirect to dashboard
         router.push("/dashboard");
         return;
       }
 
-      setUserEmail(user.email || null);
+      setUserEmail(status.email || null);
       setIsCheckingAuth(false);
     }
 
@@ -72,6 +71,7 @@ export default function ChangePasswordPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setIsRateLimited(false);
 
     if (!isPasswordValid) {
       setError("Please enter a valid password that meets all requirements");
@@ -86,18 +86,14 @@ export default function ChangePasswordPage() {
     setIsLoading(true);
 
     try {
-      const supabase = createClient();
+      // Call server action (includes rate limiting)
+      const result = await updatePasswordAction(newPassword, true);
 
-      // Update the password
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: newPassword,
-        data: {
-          must_change_password: false, // Clear the flag
-        },
-      });
-
-      if (updateError) {
-        setError(updateError.message);
+      if (!result.success) {
+        setError(result.error || "Failed to update password");
+        if (result.resetIn && result.remaining === 0) {
+          setIsRateLimited(true);
+        }
         setIsLoading(false);
         return;
       }
@@ -124,14 +120,16 @@ export default function ChangePasswordPage() {
     <div className="flex flex-col gap-8">
       {/* Logo */}
       <div className="flex flex-col items-center gap-2">
-        <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-primary text-primary-foreground font-bold text-xl">
+        <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-rose-500 text-white font-bold text-xl shadow-lg shadow-orange-500/30">
           FC
         </div>
-        <h1 className="text-xl font-semibold text-foreground">Formula Contract</h1>
+        <h1 className="text-xl font-semibold bg-gradient-to-r from-orange-600 to-rose-600 bg-clip-text text-transparent">
+          Formula Contract
+        </h1>
       </div>
 
       {/* Change Password Card */}
-      <Card className="border-border/50 shadow-sm">
+      <GlassCard className="w-full">
         <CardHeader className="text-center pb-2">
           <CardTitle className="text-lg">Change Your Password</CardTitle>
           <CardDescription>
@@ -145,19 +143,25 @@ export default function ChangePasswordPage() {
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             {/* Error Message */}
             {error && (
-              <Alert variant="destructive">
-                <AlertCircleIcon className="size-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
+              <div className={`p-3 rounded-lg text-sm flex items-center gap-2 ${
+                isRateLimited
+                  ? "bg-amber-50 border border-amber-200 text-amber-700"
+                  : "bg-rose-50 border border-rose-200 text-rose-700"
+              }`}>
+                {isRateLimited ? (
+                  <ShieldAlertIcon className="size-4 shrink-0" />
+                ) : (
+                  <AlertCircleIcon className="size-4 shrink-0" />
+                )}
+                {error}
+              </div>
             )}
 
             {/* Info Alert */}
-            <Alert>
-              <AlertCircleIcon className="size-4" />
-              <AlertDescription>
-                You are using a temporary password. Please create a new secure password.
-              </AlertDescription>
-            </Alert>
+            <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-sm flex items-center gap-2">
+              <InfoIcon className="size-4 shrink-0" />
+              You are using a temporary password. Please create a new secure password.
+            </div>
 
             {/* New Password Field */}
             <div className="flex flex-col gap-2">
@@ -241,7 +245,7 @@ export default function ChangePasswordPage() {
             {/* Submit Button */}
             <Button
               type="submit"
-              className="w-full mt-2"
+              className="w-full mt-2 bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600"
               disabled={isLoading || !isPasswordValid || !passwordsMatch}
             >
               {isLoading ? (
@@ -255,7 +259,7 @@ export default function ChangePasswordPage() {
             </Button>
           </form>
         </CardContent>
-      </Card>
+      </GlassCard>
 
       {/* Footer */}
       <p className="text-center text-sm text-muted-foreground">

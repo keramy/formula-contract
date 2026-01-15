@@ -1,9 +1,7 @@
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
-import { Button } from "@/components/ui/button";
-import { PlusIcon } from "lucide-react";
-import Link from "next/link";
 import { ClientsTable } from "./clients-table";
+import { ClientsPageHeader } from "./clients-page-header";
 
 export default async function ClientsPage({
   searchParams,
@@ -33,18 +31,7 @@ export default async function ClientsPage({
   return (
     <div className="p-6">
       {/* Page Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground">Clients</h1>
-          <p className="text-muted-foreground">Manage your client relationships</p>
-        </div>
-        <Button asChild>
-          <Link href="/clients/new">
-            <PlusIcon className="size-4" />
-            New Client
-          </Link>
-        </Button>
-      </div>
+      <ClientsPageHeader />
 
       {/* Clients Table */}
       <Suspense fallback={<div className="py-8 text-center text-muted-foreground">Loading clients...</div>}>

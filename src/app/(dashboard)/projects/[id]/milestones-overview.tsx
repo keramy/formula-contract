@@ -3,9 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { GlassCard, GradientIcon, StatusBadge, EmptyState } from "@/components/ui/ui-helpers";
 import { Progress } from "@/components/ui/progress";
 import {
   AlertDialog,
@@ -136,25 +135,25 @@ export function MilestonesOverview({
     return "upcoming";
   };
 
-  const statusConfig = {
+  const statusConfig: Record<string, { variant: "success" | "danger" | "warning" | "info"; icon: React.ReactNode; label: string }> = {
     completed: {
-      color: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-      icon: <CheckCircleIcon className="size-4" />,
+      variant: "success",
+      icon: <CheckCircleIcon className="size-3.5" />,
       label: "Completed",
     },
     overdue: {
-      color: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-      icon: <AlertTriangleIcon className="size-4" />,
+      variant: "danger",
+      icon: <AlertTriangleIcon className="size-3.5" />,
       label: "Overdue",
     },
     warning: {
-      color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
-      icon: <ClockIcon className="size-4" />,
+      variant: "warning",
+      icon: <ClockIcon className="size-3.5" />,
       label: "Due Soon",
     },
     upcoming: {
-      color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-      icon: <CalendarIcon className="size-4" />,
+      variant: "info",
+      icon: <CalendarIcon className="size-3.5" />,
       label: "Upcoming",
     },
   };
@@ -171,13 +170,19 @@ export function MilestonesOverview({
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-medium">Milestones</h3>
-          <p className="text-sm text-muted-foreground">
-            Track project timeline and key deliverables
-          </p>
+        <div className="flex items-center gap-3">
+          <GradientIcon icon={<FlagIcon className="size-5" />} color="violet" size="default" />
+          <div>
+            <h3 className="text-lg font-medium">Milestones</h3>
+            <p className="text-sm text-muted-foreground">
+              Track project timeline and key deliverables
+            </p>
+          </div>
         </div>
-        <Button onClick={handleAdd}>
+        <Button
+          onClick={handleAdd}
+          className="bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600"
+        >
           <PlusIcon className="size-4" />
           Add Milestone
         </Button>
@@ -185,67 +190,86 @@ export function MilestonesOverview({
 
       {/* Progress */}
       {milestones.length > 0 && (
-        <Card className="p-4">
+        <GlassCard className="p-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium">Overall Progress</span>
-            <span className="text-sm text-muted-foreground">{progress}%</span>
+            <span className="text-sm font-semibold text-violet-600">{progress}%</span>
           </div>
-          <Progress value={progress} className="h-2" />
+          <Progress value={progress} className="h-2.5 [&>div]:bg-gradient-to-r [&>div]:from-violet-500 [&>div]:to-purple-500" />
           <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
-            <span>{stats.completed} completed</span>
-            <span>{stats.upcoming} upcoming</span>
+            <span className="flex items-center gap-1">
+              <div className="size-2 rounded-full bg-emerald-500" />
+              {stats.completed} completed
+            </span>
+            <span className="flex items-center gap-1">
+              <div className="size-2 rounded-full bg-sky-500" />
+              {stats.upcoming} upcoming
+            </span>
             {stats.overdue > 0 && (
-              <span className="text-red-600">{stats.overdue} overdue</span>
+              <span className="flex items-center gap-1 text-rose-600">
+                <div className="size-2 rounded-full bg-rose-500" />
+                {stats.overdue} overdue
+              </span>
             )}
           </div>
-        </Card>
+        </GlassCard>
       )}
 
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4">
-        <Card className="p-4">
+        <GlassCard hover="lift" className="p-4">
           <div className="flex items-center gap-2 text-muted-foreground mb-1">
-            <FlagIcon className="size-4" />
+            <div className="p-1.5 rounded-lg bg-gradient-to-br from-violet-500/10 to-purple-500/10">
+              <FlagIcon className="size-3.5 text-violet-600" />
+            </div>
             <span className="text-xs font-medium">Total</span>
           </div>
           <p className="text-2xl font-bold">{stats.total}</p>
-        </Card>
+        </GlassCard>
 
-        <Card className="p-4">
+        <GlassCard hover="lift" className="p-4">
           <div className="flex items-center gap-2 text-muted-foreground mb-1">
-            <CheckCircleIcon className="size-4 text-green-500" />
+            <div className="p-1.5 rounded-lg bg-gradient-to-br from-emerald-500/10 to-teal-500/10">
+              <CheckCircleIcon className="size-3.5 text-emerald-600" />
+            </div>
             <span className="text-xs font-medium">Completed</span>
           </div>
-          <p className="text-2xl font-bold text-green-600">{stats.completed}</p>
-        </Card>
+          <p className="text-2xl font-bold text-emerald-600">{stats.completed}</p>
+        </GlassCard>
 
-        <Card className="p-4">
+        <GlassCard hover="lift" className="p-4">
           <div className="flex items-center gap-2 text-muted-foreground mb-1">
-            <ClockIcon className="size-4 text-blue-500" />
+            <div className="p-1.5 rounded-lg bg-gradient-to-br from-sky-500/10 to-blue-500/10">
+              <ClockIcon className="size-3.5 text-sky-600" />
+            </div>
             <span className="text-xs font-medium">Upcoming</span>
           </div>
-          <p className="text-2xl font-bold text-blue-600">{stats.upcoming}</p>
-        </Card>
+          <p className="text-2xl font-bold text-sky-600">{stats.upcoming}</p>
+        </GlassCard>
 
-        <Card className="p-4">
+        <GlassCard hover="lift" className="p-4">
           <div className="flex items-center gap-2 text-muted-foreground mb-1">
-            <AlertTriangleIcon className="size-4 text-red-500" />
+            <div className="p-1.5 rounded-lg bg-gradient-to-br from-rose-500/10 to-red-500/10">
+              <AlertTriangleIcon className="size-3.5 text-rose-600" />
+            </div>
             <span className="text-xs font-medium">Overdue</span>
           </div>
-          <p className="text-2xl font-bold text-red-600">{stats.overdue}</p>
-        </Card>
+          <p className="text-2xl font-bold text-rose-600">{stats.overdue}</p>
+        </GlassCard>
       </div>
 
       {/* Overdue Alert */}
       {stats.overdue > 0 && (
-        <Card className="p-4 border-red-200 bg-red-50 dark:bg-red-900/10 dark:border-red-800">
+        <GlassCard className="p-4 border-rose-200 bg-rose-50/80 dark:bg-rose-900/10 dark:border-rose-800">
           <div className="flex items-center gap-2">
-            <AlertTriangleIcon className="size-5 text-red-500" />
-            <span className="font-medium text-red-700 dark:text-red-400">
+            <div className="p-1.5 rounded-lg bg-gradient-to-br from-rose-500/20 to-red-500/20">
+              <AlertTriangleIcon className="size-4 text-rose-600" />
+            </div>
+            <span className="font-medium text-rose-700 dark:text-rose-400">
               {stats.overdue} milestone{stats.overdue !== 1 ? "s" : ""} overdue!
             </span>
           </div>
-        </Card>
+        </GlassCard>
       )}
 
       {/* Milestones List */}
@@ -257,17 +281,17 @@ export function MilestonesOverview({
             const daysUntil = differenceInDays(new Date(milestone.due_date), new Date());
 
             return (
-              <Card key={milestone.id} className={`p-4 ${milestone.is_completed ? "opacity-60" : ""}`}>
+              <GlassCard key={milestone.id} className={`p-4 ${milestone.is_completed ? "opacity-60" : ""}`}>
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start gap-3">
                     {/* Checkbox */}
                     <button
                       onClick={() => handleToggleComplete(milestone)}
                       disabled={isLoading}
-                      className={`mt-0.5 size-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                      className={`mt-0.5 size-5 rounded-full border-2 flex items-center justify-center transition-all ${
                         milestone.is_completed
-                          ? "bg-green-500 border-green-500 text-white"
-                          : "border-muted-foreground/30 hover:border-primary"
+                          ? "bg-gradient-to-br from-emerald-500 to-teal-500 border-emerald-500 text-white shadow-sm shadow-emerald-500/30"
+                          : "border-muted-foreground/30 hover:border-violet-500 hover:bg-violet-50"
                       }`}
                     >
                       {milestone.is_completed && <CheckIcon className="size-3" />}
@@ -276,13 +300,13 @@ export function MilestonesOverview({
                     {/* Content */}
                     <div>
                       <div className="flex items-center gap-2 mb-1">
-                        <h4 className={`font-medium ${milestone.is_completed ? "line-through" : ""}`}>
+                        <h4 className={`font-medium ${milestone.is_completed ? "line-through text-muted-foreground" : ""}`}>
                           {milestone.name}
                         </h4>
-                        <Badge variant="secondary" className={config.color}>
+                        <StatusBadge variant={config.variant}>
                           {config.icon}
                           <span className="ml-1">{config.label}</span>
-                        </Badge>
+                        </StatusBadge>
                       </div>
 
                       {milestone.description && (
@@ -297,7 +321,7 @@ export function MilestonesOverview({
                           {format(new Date(milestone.due_date), "MMM d, yyyy")}
                         </span>
                         {!milestone.is_completed && (
-                          <span className={daysUntil < 0 ? "text-red-600" : ""}>
+                          <span className={daysUntil < 0 ? "text-rose-600 font-medium" : daysUntil <= 7 ? "text-amber-600" : ""}>
                             {daysUntil === 0
                               ? "Due today"
                               : daysUntil > 0
@@ -306,7 +330,7 @@ export function MilestonesOverview({
                           </span>
                         )}
                         {milestone.is_completed && milestone.completed_at && (
-                          <span className="text-green-600">
+                          <span className="text-emerald-600">
                             Completed {format(new Date(milestone.completed_at), "MMM d, yyyy")}
                           </span>
                         )}
@@ -321,6 +345,7 @@ export function MilestonesOverview({
                       variant="ghost"
                       onClick={() => handleEdit(milestone)}
                       disabled={isLoading}
+                      className="hover:bg-violet-50 hover:text-violet-600"
                     >
                       <PencilIcon className="size-3" />
                     </Button>
@@ -329,31 +354,31 @@ export function MilestonesOverview({
                       variant="ghost"
                       onClick={() => handleDeleteClick(milestone.id)}
                       disabled={isLoading}
-                      className="text-destructive hover:text-destructive"
+                      className="text-rose-600 hover:text-rose-700 hover:bg-rose-50"
                     >
                       <TrashIcon className="size-3" />
                     </Button>
                   </div>
                 </div>
-              </Card>
+              </GlassCard>
             );
           })}
         </div>
       ) : (
-        <Card className="p-8">
-          <div className="flex flex-col items-center justify-center text-center">
-            <div className="rounded-full bg-muted p-3 mb-4">
-              <FlagIcon className="size-6 text-muted-foreground" />
-            </div>
-            <p className="text-muted-foreground mb-4">
-              No milestones set yet. Add milestones to track project timeline.
-            </p>
-            <Button onClick={handleAdd}>
+        <EmptyState
+          icon={<FlagIcon className="size-6" />}
+          title="No milestones yet"
+          description="No milestones set yet. Add milestones to track project timeline."
+          action={
+            <Button
+              onClick={handleAdd}
+              className="bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600"
+            >
               <PlusIcon className="size-4" />
               Add First Milestone
             </Button>
-          </div>
-        </Card>
+          }
+        />
       )}
 
       {/* Form Dialog */}

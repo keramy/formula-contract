@@ -1,0 +1,102 @@
+/* Formula Contract Loader - Based on Uiverse.io by kennyotsu */
+
+.formula-loader-card {
+  --bg-color: hsl(var(--background));
+  background-color: var(--bg-color);
+  padding: 1rem 2rem;
+  border-radius: 1.25rem;
+}
+
+.formula-loader {
+  color: hsl(var(--muted-foreground));
+  font-family: var(--font-sans), "Poppins", sans-serif;
+  font-weight: 500;
+  font-size: 25px;
+  box-sizing: content-box;
+  height: 40px;
+  padding: 10px 10px;
+  display: flex;
+  border-radius: 8px;
+}
+
+.formula-loading-text {
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  animation: formula-loading-collapse 5s infinite;
+}
+
+.formula-words {
+  overflow: hidden;
+  position: relative;
+}
+
+.formula-words::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    var(--bg-color) 10%,
+    transparent 30%,
+    transparent 70%,
+    var(--bg-color) 90%
+  );
+  z-index: 20;
+}
+
+.formula-word {
+  display: block;
+  height: 100%;
+  padding-left: 6px;
+  color: hsl(var(--primary));
+  animation: formula-spin 5s infinite;
+}
+
+/* FORMULA brand styling */
+.formula-word.formula-brand {
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding-left: 0;
+}
+
+@keyframes formula-spin {
+  0%, 10% {
+    transform: translateY(0);
+  }
+  15%, 25% {
+    transform: translateY(-100%);
+  }
+  30%, 40% {
+    transform: translateY(-200%);
+  }
+  45%, 55% {
+    transform: translateY(-300%);
+  }
+  60%, 90% {
+    transform: translateY(-400%);
+  }
+  95%, 100% {
+    transform: translateY(0);
+  }
+}
+
+/* Collapse "loading" text completely when FORMULA is showing */
+@keyframes formula-loading-collapse {
+  0%, 56% {
+    width: auto;
+    opacity: 1;
+  }
+  58%, 94% {
+    width: 0;
+    opacity: 0;
+  }
+  95%, 100% {
+    width: auto;
+    opacity: 1;
+  }
+}
+
+/* Dark mode support - automatically uses CSS variables */
+.dark .formula-loader-card {
+  --bg-color: hsl(var(--background));
+}

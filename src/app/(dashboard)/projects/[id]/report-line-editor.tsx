@@ -53,6 +53,7 @@ import {
   XIcon,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { compressImage } from "@/lib/image-utils";
 import {
   addReportLine,
   updateReportLine,
@@ -142,18 +143,18 @@ function SortableLineItem({ line, onEdit, onDelete, disabled }: SortableLineItem
               {photos.slice(0, 4).map((url, idx) => (
                 <div
                   key={idx}
-                  className="relative size-16 rounded-md overflow-hidden bg-muted"
+                  className="relative w-20 h-14 rounded-md overflow-hidden bg-slate-100"
                 >
                   <Image
                     src={url}
                     alt={`Photo ${idx + 1}`}
                     fill
-                    className="object-cover"
+                    className="object-contain"
                   />
                 </div>
               ))}
               {photos.length > 4 && (
-                <div className="size-16 rounded-md bg-muted flex items-center justify-center text-sm text-muted-foreground">
+                <div className="w-20 h-14 rounded-md bg-muted flex items-center justify-center text-sm text-muted-foreground">
                   +{photos.length - 4}
                 </div>
               )}
@@ -271,20 +272,31 @@ export function ReportLineEditor({
     setUploadingPhoto(true);
     const supabase = createClient();
 
-    for (const file of Array.from(files)) {
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${projectId}/${reportId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
+    for (const originalFile of Array.from(files)) {
+      try {
+        // Compress the image before upload
+        const compressedFile = await compressImage(originalFile, {
+          maxWidth: 1920,
+          maxHeight: 1080,
+          quality: 0.8,
+        });
 
-      const { data, error } = await supabase.storage
-        .from("reports")
-        .upload(fileName, file);
+        const fileExt = compressedFile.name.split(".").pop()?.toLowerCase() || "jpg";
+        const fileName = `${projectId}/${reportId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
 
-      if (!error && data) {
-        const { data: { publicUrl } } = supabase.storage
+        const { data, error } = await supabase.storage
           .from("reports")
-          .getPublicUrl(data.path);
+          .upload(fileName, compressedFile);
 
-        setPhotos((prev) => [...prev, publicUrl]);
+        if (!error && data) {
+          const { data: { publicUrl } } = supabase.storage
+            .from("reports")
+            .getPublicUrl(data.path);
+
+          setPhotos((prev) => [...prev, publicUrl]);
+        }
+      } catch (err) {
+        console.error("Photo upload error:", err);
       }
     }
 
@@ -445,13 +457,13 @@ export function ReportLineEditor({
                 {photos.map((url, idx) => (
                   <div
                     key={idx}
-                    className="relative size-20 rounded-md overflow-hidden bg-muted group"
+                    className="relative w-24 h-16 rounded-md overflow-hidden bg-slate-100 group"
                   >
                     <Image
                       src={url}
                       alt={`Photo ${idx + 1}`}
                       fill
-                      className="object-cover"
+                      className="object-contain"
                     />
                     <button
                       type="button"
@@ -464,7 +476,7 @@ export function ReportLineEditor({
                 ))}
 
                 {/* Upload Button */}
-                <label className="size-20 rounded-md border-2 border-dashed border-muted-foreground/25 hover:border-muted-foreground/50 flex flex-col items-center justify-center cursor-pointer transition-colors">
+                <label className="w-24 h-16 rounded-md border-2 border-dashed border-muted-foreground/25 hover:border-muted-foreground/50 flex flex-col items-center justify-center cursor-pointer transition-colors">
                   {uploadingPhoto ? (
                     <Spinner className="size-5" />
                   ) : (

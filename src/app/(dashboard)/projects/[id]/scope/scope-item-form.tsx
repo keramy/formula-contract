@@ -14,9 +14,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Card, CardContent } from "@/components/ui/card";
+import { CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
+import { GlassCard } from "@/components/ui/ui-helpers";
 import { ScopeItemImageUpload } from "@/components/scope-items";
+import { AlertCircleIcon } from "lucide-react";
 import {
   scopeItemSchema,
   safeValidate,
@@ -193,11 +195,12 @@ export function ScopeItemForm({ projectId, projectCurrency = "TRY", initialData 
   };
 
   return (
-    <Card>
+    <GlassCard>
       <CardContent className="pt-6">
         <form onSubmit={handleSubmit} className="space-y-6">
           {error && (
-            <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+            <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-sm flex items-center gap-2">
+              <AlertCircleIcon className="size-4 shrink-0" />
               {error}
             </div>
           )}
@@ -425,7 +428,11 @@ export function ScopeItemForm({ projectId, projectCurrency = "TRY", initialData 
 
           {/* Actions */}
           <div className="flex gap-3 pt-4">
-            <Button type="submit" disabled={isLoading}>
+            <Button
+              type="submit"
+              disabled={isLoading}
+              className="bg-gradient-to-r from-sky-500 to-blue-500 hover:from-sky-600 hover:to-blue-600"
+            >
               {isLoading ? (
                 <>
                   <Spinner className="size-4" />
@@ -448,6 +455,6 @@ export function ScopeItemForm({ projectId, projectCurrency = "TRY", initialData 
           </div>
         </form>
       </CardContent>
-    </Card>
+    </GlassCard>
   );
 }

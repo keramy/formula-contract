@@ -21,8 +21,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { InfoIcon, MailIcon, CopyIcon, CheckIcon, AlertCircleIcon } from "lucide-react";
+import { GradientIcon } from "@/components/ui/ui-helpers";
+import { InfoIcon, MailIcon, CopyIcon, CheckIcon, AlertCircleIcon, UserPlusIcon, UserIcon } from "lucide-react";
 import { inviteUser, updateUser } from "./actions";
 
 interface User {
@@ -150,7 +150,14 @@ export function UserFormDialog({ open, onOpenChange, editUser }: UserFormDialogP
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{isEditing ? "Edit User" : "Add User"}</DialogTitle>
+          <div className="flex items-center gap-2">
+            <GradientIcon
+              icon={isEditing ? <UserIcon className="size-4" /> : <UserPlusIcon className="size-4" />}
+              color="violet"
+              size="sm"
+            />
+            <DialogTitle>{isEditing ? "Edit User" : "Add User"}</DialogTitle>
+          </div>
           <DialogDescription>
             {isEditing
               ? "Update user details and role"
@@ -161,8 +168,8 @@ export function UserFormDialog({ open, onOpenChange, editUser }: UserFormDialogP
         {success ? (
           <div className="py-4 space-y-4">
             <div className="text-center space-y-2">
-              <div className="mx-auto w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                <CheckIcon className="size-6 text-green-600" />
+              <div className="mx-auto w-12 h-12 rounded-full bg-gradient-to-br from-emerald-500/20 to-teal-500/20 flex items-center justify-center">
+                <CheckIcon className="size-6 text-emerald-600" />
               </div>
               <div>
                 <h3 className="font-medium">User Created!</h3>
@@ -176,21 +183,21 @@ export function UserFormDialog({ open, onOpenChange, editUser }: UserFormDialogP
             </div>
 
             {emailSent && (
-              <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300">
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700">
                 <MailIcon className="size-4 shrink-0" />
                 <p className="text-sm">Welcome email sent successfully!</p>
               </div>
             )}
 
             {!emailSent && tempPassword && (
-              <div className="flex items-center gap-2 p-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300">
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-700">
                 <AlertCircleIcon className="size-4 shrink-0" />
                 <p className="text-sm">Email not configured. Please share credentials manually.</p>
               </div>
             )}
 
             {tempPassword && (
-              <div className="space-y-3 p-4 bg-muted/50 rounded-lg">
+              <div className="space-y-3 p-4 bg-gray-50/80 rounded-lg border">
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">Email</Label>
                   <p className="font-mono text-sm">{email}</p>
@@ -201,7 +208,7 @@ export function UserFormDialog({ open, onOpenChange, editUser }: UserFormDialogP
                     <Input
                       value={tempPassword}
                       readOnly
-                      className="font-mono"
+                      className="font-mono bg-white"
                     />
                     <Button
                       variant="outline"
@@ -211,9 +218,10 @@ export function UserFormDialog({ open, onOpenChange, editUser }: UserFormDialogP
                         setCopied(true);
                         setTimeout(() => setCopied(false), 2000);
                       }}
+                      className="hover:bg-violet-50 hover:border-violet-200"
                     >
                       {copied ? (
-                        <CheckIcon className="size-4 text-green-600" />
+                        <CheckIcon className="size-4 text-emerald-600" />
                       ) : (
                         <CopyIcon className="size-4" />
                       )}
@@ -227,25 +235,29 @@ export function UserFormDialog({ open, onOpenChange, editUser }: UserFormDialogP
             )}
 
             <div className="flex justify-center pt-2">
-              <Button onClick={handleClose}>Done</Button>
+              <Button
+                onClick={handleClose}
+                className="bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600"
+              >
+                Done
+              </Button>
             </div>
           </div>
         ) : (
           <>
             <div className="space-y-4 py-2">
               {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
+                <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-sm flex items-center gap-2">
+                  <AlertCircleIcon className="size-4 shrink-0" />
+                  {error}
+                </div>
               )}
 
               {!isEditing && (
-                <Alert>
-                  <InfoIcon className="size-4" />
-                  <AlertDescription>
-                    A temporary password will be generated. Share it with the user to let them log in.
-                  </AlertDescription>
-                </Alert>
+                <div className="p-3 rounded-lg bg-violet-50 border border-violet-200 text-violet-700 text-sm flex items-center gap-2">
+                  <InfoIcon className="size-4 shrink-0" />
+                  A temporary password will be generated. Share it with the user to let them log in.
+                </div>
               )}
 
               {/* Email */}
@@ -311,7 +323,11 @@ export function UserFormDialog({ open, onOpenChange, editUser }: UserFormDialogP
               <Button variant="outline" onClick={handleClose} disabled={isLoading}>
                 Cancel
               </Button>
-              <Button onClick={handleSubmit} disabled={isLoading || !email.trim() || !name.trim()}>
+              <Button
+                onClick={handleSubmit}
+                disabled={isLoading || !email.trim() || !name.trim()}
+                className="bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600"
+              >
                 {isLoading && <Spinner className="size-4 mr-2" />}
                 {isEditing ? "Save Changes" : "Create User"}
               </Button>

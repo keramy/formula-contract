@@ -53,6 +53,7 @@ import {
   CheckCircle2Icon,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { GlassCard, EmptyState, StatusBadge } from "@/components/ui/ui-helpers";
 
 interface ScopeItem {
   id: string;
@@ -265,18 +266,18 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
 
   if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center border rounded-lg bg-muted/30">
-        <div className="rounded-full bg-muted p-4 mb-4">
-          <ClipboardListIcon className="size-8 text-muted-foreground" />
-        </div>
-        <h3 className="font-semibold text-lg mb-1">No scope items</h3>
-        <p className="text-sm text-muted-foreground max-w-sm mb-4">
-          Add scope items to track production and procurement for this project.
-        </p>
-        <Button asChild>
-          <Link href={`/projects/${projectId}/scope/new`}>Add Scope Item</Link>
-        </Button>
-      </div>
+      <GlassCard>
+        <EmptyState
+          icon={<ClipboardListIcon className="size-8" />}
+          title="No scope items"
+          description="Add scope items to track production and procurement for this project."
+          action={
+            <Button asChild className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700">
+              <Link href={`/projects/${projectId}/scope/new`}>Add Scope Item</Link>
+            </Button>
+          }
+        />
+      </GlassCard>
     );
   }
 
@@ -411,11 +412,11 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
       )}
 
       {/* Table */}
-      <div className="border rounded-lg">
+      <GlassCard className="py-0">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead className="w-[40px]">
+            <TableRow className="hover:bg-transparent border-b border-gray-100">
+              <TableHead className="w-[40px] py-4">
                 <Checkbox
                   checked={isAllSelected}
                   ref={(el) => {
@@ -543,7 +544,7 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
             ))}
           </TableBody>
         </Table>
-      </div>
+      </GlassCard>
 
       {/* Unit Price Dialog */}
       <Dialog open={priceDialogOpen} onOpenChange={setPriceDialogOpen}>

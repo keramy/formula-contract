@@ -17,6 +17,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { UploadIcon, FileIcon, XIcon } from "lucide-react";
+import { validateFile, DRAWING_CONFIG, CAD_CONFIG, formatFileSize, sanitizeFileName } from "@/lib/file-validation";
+import { sanitizeText } from "@/lib/sanitize";
 import type { DrawingInsert, DrawingUpdate, DrawingRevisionInsert, ScopeItemUpdate } from "@/types/database";
 
 interface DrawingUploadProps {
@@ -58,8 +60,10 @@ export function DrawingUpload({ scopeItemId, currentRevision, hasDrawing }: Draw
   const handlePdfSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (!file.type.includes("pdf") && !file.type.includes("image")) {
-        setError("Please select a PDF or image file");
+      // Validate using the drawing config (PDF + images)
+      const validation = validateFile(file, DRAWING_CONFIG);
+      if (!validation.valid) {
+        setError(validation.error || "Invalid file");
         return;
       }
       setPdfFile(file);
@@ -70,14 +74,15 @@ export function DrawingUpload({ scopeItemId, currentRevision, hasDrawing }: Draw
   const handleCadSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Validate using the CAD config
+      const validation = validateFile(file, CAD_CONFIG);
+      if (!validation.valid) {
+        setError(validation.error || "Invalid CAD file");
+        return;
+      }
       setCadFile(file);
+      setError(null);
     }
-  };
-
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -97,9 +102,10 @@ export function DrawingUpload({ scopeItemId, currentRevision, hasDrawing }: Draw
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Generate unique file names
+      // Generate unique file names with sanitized names
       const timestamp = Date.now();
-      const pdfFileName = `${scopeItemId}/${nextRevision}_${timestamp}_${pdfFile.name}`;
+      const sanitizedPdfName = sanitizeFileName(pdfFile.name);
+      const pdfFileName = `${scopeItemId}/${nextRevision}_${timestamp}_${sanitizedPdfName}`;
 
       // Upload PDF/image to storage
       const { error: uploadError } = await supabase.storage
@@ -118,7 +124,8 @@ export function DrawingUpload({ scopeItemId, currentRevision, hasDrawing }: Draw
 
       // Upload CAD file if provided
       if (cadFile) {
-        const cadStorageName = `${scopeItemId}/${nextRevision}_${timestamp}_${cadFile.name}`;
+        const sanitizedCadName = sanitizeFileName(cadFile.name);
+        const cadStorageName = `${scopeItemId}/${nextRevision}_${timestamp}_${sanitizedCadName}`;
         const { error: cadUploadError } = await supabase.storage
           .from("drawings")
           .upload(cadStorageName, cadFile);
@@ -175,16 +182,16 @@ export function DrawingUpload({ scopeItemId, currentRevision, hasDrawing }: Draw
         if (updateError) throw updateError;
       }
 
-      // Create revision record
+      // Create revision record with sanitized inputs
       const revisionInsert: DrawingRevisionInsert = {
         drawing_id: drawingId,
         revision: nextRevision,
         file_url: urlData.publicUrl,
-        file_name: pdfFile.name,
+        file_name: sanitizedPdfName,
         file_size: pdfFile.size,
         cad_file_url: cadFileUrl,
-        cad_file_name: cadFileName,
-        notes: notes || null,
+        cad_file_name: cadFileName ? sanitizeFileName(cadFileName) : null,
+        notes: notes ? sanitizeText(notes) : null,
         uploaded_by: user.id,
       };
       const { error: revisionError } = await supabase

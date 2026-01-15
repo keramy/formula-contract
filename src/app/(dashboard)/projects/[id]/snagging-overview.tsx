@@ -4,9 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,6 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { GlassCard, GradientIcon, StatusBadge, EmptyState } from "@/components/ui/ui-helpers";
 import {
   AlertTriangleIcon,
   PlusIcon,
@@ -26,6 +25,7 @@ import {
   PencilIcon,
   TrashIcon,
   CheckIcon,
+  BugIcon,
 } from "lucide-react";
 import { format } from "date-fns";
 import { SnaggingFormDialog } from "./snagging-form-dialog";
@@ -160,13 +160,19 @@ export function SnaggingOverview({
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-medium">Snagging / Defects</h3>
-          <p className="text-sm text-muted-foreground">
-            Track and resolve quality issues
-          </p>
+        <div className="flex items-center gap-3">
+          <GradientIcon icon={<BugIcon className="size-5" />} color="rose" size="default" />
+          <div>
+            <h3 className="text-lg font-medium">Snagging / Defects</h3>
+            <p className="text-sm text-muted-foreground">
+              Track and resolve quality issues
+            </p>
+          </div>
         </div>
-        <Button onClick={handleAdd}>
+        <Button
+          onClick={handleAdd}
+          className="bg-gradient-to-r from-rose-500 to-orange-500 hover:from-rose-600 hover:to-orange-600"
+        >
           <PlusIcon className="size-4" />
           Report Issue
         </Button>
@@ -174,53 +180,61 @@ export function SnaggingOverview({
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
-        <Card className="p-4">
+        <GlassCard hover="lift" className="p-4">
           <div className="flex items-center gap-2 text-muted-foreground mb-1">
-            <AlertTriangleIcon className="size-4" />
+            <div className="p-1.5 rounded-lg bg-gradient-to-br from-slate-500/10 to-gray-500/10">
+              <BugIcon className="size-3.5 text-slate-600" />
+            </div>
             <span className="text-xs font-medium">Total Issues</span>
           </div>
           <p className="text-2xl font-bold">{stats.total}</p>
-        </Card>
+        </GlassCard>
 
-        <Card className="p-4">
+        <GlassCard hover="lift" className="p-4">
           <div className="flex items-center gap-2 text-muted-foreground mb-1">
-            <ClockIcon className="size-4 text-yellow-500" />
+            <div className="p-1.5 rounded-lg bg-gradient-to-br from-amber-500/10 to-yellow-500/10">
+              <ClockIcon className="size-3.5 text-amber-600" />
+            </div>
             <span className="text-xs font-medium">Open</span>
           </div>
-          <p className="text-2xl font-bold text-yellow-600">{stats.open}</p>
-        </Card>
+          <p className="text-2xl font-bold text-amber-600">{stats.open}</p>
+        </GlassCard>
 
-        <Card className="p-4">
+        <GlassCard hover="lift" className="p-4">
           <div className="flex items-center gap-2 text-muted-foreground mb-1">
-            <CheckCircleIcon className="size-4 text-green-500" />
+            <div className="p-1.5 rounded-lg bg-gradient-to-br from-emerald-500/10 to-teal-500/10">
+              <CheckCircleIcon className="size-3.5 text-emerald-600" />
+            </div>
             <span className="text-xs font-medium">Resolved</span>
           </div>
-          <p className="text-2xl font-bold text-green-600">{stats.resolved}</p>
-        </Card>
+          <p className="text-2xl font-bold text-emerald-600">{stats.resolved}</p>
+        </GlassCard>
       </div>
 
       {/* Open Issues Alert */}
       {stats.open > 0 && (
-        <Card className="p-4 border-yellow-200 bg-yellow-50 dark:bg-yellow-900/10 dark:border-yellow-800">
+        <GlassCard className="p-4 border-amber-200 bg-amber-50/80 dark:bg-amber-900/10 dark:border-amber-800">
           <div className="flex items-center gap-2">
-            <AlertTriangleIcon className="size-5 text-yellow-500" />
-            <span className="font-medium text-yellow-700 dark:text-yellow-400">
+            <div className="p-1.5 rounded-lg bg-gradient-to-br from-amber-500/20 to-orange-500/20">
+              <AlertTriangleIcon className="size-4 text-amber-600" />
+            </div>
+            <span className="font-medium text-amber-700 dark:text-amber-400">
               {stats.open} open issue{stats.open !== 1 ? "s" : ""} requiring attention
             </span>
           </div>
-        </Card>
+        </GlassCard>
       )}
 
       {/* Items List */}
       {snaggingItems.length > 0 ? (
         <div className="space-y-3">
           {snaggingItems.map((item) => (
-            <Card key={item.id} className={`p-4 ${item.is_resolved ? "opacity-60" : ""}`}>
+            <GlassCard key={item.id} className={`p-4 ${item.is_resolved ? "opacity-60" : ""}`}>
               <div className="flex gap-4">
                 {/* Photo thumbnail */}
                 <div className="shrink-0">
                   {item.photos && item.photos.length > 0 ? (
-                    <div className="relative size-16 rounded-md overflow-hidden bg-muted">
+                    <div className="relative size-16 rounded-lg overflow-hidden bg-muted ring-1 ring-black/5">
                       <Image
                         src={item.photos[0]}
                         alt="Issue photo"
@@ -228,14 +242,14 @@ export function SnaggingOverview({
                         className="object-cover"
                       />
                       {item.photos.length > 1 && (
-                        <div className="absolute bottom-1 right-1 bg-black/60 text-white text-xs px-1 rounded">
+                        <div className="absolute bottom-1 right-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded-md font-medium">
                           +{item.photos.length - 1}
                         </div>
                       )}
                     </div>
                   ) : (
-                    <div className="size-16 rounded-md bg-muted flex items-center justify-center">
-                      <ImageIcon className="size-6 text-muted-foreground" />
+                    <div className="size-16 rounded-lg bg-gradient-to-br from-slate-100 to-slate-50 flex items-center justify-center ring-1 ring-black/5">
+                      <ImageIcon className="size-6 text-slate-400" />
                     </div>
                   )}
                 </div>
@@ -244,11 +258,11 @@ export function SnaggingOverview({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2 mb-1">
                     <div className="flex items-center gap-2">
-                      <Badge variant={item.is_resolved ? "secondary" : "destructive"}>
+                      <StatusBadge variant={item.is_resolved ? "success" : "danger"}>
                         {item.is_resolved ? "Resolved" : "Open"}
-                      </Badge>
+                      </StatusBadge>
                       {item.item && (
-                        <span className="text-xs text-muted-foreground font-mono">
+                        <span className="text-xs text-muted-foreground font-mono bg-slate-100 px-1.5 py-0.5 rounded">
                           {item.item.item_code}
                         </span>
                       )}
@@ -267,8 +281,8 @@ export function SnaggingOverview({
                   )}
 
                   {item.is_resolved && item.resolution_notes && (
-                    <div className="p-2 rounded-md bg-green-50 dark:bg-green-900/20 mb-2">
-                      <p className="text-xs font-medium text-green-700 dark:text-green-400">
+                    <div className="p-2.5 rounded-lg bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 mb-2 ring-1 ring-emerald-200/50">
+                      <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
                         Resolution: {item.resolution_notes}
                       </p>
                     </div>
@@ -279,10 +293,9 @@ export function SnaggingOverview({
                     {!item.is_resolved && (
                       <Button
                         size="sm"
-                        variant="outline"
                         onClick={() => handleResolveClick(item)}
                         disabled={isLoading}
-                        className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                        className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white"
                       >
                         <CheckIcon className="size-3 mr-1" />
                         Resolve
@@ -302,7 +315,7 @@ export function SnaggingOverview({
                       variant="ghost"
                       onClick={() => handleDeleteClick(item.id)}
                       disabled={isLoading}
-                      className="text-destructive hover:text-destructive"
+                      className="text-rose-600 hover:text-rose-700 hover:bg-rose-50"
                     >
                       <TrashIcon className="size-3 mr-1" />
                       Delete
@@ -310,24 +323,24 @@ export function SnaggingOverview({
                   </div>
                 </div>
               </div>
-            </Card>
+            </GlassCard>
           ))}
         </div>
       ) : (
-        <Card className="p-8">
-          <div className="flex flex-col items-center justify-center text-center">
-            <div className="rounded-full bg-muted p-3 mb-4">
-              <AlertTriangleIcon className="size-6 text-muted-foreground" />
-            </div>
-            <p className="text-muted-foreground mb-4">
-              No snagging items reported yet. Report issues as they arise during production or installation.
-            </p>
-            <Button onClick={handleAdd}>
+        <EmptyState
+          icon={<BugIcon className="size-6" />}
+          title="No issues reported"
+          description="No snagging items reported yet. Report issues as they arise during production or installation."
+          action={
+            <Button
+              onClick={handleAdd}
+              className="bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600"
+            >
               <PlusIcon className="size-4" />
               Report First Issue
             </Button>
-          </div>
-        </Card>
+          }
+        />
       )}
 
       {/* Form Dialog */}

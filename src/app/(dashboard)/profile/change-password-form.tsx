@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { GlassCard, GradientIcon } from "@/components/ui/ui-helpers";
 import { KeyIcon, CheckCircleIcon, AlertCircleIcon, EyeIcon, EyeOffIcon } from "lucide-react";
 
 export function ChangePasswordForm() {
@@ -102,28 +102,28 @@ export function ChangePasswordForm() {
   };
 
   return (
-    <Card>
+    <GlassCard>
       <CardHeader>
         <div className="flex items-center gap-2">
-          <KeyIcon className="size-5 text-muted-foreground" />
-          <CardTitle>Change Password</CardTitle>
+          <GradientIcon icon={<KeyIcon className="size-4" />} color="amber" size="sm" />
+          <CardTitle className="text-base">Change Password</CardTitle>
         </div>
         <CardDescription>Update your password to keep your account secure</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <Alert variant="destructive">
+            <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-sm flex items-center gap-2">
               <AlertCircleIcon className="size-4" />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
+              {error}
+            </div>
           )}
 
           {success && (
-            <Alert className="border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-900/20 dark:text-green-400">
+            <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm flex items-center gap-2">
               <CheckCircleIcon className="size-4" />
-              <AlertDescription>Password changed successfully!</AlertDescription>
-            </Alert>
+              Password changed successfully!
+            </div>
           )}
 
           {/* Current Password */}
@@ -220,7 +220,11 @@ export function ChangePasswordForm() {
 
           {/* Submit */}
           <div className="pt-4">
-            <Button type="submit" disabled={isLoading || !canSubmit}>
+            <Button
+              type="submit"
+              disabled={isLoading || !canSubmit}
+              className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
+            >
               {isLoading ? (
                 <>
                   <Spinner className="size-4" />
@@ -233,6 +237,6 @@ export function ChangePasswordForm() {
           </div>
         </form>
       </CardContent>
-    </Card>
+    </GlassCard>
   );
 }

@@ -604,6 +604,27 @@ export interface Database {
         };
         Relationships: [];
       };
+      report_shares: {
+        Row: {
+          id: string;
+          report_id: string;
+          user_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          report_id: string;
+          user_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          report_id?: string;
+          user_id?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       notifications: {
         Row: {
           id: string;
@@ -718,6 +739,7 @@ export type ItemMaterial = Database["public"]["Tables"]["item_materials"]["Row"]
 export type Snagging = Database["public"]["Tables"]["snagging"]["Row"];
 export type Report = Database["public"]["Tables"]["reports"]["Row"];
 export type ReportLine = Database["public"]["Tables"]["report_lines"]["Row"];
+export type ReportShare = Database["public"]["Tables"]["report_shares"]["Row"];
 export type Notification = Database["public"]["Tables"]["notifications"]["Row"];
 export type ActivityLog = Database["public"]["Tables"]["activity_log"]["Row"];
 
