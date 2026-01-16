@@ -1,0 +1,65 @@
+import { defineConfig, devices } from "@playwright/test";
+import path from "path";
+
+/**
+ * Playwright Configuration for Formula Contract
+ *
+ * Test Structure:
+ * 1. setup - Authenticates once and saves session
+ * 2. chromium - Runs authenticated tests using saved session
+ * 3. lighthouse - Runs performance audits (separate project)
+ *
+ * Usage:
+ * - npm run test:e2e        - Run all E2E tests
+ * - npm run test:e2e:ui     - Run with Playwright UI
+ * - npm run lighthouse      - Run only Lighthouse audits
+ */
+
+const authFile = path.join(__dirname, ".auth/user.json");
+
+export default defineConfig({
+  testDir: "./e2e",
+  fullyParallel: true,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI ? 1 : undefined,
+  reporter: [
+    ["html", { outputFolder: "playwright-report" }],
+    ["list"],
+  ],
+  use: {
+    baseURL: "http://localhost:3000",
+    trace: "on-first-retry",
+    screenshot: "only-on-failure",
+    video: "on-first-retry",
+  },
+  projects: [
+    // Setup project - runs first to authenticate
+    {
+      name: "setup",
+      testMatch: /.*\.setup\.ts/,
+    },
+    // Main test project - uses authenticated state
+    {
+      name: "chromium",
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: authFile,
+      },
+      dependencies: ["setup"],
+      testIgnore: /.*\.setup\.ts|.*lighthouse.*\.ts/,
+    },
+    // Lighthouse audits - separate project (no auth dependency for public pages)
+    {
+      name: "lighthouse",
+      testMatch: /.*lighthouse.*\.ts/,
+      use: { ...devices["Desktop Chrome"] },
+    },
+  ],
+  webServer: {
+    command: "npm run dev",
+    url: "http://localhost:3000",
+    reuseExistingServer: !process.env.CI,
+    timeout: 120 * 1000,
+  },
+});

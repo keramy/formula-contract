@@ -1,56 +1,95 @@
 "use server";
 
+/**
+ * Project Assignments Server Actions
+ *
+ * Handles user-project assignment operations including:
+ * - Listing project team members
+ * - Finding available users to assign
+ * - Assigning/removing users from projects
+ */
+
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { logActivity } from "@/lib/activity-log/actions";
 import { ACTIVITY_ACTIONS } from "@/lib/activity-log/constants";
 
-export async function getProjectAssignments(projectId: string) {
+// ============================================================================
+// Types
+// ============================================================================
+
+export interface ProjectAssignment {
+  id: string;
+  assigned_at: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+  };
+  assigned_by_user: { name: string } | null;
+}
+
+export interface AvailableUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+}
+
+export interface ActionResult {
+  success: boolean;
+  error?: string;
+}
+
+// ============================================================================
+// Query Operations
+// ============================================================================
+
+/**
+ * Get all users assigned to a project
+ */
+export async function getProjectAssignments(projectId: string): Promise<ProjectAssignment[]> {
   const supabase = await createClient();
 
-  // Get assignments
-  const { data: assignmentsData, error: assignmentsError } = await supabase
+  // OPTIMIZED: Single query with nested user select (was 2 queries)
+  // Using explicit FK reference to avoid "more than one relationship" error
+  // (project_assignments has both user_id and assigned_by pointing to users)
+  const { data, error } = await supabase
     .from("project_assignments")
-    .select("id, assigned_at, user_id")
+    .select(`
+      id,
+      assigned_at,
+      user:users!project_assignments_user_id_fkey(id, name, email, role),
+      assigned_by_user:users!project_assignments_assigned_by_fkey(name)
+    `)
     .eq("project_id", projectId)
     .order("assigned_at", { ascending: false });
 
-  if (assignmentsError) {
-    console.error("Error fetching assignments:", assignmentsError.message);
+  if (error) {
+    console.error("Error fetching assignments:", error.message);
     return [];
   }
 
-  if (!assignmentsData || assignmentsData.length === 0) {
+  if (!data || data.length === 0) {
     return [];
   }
 
-  // Get user details for assigned users
-  const userIds = assignmentsData.map((a) => a.user_id);
-  const { data: usersData, error: usersError } = await supabase
-    .from("users")
-    .select("id, name, email, role")
-    .in("id", userIds);
-
-  if (usersError) {
-    console.error("Error fetching users:", usersError.message);
-    return [];
-  }
-
-  // Map users by id
-  const usersMap = new Map((usersData || []).map((u) => [u.id, u]));
-
-  // Combine data
-  const assignments = assignmentsData.map((item) => ({
+  // Transform to expected format
+  const assignments = data.map((item) => ({
     id: item.id,
     assigned_at: item.assigned_at,
-    user: usersMap.get(item.user_id) || { id: item.user_id, name: "Unknown", email: "", role: "unknown" },
-    assigned_by_user: null,
+    user: item.user || { id: "", name: "Unknown", email: "", role: "unknown" },
+    assigned_by_user: item.assigned_by_user || null,
   }));
 
-  return assignments;
+  return assignments as unknown as ProjectAssignment[];
 }
 
-export async function getAvailableUsers(projectId: string) {
+/**
+ * Get users who are not yet assigned to a project
+ */
+export async function getAvailableUsers(projectId: string): Promise<AvailableUser[]> {
   const supabase = await createClient();
 
   // Get users who are not already assigned to this project
@@ -82,10 +121,17 @@ export async function getAvailableUsers(projectId: string) {
   return data || [];
 }
 
+// ============================================================================
+// Mutation Operations
+// ============================================================================
+
+/**
+ * Assign a user to a project
+ */
 export async function assignUserToProject(
   projectId: string,
   userId: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<ActionResult> {
   const supabase = await createClient();
 
   // Get current user for assigned_by
@@ -139,10 +185,13 @@ export async function assignUserToProject(
   return { success: true };
 }
 
+/**
+ * Remove a user from a project
+ */
 export async function removeUserFromProject(
   projectId: string,
   userId: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<ActionResult> {
   const supabase = await createClient();
 
   // Get user details for logging

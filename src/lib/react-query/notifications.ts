@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
 import {
   getNotifications,
   getUnreadCount,
@@ -17,12 +18,34 @@ export const notificationKeys = {
 };
 
 /**
+ * OPTIMIZED: Hook to detect if page is visible (for focus-aware polling)
+ * Stops polling when user switches to another tab/window
+ */
+function usePageVisibility() {
+  const [isVisible, setIsVisible] = useState(true);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setIsVisible(document.visibilityState === "visible");
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
+
+  return isVisible;
+}
+
+/**
  * Hook for fetching notifications with automatic caching and background refetching
  *
  * Features:
- * - Automatic polling every 30 seconds for unread count
+ * - Automatic polling every 60 seconds for unread count (when tab is focused)
  * - Deduplicated requests (multiple components won't cause multiple fetches)
  * - Stale-while-revalidate pattern for instant UI with fresh data
+ * - OPTIMIZED: Focus-aware polling - stops when tab is not visible
  */
 export function useNotifications(limit: number = 20) {
   return useQuery({
@@ -31,21 +54,28 @@ export function useNotifications(limit: number = 20) {
     // Don't refetch in background for the list (triggered manually on dropdown open)
     refetchInterval: false,
     // Keep stale data while refetching
-    staleTime: 30 * 1000, // 30 seconds
+    staleTime: 60 * 1000, // 60 seconds (increased from 30s)
+    // Refetch when window regains focus
+    refetchOnWindowFocus: true,
   });
 }
 
 /**
- * Hook for fetching unread notification count with polling
+ * Hook for fetching unread notification count with OPTIMIZED polling
+ * PERFORMANCE: Polls every 60 seconds (was 30s) and only when tab is visible
  */
 export function useUnreadCount() {
+  const isPageVisible = usePageVisibility();
+
   return useQuery({
     queryKey: notificationKeys.unreadCount(),
     queryFn: getUnreadCount,
-    // Poll every 30 seconds for real-time unread count
-    refetchInterval: 30 * 1000,
-    // Keep data fresh for 15 seconds
-    staleTime: 15 * 1000,
+    // OPTIMIZED: Poll every 60 seconds (was 30s), only when page is visible
+    refetchInterval: isPageVisible ? 60 * 1000 : false,
+    // Keep data fresh for 30 seconds (was 15s)
+    staleTime: 30 * 1000,
+    // Refetch immediately when window regains focus
+    refetchOnWindowFocus: true,
   });
 }
 

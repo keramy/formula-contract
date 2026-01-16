@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { createClient } from "@/lib/supabase/client";
+import { bulkUpdateScopeItems, bulkAssignMaterials, type ScopeItemField } from "@/lib/actions/scope-items";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -132,8 +133,8 @@ const unitOptions = [
 
 export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" }: ScopeItemsTableProps) {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [isUpdating, setIsUpdating] = useState(false);
 
   // Dialog states for numeric inputs
   const [priceDialogOpen, setPriceDialogOpen] = useState(false);
@@ -169,28 +170,21 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
     setSelectedIds(new Set());
   };
 
-  const bulkUpdate = async (field: string, value: unknown) => {
+  const bulkUpdate = (field: ScopeItemField, value: unknown) => {
     if (selectedIds.size === 0) return;
 
-    setIsUpdating(true);
-    try {
-      const supabase = createClient();
+    startTransition(async () => {
       const ids = Array.from(selectedIds);
+      const result = await bulkUpdateScopeItems(projectId, ids, field, value);
 
-      const { error } = await supabase
-        .from("scope_items")
-        .update({ [field]: value })
-        .in("id", ids);
-
-      if (error) throw error;
-
-      setSelectedIds(new Set());
-      router.refresh();
-    } catch (error) {
-      console.error("Bulk update failed:", error);
-    } finally {
-      setIsUpdating(false);
-    }
+      if (result.success) {
+        setSelectedIds(new Set());
+        router.refresh();
+        toast.success(`Updated ${ids.length} item${ids.length > 1 ? "s" : ""}`);
+      } else {
+        toast.error(result.error || "Failed to update items");
+      }
+    });
   };
 
   const handlePriceSubmit = () => {
@@ -221,47 +215,25 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
     setSelectedMaterialIds(newSelected);
   };
 
-  const handleMaterialsSubmit = async () => {
+  const handleMaterialsSubmit = () => {
     if (selectedIds.size === 0 || selectedMaterialIds.size === 0) return;
 
-    setIsUpdating(true);
-    try {
-      const supabase = createClient();
+    startTransition(async () => {
       const itemIds = Array.from(selectedIds);
       const materialIds = Array.from(selectedMaterialIds);
 
-      // Create assignments for all combinations
-      const assignments: { item_id: string; material_id: string }[] = [];
-      for (const itemId of itemIds) {
-        for (const materialId of materialIds) {
-          assignments.push({ item_id: itemId, material_id: materialId });
-        }
+      const result = await bulkAssignMaterials(projectId, itemIds, materialIds);
+
+      if (result.success && result.data) {
+        setSelectedIds(new Set());
+        setSelectedMaterialIds(new Set());
+        setMaterialsDialogOpen(false);
+        router.refresh();
+        toast.success(`Assigned ${result.data.assigned} material-item combination${result.data.assigned !== 1 ? "s" : ""}`);
+      } else {
+        toast.error(result.error || "Failed to assign materials");
       }
-
-      // Upsert to avoid duplicates (using onConflict would be ideal but let's do it safely)
-      for (const assignment of assignments) {
-        // Check if assignment exists
-        const { data: existing } = await supabase
-          .from("item_materials")
-          .select("id")
-          .eq("item_id", assignment.item_id)
-          .eq("material_id", assignment.material_id)
-          .single();
-
-        if (!existing) {
-          await supabase.from("item_materials").insert(assignment);
-        }
-      }
-
-      setSelectedIds(new Set());
-      setSelectedMaterialIds(new Set());
-      setMaterialsDialogOpen(false);
-      router.refresh();
-    } catch (error) {
-      console.error("Material assignment failed:", error);
-    } finally {
-      setIsUpdating(false);
-    }
+    });
   };
 
   if (items.length === 0) {
@@ -303,12 +275,12 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
           </div>
 
           <div className="flex items-center gap-2 ml-auto">
-            {isUpdating && <Spinner className="size-4" />}
+            {isPending && <Spinner className="size-4" />}
 
             {/* Bulk Actions Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" disabled={isUpdating}>
+                <Button variant="outline" size="sm" disabled={isPending}>
                   Bulk Actions
                   <ChevronDownIcon className="size-4 ml-1" />
                 </Button>
@@ -403,7 +375,7 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Button variant="ghost" size="sm" onClick={clearSelection} disabled={isUpdating}>
+            <Button variant="ghost" size="sm" onClick={clearSelection} disabled={isPending}>
               <XIcon className="size-4" />
               Clear
             </Button>
@@ -652,9 +624,9 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
             </Button>
             <Button
               onClick={handleMaterialsSubmit}
-              disabled={isUpdating || selectedMaterialIds.size === 0}
+              disabled={isPending || selectedMaterialIds.size === 0}
             >
-              {isUpdating && <Spinner className="size-4 mr-2" />}
+              {isPending && <Spinner className="size-4 mr-2" />}
               Assign {selectedMaterialIds.size > 0 ? `(${selectedMaterialIds.size})` : ""}
             </Button>
           </DialogFooter>

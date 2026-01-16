@@ -1,10 +1,24 @@
 "use server";
 
+/**
+ * Reports Server Actions
+ *
+ * Handles all report-related operations including:
+ * - Report CRUD operations
+ * - Report line management
+ * - Publishing/unpublishing
+ * - Sharing and photo uploads
+ */
+
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { logActivity } from "@/lib/activity-log/actions";
 import { ACTIVITY_ACTIONS } from "@/lib/activity-log/constants";
 import { sanitizeText, sanitizeHTML } from "@/lib/sanitize";
+
+// ============================================================================
+// Types
+// ============================================================================
 
 export interface SharedUser {
   id: string;
@@ -41,7 +55,20 @@ export interface ReportLine {
   updated_at: string;
 }
 
-// Get all reports for a project
+export interface ActionResult<T = void> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
+
+// ============================================================================
+// Query Operations
+// ============================================================================
+
+/**
+ * Get all reports for a project
+ * OPTIMIZED: Reduced from 5 queries to 2 queries using nested selects
+ */
 export async function getProjectReports(projectId: string): Promise<Report[]> {
   const supabase = await createClient();
 
@@ -57,13 +84,16 @@ export async function getProjectReports(projectId: string): Promise<Report[]> {
 
   const isClient = profile?.role === "client";
 
+  // OPTIMIZED: Single query with nested selects for lines and shares
   let query = supabase
     .from("reports")
     .select(`
       id, project_id, report_type, is_published, published_at,
       share_with_client, share_internal, created_by, updated_by, created_at, updated_at,
       creator:users!reports_created_by_fkey(name),
-      updater:users!reports_updated_by_fkey(name)
+      updater:users!reports_updated_by_fkey(name),
+      report_lines(id, report_id, line_order, title, description, photos, created_at, updated_at),
+      report_shares(report_id, user:users(id, name, email))
     `)
     .eq("project_id", projectId)
     .order("created_at", { ascending: false });
@@ -80,61 +110,46 @@ export async function getProjectReports(projectId: string): Promise<Report[]> {
     return [];
   }
 
-  // Fetch lines for each report
-  const reports = (data || []) as unknown as Report[];
+  // Transform data to expected format
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const reports = (data || []).map((report: any) => {
+    // Sort lines by line_order
+    const lines = (report.report_lines || []).sort(
+      (a: ReportLine, b: ReportLine) => a.line_order - b.line_order
+    );
 
-  if (reports.length > 0) {
-    const reportIds = reports.map(r => r.id);
+    // Extract shared users from report_shares
+    const sharedWith = (report.report_shares || [])
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .filter((share: any) => share.user)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((share: any) => share.user as SharedUser);
 
-    // Fetch report lines
-    const { data: linesData } = await supabase
-      .from("report_lines")
-      .select("id, report_id, line_order, title, description, photos, created_at, updated_at")
-      .in("report_id", reportIds)
-      .order("line_order", { ascending: true });
-
-    // Fetch shared users for each report
-    const { data: sharesData } = await supabase
-      .from("report_shares")
-      .select(`
-        report_id,
-        user:users(id, name, email)
-      `)
-      .in("report_id", reportIds);
-
-    // Group lines by report_id
-    const lines = (linesData || []) as unknown as ReportLine[];
-    const linesByReport = lines.reduce((acc, line) => {
-      if (!acc[line.report_id]) {
-        acc[line.report_id] = [];
-      }
-      acc[line.report_id].push(line);
-      return acc;
-    }, {} as Record<string, ReportLine[]>);
-
-    // Group shared users by report_id
-    const sharesByReport = (sharesData || []).reduce((acc, share) => {
-      const reportId = share.report_id as string;
-      if (!acc[reportId]) {
-        acc[reportId] = [];
-      }
-      if (share.user) {
-        acc[reportId].push(share.user as unknown as SharedUser);
-      }
-      return acc;
-    }, {} as Record<string, SharedUser[]>);
-
-    // Attach lines and shared users to reports
-    reports.forEach(report => {
-      report.lines = linesByReport[report.id] || [];
-      report.shared_with = sharesByReport[report.id] || [];
-    });
-  }
+    return {
+      id: report.id,
+      project_id: report.project_id,
+      report_type: report.report_type,
+      is_published: report.is_published,
+      published_at: report.published_at,
+      share_with_client: report.share_with_client,
+      share_internal: report.share_internal,
+      created_by: report.created_by,
+      updated_by: report.updated_by,
+      created_at: report.created_at,
+      updated_at: report.updated_at,
+      creator: report.creator,
+      updater: report.updater,
+      lines,
+      shared_with: sharedWith,
+    } as Report;
+  });
 
   return reports;
 }
 
-// Get a single report with lines
+/**
+ * Get a single report with lines
+ */
 export async function getReportDetail(reportId: string): Promise<Report | null> {
   const supabase = await createClient();
 
@@ -174,11 +189,44 @@ export async function getReportDetail(reportId: string): Promise<Report | null> 
   };
 }
 
-// Create a new report
+/**
+ * Get all users for sharing picker (project team members)
+ */
+export async function getProjectTeamMembers(
+  projectId: string
+): Promise<Array<{ id: string; name: string; email: string; role: string }>> {
+  const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  // Get project team members from project_assignments
+  const { data: teamData } = await supabase
+    .from("project_assignments")
+    .select(`
+      user:users(id, name, email, role)
+    `)
+    .eq("project_id", projectId);
+
+  if (!teamData) return [];
+
+  // Extract and return user data
+  return teamData
+    .filter(t => t.user)
+    .map(t => t.user as unknown as { id: string; name: string; email: string; role: string });
+}
+
+// ============================================================================
+// Report CRUD Operations
+// ============================================================================
+
+/**
+ * Create a new report
+ */
 export async function createReport(
   projectId: string,
   reportType: string = "progress"
-): Promise<{ success: boolean; reportId?: string; error?: string }> {
+): Promise<ActionResult<{ reportId: string }>> {
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -212,10 +260,12 @@ export async function createReport(
   });
 
   revalidatePath(`/projects/${projectId}`);
-  return { success: true, reportId: data.id };
+  return { success: true, data: { reportId: data.id } };
 }
 
-// Update report metadata
+/**
+ * Update report metadata
+ */
 export async function updateReport(
   reportId: string,
   data: {
@@ -223,7 +273,7 @@ export async function updateReport(
     share_with_client?: boolean;
     share_internal?: boolean;
   }
-): Promise<{ success: boolean; error?: string }> {
+): Promise<ActionResult> {
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -257,8 +307,10 @@ export async function updateReport(
   return { success: true };
 }
 
-// Delete a report
-export async function deleteReport(reportId: string): Promise<{ success: boolean; error?: string }> {
+/**
+ * Delete a report
+ */
+export async function deleteReport(reportId: string): Promise<ActionResult> {
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -288,8 +340,14 @@ export async function deleteReport(reportId: string): Promise<{ success: boolean
   return { success: true };
 }
 
-// Publish a report
-export async function publishReport(reportId: string): Promise<{ success: boolean; error?: string }> {
+// ============================================================================
+// Report Publishing Operations
+// ============================================================================
+
+/**
+ * Publish a report
+ */
+export async function publishReport(reportId: string): Promise<ActionResult> {
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -329,8 +387,10 @@ export async function publishReport(reportId: string): Promise<{ success: boolea
   return { success: true };
 }
 
-// Unpublish a report
-export async function unpublishReport(reportId: string): Promise<{ success: boolean; error?: string }> {
+/**
+ * Unpublish a report
+ */
+export async function unpublishReport(reportId: string): Promise<ActionResult> {
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -363,7 +423,13 @@ export async function unpublishReport(reportId: string): Promise<{ success: bool
   return { success: true };
 }
 
-// Add a report line
+// ============================================================================
+// Report Line Operations
+// ============================================================================
+
+/**
+ * Add a report line
+ */
 export async function addReportLine(
   reportId: string,
   data: {
@@ -371,7 +437,7 @@ export async function addReportLine(
     description?: string;
     photos?: string[];
   }
-): Promise<{ success: boolean; lineId?: string; error?: string }> {
+): Promise<ActionResult<{ lineId: string }>> {
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -421,10 +487,12 @@ export async function addReportLine(
     revalidatePath(`/projects/${report.project_id}`);
   }
 
-  return { success: true, lineId: newLine.id };
+  return { success: true, data: { lineId: newLine.id } };
 }
 
-// Update a report line
+/**
+ * Update a report line
+ */
 export async function updateReportLine(
   lineId: string,
   data: {
@@ -432,7 +500,7 @@ export async function updateReportLine(
     description?: string;
     photos?: string[];
   }
-): Promise<{ success: boolean; error?: string }> {
+): Promise<ActionResult> {
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -463,8 +531,10 @@ export async function updateReportLine(
   return { success: true };
 }
 
-// Delete a report line
-export async function deleteReportLine(lineId: string): Promise<{ success: boolean; error?: string }> {
+/**
+ * Delete a report line
+ */
+export async function deleteReportLine(lineId: string): Promise<ActionResult> {
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -483,11 +553,13 @@ export async function deleteReportLine(lineId: string): Promise<{ success: boole
   return { success: true };
 }
 
-// Reorder report lines
+/**
+ * Reorder report lines
+ */
 export async function reorderReportLines(
   reportId: string,
   lineIds: string[]
-): Promise<{ success: boolean; error?: string }> {
+): Promise<ActionResult> {
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -524,12 +596,18 @@ export async function reorderReportLines(
   return { success: true };
 }
 
-// Upload photo for report line
+// ============================================================================
+// Report Photo & Sharing Operations
+// ============================================================================
+
+/**
+ * Upload photo for report line
+ */
 export async function uploadReportPhoto(
   projectId: string,
   reportId: string,
   file: File
-): Promise<{ success: boolean; url?: string; error?: string }> {
+): Promise<ActionResult<{ url: string }>> {
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -552,14 +630,16 @@ export async function uploadReportPhoto(
     .from("reports")
     .getPublicUrl(data.path);
 
-  return { success: true, url: publicUrl };
+  return { success: true, data: { url: publicUrl } };
 }
 
-// Update report shares (replace all shares with new list)
+/**
+ * Update report shares (replace all shares with new list)
+ */
 export async function updateReportShares(
   reportId: string,
   userIds: string[]
-): Promise<{ success: boolean; error?: string }> {
+): Promise<ActionResult> {
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -605,29 +685,4 @@ export async function updateReportShares(
   }
 
   return { success: true };
-}
-
-// Get all users for sharing picker (project team members)
-export async function getProjectTeamMembers(
-  projectId: string
-): Promise<Array<{ id: string; name: string; email: string; role: string }>> {
-  const supabase = await createClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
-
-  // Get project team members from project_assignments
-  const { data: teamData } = await supabase
-    .from("project_assignments")
-    .select(`
-      user:users(id, name, email, role)
-    `)
-    .eq("project_id", projectId);
-
-  if (!teamData) return [];
-
-  // Extract and return user data
-  return teamData
-    .filter(t => t.user)
-    .map(t => t.user as unknown as { id: string; name: string; email: string; role: string });
 }

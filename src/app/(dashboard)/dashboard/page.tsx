@@ -14,6 +14,7 @@ import {
   PlusIcon,
 } from "lucide-react";
 import { DashboardHeader } from "./dashboard-header";
+import { getCachedDashboardStats, getCachedRecentProjects } from "@/lib/cache";
 
 // Status configuration for badges
 const statusConfig: Record<string, { variant: "info" | "success" | "warning" | "default" | "danger"; label: string }> = {
@@ -25,83 +26,63 @@ const statusConfig: Record<string, { variant: "info" | "success" | "warning" | "
 };
 
 export default async function DashboardPage() {
+  const pageStart = performance.now();
+  console.log("\n📊 [PROFILE] Dashboard Data Fetch Starting...");
+
+  // OPTIMIZED: Use cached data for stats (60s TTL)
+  // This dramatically speeds up the slow COUNT queries
   const supabase = await createClient();
 
-  // Get current user
-  const { data: { user } } = await supabase.auth.getUser();
-  let userName = "User";
-  let userRole = "pm";
+  // Run user auth and cached stats in parallel
+  const [
+    authResult,
+    cachedStats,
+    recentProjects,
+  ] = await Promise.all([
+    // 1. User auth + profile (not cached - user-specific)
+    (async () => {
+      const start = performance.now();
+      const { data: { user } } = await supabase.auth.getUser();
+      let userName = "User";
+      let userRole = "pm";
 
-  if (user) {
-    const { data: profile } = await supabase
-      .from("users")
-      .select("name, role")
-      .eq("id", user.id)
-      .single();
-    if (profile) {
-      userName = profile.name || "User";
-      userRole = profile.role;
-    }
-  }
+      if (user) {
+        const { data: profile } = await supabase
+          .from("users")
+          .select("name, role")
+          .eq("id", user.id)
+          .single();
+        if (profile) {
+          userName = profile.name || "User";
+          userRole = profile.role;
+        }
+      }
+      console.log(`  👤 Auth + Profile: ${(performance.now() - start).toFixed(0)}ms`);
+      return { userName, userRole };
+    })(),
+    // 2. Cached dashboard stats (60s cache)
+    (async () => {
+      const start = performance.now();
+      const stats = await getCachedDashboardStats();
+      console.log(`  📊 Cached Stats: ${(performance.now() - start).toFixed(0)}ms`);
+      return stats;
+    })(),
+    // 3. Cached recent projects (60s cache)
+    (async () => {
+      const start = performance.now();
+      const projects = await getCachedRecentProjects();
+      console.log(`  📋 Cached Recent: ${(performance.now() - start).toFixed(0)}ms`);
+      return projects;
+    })(),
+  ]);
 
-  // Fetch project counts by status
-  const { data: projects } = await supabase
-    .from("projects")
-    .select("id, status")
-    .eq("is_deleted", false);
+  const { userName, userRole } = authResult;
+  const { projectCounts, clientCount, userCount } = cachedStats;
 
-  const projectCounts = {
-    total: projects?.length || 0,
-    active: projects?.filter(p => p.status === "active").length || 0,
-    tender: projects?.filter(p => p.status === "tender").length || 0,
-    on_hold: projects?.filter(p => p.status === "on_hold").length || 0,
-    completed: projects?.filter(p => p.status === "completed").length || 0,
-    cancelled: projects?.filter(p => p.status === "cancelled").length || 0,
-  };
+  // Recent projects already have client data merged from cache
+  const projectsWithClients = recentProjects;
 
-  // Fetch client count
-  const { count: clientCount } = await supabase
-    .from("clients")
-    .select("*", { count: "exact", head: true })
-    .eq("is_deleted", false);
-
-  // Fetch user count
-  const { count: userCount } = await supabase
-    .from("users")
-    .select("*", { count: "exact", head: true })
-    .eq("is_active", true);
-
-  // Fetch recent projects (last 5)
-  const { data: recentProjects } = await supabase
-    .from("projects")
-    .select(`
-      id,
-      project_code,
-      name,
-      status,
-      client_id
-    `)
-    .eq("is_deleted", false)
-    .order("created_at", { ascending: false })
-    .limit(5);
-
-  // Fetch client names for recent projects
-  const clientIds = (recentProjects?.map(p => p.client_id).filter((id): id is string => id !== null)) || [];
-  const { data: clients } = clientIds.length > 0
-    ? await supabase
-        .from("clients")
-        .select("id, company_name")
-        .in("id", clientIds)
-    : { data: [] };
-
-  // Create a map of client_id to company_name
-  const clientMap = new Map(clients?.map(c => [c.id, c.company_name]) || []);
-
-  // Merge client data into projects
-  const projectsWithClients = recentProjects?.map(project => ({
-    ...project,
-    client: project.client_id ? { company_name: clientMap.get(project.client_id) || null } : null
-  })) || [];
+  console.log(`📊 [PROFILE] Dashboard Total: ${(performance.now() - pageStart).toFixed(0)}ms\n`);
 
   const canCreateProject = ["admin", "pm"].includes(userRole);
 

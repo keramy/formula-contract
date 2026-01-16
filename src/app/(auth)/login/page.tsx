@@ -11,7 +11,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { FormulaLoader } from "@/components/ui/formula-loader";
 import { GlassCard } from "@/components/ui/ui-helpers";
 import { AlertCircleIcon, ShieldAlertIcon } from "lucide-react";
-import { loginAction } from "../actions";
+import { loginAction } from "@/lib/actions/auth";
 
 function LoginForm() {
   const router = useRouter();

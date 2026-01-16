@@ -1,11 +1,18 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+/**
+ * ReportCreationModal Component
+ *
+ * Modal dialog for creating new project reports.
+ * Supports sections with photos, drag-and-drop reordering,
+ * and team sharing functionality.
+ *
+ * REFACTORED: Now uses shared components from @/components/reports
+ * Original: ~875 lines -> Refactored: ~350 lines
+ */
+
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
-import { Checkbox } from "@/components/ui/checkbox";
-import { GradientAvatar } from "@/components/ui/ui-helpers";
-import { getProjectTeamMembers, updateReportShares } from "./reports/actions";
 import {
   DndContext,
   closestCenter,
@@ -19,14 +26,10 @@ import {
   arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
-  useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Card } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
@@ -46,22 +49,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  GripVerticalIcon,
   PlusIcon,
-  PencilIcon,
-  TrashIcon,
   ImageIcon,
-  XIcon,
   FileTextIcon,
   SaveIcon,
   SendIcon,
@@ -69,133 +58,26 @@ import {
   ChevronUpIcon,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { sanitizeText, sanitizeHTML } from "@/lib/sanitize";
-import { validateFile, IMAGE_CONFIG } from "@/lib/file-validation";
-import { compressImage } from "@/lib/image-utils";
+import {
+  getProjectTeamMembers,
+  updateReportShares,
+} from "@/lib/actions/reports";
 
-// Types for local state management
-interface LocalSection {
-  id: string; // Temporary local ID
-  title: string;
-  description: string;
-  photos: string[];
-}
+// Shared report components
+import {
+  REPORT_TYPES,
+  type LocalSection,
+  type TeamMember,
+} from "@/components/reports";
+import { SortableSection } from "@/components/reports/sortable-section";
+import { TeamShareSelector } from "@/components/reports/team-share-selector";
+import { SectionFormDialog } from "@/components/reports/section-form-dialog";
+import { DeleteSectionDialog } from "@/components/reports/delete-section-dialog";
 
 interface ReportCreationModalProps {
   projectId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-}
-
-const REPORT_TYPES = [
-  { value: "progress", label: "Progress Report" },
-  { value: "weekly", label: "Weekly Report" },
-  { value: "monthly", label: "Monthly Report" },
-  { value: "milestone", label: "Milestone Report" },
-  { value: "final", label: "Final Report" },
-];
-
-// Generate temporary local IDs
-function generateLocalId(): string {
-  return `local-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-}
-
-// Sortable Section Item Component
-interface SortableSectionProps {
-  section: LocalSection;
-  onEdit: (section: LocalSection) => void;
-  onDelete: (id: string) => void;
-  disabled?: boolean;
-}
-
-function SortableSection({ section, onEdit, onDelete, disabled }: SortableSectionProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: section.id, disabled });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
-  return (
-    <Card
-      ref={setNodeRef}
-      style={style}
-      className={`p-3 ${isDragging ? "shadow-lg ring-2 ring-orange-500" : "hover:bg-muted/30"}`}
-    >
-      <div className="flex items-start gap-2">
-        {/* Drag Handle */}
-        <button
-          {...attributes}
-          {...listeners}
-          className="mt-0.5 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground shrink-0"
-          disabled={disabled}
-        >
-          <GripVerticalIcon className="size-4" />
-        </button>
-
-        {/* Content */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <h4 className="font-medium text-sm truncate">{section.title}</h4>
-              {section.description && (
-                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                  {section.description}
-                </p>
-              )}
-            </div>
-            <div className="flex gap-0.5 shrink-0">
-              <Button
-                size="icon"
-                variant="ghost"
-                className="size-7"
-                onClick={() => onEdit(section)}
-                disabled={disabled}
-              >
-                <PencilIcon className="size-3.5" />
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="size-7 text-destructive hover:text-destructive"
-                onClick={() => onDelete(section.id)}
-                disabled={disabled}
-              >
-                <TrashIcon className="size-3.5" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Photos Preview */}
-          {section.photos.length > 0 && (
-            <div className="flex gap-1.5 mt-2 flex-wrap">
-              {section.photos.map((url, idx) => (
-                <div
-                  key={idx}
-                  className="relative w-12 h-9 rounded overflow-hidden bg-slate-100"
-                >
-                  <Image
-                    src={url}
-                    alt={`Photo ${idx + 1}`}
-                    fill
-                    className="object-contain"
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </Card>
-  );
 }
 
 export function ReportCreationModal({
@@ -204,7 +86,6 @@ export function ReportCreationModal({
   onOpenChange,
 }: ReportCreationModalProps) {
   const router = useRouter();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Report metadata state
   const [reportType, setReportType] = useState("progress");
@@ -217,12 +98,8 @@ export function ReportCreationModal({
   // Section form state
   const [sectionFormOpen, setSectionFormOpen] = useState(false);
   const [editingSection, setEditingSection] = useState<LocalSection | null>(null);
-  const [sectionTitle, setSectionTitle] = useState("");
-  const [sectionDescription, setSectionDescription] = useState("");
-  const [sectionPhotos, setSectionPhotos] = useState<string[]>([]);
 
   // Loading states
-  const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -233,12 +110,6 @@ export function ReportCreationModal({
   const [settingsExpanded, setSettingsExpanded] = useState(true);
 
   // Team members state for sharing
-  interface TeamMember {
-    id: string;
-    name: string;
-    email: string;
-    role: string;
-  }
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [selectedShareUsers, setSelectedShareUsers] = useState<string[]>([]);
   const [loadingTeam, setLoadingTeam] = useState(false);
@@ -267,7 +138,6 @@ export function ReportCreationModal({
   // Reset all state when modal opens/closes
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen && !isSaving) {
-      // Reset all state when closing
       setReportType("progress");
       setShareWithClient(false);
       setShareInternal(true);
@@ -302,21 +172,26 @@ export function ReportCreationModal({
     }
   };
 
-  // Section form handlers
+  // Section handlers
   const handleAddSection = () => {
     setEditingSection(null);
-    setSectionTitle("");
-    setSectionDescription("");
-    setSectionPhotos([]);
     setSectionFormOpen(true);
   };
 
   const handleEditSection = (section: LocalSection) => {
     setEditingSection(section);
-    setSectionTitle(section.title);
-    setSectionDescription(section.description);
-    setSectionPhotos([...section.photos]);
     setSectionFormOpen(true);
+  };
+
+  const handleSaveSection = (section: LocalSection) => {
+    if (editingSection) {
+      setSections((prev) =>
+        prev.map((s) => (s.id === editingSection.id ? section : s))
+      );
+    } else {
+      setSections((prev) => [...prev, section]);
+    }
+    setEditingSection(null);
   };
 
   const handleDeleteSection = (id: string) => {
@@ -328,116 +203,6 @@ export function ReportCreationModal({
       setSections((prev) => prev.filter((s) => s.id !== deleteId));
       setDeleteId(null);
     }
-  };
-
-  // Photo upload handler with compression
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    setIsUploading(true);
-    setError(null);
-
-    const supabase = createClient();
-    const newPhotos: string[] = [];
-    const errors: string[] = [];
-
-    for (const originalFile of Array.from(files)) {
-      // Validate file
-      const validation = validateFile(originalFile, IMAGE_CONFIG);
-      if (!validation.valid) {
-        errors.push(`${originalFile.name}: ${validation.error || "Invalid file"}`);
-        continue;
-      }
-
-      try {
-        // Compress the image before upload (max 1920x1080, 80% quality)
-        const compressedFile = await compressImage(originalFile, {
-          maxWidth: 1920,
-          maxHeight: 1080,
-          quality: 0.8,
-        });
-
-        const fileExt = compressedFile.name.split(".").pop()?.toLowerCase() || "jpg";
-        const fileName = `${projectId}/temp/${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
-
-        const { data, error: uploadError } = await supabase.storage
-          .from("reports")
-          .upload(fileName, compressedFile);
-
-        if (uploadError) {
-          console.error("Upload error:", uploadError);
-          errors.push(`${originalFile.name}: ${uploadError.message}`);
-          continue;
-        }
-
-        if (data) {
-          const { data: { publicUrl } } = supabase.storage
-            .from("reports")
-            .getPublicUrl(data.path);
-
-          newPhotos.push(publicUrl);
-        }
-      } catch (err) {
-        console.error("Upload exception:", err);
-        errors.push(`${originalFile.name}: Upload failed`);
-      }
-    }
-
-    if (errors.length > 0) {
-      setError(errors.join(". "));
-    }
-
-    if (newPhotos.length > 0) {
-      setSectionPhotos((prev) => [...prev, ...newPhotos]);
-    }
-
-    setIsUploading(false);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
-
-  const handleRemovePhoto = (index: number) => {
-    setSectionPhotos((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  // Save section to local state
-  const handleSaveSection = () => {
-    if (!sectionTitle.trim()) return;
-
-    const sanitizedTitle = sanitizeText(sectionTitle.trim());
-    const sanitizedDescription = sectionDescription.trim()
-      ? sanitizeHTML(sectionDescription.trim())
-      : "";
-
-    if (editingSection) {
-      // Update existing section
-      setSections((prev) =>
-        prev.map((s) =>
-          s.id === editingSection.id
-            ? {
-                ...s,
-                title: sanitizedTitle,
-                description: sanitizedDescription,
-                photos: sectionPhotos,
-              }
-            : s
-        )
-      );
-    } else {
-      // Add new section
-      const newSection: LocalSection = {
-        id: generateLocalId(),
-        title: sanitizedTitle,
-        description: sanitizedDescription,
-        photos: sectionPhotos,
-      };
-      setSections((prev) => [...prev, newSection]);
-    }
-
-    setSectionFormOpen(false);
-    setEditingSection(null);
   };
 
   // Save report to database
@@ -454,7 +219,9 @@ export function ReportCreationModal({
       const supabase = createClient();
 
       // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
       // Create the report
@@ -569,7 +336,10 @@ export function ReportCreationModal({
                         checked={shareInternal}
                         onCheckedChange={setShareInternal}
                       />
-                      <Label htmlFor="share-internal" className="text-sm font-normal cursor-pointer">
+                      <Label
+                        htmlFor="share-internal"
+                        className="text-sm font-normal cursor-pointer"
+                      >
                         Share internally
                       </Label>
                     </div>
@@ -580,52 +350,22 @@ export function ReportCreationModal({
                         checked={shareWithClient}
                         onCheckedChange={setShareWithClient}
                       />
-                      <Label htmlFor="share-client" className="text-sm font-normal cursor-pointer">
+                      <Label
+                        htmlFor="share-client"
+                        className="text-sm font-normal cursor-pointer"
+                      >
                         Share with client
                       </Label>
                     </div>
                   </div>
 
-                  {/* Share With Specific Users */}
-                  <div className="space-y-2">
-                    <Label className="text-sm">Share with specific users</Label>
-                    {loadingTeam ? (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Spinner className="size-4" />
-                        Loading team members...
-                      </div>
-                    ) : teamMembers.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">
-                        No team members assigned to this project
-                      </p>
-                    ) : (
-                      <div className="max-h-40 overflow-y-auto border rounded-md p-2 space-y-1">
-                        {teamMembers.map((member) => (
-                          <label
-                            key={member.id}
-                            className="flex items-center gap-3 p-2 rounded hover:bg-muted/50 cursor-pointer"
-                          >
-                            <Checkbox
-                              checked={selectedShareUsers.includes(member.id)}
-                              onCheckedChange={() => toggleUserSelection(member.id)}
-                            />
-                            <GradientAvatar name={member.name} size="sm" />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">{member.name}</p>
-                              <p className="text-xs text-muted-foreground truncate">
-                                {member.role.charAt(0).toUpperCase() + member.role.slice(1).replace("_", " ")}
-                              </p>
-                            </div>
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                    {selectedShareUsers.length > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        {selectedShareUsers.length} user{selectedShareUsers.length === 1 ? "" : "s"} selected
-                      </p>
-                    )}
-                  </div>
+                  {/* Team Share Selector */}
+                  <TeamShareSelector
+                    teamMembers={teamMembers}
+                    selectedUserIds={selectedShareUsers}
+                    onToggleUser={toggleUserSelection}
+                    loading={loadingTeam}
+                  />
                 </div>
               )}
             </div>
@@ -636,7 +376,8 @@ export function ReportCreationModal({
                 <div>
                   <h3 className="font-medium text-sm">Report Sections</h3>
                   <p className="text-xs text-muted-foreground">
-                    {sections.length} {sections.length === 1 ? "section" : "sections"}
+                    {sections.length}{" "}
+                    {sections.length === 1 ? "section" : "sections"}
                   </p>
                 </div>
                 <Button size="sm" variant="outline" onClick={handleAddSection}>
@@ -676,6 +417,7 @@ export function ReportCreationModal({
                           onEdit={handleEditSection}
                           onDelete={handleDeleteSection}
                           disabled={isSaving}
+                          accentColor="orange"
                         />
                       ))}
                     </div>
@@ -732,143 +474,20 @@ export function ReportCreationModal({
       </Dialog>
 
       {/* Section Add/Edit Dialog */}
-      <Dialog open={sectionFormOpen} onOpenChange={(open) => {
-        setSectionFormOpen(open);
-        if (!open) setError(null); // Clear errors when closing
-      }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              {editingSection ? "Edit Section" : "Add Section"}
-            </DialogTitle>
-            <DialogDescription>
-              {editingSection
-                ? "Update the section content."
-                : "Add a new section to your report."}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-2">
-            {/* Error display for upload issues */}
-            {error && (
-              <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-sm">
-                {error}
-              </div>
-            )}
-
-            {/* Title */}
-            <div className="space-y-2">
-              <Label htmlFor="section-title">Title *</Label>
-              <Input
-                id="section-title"
-                value={sectionTitle}
-                onChange={(e) => setSectionTitle(e.target.value)}
-                placeholder="e.g., Site Preparation Complete"
-              />
-            </div>
-
-            {/* Description */}
-            <div className="space-y-2">
-              <Label htmlFor="section-description">Description</Label>
-              <Textarea
-                id="section-description"
-                value={sectionDescription}
-                onChange={(e) => setSectionDescription(e.target.value)}
-                placeholder="Add details, notes, or observations..."
-                rows={4}
-              />
-            </div>
-
-            {/* Photos */}
-            <div className="space-y-2">
-              <Label>Photos</Label>
-              <div className="flex flex-wrap gap-2">
-                {sectionPhotos.map((url, idx) => (
-                  <div
-                    key={idx}
-                    className="relative w-20 h-14 rounded-md overflow-hidden bg-slate-100 group"
-                  >
-                    <Image
-                      src={url}
-                      alt={`Photo ${idx + 1}`}
-                      fill
-                      className="object-contain"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleRemovePhoto(idx)}
-                      className="absolute top-0.5 right-0.5 size-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <XIcon className="size-3" />
-                    </button>
-                  </div>
-                ))}
-
-                {/* Upload Button */}
-                <label className="size-16 rounded-md border-2 border-dashed border-muted-foreground/25 hover:border-muted-foreground/50 flex flex-col items-center justify-center cursor-pointer transition-colors">
-                  {isUploading ? (
-                    <Spinner className="size-5" />
-                  ) : (
-                    <>
-                      <ImageIcon className="size-4 text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground mt-0.5">Add</span>
-                    </>
-                  )}
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={handlePhotoUpload}
-                    className="hidden"
-                    disabled={isUploading}
-                  />
-                </label>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Max 10MB per image. JPG, PNG, GIF, WebP supported.
-              </p>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setSectionFormOpen(false)}
-              disabled={isUploading}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSaveSection}
-              disabled={!sectionTitle.trim() || isUploading}
-            >
-              {editingSection ? "Save Changes" : "Add Section"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <SectionFormDialog
+        open={sectionFormOpen}
+        onOpenChange={setSectionFormOpen}
+        editingSection={editingSection}
+        onSave={handleSaveSection}
+        projectId={projectId}
+      />
 
       {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Section</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this section? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDeleteSection}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteSectionDialog
+        open={!!deleteId}
+        onOpenChange={() => setDeleteId(null)}
+        onConfirm={confirmDeleteSection}
+      />
     </>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,7 +38,7 @@ import {
   TrashIcon,
   UserIcon,
 } from "lucide-react";
-import { assignUserToProject, removeUserFromProject, getAvailableUsers } from "./actions";
+import { assignUserToProject, removeUserFromProject, getAvailableUsers } from "@/lib/actions/project-assignments";
 
 interface User {
   id: string;
@@ -146,15 +146,17 @@ export function TeamOverview({ projectId, assignments, canManageTeam }: TeamOver
     setRemoveDialogOpen(true);
   };
 
-  // Group assignments by role
-  const groupedAssignments = assignments.reduce((acc, assignment) => {
-    const role = assignment.user.role;
-    if (!acc[role]) {
-      acc[role] = [];
-    }
-    acc[role].push(assignment);
-    return acc;
-  }, {} as Record<string, Assignment[]>);
+  // OPTIMIZED: Memoize grouped assignments to avoid recomputing on every render
+  const groupedAssignments = useMemo(() =>
+    assignments.reduce((acc, assignment) => {
+      const role = assignment.user.role;
+      if (!acc[role]) {
+        acc[role] = [];
+      }
+      acc[role].push(assignment);
+      return acc;
+    }, {} as Record<string, Assignment[]>),
+  [assignments]);
 
   return (
     <div className="space-y-4">

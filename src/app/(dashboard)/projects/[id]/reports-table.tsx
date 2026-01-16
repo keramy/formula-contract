@@ -37,7 +37,7 @@ import {
   publishReport,
   unpublishReport,
   type Report,
-} from "./reports/actions";
+} from "@/lib/actions/reports";
 import {
   AlertDialog,
   AlertDialogAction,

@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { createReport, updateReport, type Report } from "./reports/actions";
+import { createReport, updateReport, type Report } from "@/lib/actions/reports";
 
 interface ReportFormDialogProps {
   projectId: string;

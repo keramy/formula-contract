@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import {
@@ -17,6 +16,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { UploadIcon, AlertTriangleIcon, CheckCircleIcon } from "lucide-react";
 import { parseMaterialsExcel, type MaterialParseResult } from "@/lib/excel-template";
+import { bulkImportMaterials } from "@/lib/actions/materials";
+import { toast } from "sonner";
 
 interface MaterialsExcelImportProps {
   projectId: string;
@@ -26,8 +27,9 @@ interface MaterialsExcelImportProps {
 export function MaterialsExcelImport({ projectId, projectCode }: MaterialsExcelImportProps) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isPending, startTransition] = useTransition();
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isParsing, setIsParsing] = useState(false);
   const [parseResult, setParseResult] = useState<MaterialParseResult | null>(null);
   const [importResult, setImportResult] = useState<{
     inserted: number;
@@ -38,12 +40,12 @@ export function MaterialsExcelImport({ projectId, projectCode }: MaterialsExcelI
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setIsLoading(true);
+    setIsParsing(true);
     setImportResult(null);
 
     try {
       const buffer = await file.arrayBuffer();
-      const result = parseMaterialsExcel(buffer);
+      const result = await parseMaterialsExcel(buffer);
       setParseResult(result);
       setDialogOpen(true);
     } catch (error) {
@@ -56,7 +58,7 @@ export function MaterialsExcelImport({ projectId, projectCode }: MaterialsExcelI
       });
       setDialogOpen(true);
     } finally {
-      setIsLoading(false);
+      setIsParsing(false);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -66,60 +68,17 @@ export function MaterialsExcelImport({ projectId, projectCode }: MaterialsExcelI
   const handleImport = async () => {
     if (!parseResult || !parseResult.success) return;
 
-    setIsLoading(true);
-    const supabase = createClient();
+    startTransition(async () => {
+      const result = await bulkImportMaterials(projectId, parseResult.items);
 
-    const results = { inserted: 0, updated: 0 };
-
-    try {
-      for (const material of parseResult.items) {
-        // Check if material with same code exists (upsert by material_code)
-        const { data: existing } = await supabase
-          .from("materials")
-          .select("id")
-          .eq("project_id", projectId)
-          .eq("material_code", material.material_code)
-          .eq("is_deleted", false)
-          .single();
-
-        if (existing) {
-          // UPDATE existing material (preserve status, images)
-          const { error: updateError } = await supabase
-            .from("materials")
-            .update({
-              name: material.name,
-              specification: material.specification,
-              supplier: material.supplier,
-            })
-            .eq("id", existing.id);
-
-          if (!updateError) {
-            results.updated++;
-          }
-        } else {
-          // INSERT new material
-          const { error: insertError } = await supabase.from("materials").insert({
-            project_id: projectId,
-            material_code: material.material_code,
-            name: material.name,
-            specification: material.specification,
-            supplier: material.supplier,
-            status: "pending",
-          });
-
-          if (!insertError) {
-            results.inserted++;
-          }
-        }
+      if (result.success && result.data) {
+        setImportResult(result.data);
+        router.refresh();
+        toast.success(`Imported ${result.data.inserted} new, updated ${result.data.updated} materials`);
+      } else {
+        toast.error(result.error || "Failed to import materials");
       }
-
-      setImportResult(results);
-      router.refresh();
-    } catch (error) {
-      console.error("Import failed:", error);
-    } finally {
-      setIsLoading(false);
-    }
+    });
   };
 
   const handleClose = () => {
@@ -134,9 +93,9 @@ export function MaterialsExcelImport({ projectId, projectCode }: MaterialsExcelI
         variant="outline"
         size="sm"
         onClick={() => fileInputRef.current?.click()}
-        disabled={isLoading}
+        disabled={isParsing}
       >
-        {isLoading ? <Spinner className="size-4" /> : <UploadIcon className="size-4" />}
+        {isParsing ? <Spinner className="size-4" /> : <UploadIcon className="size-4" />}
         Import
       </Button>
       <input
@@ -257,9 +216,9 @@ export function MaterialsExcelImport({ projectId, projectCode }: MaterialsExcelI
                 </Button>
                 <Button
                   onClick={handleImport}
-                  disabled={isLoading || !parseResult.success || parseResult.items.length === 0}
+                  disabled={isPending || !parseResult.success || parseResult.items.length === 0}
                 >
-                  {isLoading && <Spinner className="size-4 mr-2" />}
+                  {isPending && <Spinner className="size-4 mr-2" />}
                   Import {parseResult.items.length} Material(s)
                 </Button>
               </DialogFooter>

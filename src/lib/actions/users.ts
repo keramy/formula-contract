@@ -1,5 +1,15 @@
 "use server";
 
+/**
+ * Users Server Actions
+ *
+ * Handles user management operations including:
+ * - Inviting new users
+ * - Updating user profiles
+ * - Activating/deactivating users
+ * - Sending welcome emails
+ */
+
 import { createClient } from "@supabase/supabase-js";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
@@ -7,7 +17,48 @@ import { Resend } from "resend";
 import { checkUserCreationRateLimit } from "@/lib/rate-limit";
 import { sanitizeText } from "@/lib/sanitize";
 
-// Send welcome email to new user
+// ============================================================================
+// Types
+// ============================================================================
+
+export interface InviteUserResult {
+  success: boolean;
+  error?: string;
+  tempPassword?: string;
+  emailSent?: boolean;
+}
+
+export interface ActionResult {
+  success: boolean;
+  error?: string;
+}
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Create Supabase admin client with service role key (server-side only)
+ */
+function createAdminClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!serviceRoleKey) {
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY is not configured");
+  }
+
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+}
+
+/**
+ * Send welcome email to new user with credentials
+ */
 async function sendWelcomeEmail(
   email: string,
   name: string,
@@ -74,29 +125,20 @@ async function sendWelcomeEmail(
   }
 }
 
-// Admin client with service role key (server-side only)
-function createAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// ============================================================================
+// User Management Operations
+// ============================================================================
 
-  if (!serviceRoleKey) {
-    throw new Error("SUPABASE_SERVICE_ROLE_KEY is not configured");
-  }
-
-  return createClient(supabaseUrl, serviceRoleKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
-}
-
+/**
+ * Invite a new user to the system
+ * Creates auth user, profile, and sends welcome email
+ */
 export async function inviteUser(data: {
   email: string;
   name: string;
   phone: string | null;
   role: string;
-}): Promise<{ success: boolean; error?: string; tempPassword?: string; emailSent?: boolean }> {
+}): Promise<InviteUserResult> {
   try {
     // Get current user (admin) for rate limiting
     const serverSupabase = await createServerClient();
@@ -193,6 +235,9 @@ export async function inviteUser(data: {
   }
 }
 
+/**
+ * Update an existing user's profile
+ */
 export async function updateUser(
   userId: string,
   data: {
@@ -200,7 +245,7 @@ export async function updateUser(
     phone: string | null;
     role: string;
   }
-): Promise<{ success: boolean; error?: string }> {
+): Promise<ActionResult> {
   try {
     // Sanitize user inputs
     const sanitizedName = sanitizeText(data.name);
@@ -233,10 +278,14 @@ export async function updateUser(
   }
 }
 
+/**
+ * Activate or deactivate a user
+ * Also bans/unbans in Supabase Auth to fully block login
+ */
 export async function toggleUserActive(
   userId: string,
   isActive: boolean
-): Promise<{ success: boolean; error?: string }> {
+): Promise<ActionResult> {
   try {
     const supabase = createAdminClient();
 

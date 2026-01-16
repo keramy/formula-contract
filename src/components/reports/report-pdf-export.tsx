@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { jsPDF } from "jspdf";
+// OPTIMIZED: Dynamic import - jsPDF is ~100KB, only load when needed
+// import { jsPDF } from "jspdf"; // Removed static import
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { DownloadIcon } from "lucide-react";
-import { loadRobotoFonts } from "@/lib/fonts/roboto-loader";
-import type { Report } from "@/app/(dashboard)/projects/[id]/reports/actions";
+import type { Report } from "@/lib/actions/reports";
 
 interface ReportPDFExportProps {
   report: Report;
@@ -101,6 +101,12 @@ export function ReportPDFExport({
     setIsGenerating(true);
 
     try {
+      // OPTIMIZED: Dynamic import - jsPDF (~100KB) loaded only when user clicks export
+      const [{ jsPDF }, { loadRobotoFonts }] = await Promise.all([
+        import("jspdf"),
+        import("@/lib/fonts/roboto-loader"),
+      ]);
+
       const doc = new jsPDF({
         orientation: "portrait",
         unit: "mm",

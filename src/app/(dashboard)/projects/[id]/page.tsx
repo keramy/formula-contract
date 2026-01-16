@@ -23,8 +23,8 @@ import { MilestonesOverview } from "./milestones-overview";
 import { TeamOverview } from "./team-overview";
 import { ReportsOverview } from "./reports-overview";
 import { ProjectDetailHeader } from "./project-detail-header";
-import { getProjectAssignments } from "./actions";
-import { getProjectReports } from "./reports/actions";
+import { getProjectAssignments } from "@/lib/actions/project-assignments";
+import { getProjectReports } from "@/lib/actions/reports";
 import { DownloadTemplateButton, ExcelImport, ExcelExport } from "@/components/scope-items";
 import { ActivityFeed } from "@/components/activity-log/activity-feed";
 import { GlassCard, GradientIcon } from "@/components/ui/ui-helpers";
@@ -134,25 +134,32 @@ export default async function ProjectDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const pageStart = performance.now();
   const { id } = await params;
   const supabase = await createClient();
 
-  // Get current user and role
+  console.log("\n📊 [PROFILE] Project Detail Data Fetch Starting...");
+
+  // OPTIMIZED: Get user and role in single auth call
+  const authStart = performance.now();
   const { data: { user } } = await supabase.auth.getUser();
-  let userRole = "pm";
-  if (user) {
-    const { data: profile } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-    if (profile) {
-      userRole = profile.role;
-    }
+  console.log(`  🔐 auth.getUser: ${(performance.now() - authStart).toFixed(0)}ms`);
+
+  if (!user) {
+    notFound();
   }
 
+  // Get user role
+  const { data: profile } = await supabase
+    .from("users")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  const userRole = profile?.role || "pm";
+
   // For client users, verify they have access to this project
-  if (userRole === "client" && user) {
+  if (userRole === "client") {
     const { data: assignment } = await supabase
       .from("project_assignments")
       .select("id")
@@ -161,7 +168,7 @@ export default async function ProjectDetailPage({
       .single();
 
     if (!assignment) {
-      notFound(); // Client doesn't have access to this project
+      notFound();
     }
   }
 
@@ -171,38 +178,118 @@ export default async function ProjectDetailPage({
   const canImportExcel = ["admin", "pm"].includes(userRole);
   const isClient = userRole === "client";
 
-  // Fetch project
-  const { data, error } = await supabase
-    .from("projects")
-    .select(`
-      id, project_code, name, description, status, installation_date, contract_value_manual, currency,
-      client:clients(id, company_name, contact_person, email, phone)
-    `)
-    .eq("id", id)
-    .single();
+  // OPTIMIZED: Run all main queries in PARALLEL with profiling
+  const parallelStart = performance.now();
+  const [
+    projectResult,
+    scopeItemsResult,
+    materialsResult,
+    snaggingResult,
+    milestonesResult,
+    reportsResult,
+    assignmentsResult,
+  ] = await Promise.all([
+    // 1. Project with Client
+    (async () => {
+      const start = performance.now();
+      const result = await supabase
+        .from("projects")
+        .select(`
+          id, project_code, name, description, status, installation_date, contract_value_manual, currency,
+          client:clients(id, company_name, contact_person, email, phone)
+        `)
+        .eq("id", id)
+        .single();
+      console.log(`  📁 Project with Client: ${(performance.now() - start).toFixed(0)}ms`);
+      return result;
+    })(),
+    // 2. Scope Items
+    (async () => {
+      const start = performance.now();
+      const result = await supabase
+        .from("scope_items")
+        .select("id, item_code, name, description, width, depth, height, item_path, status, quantity, unit, unit_price, total_price, production_percentage, is_installed, notes, images")
+        .eq("project_id", id)
+        .eq("is_deleted", false)
+        .order("item_code");
+      console.log(`  📋 Scope Items: ${(performance.now() - start).toFixed(0)}ms`);
+      return result;
+    })(),
+    // 3. Materials with Item Materials
+    (async () => {
+      const start = performance.now();
+      const result = await supabase
+        .from("materials")
+        .select(`
+          id, material_code, name, specification, supplier, images, status,
+          item_materials(item_id, material_id)
+        `)
+        .eq("project_id", id)
+        .eq("is_deleted", false)
+        .order("material_code");
+      console.log(`  📦 Materials: ${(performance.now() - start).toFixed(0)}ms`);
+      return result;
+    })(),
+    // 4. Snagging with Joins
+    (async () => {
+      const start = performance.now();
+      const result = await supabase
+        .from("snagging")
+        .select(`
+          id, project_id, item_id, description, photos, is_resolved,
+          resolved_at, resolved_by, resolution_notes, created_by, created_at,
+          item:scope_items!snagging_item_id_fkey(item_code, name),
+          creator:users!snagging_created_by_fkey(name),
+          resolver:users!snagging_resolved_by_fkey(name)
+        `)
+        .eq("project_id", id)
+        .order("created_at", { ascending: false });
+      console.log(`  🔧 Snagging: ${(performance.now() - start).toFixed(0)}ms`);
+      return result;
+    })(),
+    // 5. Milestones
+    (async () => {
+      const start = performance.now();
+      const result = await supabase
+        .from("milestones")
+        .select("id, project_id, name, description, due_date, is_completed, completed_at, alert_days_before")
+        .eq("project_id", id)
+        .order("due_date");
+      console.log(`  🎯 Milestones: ${(performance.now() - start).toFixed(0)}ms`);
+      return result;
+    })(),
+    // 6. Reports
+    (async () => {
+      const start = performance.now();
+      const result = await getProjectReports(id);
+      console.log(`  📄 Reports: ${(performance.now() - start).toFixed(0)}ms`);
+      return result;
+    })(),
+    // 7. Assignments
+    (async () => {
+      const start = performance.now();
+      const result = await getProjectAssignments(id);
+      console.log(`  👥 Assignments: ${(performance.now() - start).toFixed(0)}ms`);
+      return result;
+    })(),
+  ]);
+  console.log(`  ⏱️ Parallel queries total: ${(performance.now() - parallelStart).toFixed(0)}ms`);
+  console.log(`📊 [PROFILE] Project Detail Total: ${(performance.now() - pageStart).toFixed(0)}ms\n`);
 
-  const project = data as Project | null;
-
-  if (error || !project) {
+  // Extract project data
+  const project = projectResult.data as Project | null;
+  if (projectResult.error || !project) {
     notFound();
   }
 
-  // Fetch scope items
-  const { data: scopeItemsData } = await supabase
-    .from("scope_items")
-    .select("id, item_code, name, description, width, depth, height, item_path, status, quantity, unit, unit_price, total_price, production_percentage, is_installed, notes, images")
-    .eq("project_id", id)
-    .eq("is_deleted", false)
-    .order("item_code");
+  // Extract scope items
+  const scopeItems = (scopeItemsResult.data || []) as ScopeItem[];
 
-  const scopeItems = (scopeItemsData || []) as ScopeItem[];
-
-  // Get production item IDs for drawings query
+  // Get production item IDs and fetch drawings if needed
   const productionItemIds = scopeItems
     .filter((item) => item.item_path === "production")
     .map((item) => item.id);
 
-  // Fetch drawings for production items
   let drawings: Drawing[] = [];
   if (productionItemIds.length > 0) {
     const { data: drawingsData } = await supabase
@@ -212,67 +299,43 @@ export default async function ProjectDetailPage({
     drawings = (drawingsData || []) as Drawing[];
   }
 
-  // Fetch materials for this project
-  const { data: materialsData } = await supabase
-    .from("materials")
-    .select("id, material_code, name, specification, supplier, images, status")
-    .eq("project_id", id)
-    .eq("is_deleted", false)
-    .order("material_code");
-
-  const materials = (materialsData || []) as Material[];
-
-  // Fetch item-material assignments
-  const materialIds = materials.map((m) => m.id);
-  let itemMaterials: ItemMaterial[] = [];
-  if (materialIds.length > 0) {
-    const { data: itemMaterialsData } = await supabase
-      .from("item_materials")
-      .select("material_id, item_id")
-      .in("material_id", materialIds);
-    itemMaterials = (itemMaterialsData || []) as ItemMaterial[];
-  }
-
-  // Combine materials with their assigned item counts
-  const materialsWithAssignments = materials.map((material) => {
-    const assignments = itemMaterials.filter((im) => im.material_id === material.id);
+  // Process materials with their item assignments (now in single query)
+  const materialsWithAssignments = ((materialsResult.data || []) as any[]).map((material) => {
+    const itemMaterialsData = material.item_materials || [];
     return {
-      ...material,
-      assignedItemsCount: assignments.length,
-      assignedItemIds: assignments.map((a) => a.item_id),
+      id: material.id,
+      material_code: material.material_code,
+      name: material.name,
+      specification: material.specification,
+      supplier: material.supplier,
+      images: material.images,
+      status: material.status,
+      assignedItemsCount: itemMaterialsData.length,
+      assignedItemIds: itemMaterialsData.map((im: ItemMaterial) => im.item_id),
     };
   });
 
-  // Fetch snagging items
-  const { data: snaggingData } = await supabase
-    .from("snagging")
-    .select(`
-      id, project_id, item_id, description, photos, is_resolved,
-      resolved_at, resolved_by, resolution_notes, created_by, created_at,
-      item:scope_items!snagging_item_id_fkey(item_code, name),
-      creator:users!snagging_created_by_fkey(name),
-      resolver:users!snagging_resolved_by_fkey(name)
-    `)
-    .eq("project_id", id)
-    .order("created_at", { ascending: false });
+  // For the ScopeItemsTable we need plain materials without assignments
+  const materials = ((materialsResult.data || []) as any[]).map((m) => ({
+    id: m.id,
+    material_code: m.material_code,
+    name: m.name,
+    specification: m.specification,
+    supplier: m.supplier,
+    images: m.images,
+    status: m.status,
+  })) as Material[];
 
-  const snaggingItems = (snaggingData || []) as unknown as Snagging[];
+  // Extract snagging data
+  const snaggingItems = (snaggingResult.data || []) as unknown as Snagging[];
   const openSnaggingCount = snaggingItems.filter((s) => !s.is_resolved).length;
 
-  // Fetch milestones
-  const { data: milestonesData } = await supabase
-    .from("milestones")
-    .select("id, project_id, name, description, due_date, is_completed, completed_at, alert_days_before")
-    .eq("project_id", id)
-    .order("due_date");
+  // Extract milestones
+  const milestones = (milestonesResult.data || []) as Milestone[];
 
-  const milestones = (milestonesData || []) as Milestone[];
-
-  // Fetch reports
-  const reports = await getProjectReports(id);
-
-  // Fetch project assignments (team members)
-  const assignments = await getProjectAssignments(id);
+  // Reports and assignments are already extracted from Promise.all
+  const reports = reportsResult;
+  const assignments = assignmentsResult;
   const canManageTeam = ["admin", "pm"].includes(userRole);
 
   const formatCurrency = (value: number | null, currency: string) => {

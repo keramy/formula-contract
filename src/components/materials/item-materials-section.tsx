@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +26,8 @@ import {
   ClockIcon,
   XCircleIcon,
 } from "lucide-react";
+import { updateItemMaterialAssignments, removeItemMaterial } from "@/lib/actions/materials";
+import { toast } from "sonner";
 
 interface Material {
   id: string;
@@ -40,6 +41,7 @@ interface Material {
 
 interface ItemMaterialsSectionProps {
   scopeItemId: string;
+  projectId: string;
   assignedMaterials: Material[];
   availableMaterials: Material[];
 }
@@ -58,12 +60,13 @@ const statusIcons: Record<string, React.ReactNode> = {
 
 export function ItemMaterialsSection({
   scopeItemId,
+  projectId,
   assignedMaterials,
   availableMaterials,
 }: ItemMaterialsSectionProps) {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
     new Set(assignedMaterials.map((m) => m.id))
   );
@@ -84,61 +87,35 @@ export function ItemMaterialsSection({
   };
 
   const handleSave = async () => {
-    setIsLoading(true);
-    const supabase = createClient();
+    startTransition(async () => {
+      const result = await updateItemMaterialAssignments(
+        scopeItemId,
+        projectId,
+        assignedMaterials.map((m) => m.id),
+        Array.from(selectedIds)
+      );
 
-    try {
-      // Get current assignments
-      const currentIds = new Set(assignedMaterials.map((m) => m.id));
-
-      // Find materials to add and remove
-      const toAdd = Array.from(selectedIds).filter((id) => !currentIds.has(id));
-      const toRemove = Array.from(currentIds).filter((id) => !selectedIds.has(id));
-
-      // Remove assignments
-      if (toRemove.length > 0) {
-        await supabase
-          .from("item_materials")
-          .delete()
-          .eq("item_id", scopeItemId)
-          .in("material_id", toRemove);
+      if (result.success) {
+        setDialogOpen(false);
+        router.refresh();
+        toast.success("Material assignments updated");
+      } else {
+        toast.error(result.error || "Failed to update assignments");
       }
-
-      // Add new assignments
-      if (toAdd.length > 0) {
-        const newAssignments = toAdd.map((materialId) => ({
-          item_id: scopeItemId,
-          material_id: materialId,
-        }));
-        await supabase.from("item_materials").insert(newAssignments);
-      }
-
-      setDialogOpen(false);
-      router.refresh();
-    } catch (error) {
-      console.error("Failed to update material assignments:", error);
-    } finally {
-      setIsLoading(false);
-    }
+    });
   };
 
   const handleRemoveMaterial = async (materialId: string) => {
-    setIsLoading(true);
-    const supabase = createClient();
+    startTransition(async () => {
+      const result = await removeItemMaterial(scopeItemId, materialId, projectId);
 
-    try {
-      await supabase
-        .from("item_materials")
-        .delete()
-        .eq("item_id", scopeItemId)
-        .eq("material_id", materialId);
-
-      router.refresh();
-    } catch (error) {
-      console.error("Failed to remove material:", error);
-    } finally {
-      setIsLoading(false);
-    }
+      if (result.success) {
+        router.refresh();
+        toast.success("Material removed");
+      } else {
+        toast.error(result.error || "Failed to remove material");
+      }
+    });
   };
 
   // All materials that could be assigned (both assigned and available)
@@ -159,7 +136,7 @@ export function ItemMaterialsSection({
               </Badge>
             )}
           </div>
-          <Button size="sm" variant="outline" onClick={handleOpenDialog} disabled={isLoading}>
+          <Button size="sm" variant="outline" onClick={handleOpenDialog} disabled={isPending}>
             <PlusIcon className="size-3" />
             {assignedMaterials.length > 0 ? "Manage" : "Assign"}
           </Button>
@@ -216,7 +193,7 @@ export function ItemMaterialsSection({
                   variant="ghost"
                   size="icon-sm"
                   onClick={() => handleRemoveMaterial(material.id)}
-                  disabled={isLoading}
+                  disabled={isPending}
                   className="shrink-0"
                 >
                   <XIcon className="size-3" />
@@ -296,11 +273,11 @@ export function ItemMaterialsSection({
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={isLoading}>
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={isPending}>
               Cancel
             </Button>
-            <Button onClick={handleSave} disabled={isLoading || allMaterials.length === 0}>
-              {isLoading && <Spinner className="size-4 mr-2" />}
+            <Button onClick={handleSave} disabled={isPending || allMaterials.length === 0}>
+              {isPending && <Spinner className="size-4 mr-2" />}
               Save Changes
             </Button>
           </DialogFooter>

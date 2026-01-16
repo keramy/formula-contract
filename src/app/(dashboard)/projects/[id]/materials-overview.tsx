@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -72,13 +72,13 @@ export function MaterialsOverview({
   const [approvalAction, setApprovalAction] = useState<"approve" | "reject">("approve");
   const [approvalMaterial, setApprovalMaterial] = useState<Material | null>(null);
 
-  // Calculate stats - PM workflow (no "awaiting client")
-  const stats = {
+  // OPTIMIZED: Memoize stats calculation to avoid recomputing on every render
+  const stats = useMemo(() => ({
     total: materials.length,
     pending: materials.filter((m) => m.status === "pending").length,
     approved: materials.filter((m) => m.status === "approved").length,
     rejected: materials.filter((m) => m.status === "rejected").length,
-  };
+  }), [materials]);
 
   const handleAddMaterial = () => {
     setEditMaterial(null);

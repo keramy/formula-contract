@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { GlassCard, GradientIcon, EmptyState } from "@/components/ui/ui-helpers";
 import {
   PlusIcon,
@@ -9,10 +11,34 @@ import {
   PencilIcon,
   EyeIcon,
 } from "lucide-react";
-import { ReportCreationModal } from "./report-creation-modal";
-import { ReportEditModal } from "./report-edit-modal";
 import { ReportsTable } from "./reports-table";
-import { type Report } from "./reports/actions";
+import { type Report } from "@/lib/actions/reports";
+
+// OPTIMIZED: Lazy load heavy modal components (900+ lines each)
+// These are only loaded when the user actually opens them
+const ReportCreationModal = dynamic(
+  () => import("./report-creation-modal").then((mod) => mod.ReportCreationModal),
+  {
+    loading: () => (
+      <div className="flex items-center justify-center p-8">
+        <Spinner className="size-6" />
+      </div>
+    ),
+    ssr: false,
+  }
+);
+
+const ReportEditModal = dynamic(
+  () => import("./report-edit-modal").then((mod) => mod.ReportEditModal),
+  {
+    loading: () => (
+      <div className="flex items-center justify-center p-8">
+        <Spinner className="size-6" />
+      </div>
+    ),
+    ssr: false,
+  }
+);
 
 interface ReportsOverviewProps {
   projectId: string;

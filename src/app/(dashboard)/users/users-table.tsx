@@ -38,7 +38,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { UserFormDialog } from "./user-form-dialog";
-import { toggleUserActive } from "./actions";
+import { toggleUserActive } from "@/lib/actions/users";
 import { GlassCard, EmptyState, GradientAvatar, StatusBadge } from "@/components/ui/ui-helpers";
 
 interface User {

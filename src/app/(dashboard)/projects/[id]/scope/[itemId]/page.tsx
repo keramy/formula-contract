@@ -465,6 +465,7 @@ export default async function ScopeItemDetailPage({
         {/* Materials Section */}
         <ItemMaterialsSection
           scopeItemId={itemId}
+          projectId={scopeItem.project.id}
           assignedMaterials={assignedMaterials}
           availableMaterials={availableMaterials}
         />

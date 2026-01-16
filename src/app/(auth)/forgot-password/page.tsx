@@ -9,7 +9,7 @@ import { CardContent, CardDescription, CardHeader, CardTitle } from "@/component
 import { Spinner } from "@/components/ui/spinner";
 import { GlassCard } from "@/components/ui/ui-helpers";
 import { ArrowLeftIcon, CheckCircle2Icon, AlertCircleIcon, ShieldAlertIcon } from "lucide-react";
-import { requestPasswordResetAction } from "../actions";
+import { requestPasswordResetAction } from "@/lib/actions/auth";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");

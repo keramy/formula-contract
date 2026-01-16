@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
@@ -21,6 +21,8 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { GradientIcon } from "@/components/ui/ui-helpers";
 import { PlusIcon, XIcon, PackageIcon } from "lucide-react";
+import { createMaterial, updateMaterial } from "@/lib/actions/materials";
+import { toast } from "sonner";
 
 interface ScopeItem {
   id: string;
@@ -53,8 +55,8 @@ export function MaterialFormDialog({
 }: MaterialFormDialogProps) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isPending, startTransition] = useTransition();
 
-  const [isLoading, setIsLoading] = useState(false);
   const [materialCode, setMaterialCode] = useState(editMaterial?.material_code || "");
   const [name, setName] = useState(editMaterial?.name || "");
   const [specification, setSpecification] = useState(editMaterial?.specification || "");
@@ -81,6 +83,8 @@ export function MaterialFormDialog({
     setTimeout(resetForm, 200);
   };
 
+  // Image upload still uses client-side Supabase storage (required for file picker)
+  // But the metadata is saved through server actions
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -115,6 +119,7 @@ export function MaterialFormDialog({
       setImages([...images, ...newImages]);
     } catch (error) {
       console.error("Failed to upload images:", error);
+      toast.error("Failed to upload images");
     } finally {
       setUploadingImages(false);
       if (fileInputRef.current) {
@@ -140,77 +145,32 @@ export function MaterialFormDialog({
   const handleSubmit = async () => {
     if (!materialCode.trim() || !name.trim()) return;
 
-    setIsLoading(true);
-    const supabase = createClient();
+    startTransition(async () => {
+      const input = {
+        material_code: materialCode.trim(),
+        name: name.trim(),
+        specification: specification.trim() || null,
+        supplier: supplier.trim() || null,
+        images: images.length > 0 ? images : null,
+      };
 
-    try {
+      const assignedItems = Array.from(selectedItemIds);
+
+      let result;
       if (isEditing && editMaterial) {
-        // Update existing material
-        const { error: updateError } = await supabase
-          .from("materials")
-          .update({
-            material_code: materialCode.trim(),
-            name: name.trim(),
-            specification: specification.trim() || null,
-            supplier: supplier.trim() || null,
-            images: images.length > 0 ? images : null,
-          })
-          .eq("id", editMaterial.id);
-
-        if (updateError) throw updateError;
-
-        // Update item assignments
-        // First, remove all existing assignments
-        await supabase
-          .from("item_materials")
-          .delete()
-          .eq("material_id", editMaterial.id);
-
-        // Then add new assignments
-        if (selectedItemIds.size > 0) {
-          const assignments = Array.from(selectedItemIds).map((itemId) => ({
-            item_id: itemId,
-            material_id: editMaterial.id,
-          }));
-
-          await supabase.from("item_materials").insert(assignments);
-        }
+        result = await updateMaterial(editMaterial.id, projectId, input, assignedItems);
       } else {
-        // Create new material
-        const { data: newMaterial, error: insertError } = await supabase
-          .from("materials")
-          .insert({
-            project_id: projectId,
-            material_code: materialCode.trim(),
-            name: name.trim(),
-            specification: specification.trim() || null,
-            supplier: supplier.trim() || null,
-            images: images.length > 0 ? images : null,
-            status: "pending",
-          })
-          .select("id")
-          .single();
-
-        if (insertError) throw insertError;
-
-        // Add item assignments
-        if (selectedItemIds.size > 0 && newMaterial) {
-          const assignments = Array.from(selectedItemIds).map((itemId) => ({
-            item_id: itemId,
-            material_id: newMaterial.id,
-          }));
-
-          await supabase.from("item_materials").insert(assignments);
-        }
+        result = await createMaterial(projectId, input, assignedItems);
       }
 
-      handleClose();
-      router.refresh();
-    } catch (error) {
-      console.error("Failed to save material:", error);
-    } finally {
-      setIsLoading(false);
-    }
+      if (result.success) {
+        handleClose();
+        router.refresh();
+        toast.success(isEditing ? "Material updated" : "Material created");
+      } else {
+        toast.error(result.error || "Failed to save material");
+      }
+    });
   };
 
   // Sync form when editMaterial changes or dialog opens
@@ -366,15 +326,15 @@ export function MaterialFormDialog({
         </ScrollArea>
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose} disabled={isLoading}>
+          <Button variant="outline" onClick={handleClose} disabled={isPending}>
             Cancel
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={isLoading || !materialCode.trim() || !name.trim()}
+            disabled={isPending || !materialCode.trim() || !name.trim()}
             className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
           >
-            {isLoading && <Spinner className="size-4 mr-2" />}
+            {isPending && <Spinner className="size-4 mr-2" />}
             {isEditing ? "Save Changes" : "Add Material"}
           </Button>
         </DialogFooter>

@@ -1,0 +1,201 @@
+/**
+ * Server-Side Caching Utilities
+ *
+ * Uses Next.js unstable_cache to cache expensive database queries.
+ * This dramatically improves performance for:
+ * - COUNT queries (which can't use Supabase's built-in caching)
+ * - Stats that don't need real-time accuracy
+ * - Data that changes infrequently
+ *
+ * Cache is automatically invalidated after the TTL expires.
+ * You can also manually revalidate using revalidateTag().
+ *
+ * IMPORTANT: Uses service role client (not cookie-based) because
+ * unstable_cache cannot use dynamic functions like cookies().
+ */
+
+import { unstable_cache } from "next/cache";
+import { createServiceRoleClient } from "@/lib/supabase/server";
+
+// Cache TTL in seconds
+const STATS_CACHE_TTL = 60; // 1 minute for dashboard stats
+const PROJECT_CACHE_TTL = 30; // 30 seconds for project data
+
+/**
+ * Get cached dashboard statistics
+ * Caches COUNT queries which are slow in PostgreSQL
+ */
+export const getCachedDashboardStats = unstable_cache(
+  async () => {
+    const start = performance.now();
+    const supabase = createServiceRoleClient();
+
+    const [projectsResult, clientCountResult, userCountResult] = await Promise.all([
+      // Get all projects (for status counts)
+      supabase.from("projects").select("id, status").eq("is_deleted", false),
+      // Client count
+      supabase.from("clients").select("*", { count: "exact", head: true }).eq("is_deleted", false),
+      // User count
+      supabase.from("users").select("*", { count: "exact", head: true }).eq("is_active", true),
+    ]);
+
+    const projects = projectsResult.data || [];
+    const projectCounts = {
+      total: projects.length,
+      active: projects.filter((p) => p.status === "active").length,
+      tender: projects.filter((p) => p.status === "tender").length,
+      on_hold: projects.filter((p) => p.status === "on_hold").length,
+      completed: projects.filter((p) => p.status === "completed").length,
+      cancelled: projects.filter((p) => p.status === "cancelled").length,
+    };
+
+    console.log(`  📊 [CACHE] Dashboard stats fetched in ${(performance.now() - start).toFixed(0)}ms`);
+
+    return {
+      projectCounts,
+      clientCount: clientCountResult.count || 0,
+      userCount: userCountResult.count || 0,
+    };
+  },
+  ["dashboard-stats"],
+  {
+    revalidate: STATS_CACHE_TTL,
+    tags: ["dashboard-stats"],
+  }
+);
+
+/**
+ * Get cached recent projects for dashboard
+ */
+export const getCachedRecentProjects = unstable_cache(
+  async () => {
+    const start = performance.now();
+    const supabase = createServiceRoleClient();
+
+    // Get recent projects
+    const { data: projects } = await supabase
+      .from("projects")
+      .select("id, project_code, name, status, client_id")
+      .eq("is_deleted", false)
+      .order("created_at", { ascending: false })
+      .limit(5);
+
+    if (!projects || projects.length === 0) {
+      console.log(`  📊 [CACHE] Recent projects: 0 found in ${(performance.now() - start).toFixed(0)}ms`);
+      return [];
+    }
+
+    // Get client names in a single query
+    const clientIds = projects
+      .map(p => p.client_id)
+      .filter((id): id is string => id !== null);
+
+    const clientMap = new Map<string, string>();
+    if (clientIds.length > 0) {
+      const { data: clients } = await supabase
+        .from("clients")
+        .select("id, company_name")
+        .in("id", clientIds);
+
+      clients?.forEach(c => clientMap.set(c.id, c.company_name));
+    }
+
+    // Merge client data
+    const projectsWithClients = projects.map(project => ({
+      id: project.id,
+      project_code: project.project_code,
+      name: project.name,
+      status: project.status,
+      client: project.client_id ? { company_name: clientMap.get(project.client_id) || null } : null,
+    }));
+
+    console.log(`  📊 [CACHE] Recent projects fetched in ${(performance.now() - start).toFixed(0)}ms`);
+
+    return projectsWithClients;
+  },
+  ["recent-projects"],
+  {
+    revalidate: STATS_CACHE_TTL,
+    tags: ["recent-projects", "projects"],
+  }
+);
+
+/**
+ * Get cached project detail data
+ * Caches the main project query for faster subsequent loads
+ */
+export const getCachedProjectDetail = unstable_cache(
+  async (projectId: string) => {
+    const start = performance.now();
+    const supabase = createServiceRoleClient();
+
+    const [
+      projectResult,
+      scopeItemsResult,
+      materialsResult,
+      snaggingResult,
+      milestonesResult,
+    ] = await Promise.all([
+      // Project with client
+      supabase
+        .from("projects")
+        .select(`
+          id, project_code, name, description, status, installation_date, contract_value_manual, currency,
+          client:clients(id, company_name, contact_person, email, phone)
+        `)
+        .eq("id", projectId)
+        .single(),
+      // Scope items
+      supabase
+        .from("scope_items")
+        .select("id, item_code, name, description, width, depth, height, item_path, status, quantity, unit, unit_price, total_price, production_percentage, is_installed, notes, images")
+        .eq("project_id", projectId)
+        .eq("is_deleted", false)
+        .order("item_code"),
+      // Materials with item_materials
+      supabase
+        .from("materials")
+        .select(`
+          id, material_code, name, specification, supplier, images, status,
+          item_materials(item_id, material_id)
+        `)
+        .eq("project_id", projectId)
+        .eq("is_deleted", false)
+        .order("material_code"),
+      // Snagging
+      supabase
+        .from("snagging")
+        .select(`
+          id, project_id, item_id, description, photos, is_resolved,
+          resolved_at, resolved_by, resolution_notes, created_by, created_at,
+          item:scope_items!snagging_item_id_fkey(item_code, name),
+          creator:users!snagging_created_by_fkey(name),
+          resolver:users!snagging_resolved_by_fkey(name)
+        `)
+        .eq("project_id", projectId)
+        .order("created_at", { ascending: false }),
+      // Milestones
+      supabase
+        .from("milestones")
+        .select("id, project_id, name, description, due_date, is_completed, completed_at, alert_days_before")
+        .eq("project_id", projectId)
+        .order("due_date"),
+    ]);
+
+    console.log(`  📊 [CACHE] Project detail fetched in ${(performance.now() - start).toFixed(0)}ms`);
+
+    return {
+      project: projectResult.data,
+      projectError: projectResult.error,
+      scopeItems: scopeItemsResult.data || [],
+      materials: materialsResult.data || [],
+      snagging: snaggingResult.data || [],
+      milestones: milestonesResult.data || [],
+    };
+  },
+  ["project-detail"],
+  {
+    revalidate: PROJECT_CACHE_TTL,
+    tags: ["project-detail"],
+  }
+);

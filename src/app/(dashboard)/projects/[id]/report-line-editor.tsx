@@ -60,7 +60,7 @@ import {
   deleteReportLine,
   reorderReportLines,
   type ReportLine,
-} from "./reports/actions";
+} from "@/lib/actions/reports";
 
 interface SortableLineItemProps {
   line: ReportLine;
@@ -336,9 +336,9 @@ export function ReportLineEditor({
         photos,
       });
 
-      if (result.success && result.lineId) {
+      if (result.success && result.data?.lineId) {
         const newLine: ReportLine = {
-          id: result.lineId,
+          id: result.data.lineId,
           report_id: reportId,
           line_order: lines.length + 1,
           title: title.trim(),

@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import { GradientIcon } from "@/components/ui/ui-helpers";
 import { InfoIcon, MailIcon, CopyIcon, CheckIcon, AlertCircleIcon, UserPlusIcon, UserIcon } from "lucide-react";
-import { inviteUser, updateUser } from "./actions";
+import { inviteUser, updateUser } from "@/lib/actions/users";
 
 interface User {
   id: string;

@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { DownloadIcon } from "lucide-react";
 import { exportMaterialsExcel, type ExportMaterial } from "@/lib/excel-template";
 
@@ -17,8 +19,15 @@ export function MaterialsExcelExport({
   projectName,
   disabled,
 }: MaterialsExcelExportProps) {
-  const handleExport = () => {
-    exportMaterialsExcel(materials, projectCode, projectName);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleExport = async () => {
+    setIsLoading(true);
+    try {
+      await exportMaterialsExcel(materials, projectCode, projectName);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -26,9 +35,9 @@ export function MaterialsExcelExport({
       variant="outline"
       size="sm"
       onClick={handleExport}
-      disabled={disabled || materials.length === 0}
+      disabled={disabled || materials.length === 0 || isLoading}
     >
-      <DownloadIcon className="size-4" />
+      {isLoading ? <Spinner className="size-4" /> : <DownloadIcon className="size-4" />}
       Export
     </Button>
   );

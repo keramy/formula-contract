@@ -70,7 +70,7 @@ export function ExcelImport({ projectId, projectCode }: ExcelImportProps) {
 
     try {
       const buffer = await file.arrayBuffer();
-      const result = parseScopeItemsExcel(buffer);
+      const result = await parseScopeItemsExcel(buffer);
       setParseResult(result);
       setStep("preview");
     } catch (err) {

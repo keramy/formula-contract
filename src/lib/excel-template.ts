@@ -1,9 +1,17 @@
 /**
  * Excel (XLSX) Template Generator and Parser for Scope Items
  * Uses SheetJS (xlsx) library for proper Excel file handling
+ *
+ * OPTIMIZED: XLSX (~150KB) is dynamically imported only when needed
  */
 
-import * as XLSX from "xlsx";
+// Dynamic import helper - loads xlsx only when called
+async function getXLSX() {
+  return import("xlsx");
+}
+
+// Type for XLSX module (for type safety without importing)
+type XLSXModule = typeof import("xlsx");
 
 export const SCOPE_ITEMS_COLUMNS = [
   "item_code",
@@ -84,7 +92,8 @@ export interface ParseResult {
 /**
  * Generate an Excel template file for scope items
  */
-export function generateScopeItemsExcel(): XLSX.WorkBook {
+export async function generateScopeItemsExcel() {
+  const XLSX = await getXLSX();
   // Create workbook
   const workbook = XLSX.utils.book_new();
 
@@ -147,8 +156,9 @@ export function generateScopeItemsExcel(): XLSX.WorkBook {
 /**
  * Download the Excel template
  */
-export function downloadScopeItemsTemplate(projectCode: string = "PROJECT"): void {
-  const workbook = generateScopeItemsExcel();
+export async function downloadScopeItemsTemplate(projectCode: string = "PROJECT"): Promise<void> {
+  const XLSX = await getXLSX();
+  const workbook = await generateScopeItemsExcel();
   const filename = `${projectCode}_scope_items_template.xlsx`;
   XLSX.writeFile(workbook, filename);
 }
@@ -156,7 +166,8 @@ export function downloadScopeItemsTemplate(projectCode: string = "PROJECT"): voi
 /**
  * Parse an Excel file and extract scope items
  */
-export function parseScopeItemsExcel(file: ArrayBuffer): ParseResult {
+export async function parseScopeItemsExcel(file: ArrayBuffer): Promise<ParseResult> {
+  const XLSX = await getXLSX();
   const errors: { row: number; message: string }[] = [];
   const warnings: { row: number; message: string }[] = [];
   const items: ParsedScopeItem[] = [];
@@ -368,11 +379,12 @@ const EXPORT_HEADERS = [
   "Notes",
 ];
 
-export function exportScopeItemsExcel(
+export async function exportScopeItemsExcel(
   items: ExportScopeItem[],
   projectCode: string,
   projectName: string
-): void {
+): Promise<void> {
+  const XLSX = await getXLSX();
   const workbook = XLSX.utils.book_new();
 
   // Convert items to rows
@@ -468,7 +480,8 @@ export interface MaterialParseResult {
 /**
  * Generate an Excel template file for materials
  */
-export function generateMaterialsExcel(): XLSX.WorkBook {
+export async function generateMaterialsExcel() {
+  const XLSX = await getXLSX();
   const workbook = XLSX.utils.book_new();
 
   // Data sheet with headers only
@@ -511,8 +524,9 @@ export function generateMaterialsExcel(): XLSX.WorkBook {
 /**
  * Download the materials Excel template
  */
-export function downloadMaterialsTemplate(projectCode: string = "PROJECT"): void {
-  const workbook = generateMaterialsExcel();
+export async function downloadMaterialsTemplate(projectCode: string = "PROJECT"): Promise<void> {
+  const XLSX = await getXLSX();
+  const workbook = await generateMaterialsExcel();
   const filename = `${projectCode}_materials_template.xlsx`;
   XLSX.writeFile(workbook, filename);
 }
@@ -520,7 +534,8 @@ export function downloadMaterialsTemplate(projectCode: string = "PROJECT"): void
 /**
  * Parse an Excel file and extract materials
  */
-export function parseMaterialsExcel(file: ArrayBuffer): MaterialParseResult {
+export async function parseMaterialsExcel(file: ArrayBuffer): Promise<MaterialParseResult> {
+  const XLSX = await getXLSX();
   const errors: { row: number; message: string }[] = [];
   const warnings: { row: number; message: string }[] = [];
   const items: ParsedMaterial[] = [];
@@ -621,11 +636,12 @@ const MATERIALS_EXPORT_HEADERS = [
   "Assigned Items",
 ];
 
-export function exportMaterialsExcel(
+export async function exportMaterialsExcel(
   materials: ExportMaterial[],
   projectCode: string,
   projectName: string
-): void {
+): Promise<void> {
+  const XLSX = await getXLSX();
   const workbook = XLSX.utils.book_new();
 
   // Convert materials to rows

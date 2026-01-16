@@ -1,5 +1,15 @@
 "use server";
 
+/**
+ * Authentication Server Actions
+ *
+ * Handles all authentication-related operations including:
+ * - Login with rate limiting
+ * - Password reset requests
+ * - Password updates
+ * - Auth status checks
+ */
+
 import { createClient } from "@/lib/supabase/server";
 import {
   checkLoginRateLimit,
@@ -20,10 +30,20 @@ export interface AuthResult {
   resetIn?: number;
 }
 
+export interface AuthStatusResult {
+  isAuthenticated: boolean;
+  mustChangePassword: boolean;
+  email?: string;
+}
+
 // ============================================================================
 // Login Action
 // ============================================================================
 
+/**
+ * Login a user with email and password
+ * Includes rate limiting based on client IP
+ */
 export async function loginAction(
   email: string,
   password: string
@@ -94,6 +114,10 @@ export async function loginAction(
 // Password Reset Request Action
 // ============================================================================
 
+/**
+ * Request a password reset email
+ * Includes rate limiting to prevent abuse
+ */
 export async function requestPasswordResetAction(
   email: string,
   redirectUrl: string
@@ -144,9 +168,13 @@ export async function requestPasswordResetAction(
 }
 
 // ============================================================================
-// Update Password Action (for password reset and change password)
+// Update Password Action
 // ============================================================================
 
+/**
+ * Update the current user's password
+ * Used for both password reset and change password flows
+ */
 export async function updatePasswordAction(
   newPassword: string,
   clearMustChangeFlag: boolean = false
@@ -214,15 +242,13 @@ export async function updatePasswordAction(
 }
 
 // ============================================================================
-// Check Auth Status Action (for change-password page)
+// Check Auth Status Action
 // ============================================================================
 
-export interface AuthStatusResult {
-  isAuthenticated: boolean;
-  mustChangePassword: boolean;
-  email?: string;
-}
-
+/**
+ * Check current authentication status
+ * Used by the change-password page to verify user state
+ */
 export async function checkAuthStatusAction(): Promise<AuthStatusResult> {
   try {
     const supabase = await createClient();

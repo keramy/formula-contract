@@ -10,7 +10,7 @@ import { CardContent, CardDescription, CardHeader, CardTitle } from "@/component
 import { Spinner } from "@/components/ui/spinner";
 import { GlassCard } from "@/components/ui/ui-helpers";
 import { CheckCircle2Icon, AlertCircleIcon, ShieldAlertIcon } from "lucide-react";
-import { updatePasswordAction } from "../actions";
+import { updatePasswordAction } from "@/lib/actions/auth";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
