@@ -1,10 +1,14 @@
 # Formula Contract - Project Intelligence
 
+> **Last Updated:** January 17, 2026
+
 ## Project Overview
 
 **What:** Project Management System for furniture manufacturing (Formula Contract)
 **Core Flow:** Tender → Active → Scope Items → Drawings/Materials Approval → Production/Procurement → Installation → Close
 **Style:** Notion-inspired (clean, minimal, generous whitespace)
+**Supabase Plan:** Pro (upgraded Jan 2026)
+**Region:** Mumbai (ap-south-1) - migration to EU planned
 
 ---
 
@@ -13,10 +17,12 @@
 ### Tech Stack
 - **Frontend:** Next.js 16 + React 19 + TypeScript
 - **Styling:** Tailwind CSS v4 + shadcn/ui (premium bundui kit)
-- **Backend:** Supabase (PostgreSQL + Auth + Storage + RLS)
-- **State:** Zustand for client state, React Query patterns for server state
+- **Backend:** Supabase Pro (PostgreSQL + Auth + Storage + RLS)
+- **State:** Zustand for client state, React Query for server state
 - **Forms:** react-hook-form + zod validation
 - **Tables:** @tanstack/react-table
+- **Testing:** Playwright (e2e), Lighthouse (performance)
+- **CI/CD:** GitHub Actions
 
 ### Routing Structure
 ```
@@ -135,6 +141,150 @@ function ProjectForm() {
 <Badge className="status-completed">Completed</Badge>
 <Badge className="path-production">Production</Badge>
 <Badge className="approval-approved">Approved</Badge>
+```
+
+---
+
+## Supabase Security Patterns
+
+### Function Security (CRITICAL)
+```sql
+-- Always add SET search_path = public to prevent schema injection
+CREATE OR REPLACE FUNCTION public.my_function()
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+STABLE
+SET search_path = public  -- REQUIRED for security
+AS $$ ... $$;
+```
+
+### RLS Performance Optimization
+```sql
+-- BAD: auth.uid() evaluated per row (O(n))
+USING (user_id = auth.uid())
+
+-- GOOD: auth.uid() evaluated once via InitPlan (O(1))
+USING (user_id = (SELECT auth.uid()))
+
+-- Also wrap function calls that internally use auth.uid()
+USING ((SELECT is_admin()) OR is_active = true)
+```
+
+### RLS Policy Best Practices
+```sql
+-- Avoid FOR ALL policies - they cause double evaluation on SELECT
+-- Instead, use specific operations:
+CREATE POLICY "Insert X" ON table FOR INSERT WITH CHECK (...);
+CREATE POLICY "Update X" ON table FOR UPDATE USING (...);
+CREATE POLICY "Delete X" ON table FOR DELETE USING (...);
+-- Leave View/Select handled by a single SELECT policy
+```
+
+### Helper Functions (SECURITY DEFINER required)
+These functions run with elevated privileges to allow RLS policies to work:
+- `get_user_role()` - Returns current user's role
+- `is_assigned_to_project(uuid)` - Checks project assignment
+- `is_client_for_project(uuid)` - Checks if user is client for project
+- `is_admin()` - Checks if user has admin role
+
+---
+
+## Server Actions Architecture
+
+### Directory Structure
+```
+src/lib/actions/
+├── index.ts              # Central exports
+├── auth.ts               # Login, logout, password reset
+├── users.ts              # User CRUD operations
+├── project-assignments.ts # Team assignment operations
+├── reports.ts            # Report CRUD + sharing
+├── materials.ts          # Material CRUD + bulk import
+└── scope-items.ts        # Scope item operations
+```
+
+### Server Action Pattern
+```typescript
+"use server";
+
+import { createClient } from "@/lib/supabase/server";
+import { revalidatePath } from "next/cache";
+
+export async function updateSomething(id: string, data: FormData) {
+  const supabase = await createClient();
+
+  // 1. Get authenticated user
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  // 2. Perform operation (RLS handles authorization)
+  const { data: result, error } = await supabase
+    .from("table")
+    .update({ ... })
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  // 3. Revalidate cache
+  revalidatePath("/relevant/path");
+
+  return result;
+}
+```
+
+### React Query Integration
+```typescript
+// src/lib/react-query/materials.ts
+export function useCreateMaterial() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data) => createMaterial(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["materials"] });
+      toast.success("Material created");
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+}
+```
+
+---
+
+## Database Migrations
+
+### Migration File Naming
+```
+supabase/migrations/
+├── 001_performance_indexes.sql
+├── 002_client_safe_views.sql
+├── 003_fix_function_search_paths.sql
+├── 004_fix_rls_init_plan.sql
+├── 005_add_fk_indexes.sql
+├── 006_consolidate_rls_policies.sql
+└── 007_fix_remaining_advisor_issues.sql
+```
+
+### Running Migrations
+1. Test locally with `supabase db push` (if using CLI)
+2. Or run directly in Supabase Dashboard SQL Editor
+3. Always check Supabase Advisor after migrations
+
+### Foreign Key Indexing
+Always create indexes on FK columns for JOIN performance:
+```sql
+CREATE INDEX IF NOT EXISTS idx_table_fk_column
+  ON public.table(fk_column);
+
+-- For nullable FKs, use partial index:
+CREATE INDEX IF NOT EXISTS idx_table_fk_column
+  ON public.table(fk_column)
+  WHERE fk_column IS NOT NULL;
 ```
 
 ---
@@ -272,6 +422,11 @@ Before any feature is complete:
 3. **Drawing revisions are immutable** - Never edit, create new revision
 4. **Client portal is read-only** - Clients can only view and approve/reject
 5. **PM override needs reason** - Can't skip approval without documented reason
+6. **RLS functions need SECURITY DEFINER** - Otherwise they can't read user table
+7. **Always use `(SELECT auth.uid())`** - Never bare `auth.uid()` in RLS policies
+8. **Functions need `SET search_path`** - Prevents schema injection attacks
+9. **Avoid FOR ALL policies** - Causes double evaluation, use specific operations
+10. **Server actions for mutations** - Never use createClient() in client components
 
 ---
 

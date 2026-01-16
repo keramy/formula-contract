@@ -1,207 +1,217 @@
 # Formula Contract - Master Development Plan
 
-## Last Updated: January 15, 2026
+## Last Updated: January 17, 2026
 
 ---
 
-# ✅ COMPLETED FEATURES
+# Current Status
+
+| Area | Status | Notes |
+|------|--------|-------|
+| **Supabase Plan** | Pro | Upgraded Jan 17, 2026 |
+| **Region** | Mumbai (ap-south-1) | EU migration planned |
+| **Database Security** | Hardened | All advisor issues fixed |
+| **Code Architecture** | Refactored | Server actions consolidated |
+| **Testing** | Setup complete | Playwright + CI configured |
+
+---
+
+# COMPLETED FEATURES
 
 ## Core Application Features
 
 | Feature | Status | Key Files |
 |---------|--------|-----------|
-| Reports Module (Full CRUD) | ✅ | `reports/actions.ts`, `reports-overview.tsx` |
-| Reports Table (Excel-style) | ✅ | `reports-table.tsx` - sortable columns, expandable rows |
-| Report Sharing (User Picker) | ✅ | `report_shares` table, user picker in modals |
-| PDF Export (Turkish fonts) | ✅ | `report-pdf-export.tsx`, `roboto-loader.ts` |
-| Mark as Installed | ✅ | `installation-status-editor.tsx` |
-| Procurement Status | ✅ | `procurement-status-editor.tsx` |
-| Dashboard UI | ✅ | `dashboard/page.tsx` - glassmorphism design |
-| User Management | ✅ | Temp password flow, welcome emails |
-| Role-Based Access | ✅ | Middleware + sidebar filtering |
-| Client Permissions | ✅ | View-only + approvals |
-| Team Assignment | ✅ | `team-overview.tsx` |
-| Force Password Change | ✅ | First login redirect |
-| Profile Settings | ✅ | `/profile` page |
-| Notifications | ✅ | Bell icon + dropdown |
-| Activity Log | ✅ | Audit trail |
+| Reports Module (Full CRUD) | Done | `lib/actions/reports.ts` |
+| Reports Table (Excel-style) | Done | `reports-table.tsx` |
+| Report Sharing (User Picker) | Done | `report_shares` table |
+| PDF Export (Turkish fonts) | Done | `report-pdf-export.tsx` |
+| Mark as Installed | Done | `installation-status-editor.tsx` |
+| Procurement Status | Done | `procurement-status-editor.tsx` |
+| Dashboard UI | Done | Glassmorphism design |
+| User Management | Done | Temp password flow |
+| Role-Based Access | Done | Middleware + sidebar |
+| Client Permissions | Done | View-only + approvals |
+| Team Assignment | Done | `team-overview.tsx` |
+| Force Password Change | Done | First login redirect |
+| Profile Settings | Done | `/profile` page |
+| Notifications | Done | Bell icon + dropdown |
+| Activity Log | Done | Audit trail |
 
-## UI Overhaul (Asana-style Design)
+## Database Security (Jan 17, 2026)
 
-| Page | Status | Components Used |
-|------|--------|-----------------|
-| Dashboard | ✅ | GlassCard, GradientIcon, StatusBadge |
-| Projects List | ✅ | GlassCard table, GradientAvatar |
-| Clients List | ✅ | GlassCard table, EmptyState |
-| Users List | ✅ | GlassCard table, filters |
-| Project Detail | ✅ | GlassCard info cards, glassmorphism tabs |
-| Scope Item Detail | ✅ | Full GlassCard layout, 7 color variants |
+| Migration | Purpose | Status |
+|-----------|---------|--------|
+| `003_fix_function_search_paths.sql` | Secured 5 functions with search_path | Done |
+| `004_fix_rls_init_plan.sql` | Optimized 3 RLS policies | Done |
+| `005_add_fk_indexes.sql` | Added 15 FK indexes | Done |
+| `006_consolidate_rls_policies.sql` | Split 10 FOR ALL policies | Done |
+| `007_fix_remaining_advisor_issues.sql` | Fixed remaining issues | Done |
 
-## Security & Performance
+## Code Architecture (Jan 16-17, 2026)
 
-| Feature | Status | File |
-|---------|--------|------|
-| Rate Limiting | ✅ | `src/lib/rate-limit.ts` |
-| XSS Sanitization | ✅ | `src/lib/sanitize.ts` |
-| File Validation | ✅ | `src/lib/file-validation.ts` |
-| React Query Caching | ✅ | `src/lib/react-query/` |
-| Performance Indexes | ✅ | `001_performance_indexes.sql` |
-| Client-Safe Views | ✅ | `002_client_safe_views.sql` |
+| Task | Status |
+|------|--------|
+| Server actions → `src/lib/actions/` | Done |
+| React Query hooks for materials | Done |
+| React Query hooks for scope-items | Done |
+| Caching utilities | Done |
+| Performance profiling | Done |
+| Dashboard skeleton loading | Done |
+| Playwright e2e tests setup | Done |
+| GitHub Actions CI workflow | Done |
+
+## Supabase Advisor Status
+
+| Category | Issues | Status |
+|----------|--------|--------|
+| Function Search Path | 0 | Fixed |
+| Auth RLS InitPlan | 0 | Fixed |
+| Multiple Permissive Policies | 0 | Fixed |
+| Unindexed FKs | 0 | Fixed |
+| Security Definer Views | 8 | False positive (ignore) |
+| Activity Log INSERT | 1 | Intentional |
+| Unused Indexes | 37 | Expected (new app) |
 
 ---
 
-# 📋 FUTURE DEVELOPMENT (Priority Order)
+# FUTURE DEVELOPMENT
 
 ## HIGH PRIORITY
 
-### 1. Testing & Quality Assurance
-- [ ] End-to-end testing of all features
-- [ ] Mobile responsiveness review
-- [ ] Performance audit (Lighthouse)
-- [ ] Accessibility check (WCAG compliance)
+### 1. Region Migration (EU)
+- [ ] Create new project in Frankfurt (eu-central-1)
+- [ ] Run all migrations
+- [ ] Update environment variables
+- [ ] Pause Mumbai project
+- **Cost:** $10/month during transition
 
-### 2. Bug Fixes & Polish
-- [ ] Review console errors across all pages
+### 2. Testing & QA
+- [ ] Run e2e tests for all features
+- [ ] Mobile responsiveness review
+- [ ] Lighthouse performance audit
+- [ ] Accessibility check (WCAG)
+
+### 3. Bug Fixes & Polish
+- [ ] Review console errors
 - [ ] Form validation edge cases
 - [ ] Loading states consistency
 
 ## MEDIUM PRIORITY
 
-### 3. UI Polish (Optional)
-- [ ] Sidebar accent colors refinement
-- [ ] Activity Feed gradient icons
-- [ ] Notifications dropdown GlassCard styling
-
-### 4. Snagging/Punch List Module
-- [ ] Create snagging list UI for project completion
+### 4. Snagging Module
+- [ ] Create snagging list UI
 - [ ] Photo upload for issues
-- [ ] Resolution tracking workflow
+- [ ] Resolution tracking
+
+### 5. React Query Expansion
+- [ ] `src/lib/react-query/drawings.ts`
+- [ ] `src/lib/react-query/projects.ts`
+- [ ] `src/lib/react-query/users.ts`
+
+### 6. Component Refactoring
+- [ ] Split `report-edit-modal.tsx` (910 lines)
+- [ ] Split `report-creation-modal.tsx` (874 lines)
+- [ ] Split `scope-items-table.tsx` (665 lines)
 
 ## LOW PRIORITY
 
-### 5. Documentation
-- [ ] Update README with setup instructions
+### 7. Documentation
+- [ ] Update README
 - [ ] API documentation
-- [ ] User guide for client users
+- [ ] User guide for clients
 
-### 6. Analytics & Reporting
-- [ ] Dashboard analytics charts (Recharts)
-- [ ] Project progress visualizations
-- [ ] Export functionality for analytics
+### 8. Analytics
+- [ ] Dashboard charts (Recharts)
+- [ ] Progress visualizations
+- [ ] Export functionality
 
 ---
 
-# REFERENCE: Tech Stack
+# TECH STACK
 
 | Category | Technology |
 |----------|------------|
 | Framework | Next.js 16 (App Router) |
 | React | 19 with Server Actions |
-| Database | Supabase (PostgreSQL + Auth + Storage) |
-| UI | shadcn/ui + Tailwind CSS |
-| Sanitization | DOMPurify |
-| Email | Resend |
+| Database | Supabase Pro (PostgreSQL + Auth + Storage) |
+| UI | shadcn/ui + Tailwind CSS v4 |
+| State | React Query + Zustand |
 | Forms | React Hook Form + Zod |
+| Testing | Playwright + Lighthouse |
+| CI/CD | GitHub Actions |
+| Email | Resend |
 | Excel | SheetJS (xlsx) |
-| Charts | Recharts |
-| PDF | jsPDF + dynamic font loading |
+| PDF | jsPDF |
 
 ---
 
-# REFERENCE: Design System
+# FILE STRUCTURE
 
-**File:** `src/components/ui/ui-helpers.tsx`
+```
+src/
+├── app/
+│   ├── (auth)/           # Login, password reset
+│   └── (dashboard)/      # Protected routes
+├── components/
+│   ├── ui/               # shadcn components
+│   ├── materials/        # Material components
+│   ├── reports/          # Report components
+│   └── scope-items/      # Scope item components
+├── lib/
+│   ├── actions/          # Server actions (consolidated)
+│   ├── react-query/      # Query hooks
+│   ├── supabase/         # Supabase clients
+│   ├── cache.ts          # Caching utilities
+│   └── profiling.ts      # Performance profiling
+└── types/                # TypeScript types
 
-| Component | Purpose |
-|-----------|---------|
-| `GlassCard` | Glassmorphism card with hover effects |
-| `GradientIcon` | Icon with gradient background |
-| `PageHeader` | Compact header with sidebar toggle |
-| `StatCard` | Stats with icon and trend |
-| `StatusBadge` | Colored status indicators |
-| `GradientAvatar` | Avatar with gradient colors |
-| `SectionHeader` | Section title with action |
-| `EmptyState` | Placeholder for empty content |
+supabase/
+├── migrations/           # 7 migration files
+└── schema.sql            # Base schema reference
 
----
-
-# REFERENCE: Permission Matrix
-
-| Route | Admin | PM | Production | Procurement | Management | Client |
-|-------|-------|-----|------------|-------------|------------|--------|
-| /dashboard | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| /projects | ✅ | ✅ | ✅ | ✅ | ✅ | ✅* |
-| /projects/new | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| /clients | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| /users | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| /reports | ✅ | ✅ | ❌ | ❌ | ✅ | ✅* |
-| /profile | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-
-*Client sees only assigned projects/reports
-
----
-
-# REFERENCE: Environment Variables
-
-```env
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=xxx
-SUPABASE_SERVICE_ROLE_KEY=xxx
-
-# Site URL
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
-
-# Email (Optional)
-RESEND_API_KEY=re_xxxxxxxxxx
+e2e/                      # Playwright tests
+.github/workflows/        # CI configuration
 ```
 
 ---
 
-# REFERENCE: Database Tables
+# ENVIRONMENT VARIABLES
 
-## Core Tables
-- `users` - User accounts with roles
-- `clients` - Client companies
-- `projects` - Project records
-- `project_assignments` - User-project relationships
-- `scope_items` - Project scope items
+```env
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=https://dovxdlrltkefqhkascoa.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=xxx
+SUPABASE_SERVICE_ROLE_KEY=xxx
 
-## Supporting Tables
-- `reports` - Project reports
-- `report_lines` - Report content sections
-- `report_shares` - Report-user sharing (NEW)
-- `drawings` - Drawing records
-- `drawing_revisions` - Drawing version history
-- `materials` - Material specifications
-- `notifications` - User notifications
-- `activity_log` - Audit trail
+# Site
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+
+# Email
+RESEND_API_KEY=re_xxx
+```
 
 ---
 
-# ARCHIVED: Implementation Details
+# GIT WORKFLOW
 
-<details>
-<summary>Click to expand archived details</summary>
+```bash
+# Current branch
+master
 
-## Reports Table Redesign (Completed Jan 15, 2026)
-- Excel-style sortable table replacing card layout
-- Columns: Type, Status, Shared With, Sections, Created By, Created, Last Edited, Actions
-- Expandable rows with report preview
-- User avatar badges showing shared users
-- User picker in creation/edit modals
-- Junction table `report_shares` for many-to-many relationship
+# Remote
+origin: https://github.com/keramy/formula-contract.git
 
-## PDF Export Enhancements (Completed Jan 15, 2026)
-- Turkish font support via Roboto (Google Fonts CDN)
-- Creator/editor info in header
-- Sharing badges (Internal/Client)
-- Teal accent bars instead of "Section 1, 2, 3" labels
+# Latest commit (Jan 17, 2026)
+e0e1fd7: feat: Major refactoring + Supabase security/performance fixes
+```
 
-## Security Implementations
-- Rate limiting: 5 login attempts per 15 min, 3 password resets per hour
-- XSS protection: DOMPurify sanitization on all user inputs
-- File validation: Type, size, extension checks with suspicious pattern detection
-- Client-safe views: Database views that filter sensitive data
+---
 
-</details>
+# NOTES
+
+- All Supabase advisor security/performance issues resolved
+- Server actions centralized in `src/lib/actions/`
+- React Query hooks available for materials and scope-items
+- E2E testing configured but tests need to be run
+- Region migration to EU postponed (can do anytime)
