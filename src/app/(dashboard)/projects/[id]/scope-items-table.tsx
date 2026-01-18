@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useEffect, useCallback, useMemo, memo } from "react";
+import { useState, useTransition, useEffect, useCallback, useMemo, memo, useReducer } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { bulkUpdateScopeItems, bulkAssignMaterials, splitScopeItem, deleteScopeItem, type ScopeItemField } from "@/lib/actions/scope-items";
@@ -233,6 +233,288 @@ function formatCurrencyValue(value: number | null, currency: string): string {
   return `${symbol}${getCurrencyFormatter(currency).format(value)}`;
 }
 
+// ============================================================================
+// PERFORMANCE: Dialog state reducer
+// Consolidates 11 separate useState calls into 1 useReducer
+// Benefits: Single state update, predictable transitions, better batching
+// ============================================================================
+
+type DialogType = "price" | "quantity" | "materials" | "split" | "delete" | null;
+
+interface DialogState {
+  activeDialog: DialogType;
+  // Shared input value for price/quantity dialogs
+  inputValue: string;
+  // Materials dialog
+  selectedMaterialIds: Set<string>;
+  // Split dialog
+  itemToSplit: ScopeItem | null;
+  splitTargetPath: "production" | "procurement";
+  splitQuantity: string;
+  splitName: string;
+  // Delete dialog
+  itemToDelete: HierarchicalScopeItem | null;
+}
+
+type DialogAction =
+  | { type: "OPEN_PRICE_DIALOG" }
+  | { type: "OPEN_QUANTITY_DIALOG" }
+  | { type: "OPEN_MATERIALS_DIALOG" }
+  | { type: "OPEN_SPLIT_DIALOG"; item: ScopeItem }
+  | { type: "OPEN_DELETE_DIALOG"; item: HierarchicalScopeItem }
+  | { type: "CLOSE_DIALOG" }
+  | { type: "SET_INPUT_VALUE"; value: string }
+  | { type: "TOGGLE_MATERIAL"; materialId: string }
+  | { type: "SET_SPLIT_PATH"; path: "production" | "procurement" }
+  | { type: "SET_SPLIT_QUANTITY"; value: string }
+  | { type: "SET_SPLIT_NAME"; value: string }
+  | { type: "RESET_MATERIALS" };
+
+const initialDialogState: DialogState = {
+  activeDialog: null,
+  inputValue: "",
+  selectedMaterialIds: new Set(),
+  itemToSplit: null,
+  splitTargetPath: "production",
+  splitQuantity: "",
+  splitName: "",
+  itemToDelete: null,
+};
+
+// ============================================================================
+// PERFORMANCE: Memoized table row component
+// Prevents re-rendering of all rows when only one row changes
+// ============================================================================
+
+interface ScopeItemRowProps {
+  item: HierarchicalScopeItem;
+  isSelected: boolean;
+  projectId: string;
+  visibleColumns: Set<string>;
+  formatCurrency: (value: number | null) => string;
+  onToggleSelect: (id: string) => void;
+  onOpenSplitDialog: (item: ScopeItem) => void;
+  onOpenDeleteDialog: (item: HierarchicalScopeItem) => void;
+}
+
+const ScopeItemRow = memo(function ScopeItemRow({
+  item,
+  isSelected,
+  projectId,
+  visibleColumns,
+  formatCurrency,
+  onToggleSelect,
+  onOpenSplitDialog,
+  onOpenDeleteDialog,
+}: ScopeItemRowProps) {
+  const isColumnVisible = (columnId: string) => visibleColumns.has(columnId);
+
+  return (
+    <TableRow
+      data-state={isSelected ? "selected" : undefined}
+      className={item.isChild ? "bg-gray-50/50 dark:bg-gray-900/20" : ""}
+    >
+      <TableCell>
+        <Checkbox
+          checked={isSelected}
+          onCheckedChange={() => onToggleSelect(item.id)}
+        />
+      </TableCell>
+      {isColumnVisible("row") && (
+        <TableCell className="text-center text-muted-foreground font-mono text-sm">
+          {item.isChild ? (
+            <span className="flex items-center justify-center gap-0.5">
+              <span className="text-violet-500">⤷</span>
+              <span className="text-xs">{item.displayRowNumber}</span>
+            </span>
+          ) : (
+            item.displayRowNumber
+          )}
+        </TableCell>
+      )}
+      {isColumnVisible("code") && (
+        <TableCell className={`font-mono text-sm ${item.isChild ? "pl-2" : ""}`}>
+          {item.isChild && <span className="text-violet-400 mr-1">└</span>}
+          {item.item_code}
+        </TableCell>
+      )}
+      {isColumnVisible("name") && (
+        <TableCell>
+          <Link
+            href={`/projects/${projectId}/scope/${item.id}`}
+            className={`font-medium hover:underline ${item.isChild ? "text-muted-foreground hover:text-foreground" : ""}`}
+          >
+            {item.name}
+          </Link>
+        </TableCell>
+      )}
+      {isColumnVisible("path") && (
+        <TableCell>
+          <div className="flex items-center gap-1.5">
+            {item.item_path === "production" ? (
+              <FactoryIcon className="size-3.5 text-purple-500" />
+            ) : (
+              <ShoppingCartIcon className="size-3.5 text-blue-500" />
+            )}
+            <span className="text-xs capitalize">{item.item_path}</span>
+          </div>
+        </TableCell>
+      )}
+      {isColumnVisible("status") && (
+        <TableCell>
+          <Badge
+            variant="secondary"
+            className={`${statusColors[item.status]} cursor-help`}
+            title={statusTooltips[item.status] || ""}
+          >
+            {statusLabels[item.status] || item.status}
+          </Badge>
+        </TableCell>
+      )}
+      {isColumnVisible("quantity") && (
+        <TableCell className="text-right text-sm">
+          {item.quantity} {item.unit}
+        </TableCell>
+      )}
+      {isColumnVisible("unit_cost") && (
+        <TableCell className="text-right font-mono text-sm">
+          {item.hasChildren ? (
+            <span className="text-muted-foreground">-</span>
+          ) : (
+            formatCurrency(item.unit_cost)
+          )}
+        </TableCell>
+      )}
+      {isColumnVisible("initial_cost") && (
+        <TableCell className="text-right font-mono text-sm text-muted-foreground">
+          {formatCurrency(item.initial_total_cost)}
+        </TableCell>
+      )}
+      {isColumnVisible("actual_cost") && (
+        <TableCell className="text-right font-mono text-sm">
+          <span className={item.hasChildren ? "text-orange-600 font-semibold" : ""}>
+            {formatCurrency(item.actualTotalCost || null)}
+          </span>
+        </TableCell>
+      )}
+      {isColumnVisible("sales_price") && (
+        <TableCell className="text-right font-mono text-sm">
+          {formatCurrency(item.total_sales_price)}
+        </TableCell>
+      )}
+      {isColumnVisible("progress") && (
+        <TableCell>
+          <div className="flex items-center gap-2">
+            <Progress value={item.production_percentage} className="h-2 flex-1" />
+            <span className="text-xs text-muted-foreground w-7">
+              {item.production_percentage}%
+            </span>
+          </div>
+        </TableCell>
+      )}
+      {isColumnVisible("installed") && (
+        <TableCell className="text-center">
+          {item.is_installed ? (
+            <CheckCircle2Icon className="size-4 text-green-600 mx-auto" />
+          ) : (
+            <span className="text-muted-foreground text-xs">-</span>
+          )}
+        </TableCell>
+      )}
+      <TableCell>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon-sm">
+              <MoreHorizontalIcon className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem asChild>
+              <Link href={`/projects/${projectId}/scope/${item.id}`}>
+                View Details
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href={`/projects/${projectId}/scope/${item.id}/edit`}>
+                <PencilIcon className="size-4 mr-2" />
+                Edit
+              </Link>
+            </DropdownMenuItem>
+            {!item.isChild && (
+              <DropdownMenuItem onClick={() => onOpenSplitDialog(item)}>
+                <SplitIcon className="size-4 mr-2" />
+                Split Item
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => onOpenDeleteDialog(item)}
+              className="text-destructive focus:text-destructive"
+            >
+              <TrashIcon className="size-4 mr-2" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </TableCell>
+    </TableRow>
+  );
+});
+
+function dialogReducer(state: DialogState, action: DialogAction): DialogState {
+  switch (action.type) {
+    case "OPEN_PRICE_DIALOG":
+      return { ...state, activeDialog: "price", inputValue: "" };
+    case "OPEN_QUANTITY_DIALOG":
+      return { ...state, activeDialog: "quantity", inputValue: "" };
+    case "OPEN_MATERIALS_DIALOG":
+      return { ...state, activeDialog: "materials", selectedMaterialIds: new Set() };
+    case "OPEN_SPLIT_DIALOG": {
+      const item = action.item;
+      return {
+        ...state,
+        activeDialog: "split",
+        itemToSplit: item,
+        splitTargetPath: item.item_path === "production" ? "procurement" : "production",
+        splitQuantity: Math.max(1, Math.floor(item.quantity / 2)).toString(),
+        splitName: item.name,
+      };
+    }
+    case "OPEN_DELETE_DIALOG":
+      return { ...state, activeDialog: "delete", itemToDelete: action.item };
+    case "CLOSE_DIALOG":
+      return {
+        ...state,
+        activeDialog: null,
+        inputValue: "",
+        itemToSplit: null,
+        splitName: "",
+        itemToDelete: null,
+      };
+    case "SET_INPUT_VALUE":
+      return { ...state, inputValue: action.value };
+    case "TOGGLE_MATERIAL": {
+      const newSet = new Set(state.selectedMaterialIds);
+      if (newSet.has(action.materialId)) {
+        newSet.delete(action.materialId);
+      } else {
+        newSet.add(action.materialId);
+      }
+      return { ...state, selectedMaterialIds: newSet };
+    }
+    case "SET_SPLIT_PATH":
+      return { ...state, splitTargetPath: action.path };
+    case "SET_SPLIT_QUANTITY":
+      return { ...state, splitQuantity: action.value };
+    case "SET_SPLIT_NAME":
+      return { ...state, splitName: action.value };
+    case "RESET_MATERIALS":
+      return { ...state, selectedMaterialIds: new Set() };
+    default:
+      return state;
+  }
+}
+
 /**
  * Organizes scope items into hierarchical order where children appear directly after their parent.
  * Returns items with additional hierarchy metadata for display, including computed actual costs.
@@ -391,25 +673,31 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
   // ============================================================================
   const hierarchicalItems = useMemo(() => organizeHierarchically(items), [items]);
 
-  // Dialog states for numeric inputs
-  const [priceDialogOpen, setPriceDialogOpen] = useState(false);
-  const [quantityDialogOpen, setQuantityDialogOpen] = useState(false);
-  const [inputValue, setInputValue] = useState("");
+  // ============================================================================
+  // PERFORMANCE: Consolidated dialog state with useReducer
+  // Before: 11 separate useState calls = 11 potential re-renders
+  // After:  1 useReducer = single batched update
+  // ============================================================================
+  const [dialogState, dispatch] = useReducer(dialogReducer, initialDialogState);
 
-  // Materials dialog state
-  const [materialsDialogOpen, setMaterialsDialogOpen] = useState(false);
-  const [selectedMaterialIds, setSelectedMaterialIds] = useState<Set<string>>(new Set());
+  // Destructure for convenience (these are stable references from the reducer)
+  const {
+    activeDialog,
+    inputValue,
+    selectedMaterialIds,
+    itemToSplit,
+    splitTargetPath,
+    splitQuantity,
+    splitName,
+    itemToDelete,
+  } = dialogState;
 
-  // Split item dialog state
-  const [splitDialogOpen, setSplitDialogOpen] = useState(false);
-  const [itemToSplit, setItemToSplit] = useState<ScopeItem | null>(null);
-  const [splitTargetPath, setSplitTargetPath] = useState<"production" | "procurement">("production");
-  const [splitQuantity, setSplitQuantity] = useState("");
-  const [splitName, setSplitName] = useState("");
-
-  // Delete confirmation dialog state
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [itemToDelete, setItemToDelete] = useState<HierarchicalScopeItem | null>(null);
+  // Dialog open state helpers
+  const priceDialogOpen = activeDialog === "price";
+  const quantityDialogOpen = activeDialog === "quantity";
+  const materialsDialogOpen = activeDialog === "materials";
+  const splitDialogOpen = activeDialog === "split";
+  const deleteDialogOpen = activeDialog === "delete";
 
   // ============================================================================
   // PERFORMANCE: Memoized selection state and handlers
@@ -474,8 +762,7 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
     if (!isNaN(price) && price >= 0) {
       bulkUpdate("unit_sales_price", price);
     }
-    setPriceDialogOpen(false);
-    setInputValue("");
+    dispatch({ type: "CLOSE_DIALOG" });
   }, [inputValue, bulkUpdate]);
 
   const handleQuantitySubmit = useCallback(() => {
@@ -483,20 +770,11 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
     if (!isNaN(qty) && qty >= 1) {
       bulkUpdate("quantity", qty);
     }
-    setQuantityDialogOpen(false);
-    setInputValue("");
+    dispatch({ type: "CLOSE_DIALOG" });
   }, [inputValue, bulkUpdate]);
 
   const toggleMaterialSelection = useCallback((materialId: string) => {
-    setSelectedMaterialIds(prev => {
-      const newSelected = new Set(prev);
-      if (newSelected.has(materialId)) {
-        newSelected.delete(materialId);
-      } else {
-        newSelected.add(materialId);
-      }
-      return newSelected;
-    });
+    dispatch({ type: "TOGGLE_MATERIAL", materialId });
   }, []);
 
   const handleMaterialsSubmit = useCallback(() => {
@@ -510,8 +788,7 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
 
       if (result.success && result.data) {
         setSelectedIds(new Set());
-        setSelectedMaterialIds(new Set());
-        setMaterialsDialogOpen(false);
+        dispatch({ type: "CLOSE_DIALOG" });
         router.refresh();
         toast.success(`Assigned ${result.data.assigned} material-item combination${result.data.assigned !== 1 ? "s" : ""}`);
       } else {
@@ -520,16 +797,14 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
     });
   }, [selectedIds, selectedMaterialIds, projectId, router]);
 
-  // Open split dialog for an item
+  // Open split dialog for an item - now dispatches to reducer
   const openSplitDialog = useCallback((item: ScopeItem) => {
-    setItemToSplit(item);
-    // Default to opposite path
-    setSplitTargetPath(item.item_path === "production" ? "procurement" : "production");
-    // Default to 50% of quantity (minimum 1)
-    setSplitQuantity(Math.max(1, Math.floor(item.quantity / 2)).toString());
-    // Default name - user can customize
-    setSplitName(item.name);
-    setSplitDialogOpen(true);
+    dispatch({ type: "OPEN_SPLIT_DIALOG", item });
+  }, []);
+
+  // Open delete dialog for an item
+  const openDeleteDialog = useCallback((item: HierarchicalScopeItem) => {
+    dispatch({ type: "OPEN_DELETE_DIALOG", item });
   }, []);
 
   // Handle split item submit
@@ -557,9 +832,7 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
       });
 
       if (result.success) {
-        setSplitDialogOpen(false);
-        setItemToSplit(null);
-        setSplitName("");
+        dispatch({ type: "CLOSE_DIALOG" });
         router.refresh();
         toast.success(`Item split successfully! New ${splitTargetPath} item created.`);
       } else {
@@ -576,8 +849,7 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
       const result = await deleteScopeItem(projectId, itemToDelete.id);
 
       if (result.success) {
-        setDeleteDialogOpen(false);
-        setItemToDelete(null);
+        dispatch({ type: "CLOSE_DIALOG" });
         router.refresh();
         toast.success(`"${itemToDelete.name}" deleted successfully`);
       } else {
@@ -789,10 +1061,10 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
                 <DropdownMenuSeparator />
 
                 {/* Price and Quantity dialogs */}
-                <DropdownMenuItem onClick={() => setPriceDialogOpen(true)}>
+                <DropdownMenuItem onClick={() => dispatch({ type: "OPEN_PRICE_DIALOG" })}>
                   Set Unit Price
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setQuantityDialogOpen(true)}>
+                <DropdownMenuItem onClick={() => dispatch({ type: "OPEN_QUANTITY_DIALOG" })}>
                   Set Quantity
                 </DropdownMenuItem>
 
@@ -810,10 +1082,7 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
                 {materials.length > 0 && (
                   <>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => {
-                      setSelectedMaterialIds(new Set());
-                      setMaterialsDialogOpen(true);
-                    }}>
+                    <DropdownMenuItem onClick={() => dispatch({ type: "OPEN_MATERIALS_DIALOG" })}>
                       <PackageIcon className="size-4 mr-2" />
                       Assign Materials
                     </DropdownMenuItem>
@@ -863,171 +1132,24 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
           </TableHeader>
           <TableBody>
             {hierarchicalItems.map((item) => (
-              <TableRow
+              <ScopeItemRow
                 key={item.id}
-                data-state={selectedIds.has(item.id) ? "selected" : undefined}
-                className={item.isChild ? "bg-gray-50/50 dark:bg-gray-900/20" : ""}
-              >
-                <TableCell>
-                  <Checkbox
-                    checked={selectedIds.has(item.id)}
-                    onCheckedChange={() => toggleSelect(item.id)}
-                  />
-                </TableCell>
-                {isColumnVisible("row") && (
-                  <TableCell className="text-center text-muted-foreground font-mono text-sm">
-                    {/* Show hierarchical row number: parent = "14", child = "⤷ 14.1" */}
-                    {item.isChild ? (
-                      <span className="flex items-center justify-center gap-0.5">
-                        <span className="text-violet-500">⤷</span>
-                        <span className="text-xs">{item.displayRowNumber}</span>
-                      </span>
-                    ) : (
-                      item.displayRowNumber
-                    )}
-                  </TableCell>
-                )}
-                {isColumnVisible("code") && (
-                  <TableCell className={`font-mono text-sm ${item.isChild ? "pl-2" : ""}`}>
-                    {item.isChild && <span className="text-violet-400 mr-1">└</span>}
-                    {item.item_code}
-                  </TableCell>
-                )}
-                {isColumnVisible("name") && (
-                  <TableCell>
-                    <Link
-                      href={`/projects/${projectId}/scope/${item.id}`}
-                      className={`font-medium hover:underline ${item.isChild ? "text-muted-foreground hover:text-foreground" : ""}`}
-                    >
-                      {item.name}
-                    </Link>
-                  </TableCell>
-                )}
-                {isColumnVisible("path") && (
-                  <TableCell>
-                    <div className="flex items-center gap-1.5">
-                      {item.item_path === "production" ? (
-                        <FactoryIcon className="size-3.5 text-purple-500" />
-                      ) : (
-                        <ShoppingCartIcon className="size-3.5 text-blue-500" />
-                      )}
-                      <span className="text-xs capitalize">{item.item_path}</span>
-                    </div>
-                  </TableCell>
-                )}
-                {isColumnVisible("status") && (
-                  <TableCell>
-                    <Badge
-                      variant="secondary"
-                      className={`${statusColors[item.status]} cursor-help`}
-                      title={statusTooltips[item.status] || ""}
-                    >
-                      {statusLabels[item.status] || item.status}
-                    </Badge>
-                  </TableCell>
-                )}
-                {isColumnVisible("quantity") && (
-                  <TableCell className="text-right text-sm">
-                    {item.quantity} {item.unit}
-                  </TableCell>
-                )}
-                {isColumnVisible("unit_cost") && (
-                  <TableCell className="text-right font-mono text-sm">
-                    {/* Unit Cost: Per item cost */}
-                    {item.hasChildren ? (
-                      <span className="text-muted-foreground">-</span>
-                    ) : (
-                      formatCurrency(item.unit_cost)
-                    )}
-                  </TableCell>
-                )}
-                {isColumnVisible("initial_cost") && (
-                  <TableCell className="text-right font-mono text-sm text-muted-foreground">
-                    {/* Initial Total Cost: Locked snapshot at creation */}
-                    {formatCurrency(item.initial_total_cost)}
-                  </TableCell>
-                )}
-                {isColumnVisible("actual_cost") && (
-                  <TableCell className="text-right font-mono text-sm">
-                    {/* Actual Total Cost: Aggregated for parents, own for leaf items */}
-                    <span className={item.hasChildren ? "text-orange-600 font-semibold" : ""}>
-                      {formatCurrency(item.actualTotalCost || null)}
-                    </span>
-                  </TableCell>
-                )}
-                {isColumnVisible("sales_price") && (
-                  <TableCell className="text-right font-mono text-sm">
-                    {/* Sales Price: What client pays */}
-                    {formatCurrency(item.total_sales_price)}
-                  </TableCell>
-                )}
-                {isColumnVisible("progress") && (
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Progress value={item.production_percentage} className="h-2 flex-1" />
-                      <span className="text-xs text-muted-foreground w-7">
-                        {item.production_percentage}%
-                      </span>
-                    </div>
-                  </TableCell>
-                )}
-                {isColumnVisible("installed") && (
-                  <TableCell className="text-center">
-                    {item.is_installed ? (
-                      <CheckCircle2Icon className="size-4 text-green-600 mx-auto" />
-                    ) : (
-                      <span className="text-muted-foreground text-xs">-</span>
-                    )}
-                  </TableCell>
-                )}
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon-sm">
-                        <MoreHorizontalIcon className="size-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem asChild>
-                        <Link href={`/projects/${projectId}/scope/${item.id}`}>
-                          View Details
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link href={`/projects/${projectId}/scope/${item.id}/edit`}>
-                          <PencilIcon className="size-4 mr-2" />
-                          Edit
-                        </Link>
-                      </DropdownMenuItem>
-                      {/* Only show Split option for parent items (non-children) */}
-                      {!item.isChild && (
-                        <DropdownMenuItem onClick={() => openSplitDialog(item)}>
-                          <SplitIcon className="size-4 mr-2" />
-                          Split Item
-                        </DropdownMenuItem>
-                      )}
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onClick={() => {
-                          setItemToDelete(item);
-                          setDeleteDialogOpen(true);
-                        }}
-                        className="text-destructive focus:text-destructive"
-                      >
-                        <TrashIcon className="size-4 mr-2" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
+                item={item}
+                isSelected={selectedIds.has(item.id)}
+                projectId={projectId}
+                visibleColumns={visibleColumns}
+                formatCurrency={formatCurrency}
+                onToggleSelect={toggleSelect}
+                onOpenSplitDialog={openSplitDialog}
+                onOpenDeleteDialog={openDeleteDialog}
+              />
             ))}
           </TableBody>
         </Table>
       </GlassCard>
 
       {/* Unit Price Dialog */}
-      <Dialog open={priceDialogOpen} onOpenChange={setPriceDialogOpen}>
+      <Dialog open={priceDialogOpen} onOpenChange={(open) => !open && dispatch({ type: "CLOSE_DIALOG" })}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Set Unit Price</DialogTitle>
@@ -1044,12 +1166,12 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
               step="0.01"
               placeholder="0.00"
               value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
+              onChange={(e) => dispatch({ type: "SET_INPUT_VALUE", value: e.target.value })}
               onKeyDown={(e) => e.key === "Enter" && handlePriceSubmit()}
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPriceDialogOpen(false)}>
+            <Button variant="outline" onClick={() => dispatch({ type: "CLOSE_DIALOG" })}>
               Cancel
             </Button>
             <Button onClick={handlePriceSubmit} disabled={!inputValue}>
@@ -1060,7 +1182,7 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
       </Dialog>
 
       {/* Quantity Dialog */}
-      <Dialog open={quantityDialogOpen} onOpenChange={setQuantityDialogOpen}>
+      <Dialog open={quantityDialogOpen} onOpenChange={(open) => !open && dispatch({ type: "CLOSE_DIALOG" })}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Set Quantity</DialogTitle>
@@ -1077,12 +1199,12 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
               step="1"
               placeholder="1"
               value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
+              onChange={(e) => dispatch({ type: "SET_INPUT_VALUE", value: e.target.value })}
               onKeyDown={(e) => e.key === "Enter" && handleQuantitySubmit()}
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setQuantityDialogOpen(false)}>
+            <Button variant="outline" onClick={() => dispatch({ type: "CLOSE_DIALOG" })}>
               Cancel
             </Button>
             <Button onClick={handleQuantitySubmit} disabled={!inputValue}>
@@ -1093,7 +1215,7 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
       </Dialog>
 
       {/* Materials Assignment Dialog */}
-      <Dialog open={materialsDialogOpen} onOpenChange={setMaterialsDialogOpen}>
+      <Dialog open={materialsDialogOpen} onOpenChange={(open) => !open && dispatch({ type: "CLOSE_DIALOG" })}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Assign Materials</DialogTitle>
@@ -1127,7 +1249,7 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
             </p>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setMaterialsDialogOpen(false)}>
+            <Button variant="outline" onClick={() => dispatch({ type: "CLOSE_DIALOG" })}>
               Cancel
             </Button>
             <Button
@@ -1142,7 +1264,7 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
       </Dialog>
 
       {/* Split Item Dialog */}
-      <Dialog open={splitDialogOpen} onOpenChange={setSplitDialogOpen}>
+      <Dialog open={splitDialogOpen} onOpenChange={(open) => !open && dispatch({ type: "CLOSE_DIALOG" })}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -1180,7 +1302,7 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
                 <Input
                   id="splitName"
                   value={splitName}
-                  onChange={(e) => setSplitName(e.target.value)}
+                  onChange={(e) => dispatch({ type: "SET_SPLIT_NAME", value: e.target.value })}
                   placeholder="e.g., Marble Supply, Door Handle, etc."
                 />
                 <p className="text-xs text-muted-foreground">
@@ -1196,7 +1318,7 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
                     type="button"
                     variant={splitTargetPath === "production" ? "default" : "outline"}
                     className={splitTargetPath === "production" ? "bg-purple-600 hover:bg-purple-700" : ""}
-                    onClick={() => setSplitTargetPath("production")}
+                    onClick={() => dispatch({ type: "SET_SPLIT_PATH", path: "production" })}
                   >
                     <FactoryIcon className="size-4 mr-2" />
                     Production
@@ -1205,7 +1327,7 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
                     type="button"
                     variant={splitTargetPath === "procurement" ? "default" : "outline"}
                     className={splitTargetPath === "procurement" ? "bg-blue-600 hover:bg-blue-700" : ""}
-                    onClick={() => setSplitTargetPath("procurement")}
+                    onClick={() => dispatch({ type: "SET_SPLIT_PATH", path: "procurement" })}
                   >
                     <ShoppingCartIcon className="size-4 mr-2" />
                     Procurement
@@ -1232,7 +1354,7 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSplitDialogOpen(false)} disabled={isPending}>
+            <Button variant="outline" onClick={() => dispatch({ type: "CLOSE_DIALOG" })} disabled={isPending}>
               Cancel
             </Button>
             <Button
@@ -1257,7 +1379,7 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <AlertDialog open={deleteDialogOpen} onOpenChange={(open) => !open && dispatch({ type: "CLOSE_DIALOG" })}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Scope Item</AlertDialogTitle>
