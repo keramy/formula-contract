@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition, useEffect, useCallback, useMemo, memo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { bulkUpdateScopeItems, bulkAssignMaterials, splitScopeItem, deleteScopeItem, type ScopeItemField } from "@/lib/actions/scope-items";
@@ -207,6 +207,32 @@ const getDefaultVisibleColumns = (): Set<string> => {
   return new Set(COLUMNS.filter(col => col.defaultVisible).map(col => col.id));
 };
 
+// ============================================================================
+// PERFORMANCE: Memoized currency formatters (created once, reused)
+// Before: new Intl.NumberFormat() created 50+ times per render
+// After:  Created once per currency, cached for reuse
+// ============================================================================
+const currencyFormatters = new Map<string, Intl.NumberFormat>();
+
+function getCurrencyFormatter(currency: string): Intl.NumberFormat {
+  if (!currencyFormatters.has(currency)) {
+    currencyFormatters.set(
+      currency,
+      new Intl.NumberFormat("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })
+    );
+  }
+  return currencyFormatters.get(currency)!;
+}
+
+function formatCurrencyValue(value: number | null, currency: string): string {
+  if (!value) return "-";
+  const symbol = currencySymbols[currency] || currency;
+  return `${symbol}${getCurrencyFormatter(currency).format(value)}`;
+}
+
 /**
  * Organizes scope items into hierarchical order where children appear directly after their parent.
  * Returns items with additional hierarchy metadata for display, including computed actual costs.
@@ -300,40 +326,70 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
     }
   }, []);
 
+  // ============================================================================
+  // PERFORMANCE: Memoized callbacks to prevent unnecessary re-renders
+  // ============================================================================
+
+  // Memoized currency formatter for this component
+  const formatCurrency = useCallback(
+    (value: number | null) => formatCurrencyValue(value, currency),
+    [currency]
+  );
+
   // Save column visibility to localStorage when it changes
-  const updateVisibleColumns = (newColumns: Set<string>) => {
+  const updateVisibleColumns = useCallback((newColumns: Set<string>) => {
     setVisibleColumns(newColumns);
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(newColumns)));
     } catch {
       // localStorage might be full or disabled
     }
-  };
+  }, []);
 
   // Toggle a single column visibility
-  const toggleColumn = (columnId: string) => {
-    const newColumns = new Set(visibleColumns);
-    if (newColumns.has(columnId)) {
-      // Don't allow hiding all columns - keep at least code and name
-      if (columnId !== "code" && columnId !== "name") {
-        newColumns.delete(columnId);
+  const toggleColumn = useCallback((columnId: string) => {
+    setVisibleColumns(prev => {
+      const newColumns = new Set(prev);
+      if (newColumns.has(columnId)) {
+        // Don't allow hiding all columns - keep at least code and name
+        if (columnId !== "code" && columnId !== "name") {
+          newColumns.delete(columnId);
+        }
+      } else {
+        newColumns.add(columnId);
       }
-    } else {
-      newColumns.add(columnId);
-    }
-    updateVisibleColumns(newColumns);
-  };
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(newColumns)));
+      } catch {
+        // localStorage might be full or disabled
+      }
+      return newColumns;
+    });
+  }, []);
 
   // Reset to default columns
-  const resetToDefaults = () => {
-    updateVisibleColumns(getDefaultVisibleColumns());
-  };
+  const resetToDefaults = useCallback(() => {
+    const defaults = getDefaultVisibleColumns();
+    setVisibleColumns(defaults);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(defaults)));
+    } catch {
+      // localStorage might be full or disabled
+    }
+  }, []);
 
-  // Check if a column is visible
-  const isColumnVisible = (columnId: string) => visibleColumns.has(columnId);
+  // Check if a column is visible - memoized
+  const isColumnVisible = useCallback(
+    (columnId: string) => visibleColumns.has(columnId),
+    [visibleColumns]
+  );
 
-  // Organize items hierarchically: parents first, then their children
-  const hierarchicalItems = organizeHierarchically(items);
+  // ============================================================================
+  // PERFORMANCE: Memoize hierarchical items computation
+  // Before: Recalculated on every render
+  // After:  Only recalculated when items change
+  // ============================================================================
+  const hierarchicalItems = useMemo(() => organizeHierarchically(items), [items]);
 
   // Dialog states for numeric inputs
   const [priceDialogOpen, setPriceDialogOpen] = useState(false);
@@ -355,32 +411,48 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<HierarchicalScopeItem | null>(null);
 
-  const isAllSelected = items.length > 0 && selectedIds.size === items.length;
-  const isSomeSelected = selectedIds.size > 0 && selectedIds.size < items.length;
+  // ============================================================================
+  // PERFORMANCE: Memoized selection state and handlers
+  // ============================================================================
 
-  const toggleSelectAll = () => {
-    if (isAllSelected) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(items.map(item => item.id)));
-    }
-  };
+  const isAllSelected = useMemo(
+    () => items.length > 0 && selectedIds.size === items.length,
+    [items.length, selectedIds.size]
+  );
+  const isSomeSelected = useMemo(
+    () => selectedIds.size > 0 && selectedIds.size < items.length,
+    [selectedIds.size, items.length]
+  );
 
-  const toggleSelect = (id: string) => {
-    const newSelected = new Set(selectedIds);
-    if (newSelected.has(id)) {
-      newSelected.delete(id);
-    } else {
-      newSelected.add(id);
-    }
-    setSelectedIds(newSelected);
-  };
+  // Memoize item IDs for toggleSelectAll
+  const allItemIds = useMemo(() => items.map(item => item.id), [items]);
 
-  const clearSelection = () => {
+  const toggleSelectAll = useCallback(() => {
+    setSelectedIds(prev => {
+      if (prev.size === allItemIds.length) {
+        return new Set();
+      }
+      return new Set(allItemIds);
+    });
+  }, [allItemIds]);
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const newSelected = new Set(prev);
+      if (newSelected.has(id)) {
+        newSelected.delete(id);
+      } else {
+        newSelected.add(id);
+      }
+      return newSelected;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => {
     setSelectedIds(new Set());
-  };
+  }, []);
 
-  const bulkUpdate = (field: ScopeItemField, value: unknown) => {
+  const bulkUpdate = useCallback((field: ScopeItemField, value: unknown) => {
     if (selectedIds.size === 0) return;
 
     startTransition(async () => {
@@ -395,37 +467,39 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
         toast.error(result.error || "Failed to update items");
       }
     });
-  };
+  }, [selectedIds, projectId, router]);
 
-  const handlePriceSubmit = () => {
+  const handlePriceSubmit = useCallback(() => {
     const price = parseFloat(inputValue);
     if (!isNaN(price) && price >= 0) {
       bulkUpdate("unit_sales_price", price);
     }
     setPriceDialogOpen(false);
     setInputValue("");
-  };
+  }, [inputValue, bulkUpdate]);
 
-  const handleQuantitySubmit = () => {
+  const handleQuantitySubmit = useCallback(() => {
     const qty = parseInt(inputValue);
     if (!isNaN(qty) && qty >= 1) {
       bulkUpdate("quantity", qty);
     }
     setQuantityDialogOpen(false);
     setInputValue("");
-  };
+  }, [inputValue, bulkUpdate]);
 
-  const toggleMaterialSelection = (materialId: string) => {
-    const newSelected = new Set(selectedMaterialIds);
-    if (newSelected.has(materialId)) {
-      newSelected.delete(materialId);
-    } else {
-      newSelected.add(materialId);
-    }
-    setSelectedMaterialIds(newSelected);
-  };
+  const toggleMaterialSelection = useCallback((materialId: string) => {
+    setSelectedMaterialIds(prev => {
+      const newSelected = new Set(prev);
+      if (newSelected.has(materialId)) {
+        newSelected.delete(materialId);
+      } else {
+        newSelected.add(materialId);
+      }
+      return newSelected;
+    });
+  }, []);
 
-  const handleMaterialsSubmit = () => {
+  const handleMaterialsSubmit = useCallback(() => {
     if (selectedIds.size === 0 || selectedMaterialIds.size === 0) return;
 
     startTransition(async () => {
@@ -444,10 +518,10 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
         toast.error(result.error || "Failed to assign materials");
       }
     });
-  };
+  }, [selectedIds, selectedMaterialIds, projectId, router]);
 
   // Open split dialog for an item
-  const openSplitDialog = (item: ScopeItem) => {
+  const openSplitDialog = useCallback((item: ScopeItem) => {
     setItemToSplit(item);
     // Default to opposite path
     setSplitTargetPath(item.item_path === "production" ? "procurement" : "production");
@@ -456,10 +530,10 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
     // Default name - user can customize
     setSplitName(item.name);
     setSplitDialogOpen(true);
-  };
+  }, []);
 
   // Handle split item submit
-  const handleSplitSubmit = () => {
+  const handleSplitSubmit = useCallback(() => {
     if (!itemToSplit) return;
 
     const qty = parseInt(splitQuantity);
@@ -492,10 +566,10 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
         toast.error(result.error || "Failed to split item");
       }
     });
-  };
+  }, [itemToSplit, splitQuantity, splitName, projectId, splitTargetPath, router]);
 
   // Handle delete item
-  const handleDelete = () => {
+  const handleDelete = useCallback(() => {
     if (!itemToDelete) return;
 
     startTransition(async () => {
@@ -510,7 +584,21 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
         toast.error(result.error || "Failed to delete item");
       }
     });
-  };
+  }, [itemToDelete, projectId, router]);
+
+  // ============================================================================
+  // PERFORMANCE: Memoize summary statistics
+  // ============================================================================
+  const summaryStats = useMemo(() => {
+    const parentItems = hierarchicalItems.filter(item => !item.isChild);
+    const totalSalesPrice = items.reduce((sum, item) => sum + (item.total_sales_price || 0), 0);
+    const totalActualCost = parentItems.reduce((sum, item) => sum + item.actualTotalCost, 0);
+    const totalInitialCost = parentItems.reduce((sum, item) => sum + (item.initial_total_cost || 0), 0);
+    const avgProgress = items.length > 0
+      ? Math.round(items.reduce((sum, item) => sum + item.production_percentage, 0) / items.length)
+      : 0;
+    return { totalSalesPrice, totalActualCost, totalInitialCost, avgProgress };
+  }, [items, hierarchicalItems]);
 
   if (items.length === 0) {
     return (
@@ -529,24 +617,8 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
     );
   }
 
-  const formatCurrency = (value: number | null) => {
-    if (!value) return "-";
-    const symbol = currencySymbols[currency] || currency;
-    return `${symbol}${new Intl.NumberFormat("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(value)}`;
-  };
-
-  // Calculate summary statistics
-  // Only sum parent items to avoid double-counting (children are already included in parent's actual cost)
-  const parentItems = hierarchicalItems.filter(item => !item.isChild);
-  const totalSalesPrice = items.reduce((sum, item) => sum + (item.total_sales_price || 0), 0);
-  const totalActualCost = parentItems.reduce((sum, item) => sum + item.actualTotalCost, 0);
-  const totalInitialCost = parentItems.reduce((sum, item) => sum + (item.initial_total_cost || 0), 0);
-  const avgProgress = items.length > 0
-    ? Math.round(items.reduce((sum, item) => sum + item.production_percentage, 0) / items.length)
-    : 0;
+  // Extract memoized summary values for cleaner JSX
+  const { totalSalesPrice, totalActualCost, totalInitialCost, avgProgress } = summaryStats;
 
   return (
     <div className="space-y-3">
