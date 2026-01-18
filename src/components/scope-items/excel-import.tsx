@@ -121,7 +121,8 @@ export function ExcelImport({ projectId, projectCode }: ExcelImportProps) {
                 height: item.height,
                 unit: item.unit,
                 quantity: item.quantity,
-                unit_price: item.unit_price,
+                // Map unit_price from Excel to unit_sales_price in database
+                unit_sales_price: item.unit_price,
                 notes: item.notes,
               })
               .eq("id", existing.id);
@@ -134,6 +135,7 @@ export function ExcelImport({ projectId, projectCode }: ExcelImportProps) {
             }
           } else {
             // INSERT new item
+            // Map unit_price from Excel to unit_sales_price in database
             const scopeItem: ScopeItemInsert = {
               project_id: projectId,
               item_code: item.item_code,
@@ -144,7 +146,7 @@ export function ExcelImport({ projectId, projectCode }: ExcelImportProps) {
               height: item.height,
               unit: item.unit,
               quantity: item.quantity,
-              unit_price: item.unit_price,
+              unit_sales_price: item.unit_price,
               item_path: item.item_path,
               status: item.status,
               notes: item.notes,

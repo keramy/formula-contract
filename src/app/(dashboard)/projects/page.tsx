@@ -14,6 +14,9 @@ interface Project {
   installation_date: string | null;
   created_at: string;
   client: { id: string; company_name: string } | null;
+  progress?: number; // Percentage of completed items
+  totalItems?: number;
+  completedItems?: number;
 }
 
 export default async function ProjectsPage({
@@ -94,10 +97,54 @@ export default async function ProjectsPage({
   }
 
   const { data, error } = await query;
-  const projects = (data || []) as unknown as Project[];
+  let projects = (data || []) as unknown as Project[];
 
   if (error) {
     console.error("Error fetching projects:", error);
+  }
+
+  // Fetch scope items to calculate progress for each project
+  if (projects.length > 0) {
+    const projectIds = projects.map(p => p.id);
+
+    const { data: scopeItemsData } = await supabase
+      .from("scope_items")
+      .select("project_id, status")
+      .in("project_id", projectIds)
+      .eq("is_deleted", false);
+
+    if (scopeItemsData) {
+      // Group items by project and calculate progress
+      const progressMap = new Map<string, { total: number; completed: number }>();
+
+      for (const item of scopeItemsData) {
+        const existing = progressMap.get(item.project_id) || { total: 0, completed: 0 };
+        existing.total++;
+        if (item.status === "complete") {
+          existing.completed++;
+        }
+        progressMap.set(item.project_id, existing);
+      }
+
+      // Add progress data to projects
+      projects = projects.map(project => {
+        const stats = progressMap.get(project.id);
+        if (stats && stats.total > 0) {
+          return {
+            ...project,
+            progress: Math.round((stats.completed / stats.total) * 100),
+            totalItems: stats.total,
+            completedItems: stats.completed,
+          };
+        }
+        return {
+          ...project,
+          progress: 0,
+          totalItems: 0,
+          completedItems: 0,
+        };
+      });
+    }
   }
 
   return (

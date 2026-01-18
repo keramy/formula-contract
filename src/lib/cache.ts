@@ -148,7 +148,7 @@ export const getCachedProjectDetail = unstable_cache(
       // Scope items
       supabase
         .from("scope_items")
-        .select("id, item_code, name, description, width, depth, height, item_path, status, quantity, unit, unit_price, total_price, production_percentage, is_installed, notes, images")
+        .select("id, item_code, name, description, width, depth, height, item_path, status, quantity, unit, unit_cost, initial_total_cost, unit_sales_price, total_sales_price, production_percentage, is_installed, notes, images")
         .eq("project_id", projectId)
         .eq("is_deleted", false)
         .order("item_code"),

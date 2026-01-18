@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { unstable_noStore as noStore } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ import {
   PlusIcon,
   ActivityIcon,
   FileTextIcon,
+  PencilIcon,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ScopeItemsTable } from "./scope-items-table";
@@ -61,12 +63,17 @@ interface ScopeItem {
   status: string;
   quantity: number;
   unit: string;
-  unit_price: number | null;
-  total_price: number | null;
+  // Cost tracking fields (what WE pay)
+  unit_cost: number | null;
+  initial_total_cost: number | null;
+  // Sales price fields (what CLIENT pays)
+  unit_sales_price: number | null;
+  total_sales_price: number | null;
   production_percentage: number;
   is_installed: boolean;
   notes: string | null;
   images: string[] | null;
+  parent_id: string | null; // References parent item when created via split
 }
 
 interface Drawing {
@@ -134,6 +141,9 @@ export default async function ProjectDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  // Opt out of static caching to ensure fresh data after mutations (split, delete, etc.)
+  noStore();
+
   const pageStart = performance.now();
   const { id } = await params;
   const supabase = await createClient();
@@ -203,15 +213,16 @@ export default async function ProjectDetailPage({
       console.log(`  📁 Project with Client: ${(performance.now() - start).toFixed(0)}ms`);
       return result;
     })(),
-    // 2. Scope Items
+    // 2. Scope Items - ordered by created_at to preserve Excel import order
+    // Include parent_id for hierarchical display (split items)
     (async () => {
       const start = performance.now();
       const result = await supabase
         .from("scope_items")
-        .select("id, item_code, name, description, width, depth, height, item_path, status, quantity, unit, unit_price, total_price, production_percentage, is_installed, notes, images")
+        .select("id, item_code, name, description, width, depth, height, item_path, status, quantity, unit, unit_cost, initial_total_cost, unit_sales_price, total_sales_price, production_percentage, is_installed, notes, images, created_at, parent_id")
         .eq("project_id", id)
         .eq("is_deleted", false)
-        .order("item_code");
+        .order("created_at", { ascending: true });
       console.log(`  📋 Scope Items: ${(performance.now() - start).toFixed(0)}ms`);
       return result;
     })(),
@@ -347,19 +358,20 @@ export default async function ProjectDetailPage({
   };
 
   // Calculate totals
-  const totalValue = scopeItems.reduce((sum, item) => sum + (item.total_price || 0), 0);
+  const totalValue = scopeItems.reduce((sum, item) => sum + (item.total_sales_price || 0), 0);
   const productionItems = scopeItems.filter((item) => item.item_path === "production");
   const procurementItems = scopeItems.filter((item) => item.item_path === "procurement");
 
   return (
     <div className="p-6">
-      {/* Header */}
+      {/* Header - Edit button removed from header, now only in Overview tab */}
       <ProjectDetailHeader
         projectId={id}
         projectName={project.name}
         projectCode={project.project_code}
         status={project.status}
         canEdit={canEdit}
+        showEditButton={false}
       />
 
       {/* Tabs */}
@@ -417,6 +429,18 @@ export default async function ProjectDetailPage({
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-4">
+          {/* Edit Project Button - Only visible in Overview tab */}
+          {canEdit && (
+            <div className="flex justify-end">
+              <Button asChild className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700">
+                <Link href={`/projects/${id}/edit`}>
+                  <PencilIcon className="size-4" />
+                  Edit Project
+                </Link>
+              </Button>
+            </div>
+          )}
+
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {/* Client Info */}
             <GlassCard>

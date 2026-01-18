@@ -94,7 +94,10 @@ export const scopeItemSchema = z.object({
   height: z.number().min(0, "Height must be positive").optional().nullable(),
   unit: unitSchema.default("pcs"),
   quantity: z.number().int().min(1, "Quantity must be at least 1").default(1),
-  unit_price: z.number().min(0, "Price must be positive").optional().nullable(),
+  // Cost tracking (what we pay)
+  unit_cost: z.number().min(0, "Cost must be positive").optional().nullable(),
+  // Sales price (what client pays) - renamed from unit_price
+  unit_sales_price: z.number().min(0, "Price must be positive").optional().nullable(),
   item_path: itemPathSchema.default("production"),
   status: itemStatusSchema.default("pending"),
   notes: z.string().optional().nullable(),

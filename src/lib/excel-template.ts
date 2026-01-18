@@ -337,8 +337,12 @@ export interface ExportScopeItem {
   height: number | null;
   unit: string;
   quantity: number;
-  unit_price: number | null;
-  total_price: number | null;
+  // Cost tracking fields (what WE pay)
+  unit_cost: number | null;
+  initial_total_cost: number | null;
+  // Sales price fields (what CLIENT pays)
+  unit_sales_price: number | null;
+  total_sales_price: number | null;
   item_path: string;
   status: string;
   production_percentage: number;
@@ -354,8 +358,10 @@ const EXPORT_COLUMNS = [
   "height",
   "unit",
   "quantity",
-  "unit_price",
-  "total_price",
+  "unit_cost",
+  "initial_total_cost",
+  "unit_sales_price",
+  "total_sales_price",
   "item_path",
   "status",
   "production_percentage",
@@ -371,8 +377,10 @@ const EXPORT_HEADERS = [
   "Height (cm)",
   "Unit",
   "Quantity",
-  "Unit Price",
-  "Total Price",
+  "Unit Cost",
+  "Initial Cost",
+  "Sales Price",
+  "Total Sales",
   "Path",
   "Status",
   "Progress %",
@@ -410,8 +418,10 @@ export async function exportScopeItemsExcel(
     { wch: 12 }, // height
     { wch: 8 },  // unit
     { wch: 10 }, // quantity
-    { wch: 12 }, // unit_price
-    { wch: 12 }, // total_price
+    { wch: 12 }, // unit_cost
+    { wch: 14 }, // initial_total_cost
+    { wch: 12 }, // unit_sales_price
+    { wch: 14 }, // total_sales_price
     { wch: 12 }, // item_path
     { wch: 15 }, // status
     { wch: 12 }, // production_percentage

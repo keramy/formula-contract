@@ -201,19 +201,53 @@ export async function getProjectTeamMembers(
   if (!user) return [];
 
   // Get project team members from project_assignments
-  const { data: teamData } = await supabase
+  // Include user_id for debugging and use explicit join
+  const { data: teamData, error: assignmentError } = await supabase
     .from("project_assignments")
     .select(`
-      user:users(id, name, email, role)
+      user_id,
+      user:users!project_assignments_user_id_fkey(id, name, email, role)
     `)
     .eq("project_id", projectId);
 
-  if (!teamData) return [];
+  if (assignmentError) {
+    console.error("[getProjectTeamMembers] Assignment query error:", assignmentError.message);
+    return [];
+  }
 
-  // Extract and return user data
-  return teamData
-    .filter(t => t.user)
+  if (!teamData || teamData.length === 0) {
+    console.log("[getProjectTeamMembers] No assignments found for project:", projectId);
+    return [];
+  }
+
+  // Extract and return user data, filtering out any null users
+  const members = teamData
+    .filter(t => t.user !== null)
     .map(t => t.user as unknown as { id: string; name: string; email: string; role: string });
+
+  // If we have assignments but no users, there might be an RLS or join issue
+  if (members.length === 0 && teamData.length > 0) {
+    console.warn("[getProjectTeamMembers] Assignments exist but user data is null. Check RLS policies on users table.");
+    console.log("[getProjectTeamMembers] Assignment user_ids:", teamData.map(t => t.user_id));
+
+    // Fallback: try to fetch users directly by their IDs
+    const userIds = teamData.map(t => t.user_id).filter(Boolean);
+    if (userIds.length > 0) {
+      const { data: usersData, error: usersError } = await supabase
+        .from("users")
+        .select("id, name, email, role")
+        .in("id", userIds);
+
+      if (usersError) {
+        console.error("[getProjectTeamMembers] Direct users query error:", usersError.message);
+      } else if (usersData && usersData.length > 0) {
+        console.log("[getProjectTeamMembers] Fallback query succeeded:", usersData.length, "users");
+        return usersData;
+      }
+    }
+  }
+
+  return members;
 }
 
 // ============================================================================

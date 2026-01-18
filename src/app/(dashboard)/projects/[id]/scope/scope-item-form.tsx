@@ -41,7 +41,11 @@ interface ScopeItemFormProps {
     height: number | null;
     unit: string;
     quantity: number;
-    unit_price: number | null;
+    // Cost fields (what we pay)
+    unit_cost: number | null;
+    initial_total_cost: number | null;
+    // Sales price fields (what client pays)
+    unit_sales_price: number | null;
     item_path: string;
     status: string;
     notes: string | null;
@@ -75,12 +79,13 @@ export function ScopeItemForm({ projectId, projectCurrency = "TRY", initialData 
     item_code: initialData?.item_code || "",
     name: initialData?.name || "",
     description: initialData?.description || "",
-    width: initialData?.width?.toString() || "",
-    depth: initialData?.depth?.toString() || "",
-    height: initialData?.height?.toString() || "",
+    // Dimensions removed from form - kept in database for backward compatibility
     unit: initialData?.unit || "pcs",
     quantity: initialData?.quantity?.toString() || "1",
-    unit_price: initialData?.unit_price?.toString() || "",
+    // Cost tracking (what we pay)
+    unit_cost: initialData?.unit_cost?.toString() || "",
+    // Sales price (what client pays) - renamed from unit_price
+    unit_sales_price: initialData?.unit_sales_price?.toString() || "",
     item_path: initialData?.item_path || "production",
     status: initialData?.status || "pending",
     notes: initialData?.notes || "",
@@ -123,16 +128,23 @@ export function ScopeItemForm({ projectId, projectCurrency = "TRY", initialData 
     setFieldErrors({});
 
     // Prepare data for validation
+    // Dimensions removed from form - preserve existing values if editing, null for new items
+    const quantity = parseIntWithDefault(formData.quantity, 1);
+    const unitCost = parseOptionalNumber(formData.unit_cost);
+
     const dataToValidate = {
       item_code: formData.item_code,
       name: formData.name,
       description: formData.description || null,
-      width: parseOptionalNumber(formData.width),
-      depth: parseOptionalNumber(formData.depth),
-      height: parseOptionalNumber(formData.height),
+      width: initialData?.width ?? null,
+      depth: initialData?.depth ?? null,
+      height: initialData?.height ?? null,
       unit: formData.unit,
-      quantity: parseIntWithDefault(formData.quantity, 1),
-      unit_price: parseOptionalNumber(formData.unit_price),
+      quantity,
+      // Cost tracking
+      unit_cost: unitCost,
+      // Sales price (to client)
+      unit_sales_price: parseOptionalNumber(formData.unit_sales_price),
       item_path: formData.item_path,
       status: formData.status,
       notes: formData.notes || null,
@@ -152,6 +164,13 @@ export function ScopeItemForm({ projectId, projectCurrency = "TRY", initialData 
     try {
       const supabase = createClient();
 
+      // Calculate initial_total_cost only on first creation (not on edit)
+      // This is a locked snapshot of the cost when the item was first created
+      const shouldSetInitialCost = !isEditing && validation.data.unit_cost !== null;
+      const initialTotalCost = shouldSetInitialCost
+        ? (validation.data.unit_cost || 0) * validation.data.quantity
+        : undefined;
+
       // Type-safe item data
       const itemData: ScopeItemInsert = {
         project_id: projectId,
@@ -163,7 +182,11 @@ export function ScopeItemForm({ projectId, projectCurrency = "TRY", initialData 
         height: validation.data.height,
         unit: validation.data.unit,
         quantity: validation.data.quantity,
-        unit_price: validation.data.unit_price,
+        // Cost tracking
+        unit_cost: validation.data.unit_cost,
+        ...(initialTotalCost !== undefined && { initial_total_cost: initialTotalCost }),
+        // Sales price (to client)
+        unit_sales_price: validation.data.unit_sales_price,
         item_path: validation.data.item_path,
         status: validation.data.status,
         notes: validation.data.notes,
@@ -250,48 +273,8 @@ export function ScopeItemForm({ projectId, projectCurrency = "TRY", initialData 
             />
           </div>
 
-          {/* Dimensions */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="width">Width (cm)</Label>
-              <Input
-                id="width"
-                type="number"
-                step="0.01"
-                placeholder="0"
-                value={formData.width}
-                onChange={(e) => handleChange("width", e.target.value)}
-                disabled={isLoading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="depth">Depth (cm)</Label>
-              <Input
-                id="depth"
-                type="number"
-                step="0.01"
-                placeholder="0"
-                value={formData.depth}
-                onChange={(e) => handleChange("depth", e.target.value)}
-                disabled={isLoading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="height">Height (cm)</Label>
-              <Input
-                id="height"
-                type="number"
-                step="0.01"
-                placeholder="0"
-                value={formData.height}
-                onChange={(e) => handleChange("height", e.target.value)}
-                disabled={isLoading}
-              />
-            </div>
-          </div>
-
-          {/* Quantity & Pricing */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* Quantity & Unit */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="quantity">Quantity *</Label>
               <Input
@@ -341,25 +324,62 @@ export function ScopeItemForm({ projectId, projectCurrency = "TRY", initialData 
               </Select>
               <p className="text-xs text-muted-foreground">Applies to all items</p>
             </div>
+          </div>
+
+          {/* Cost & Pricing */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="unit_price">Unit Price</Label>
+              <Label htmlFor="unit_cost">Unit Cost (Our Cost)</Label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
                   {currencySymbols[currency] || currency}
                 </span>
                 <Input
-                  id="unit_price"
+                  id="unit_cost"
                   type="number"
                   step="0.01"
                   placeholder="0.00"
                   className="pl-8"
-                  value={formData.unit_price}
-                  onChange={(e) => handleChange("unit_price", e.target.value)}
+                  value={formData.unit_cost}
+                  onChange={(e) => handleChange("unit_cost", e.target.value)}
                   disabled={isLoading}
                 />
               </div>
+              <p className="text-xs text-muted-foreground">What we pay per unit</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="unit_sales_price">Unit Sales Price (Client Pays)</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                  {currencySymbols[currency] || currency}
+                </span>
+                <Input
+                  id="unit_sales_price"
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  className="pl-8"
+                  value={formData.unit_sales_price}
+                  onChange={(e) => handleChange("unit_sales_price", e.target.value)}
+                  disabled={isLoading}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">What client pays per unit</p>
             </div>
           </div>
+
+          {/* Show Initial Cost info if editing and it's set */}
+          {isEditing && initialData?.initial_total_cost !== null && initialData?.initial_total_cost !== undefined && (
+            <div className="p-3 rounded-lg bg-muted/50 border">
+              <p className="text-sm text-muted-foreground">
+                <span className="font-medium">Initial Cost (locked):</span>{" "}
+                <span className="font-mono">{currencySymbols[currency] || currency}{initialData.initial_total_cost.toLocaleString()}</span>
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                This is the cost snapshot when the item was first created and cannot be changed.
+              </p>
+            </div>
+          )}
 
           {/* Path & Status */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

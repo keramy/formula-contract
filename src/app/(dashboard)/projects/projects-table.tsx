@@ -18,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontalIcon, EyeIcon, PencilIcon, ArchiveIcon, FolderKanbanIcon, ArrowRightIcon } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { formatDistanceToNow } from "date-fns";
 import { GlassCard, StatusBadge, EmptyState, GradientAvatar } from "@/components/ui/ui-helpers";
 
@@ -29,6 +30,9 @@ interface Project {
   installation_date: string | null;
   created_at: string;
   client: { id: string; company_name: string } | null;
+  progress?: number;
+  totalItems?: number;
+  completedItems?: number;
 }
 
 interface ProjectsTableProps {
@@ -71,6 +75,7 @@ export function ProjectsTable({ projects }: ProjectsTableProps) {
             <TableHead className="py-4">Project</TableHead>
             <TableHead>Client</TableHead>
             <TableHead>Status</TableHead>
+            <TableHead>Progress</TableHead>
             <TableHead>Created</TableHead>
             <TableHead className="w-[50px]"></TableHead>
           </TableRow>
@@ -110,6 +115,18 @@ export function ProjectsTable({ projects }: ProjectsTableProps) {
                   <StatusBadge variant={config.variant} dot>
                     {config.label}
                   </StatusBadge>
+                </TableCell>
+                <TableCell>
+                  {project.totalItems !== undefined && project.totalItems > 0 ? (
+                    <div className="flex items-center gap-2 min-w-[120px]">
+                      <Progress value={project.progress || 0} className="h-2 flex-1" />
+                      <span className="text-xs text-muted-foreground w-12 text-right">
+                        {project.completedItems}/{project.totalItems}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground italic">No items</span>
+                  )}
                 </TableCell>
                 <TableCell className="text-muted-foreground text-sm">
                   {formatDistanceToNow(new Date(project.created_at), { addSuffix: true })}

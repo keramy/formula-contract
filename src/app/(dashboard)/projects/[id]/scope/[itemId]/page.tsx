@@ -18,6 +18,8 @@ import {
   CheckCircle2Icon,
   TruckIcon,
   StickyNoteIcon,
+  GitBranchIcon,
+  ExternalLinkIcon,
 } from "lucide-react";
 import { DrawingUpload, DrawingsList, DrawingApproval } from "@/components/drawings";
 import { ProductionProgressEditor, InstallationStatusEditor, ProcurementStatusEditor } from "@/components/scope-items";
@@ -35,8 +37,12 @@ interface ScopeItem {
   height: number | null;
   unit: string;
   quantity: number;
-  unit_price: number | null;
-  total_price: number | null;
+  // Cost tracking fields (what WE pay)
+  unit_cost: number | null;
+  initial_total_cost: number | null;
+  // Sales price fields (what CLIENT pays)
+  unit_sales_price: number | null;
+  total_sales_price: number | null;
   item_path: "production" | "procurement";
   status: string;
   notes: string | null;
@@ -45,12 +51,22 @@ interface ScopeItem {
   is_installed: boolean;
   installed_at: string | null;
   images: string[] | null;
+  parent_id: string | null; // References parent item when created via split
   project: {
     id: string;
     name: string;
     project_code: string;
     currency: string;
   };
+}
+
+// Parent/child item info for display
+interface RelatedItem {
+  id: string;
+  item_code: string;
+  name: string;
+  item_path: "production" | "procurement";
+  status: string;
 }
 
 interface Drawing {
@@ -171,8 +187,9 @@ export default async function ScopeItemDetailPage({
     .from("scope_items")
     .select(`
       id, item_code, name, description, width, depth, height, unit, quantity,
-      unit_price, total_price, item_path, status, notes, production_percentage,
-      procurement_status, is_installed, installed_at, images,
+      unit_cost, initial_total_cost, unit_sales_price, total_sales_price,
+      item_path, status, notes, production_percentage,
+      procurement_status, is_installed, installed_at, images, parent_id,
       project:projects(id, name, project_code, currency)
     `)
     .eq("id", itemId)
@@ -185,6 +202,31 @@ export default async function ScopeItemDetailPage({
   if (error || !scopeItem) {
     notFound();
   }
+
+  // Fetch parent item if this is a child (has parent_id)
+  let parentItem: RelatedItem | null = null;
+  if (scopeItem.parent_id) {
+    const { data: parentData } = await supabase
+      .from("scope_items")
+      .select("id, item_code, name, item_path, status")
+      .eq("id", scopeItem.parent_id)
+      .eq("is_deleted", false)
+      .single();
+
+    if (parentData) {
+      parentItem = parentData as RelatedItem;
+    }
+  }
+
+  // Fetch child items if this item has children
+  const { data: childrenData } = await supabase
+    .from("scope_items")
+    .select("id, item_code, name, item_path, status")
+    .eq("parent_id", itemId)
+    .eq("is_deleted", false)
+    .order("item_code", { ascending: true });
+
+  const childItems = (childrenData || []) as RelatedItem[];
 
   // Fetch drawing and revisions if this is a production item
   let drawing: Drawing | null = null;
@@ -270,6 +312,78 @@ export default async function ScopeItemDetailPage({
 
       {/* Compact Single Column Layout */}
       <div className="max-w-4xl space-y-4">
+        {/* Parent/Child Relationship Section */}
+        {(parentItem || childItems.length > 0) && (
+          <GlassCard className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <GradientIcon icon={<GitBranchIcon className="size-3.5" />} color="violet" size="sm" />
+              <span className="text-sm font-medium">Related Items</span>
+            </div>
+            <div className="space-y-3">
+              {/* Show parent if this is a child item */}
+              {parentItem && (
+                <div className="p-3 rounded-lg bg-violet-50 dark:bg-violet-950/20 border border-violet-200 dark:border-violet-800">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Parent Item</p>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-sm text-violet-700 dark:text-violet-300">{parentItem.item_code}</span>
+                      <span className="text-sm font-medium">{parentItem.name}</span>
+                      <div className="flex items-center gap-1">
+                        {parentItem.item_path === "production" ? (
+                          <FactoryIcon className="size-3 text-purple-500" />
+                        ) : (
+                          <ShoppingCartIcon className="size-3 text-blue-500" />
+                        )}
+                        <span className="text-xs text-muted-foreground capitalize">{parentItem.item_path}</span>
+                      </div>
+                    </div>
+                    <Link
+                      href={`/projects/${projectId}/scope/${parentItem.id}`}
+                      className="inline-flex items-center gap-1 text-xs text-violet-600 hover:text-violet-700 hover:underline"
+                    >
+                      View
+                      <ExternalLinkIcon className="size-3" />
+                    </Link>
+                  </div>
+                </div>
+              )}
+
+              {/* Show children if this is a parent item */}
+              {childItems.length > 0 && (
+                <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Split Items ({childItems.length})</p>
+                  <div className="space-y-2">
+                    {childItems.map((child) => (
+                      <div key={child.id} className="flex items-center justify-between p-2 rounded bg-white/50 dark:bg-gray-900/20">
+                        <div className="flex items-center gap-2">
+                          <span className="text-violet-400">⤷</span>
+                          <span className="font-mono text-sm text-blue-700 dark:text-blue-300">{child.item_code}</span>
+                          <span className="text-sm">{child.name}</span>
+                          <div className="flex items-center gap-1">
+                            {child.item_path === "production" ? (
+                              <FactoryIcon className="size-3 text-purple-500" />
+                            ) : (
+                              <ShoppingCartIcon className="size-3 text-blue-500" />
+                            )}
+                            <span className="text-xs text-muted-foreground capitalize">{child.item_path}</span>
+                          </div>
+                        </div>
+                        <Link
+                          href={`/projects/${projectId}/scope/${child.id}`}
+                          className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 hover:underline"
+                        >
+                          View
+                          <ExternalLinkIcon className="size-3" />
+                        </Link>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </GlassCard>
+        )}
+
         {/* Progress & Pricing Row */}
         <div className="grid grid-cols-2 gap-4">
           {/* Progress */}
@@ -284,11 +398,11 @@ export default async function ScopeItemDetailPage({
             />
           </GlassCard>
 
-          {/* Pricing */}
+          {/* Cost & Pricing */}
           <GlassCard className="p-4">
             <div className="flex items-center gap-2 mb-3">
               <GradientIcon icon={<DollarSignIcon className="size-3.5" />} color="teal" size="sm" />
-              <span className="text-sm font-medium">Pricing</span>
+              <span className="text-sm font-medium">Cost & Pricing</span>
             </div>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
@@ -296,12 +410,23 @@ export default async function ScopeItemDetailPage({
                 <span className="font-medium">{scopeItem.quantity} {scopeItem.unit}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Unit Price</span>
-                <span className="font-mono">{formatCurrency(scopeItem.unit_price, scopeItem.project.currency)}</span>
+                <span className="text-muted-foreground">Unit Cost (Our Cost)</span>
+                <span className="font-mono">{formatCurrency(scopeItem.unit_cost, scopeItem.project.currency)}</span>
               </div>
-              <div className="border-t pt-2 flex justify-between">
-                <span className="font-medium">Total</span>
-                <span className="font-semibold font-mono text-teal-700">{formatCurrency(scopeItem.total_price, scopeItem.project.currency)}</span>
+              {scopeItem.initial_total_cost !== null && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Initial Cost (Locked)</span>
+                  <span className="font-mono text-gray-500">{formatCurrency(scopeItem.initial_total_cost, scopeItem.project.currency)}</span>
+                </div>
+              )}
+              <div className="border-t pt-2" />
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Unit Sales Price</span>
+                <span className="font-mono">{formatCurrency(scopeItem.unit_sales_price, scopeItem.project.currency)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-medium">Total Sales Price</span>
+                <span className="font-semibold font-mono text-teal-700">{formatCurrency(scopeItem.total_sales_price, scopeItem.project.currency)}</span>
               </div>
             </div>
           </GlassCard>

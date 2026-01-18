@@ -23,14 +23,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
 import {
   UsersIcon,
@@ -76,11 +71,33 @@ export function TeamOverview({ projectId, assignments, canManageTeam }: TeamOver
   const [isLoading, setIsLoading] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
-  const [selectedUserId, setSelectedUserId] = useState<string>("");
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
   const [userToRemove, setUserToRemove] = useState<User | null>(null);
   const [availableUsers, setAvailableUsers] = useState<User[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Toggle user selection for multi-select
+  const toggleUserSelection = (userId: string) => {
+    setSelectedUserIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(userId)) {
+        newSet.delete(userId);
+      } else {
+        newSet.add(userId);
+      }
+      return newSet;
+    });
+  };
+
+  // Select/deselect all users
+  const toggleSelectAll = () => {
+    if (selectedUserIds.size === availableUsers.length) {
+      setSelectedUserIds(new Set());
+    } else {
+      setSelectedUserIds(new Set(availableUsers.map((u) => u.id)));
+    }
+  };
 
   // Load available users when dialog opens
   useEffect(() => {
@@ -102,23 +119,38 @@ export function TeamOverview({ projectId, assignments, canManageTeam }: TeamOver
   }, [addDialogOpen, projectId]);
 
   const handleAssign = async () => {
-    if (!selectedUserId) return;
+    if (selectedUserIds.size === 0) return;
 
     setIsLoading(true);
     setError(null);
 
-    const result = await assignUserToProject(projectId, selectedUserId);
+    const userIds = Array.from(selectedUserIds);
+    let successCount = 0;
+    let failedCount = 0;
+    const errors: string[] = [];
 
-    if (!result.success) {
-      setError(result.error || "Failed to assign user");
-      setIsLoading(false);
-      return;
+    // Assign all selected users
+    for (const userId of userIds) {
+      const result = await assignUserToProject(projectId, userId);
+      if (result.success) {
+        successCount++;
+      } else {
+        failedCount++;
+        errors.push(result.error || "Unknown error");
+      }
     }
 
-    setAddDialogOpen(false);
-    setSelectedUserId("");
+    if (failedCount > 0) {
+      setError(`Failed to assign ${failedCount} user(s): ${errors[0]}`);
+    }
+
+    if (successCount > 0) {
+      setAddDialogOpen(false);
+      setSelectedUserIds(new Set());
+      router.refresh();
+    }
+
     setIsLoading(false);
-    router.refresh();
   };
 
   const handleRemove = async () => {
@@ -194,7 +226,19 @@ export function TeamOverview({ projectId, assignments, canManageTeam }: TeamOver
                 )}
 
                 <div className="space-y-2">
-                  <Label htmlFor="user">Select User</Label>
+                  <div className="flex items-center justify-between">
+                    <Label>Select Users</Label>
+                    {availableUsers.length > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={toggleSelectAll}
+                        className="text-xs h-6"
+                      >
+                        {selectedUserIds.size === availableUsers.length ? "Deselect All" : "Select All"}
+                      </Button>
+                    )}
+                  </div>
                   {loadingUsers ? (
                     <div className="flex items-center gap-2 p-3 text-muted-foreground">
                       <Spinner className="size-4" />
@@ -205,43 +249,53 @@ export function TeamOverview({ projectId, assignments, canManageTeam }: TeamOver
                       All users are already assigned to this project.
                     </p>
                   ) : (
-                    <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a user to add..." />
-                      </SelectTrigger>
-                      <SelectContent>
+                    <ScrollArea className="h-[200px] border rounded-md p-2">
+                      <div className="space-y-1">
                         {availableUsers.map((user) => {
                           const config = roleConfig[user.role] || { variant: "default" as StatusVariant, label: user.role };
                           return (
-                            <SelectItem key={user.id} value={user.id}>
-                              <div className="flex items-center gap-2">
-                                <span>{user.name}</span>
-                                <span className="text-muted-foreground">({user.email})</span>
-                                <StatusBadge variant={config.variant}>
-                                  {config.label}
-                                </StatusBadge>
+                            <label
+                              key={user.id}
+                              className="flex items-center gap-3 p-2 rounded hover:bg-muted/50 cursor-pointer"
+                            >
+                              <Checkbox
+                                checked={selectedUserIds.has(user.id)}
+                                onCheckedChange={() => toggleUserSelection(user.id)}
+                              />
+                              <GradientAvatar name={user.name} size="sm" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{user.name}</p>
+                                <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                               </div>
-                            </SelectItem>
+                              <StatusBadge variant={config.variant}>
+                                {config.label}
+                              </StatusBadge>
+                            </label>
                           );
                         })}
-                      </SelectContent>
-                    </Select>
+                      </div>
+                    </ScrollArea>
+                  )}
+                  {selectedUserIds.size > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {selectedUserIds.size} user{selectedUserIds.size === 1 ? "" : "s"} selected
+                    </p>
                   )}
                 </div>
 
                 <div className="flex gap-3 pt-2">
                   <Button
                     onClick={handleAssign}
-                    disabled={isLoading || !selectedUserId}
+                    disabled={isLoading || selectedUserIds.size === 0}
                     className="bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600"
                   >
                     {isLoading ? (
                       <>
                         <Spinner className="size-4" />
-                        Adding...
+                        Adding {selectedUserIds.size}...
                       </>
                     ) : (
-                      "Add to Project"
+                      `Add ${selectedUserIds.size > 0 ? `${selectedUserIds.size} ` : ""}to Project`
                     )}
                   </Button>
                   <Button

@@ -15,7 +15,11 @@ interface ScopeItemData {
   height: number | null;
   unit: string;
   quantity: number;
-  unit_price: number | null;
+  // Cost tracking fields (what WE pay)
+  unit_cost: number | null;
+  initial_total_cost: number | null;
+  // Sales price fields (what CLIENT pays)
+  unit_sales_price: number | null;
   item_path: string;
   status: string;
   notes: string | null;
@@ -38,7 +42,8 @@ export default async function EditScopeItemPage({
     .from("scope_items")
     .select(`
       id, item_code, name, description, width, depth, height,
-      unit, quantity, unit_price, item_path, status, notes, images,
+      unit, quantity, unit_cost, initial_total_cost, unit_sales_price,
+      item_path, status, notes, images,
       project:projects(currency)
     `)
     .eq("id", itemId)

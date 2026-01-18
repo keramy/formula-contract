@@ -22,6 +22,7 @@ interface ProjectDetailHeaderProps {
   projectCode: string;
   status: string;
   canEdit: boolean;
+  showEditButton?: boolean; // New prop - defaults to false
 }
 
 export function ProjectDetailHeader({
@@ -30,6 +31,7 @@ export function ProjectDetailHeader({
   projectCode,
   status,
   canEdit,
+  showEditButton = false, // Only show Edit button when explicitly requested
 }: ProjectDetailHeaderProps) {
   const { toggleSidebar } = useSidebar();
   const config = statusConfig[status] || { variant: "default" as StatusVariant, label: status };
@@ -66,7 +68,7 @@ export function ProjectDetailHeader({
           <p className="text-sm text-muted-foreground font-mono">{projectCode}</p>
         </div>
       </div>
-      {canEdit && (
+      {canEdit && showEditButton && (
         <Button asChild className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700">
           <Link href={`/projects/${projectId}/edit`}>
             <PencilIcon className="size-4" />
