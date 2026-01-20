@@ -11,7 +11,7 @@
  * - sanitizeObject(): For sanitizing entire form data objects
  */
 
-import DOMPurify from "dompurify";
+import DOMPurify from "isomorphic-dompurify";
 
 // ============================================================================
 // Configuration

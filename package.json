@@ -59,6 +59,7 @@
     "dompurify": "^3.3.1",
     "embla-carousel-react": "^8.6.0",
     "input-otp": "^1.4.2",
+    "isomorphic-dompurify": "^2.35.0",
     "jspdf": "^4.0.0",
     "lucide-react": "^0.562.0",
     "motion": "^12.24.11",
