@@ -517,7 +517,12 @@ export function ScopeItemSheet({
 
               {/* Pricing */}
               <div className="space-y-3">
-                <Label className="text-sm font-medium">Pricing ({currencySymbol})</Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium">Pricing</Label>
+                  <span className="text-xs px-2 py-1 rounded-full bg-muted font-medium">
+                    {projectCurrency} ({currencySymbol})
+                  </span>
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <Input

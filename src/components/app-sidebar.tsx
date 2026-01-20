@@ -27,6 +27,7 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { UserMenu } from "@/components/user-menu";
+import { NotificationsDropdown } from "@/components/notifications/notifications-dropdown";
 
 interface AppSidebarProps {
   user: {
@@ -139,16 +140,20 @@ export function AppSidebar({ user }: AppSidebarProps) {
 
   return (
     <Sidebar className="border-r-0">
-      {/* Header with Gradient Logo */}
+      {/* Header with Gradient Logo and Notifications */}
       <SidebarHeader className="border-b border-sidebar-border/50">
-        <div className="flex items-center gap-3 px-2 py-2">
-          <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 text-white font-bold text-sm shadow-lg shadow-violet-500/25">
-            FC
+        <div className="flex items-center justify-between px-2 py-2">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 text-white font-bold text-sm shadow-lg shadow-violet-500/25">
+              FC
+            </div>
+            <div className="flex flex-col">
+              <span className="text-sm font-semibold tracking-tight">Formula Contract</span>
+              <span className="text-xs text-muted-foreground">Project Management</span>
+            </div>
           </div>
-          <div className="flex flex-col">
-            <span className="text-sm font-semibold tracking-tight">Formula Contract</span>
-            <span className="text-xs text-muted-foreground">Project Management</span>
-          </div>
+          {/* Notifications Bell */}
+          <NotificationsDropdown />
         </div>
       </SidebarHeader>
 

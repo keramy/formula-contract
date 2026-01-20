@@ -53,7 +53,7 @@ export default async function DashboardPage() {
   }
 
   const isClient = userRole === "client";
-  const isPMOrAdmin = ["admin", "pm"].includes(userRole);
+  const isPMOrAdmin = ["admin", "pm", "management"].includes(userRole);
 
   // Run role-specific data fetches in parallel
   const [
