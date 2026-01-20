@@ -2,7 +2,7 @@
  * Input Sanitization Utility
  *
  * Provides XSS protection for user-generated content.
- * Uses DOMPurify for HTML sanitization with safe defaults.
+ * Uses pure JavaScript implementation that works on both server and client.
  *
  * Usage:
  * - sanitizeText(): For plain text fields (removes ALL HTML)
@@ -11,42 +11,92 @@
  * - sanitizeObject(): For sanitizing entire form data objects
  */
 
-import DOMPurify from "isomorphic-dompurify";
-
 // ============================================================================
-// Configuration
+// Pure JavaScript Sanitization (No DOM required - works on Vercel!)
 // ============================================================================
 
 /**
- * Safe HTML configuration - allows basic formatting but no scripts/dangerous tags
+ * HTML entity map for encoding
  */
-const SAFE_HTML_CONFIG = {
-  ALLOWED_TAGS: [
-    "p", "br", "strong", "b", "em", "i", "u", "s",
-    "h1", "h2", "h3", "h4", "h5", "h6",
-    "ul", "ol", "li",
-    "a", "blockquote", "code", "pre",
-    "table", "thead", "tbody", "tr", "th", "td",
-    "span", "div",
-  ] as string[],
-  ALLOWED_ATTR: [
-    "href", "target", "rel", "class", "style",
-  ] as string[],
-  ALLOW_DATA_ATTR: false,
-  // Force all links to open in new tab and have safe rel
-  ADD_ATTR: ["target", "rel"] as string[],
-  FORBID_TAGS: ["script", "style", "iframe", "form", "input", "button"] as string[],
-  FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover"] as string[],
+const HTML_ENTITIES: Record<string, string> = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#039;",
 };
 
 /**
- * Plain text configuration - strips ALL HTML
+ * Reverse HTML entity map for decoding
  */
-const PLAIN_TEXT_CONFIG = {
-  ALLOWED_TAGS: [] as string[],
-  ALLOWED_ATTR: [] as string[],
-  KEEP_CONTENT: true,
+const HTML_DECODE_MAP: Record<string, string> = {
+  "&amp;": "&",
+  "&lt;": "<",
+  "&gt;": ">",
+  "&quot;": '"',
+  "&#039;": "'",
+  "&#x27;": "'",
+  "&apos;": "'",
+  "&nbsp;": " ",
 };
+
+/**
+ * Dangerous patterns to remove
+ */
+const DANGEROUS_PATTERNS = [
+  // Script tags and content
+  /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
+  // Event handlers
+  /\bon\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi,
+  // JavaScript URLs
+  /javascript\s*:/gi,
+  // Data URLs (can contain scripts)
+  /data\s*:\s*text\/html/gi,
+  // VBScript
+  /vbscript\s*:/gi,
+  // Expression (IE)
+  /expression\s*\(/gi,
+];
+
+/**
+ * Strip all HTML tags from a string
+ */
+function stripHtmlTags(input: string): string {
+  // Remove all HTML tags
+  return input
+    .replace(/<[^>]*>/g, " ") // Replace tags with space
+    .replace(/\s+/g, " ") // Normalize whitespace
+    .trim();
+}
+
+/**
+ * Decode HTML entities
+ */
+function decodeHTMLEntities(input: string): string {
+  let result = input;
+  for (const [entity, char] of Object.entries(HTML_DECODE_MAP)) {
+    result = result.replace(new RegExp(entity, "gi"), char);
+  }
+  // Handle numeric entities
+  result = result.replace(/&#(\d+);/g, (_, num) =>
+    String.fromCharCode(parseInt(num, 10))
+  );
+  result = result.replace(/&#x([0-9a-f]+);/gi, (_, hex) =>
+    String.fromCharCode(parseInt(hex, 16))
+  );
+  return result;
+}
+
+/**
+ * Remove dangerous patterns from HTML
+ */
+function removeDangerousPatterns(input: string): string {
+  let result = input;
+  for (const pattern of DANGEROUS_PATTERNS) {
+    result = result.replace(pattern, "");
+  }
+  return result;
+}
 
 // ============================================================================
 // Sanitization Functions
@@ -58,18 +108,77 @@ const PLAIN_TEXT_CONFIG = {
  */
 export function sanitizeText(input: string | null | undefined): string {
   if (!input) return "";
-  // First decode HTML entities, then strip tags
-  const decoded = decodeHTMLEntities(input);
-  return DOMPurify.sanitize(decoded, PLAIN_TEXT_CONFIG).trim();
+
+  // Decode HTML entities first
+  let result = decodeHTMLEntities(input);
+
+  // Strip all HTML tags
+  result = stripHtmlTags(result);
+
+  // Remove any remaining dangerous patterns
+  result = removeDangerousPatterns(result);
+
+  // Normalize whitespace and trim
+  result = result.replace(/\s+/g, " ").trim();
+
+  return result;
 }
 
 /**
- * Sanitize HTML content - allows safe HTML tags
+ * Sanitize HTML content - removes dangerous tags/attributes but keeps safe formatting
  * Use for: rich text editors, formatted descriptions
  */
 export function sanitizeHTML(input: string | null | undefined): string {
   if (!input) return "";
-  return DOMPurify.sanitize(input, SAFE_HTML_CONFIG);
+
+  let result = input;
+
+  // Remove dangerous patterns
+  result = removeDangerousPatterns(result);
+
+  // Remove dangerous tags completely
+  const dangerousTags = [
+    "script",
+    "style",
+    "iframe",
+    "frame",
+    "frameset",
+    "object",
+    "embed",
+    "applet",
+    "form",
+    "input",
+    "button",
+    "select",
+    "textarea",
+    "meta",
+    "link",
+    "base",
+  ];
+
+  for (const tag of dangerousTags) {
+    // Remove opening and closing tags with content
+    const tagRegex = new RegExp(
+      `<${tag}\\b[^<]*(?:(?!<\\/${tag}>)<[^<]*)*<\\/${tag}>`,
+      "gi"
+    );
+    result = result.replace(tagRegex, "");
+
+    // Remove self-closing tags
+    const selfClosingRegex = new RegExp(`<${tag}\\b[^>]*\\/?>`, "gi");
+    result = result.replace(selfClosingRegex, "");
+  }
+
+  // Remove all event handlers from remaining tags
+  result = result.replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, "");
+
+  // Remove javascript: and data: URLs from href/src attributes
+  result = result.replace(
+    /(href|src)\s*=\s*["']?\s*(javascript|data|vbscript)\s*:/gi,
+    '$1=""'
+  );
+
+  return result.trim();
 }
 
 /**
@@ -93,9 +202,7 @@ export function sanitizeURL(input: string | null | undefined): string {
 
   // Only allow safe protocols
   const safeProtocols = ["http://", "https://", "mailto:"];
-  const hasProtocol = safeProtocols.some((p) =>
-    lowercased.startsWith(p)
-  );
+  const hasProtocol = safeProtocols.some((p) => lowercased.startsWith(p));
 
   // If no protocol, assume https
   if (!hasProtocol && trimmed.length > 0) {
@@ -155,35 +262,7 @@ export function sanitizeObject<T extends Record<string, unknown>>(
  */
 export function escapeHTML(input: string | null | undefined): string {
   if (!input) return "";
-  return input
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
-/**
- * Decode HTML entities
- */
-function decodeHTMLEntities(input: string): string {
-  const textarea = typeof document !== "undefined"
-    ? document.createElement("textarea")
-    : null;
-
-  if (!textarea) {
-    // Server-side fallback - handle common entities
-    return input
-      .replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&quot;/g, '"')
-      .replace(/&#039;/g, "'")
-      .replace(/&nbsp;/g, " ");
-  }
-
-  textarea.innerHTML = input;
-  return textarea.value;
+  return input.replace(/[&<>"']/g, (char) => HTML_ENTITIES[char] || char);
 }
 
 // ============================================================================
@@ -210,11 +289,13 @@ export const sanitizedURL = z.string().transform(sanitizeURL);
 /**
  * Create a sanitized string schema with validation
  */
-export function createSanitizedString(options: {
-  minLength?: number;
-  maxLength?: number;
-  required?: boolean;
-} = {}) {
+export function createSanitizedString(
+  options: {
+    minLength?: number;
+    maxLength?: number;
+    required?: boolean;
+  } = {}
+) {
   const { minLength, maxLength, required = true } = options;
 
   let schema = z.string();
