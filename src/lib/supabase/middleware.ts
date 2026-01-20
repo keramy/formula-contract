@@ -118,16 +118,39 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  // Check if authenticated user is deactivated or lacks permission
+  // ============================================================================
+  // PERFORMANCE: Read role and is_active from JWT metadata instead of DB
+  // This eliminates a ~3s database query on every request!
+  //
+  // The user_metadata is synced when:
+  // - User is created (inviteUser)
+  // - User role is updated (updateUser)
+  // - User is activated/deactivated (toggleUserActive)
+  // ============================================================================
   if (user && !isAuthPage && !isPublicPage) {
-    const { data: profile } = await supabase
-      .from("users")
-      .select("is_active, role")
-      .eq("id", user.id)
-      .single();
+    const metadata = user.user_metadata || {};
 
-    // If user profile exists and is deactivated, sign out and redirect
-    if (profile && !profile.is_active) {
+    // Try to get role and is_active from JWT metadata first
+    let role: string | undefined = metadata.role;
+    let isActive: boolean | undefined = metadata.is_active;
+
+    // Fallback to DB query ONLY if metadata is missing (legacy users before migration)
+    if (role === undefined || isActive === undefined) {
+      console.warn(`[Middleware] User ${user.email} missing JWT metadata, falling back to DB query`);
+      const { data: profile } = await supabase
+        .from("users")
+        .select("is_active, role")
+        .eq("id", user.id)
+        .single();
+
+      if (profile) {
+        role = profile.role;
+        isActive = profile.is_active;
+      }
+    }
+
+    // Check if user is deactivated
+    if (isActive === false) {
       // Sign out the deactivated user
       await supabase.auth.signOut();
       const url = request.nextUrl.clone();
@@ -137,7 +160,7 @@ export async function updateSession(request: NextRequest) {
     }
 
     // Check role-based access
-    if (profile && !canAccessRoute(pathname, profile.role)) {
+    if (role && !canAccessRoute(pathname, role)) {
       const url = request.nextUrl.clone();
       url.pathname = "/dashboard";
       url.searchParams.set("error", "unauthorized");

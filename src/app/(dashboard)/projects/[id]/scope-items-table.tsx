@@ -72,9 +72,31 @@ import {
   SlidersHorizontalIcon,
   EyeIcon,
   EyeOffIcon,
+  PlusIcon,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { GlassCard, EmptyState, StatusBadge } from "@/components/ui/ui-helpers";
+import dynamic from "next/dynamic";
+
+// ============================================================================
+// PERFORMANCE: Lazy load the Sheet component
+// Before: ScopeItemSheet (~700 lines + dependencies) loaded with table
+// After:  Only loaded when user opens add/edit sheet
+// ============================================================================
+const ScopeItemSheet = dynamic(
+  () => import("@/components/scope-items/scope-item-sheet").then((mod) => mod.ScopeItemSheet),
+  {
+    loading: () => (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="bg-white rounded-lg p-6 flex items-center gap-3 shadow-xl">
+          <Spinner className="size-5" />
+          <span>Loading editor...</span>
+        </div>
+      </div>
+    ),
+    ssr: false,
+  }
+);
 
 interface ScopeItem {
   id: string;
@@ -295,6 +317,8 @@ interface ScopeItemRowProps {
   onToggleSelect: (id: string) => void;
   onOpenSplitDialog: (item: ScopeItem) => void;
   onOpenDeleteDialog: (item: HierarchicalScopeItem) => void;
+  onEditItem: (item: HierarchicalScopeItem) => void;
+  onViewItem: (item: HierarchicalScopeItem) => void;
 }
 
 const ScopeItemRow = memo(function ScopeItemRow({
@@ -306,6 +330,8 @@ const ScopeItemRow = memo(function ScopeItemRow({
   onToggleSelect,
   onOpenSplitDialog,
   onOpenDeleteDialog,
+  onEditItem,
+  onViewItem,
 }: ScopeItemRowProps) {
   const isColumnVisible = (columnId: string) => visibleColumns.has(columnId);
 
@@ -340,12 +366,12 @@ const ScopeItemRow = memo(function ScopeItemRow({
       )}
       {isColumnVisible("name") && (
         <TableCell>
-          <Link
-            href={`/projects/${projectId}/scope/${item.id}`}
-            className={`font-medium hover:underline ${item.isChild ? "text-muted-foreground hover:text-foreground" : ""}`}
+          <button
+            onClick={() => onViewItem(item)}
+            className={`font-medium hover:underline text-left cursor-pointer ${item.isChild ? "text-muted-foreground hover:text-foreground" : ""}`}
           >
             {item.name}
-          </Link>
+          </button>
         </TableCell>
       )}
       {isColumnVisible("path") && (
@@ -429,16 +455,13 @@ const ScopeItemRow = memo(function ScopeItemRow({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem asChild>
-              <Link href={`/projects/${projectId}/scope/${item.id}`}>
-                View Details
-              </Link>
+            <DropdownMenuItem onClick={() => onViewItem(item)}>
+              <EyeIcon className="size-4 mr-2" />
+              View
             </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href={`/projects/${projectId}/scope/${item.id}/edit`}>
-                <PencilIcon className="size-4 mr-2" />
-                Edit
-              </Link>
+            <DropdownMenuItem onClick={() => onEditItem(item)}>
+              <PencilIcon className="size-4 mr-2" />
+              Edit
             </DropdownMenuItem>
             {!item.isChild && (
               <DropdownMenuItem onClick={() => onOpenSplitDialog(item)}>
@@ -594,6 +617,10 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
   // Column visibility state - initialize from localStorage or defaults
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(() => getDefaultVisibleColumns());
   const [columnPopoverOpen, setColumnPopoverOpen] = useState(false);
+
+  // Sheet state (merged view + edit)
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
   // Load column visibility from localStorage on mount
   useEffect(() => {
@@ -807,6 +834,12 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
     dispatch({ type: "OPEN_DELETE_DIALOG", item });
   }, []);
 
+  // Open sheet for an item (both view and edit use the same merged sheet)
+  const openItemSheet = useCallback((item: HierarchicalScopeItem) => {
+    setSelectedItemId(item.id);
+    setSheetOpen(true);
+  }, []);
+
   // Handle split item submit
   const handleSplitSubmit = useCallback(() => {
     if (!itemToSplit) return;
@@ -872,20 +905,43 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
     return { totalSalesPrice, totalActualCost, totalInitialCost, avgProgress };
   }, [items, hierarchicalItems]);
 
+  // Function to open sheet for adding new item
+  const openAddSheet = useCallback(() => {
+    setSelectedItemId(null);
+    setSheetOpen(true);
+  }, []);
+
   if (items.length === 0) {
     return (
-      <GlassCard>
-        <EmptyState
-          icon={<ClipboardListIcon className="size-8" />}
-          title="No scope items"
-          description="Add scope items to track production and procurement for this project."
-          action={
-            <Button asChild className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700">
-              <Link href={`/projects/${projectId}/scope/new`}>Add Scope Item</Link>
-            </Button>
-          }
-        />
-      </GlassCard>
+      <>
+        <GlassCard>
+          <EmptyState
+            icon={<ClipboardListIcon className="size-8" />}
+            title="No scope items"
+            description="Add scope items to track production and procurement for this project."
+            action={
+              <Button
+                onClick={openAddSheet}
+                className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700"
+              >
+                <PlusIcon className="size-4 mr-2" />
+                Add Scope Item
+              </Button>
+            }
+          />
+        </GlassCard>
+
+        {/* Sheet for adding items - only mount when open */}
+        {sheetOpen && (
+          <ScopeItemSheet
+            projectId={projectId}
+            projectCurrency={currency}
+            open={sheetOpen}
+            onOpenChange={setSheetOpen}
+            itemId={null}
+          />
+        )}
+      </>
     );
   }
 
@@ -1142,6 +1198,8 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
                 onToggleSelect={toggleSelect}
                 onOpenSplitDialog={openSplitDialog}
                 onOpenDeleteDialog={openDeleteDialog}
+                onEditItem={openItemSheet}
+                onViewItem={openItemSheet}
               />
             ))}
           </TableBody>
@@ -1415,6 +1473,17 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Scope Item Sheet (merged view + edit) - only mount when open */}
+      {sheetOpen && (
+        <ScopeItemSheet
+          projectId={projectId}
+          projectCurrency={currency}
+          open={sheetOpen}
+          onOpenChange={setSheetOpen}
+          itemId={selectedItemId}
+        />
+      )}
     </div>
   );
 }

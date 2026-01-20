@@ -2,9 +2,11 @@
 
 import { useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/client";
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { GlassCard, GradientIcon, EmptyState } from "@/components/ui/ui-helpers";
 import {
   AlertDialog,
@@ -25,8 +27,26 @@ import {
   AlertTriangleIcon,
 } from "lucide-react";
 import { MaterialCard, type Material } from "@/components/materials/material-card";
-import { MaterialFormDialog } from "@/components/materials/material-form-dialog";
 import { MaterialApproval } from "@/components/materials/material-approval";
+
+// ============================================================================
+// PERFORMANCE: Lazy load MaterialSheet (~500+ lines + dependencies)
+// Only loaded when user clicks "Add Material" or "Edit" button
+// ============================================================================
+const MaterialSheet = dynamic(
+  () => import("@/components/materials/material-sheet").then((mod) => mod.MaterialSheet),
+  {
+    loading: () => (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="bg-white rounded-lg p-6 flex items-center gap-3">
+          <Spinner className="size-5" />
+          <span>Loading...</span>
+        </div>
+      </div>
+    ),
+    ssr: false,
+  }
+);
 import { MaterialsExcelImport, MaterialsExcelExport, MaterialsTemplateButton } from "@/components/materials";
 
 interface ScopeItem {
@@ -80,25 +100,30 @@ export function MaterialsOverview({
     rejected: materials.filter((m) => m.status === "rejected").length,
   }), [materials]);
 
-  const handleAddMaterial = () => {
+  // ============================================================================
+  // PERFORMANCE: Memoized callbacks to prevent MaterialCard re-renders
+  // When parent re-renders, these stable references ensure children don't re-render
+  // ============================================================================
+
+  const handleAddMaterial = useCallback(() => {
     setEditMaterial(null);
     setFormDialogOpen(true);
-  };
+  }, []);
 
-  const handleEditMaterial = (material: Material) => {
+  const handleEditMaterial = useCallback((material: Material) => {
     const fullMaterial = materials.find((m) => m.id === material.id);
     if (fullMaterial) {
       setEditMaterial(fullMaterial);
       setFormDialogOpen(true);
     }
-  };
+  }, [materials]);
 
-  const handleDeleteClick = (materialId: string) => {
+  const handleDeleteClick = useCallback((materialId: string) => {
     setDeleteMaterialId(materialId);
     setDeleteDialogOpen(true);
-  };
+  }, []);
 
-  const handleDeleteConfirm = async () => {
+  const handleDeleteConfirm = useCallback(async () => {
     if (!deleteMaterialId) return;
 
     setIsLoading(true);
@@ -121,25 +146,25 @@ export function MaterialsOverview({
       setDeleteDialogOpen(false);
       setDeleteMaterialId(null);
     }
-  };
+  }, [deleteMaterialId, router]);
 
-  const handleApprove = (materialId: string) => {
+  const handleApprove = useCallback((materialId: string) => {
     const material = materials.find((m) => m.id === materialId);
     if (material) {
       setApprovalMaterial(material);
       setApprovalAction("approve");
       setApprovalDialogOpen(true);
     }
-  };
+  }, [materials]);
 
-  const handleReject = (materialId: string) => {
+  const handleReject = useCallback((materialId: string) => {
     const material = materials.find((m) => m.id === materialId);
     if (material) {
       setApprovalMaterial(material);
       setApprovalAction("reject");
       setApprovalDialogOpen(true);
     }
-  };
+  }, [materials]);
 
   if (materials.length === 0 && scopeItems.length === 0) {
     return (
@@ -289,22 +314,24 @@ export function MaterialsOverview({
         </GlassCard>
       )}
 
-      {/* Form Dialog */}
-      <MaterialFormDialog
-        projectId={projectId}
-        scopeItems={scopeItems}
-        open={formDialogOpen}
-        onOpenChange={setFormDialogOpen}
-        editMaterial={editMaterial ? {
-          id: editMaterial.id,
-          material_code: editMaterial.material_code,
-          name: editMaterial.name,
-          specification: editMaterial.specification,
-          supplier: editMaterial.supplier,
-          images: editMaterial.images,
-          assignedItemIds: editMaterial.assignedItemIds,
-        } : null}
-      />
+      {/* Material Sheet (slide-out drawer) - only mount when open */}
+      {formDialogOpen && (
+        <MaterialSheet
+          projectId={projectId}
+          scopeItems={scopeItems}
+          open={formDialogOpen}
+          onOpenChange={setFormDialogOpen}
+          editMaterial={editMaterial ? {
+            id: editMaterial.id,
+            material_code: editMaterial.material_code,
+            name: editMaterial.name,
+            specification: editMaterial.specification,
+            supplier: editMaterial.supplier,
+            images: editMaterial.images,
+            assignedItemIds: editMaterial.assignedItemIds,
+          } : null}
+        />
+      )}
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

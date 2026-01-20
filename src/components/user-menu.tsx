@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -24,6 +25,12 @@ interface UserMenuProps {
 
 export function UserMenu({ user }: UserMenuProps) {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+
+  // Prevent hydration mismatch by only rendering dropdown after mount
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleLogout = async () => {
     const supabase = createClient();
@@ -40,6 +47,24 @@ export function UserMenu({ user }: UserMenuProps) {
       .toUpperCase()
       .slice(0, 2);
   };
+
+  // Show static button during SSR to prevent hydration mismatch
+  if (!mounted) {
+    return (
+      <SidebarMenuButton size="lg" className="w-full">
+        <Avatar className="size-8">
+          <AvatarFallback className="bg-primary/10 text-primary text-xs">
+            {getInitials(user.name)}
+          </AvatarFallback>
+        </Avatar>
+        <div className="flex flex-col items-start text-left flex-1 min-w-0">
+          <span className="text-sm font-medium truncate w-full">{user.name}</span>
+          <span className="text-xs text-muted-foreground capitalize">{user.role}</span>
+        </div>
+        <ChevronDownIcon className="size-4 text-muted-foreground" />
+      </SidebarMenuButton>
+    );
+  }
 
   return (
     <DropdownMenu>

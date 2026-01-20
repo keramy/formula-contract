@@ -92,33 +92,32 @@ export async function getProjectAssignments(projectId: string): Promise<ProjectA
 export async function getAvailableUsers(projectId: string): Promise<AvailableUser[]> {
   const supabase = await createClient();
 
-  // Get users who are not already assigned to this project
-  const { data: assignments } = await supabase
-    .from("project_assignments")
-    .select("user_id")
-    .eq("project_id", projectId);
+  // Fetch assignments and all users in PARALLEL, then filter client-side
+  const [assignmentsResult, usersResult] = await Promise.all([
+    supabase
+      .from("project_assignments")
+      .select("user_id")
+      .eq("project_id", projectId),
+    supabase
+      .from("users")
+      .select("id, name, email, role")
+      .eq("is_active", true)
+      .order("name"),
+  ]);
 
-  const assignedUserIds = (assignments || []).map((a) => a.user_id);
-
-  // Get all active users except those already assigned
-  let query = supabase
-    .from("users")
-    .select("id, name, email, role")
-    .eq("is_active", true)
-    .order("name");
-
-  if (assignedUserIds.length > 0) {
-    query = query.not("id", "in", `(${assignedUserIds.join(",")})`);
-  }
-
-  const { data, error } = await query;
+  const { data: assignments } = assignmentsResult;
+  const { data: allUsers, error } = usersResult;
 
   if (error) {
     console.error("Error fetching available users:", error);
     return [];
   }
 
-  return data || [];
+  // Filter out already assigned users (client-side - fast)
+  const assignedUserIds = new Set((assignments || []).map((a) => a.user_id));
+  const availableUsers = (allUsers || []).filter((user) => !assignedUserIds.has(user.id));
+
+  return availableUsers;
 }
 
 // ============================================================================
@@ -140,24 +139,27 @@ export async function assignUserToProject(
     return { success: false, error: "Not authenticated" };
   }
 
-  // Check if already assigned
-  const { data: existing } = await supabase
-    .from("project_assignments")
-    .select("id")
-    .eq("project_id", projectId)
-    .eq("user_id", userId)
-    .single();
+  // Check if already assigned AND get user details in PARALLEL
+  const [existingResult, assignedUserResult] = await Promise.all([
+    supabase
+      .from("project_assignments")
+      .select("id")
+      .eq("project_id", projectId)
+      .eq("user_id", userId)
+      .single(),
+    supabase
+      .from("users")
+      .select("name")
+      .eq("id", userId)
+      .single(),
+  ]);
+
+  const { data: existing } = existingResult;
+  const { data: assignedUser } = assignedUserResult;
 
   if (existing) {
     return { success: false, error: "User is already assigned to this project" };
   }
-
-  // Get user details for logging
-  const { data: assignedUser } = await supabase
-    .from("users")
-    .select("name")
-    .eq("id", userId)
-    .single();
 
   const { error } = await supabase
     .from("project_assignments")

@@ -1,36 +1,130 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Formula Contract
+
+A modern Project Management System for furniture manufacturing operations. Built with Next.js, Supabase, and shadcn/ui.
+
+## Overview
+
+Formula Contract helps Formula International manage the complete project lifecycle:
+- **Tendering:** Track potential projects
+- **Scope Management:** Define and manage furniture items with dual-path workflow (Production/Procurement)
+- **Approval Workflows:** Drawing and material approval cycles with client collaboration
+- **Production Tracking:** Monitor production progress percentages
+- **Reporting:** Generate and share progress reports with stakeholders
+
+## Tech Stack
+
+- **Frontend:** Next.js 14+ (App Router), React, TypeScript
+- **Styling:** Tailwind CSS v4, shadcn/ui
+- **Database:** Supabase (PostgreSQL, Auth, Storage, RLS)
+- **State Management:** React Query (server), Zustand (client)
+- **Forms:** react-hook-form + zod
+- **Tables:** @tanstack/react-table
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 18+
+- npm/yarn/pnpm
+- Supabase project
+
+### Environment Variables
+
+Create a `.env.local` file:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Installation
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+# Install dependencies
+npm install
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# Run development server
+npm run dev
+```
 
-## Learn More
+Open [http://localhost:3000](http://localhost:3000) to view the app.
 
-To learn more about Next.js, take a look at the following resources:
+### Build
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+# Production build
+npm run build
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+# Start production server
+npm start
+```
 
-## Deploy on Vercel
+## Project Structure
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```
+src/
+├── app/                    # Next.js App Router pages
+│   ├── (auth)/             # Authentication pages
+│   └── (dashboard)/        # Protected dashboard pages
+├── components/             # React components
+│   ├── ui/                 # shadcn/ui components
+│   └── [feature]/          # Feature-specific components
+├── lib/
+│   ├── actions/            # Server actions
+│   ├── supabase/           # Supabase clients
+│   └── react-query/        # React Query hooks
+├── hooks/                  # Custom React hooks
+└── types/                  # TypeScript definitions
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Documentation
+
+- [CLAUDE.md](./CLAUDE.md) - AI/Developer context file
+- [docs/DATABASE.md](./docs/DATABASE.md) - Database schema
+- [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) - Technical architecture
+- [docs/ROADMAP.md](./docs/ROADMAP.md) - Future plans
+
+## User Roles
+
+| Role | Description |
+|------|-------------|
+| Admin | Full system access, user management |
+| PM | Project management, scope items, drawings, reports |
+| Production | Update production progress |
+| Procurement | Manage procurement items |
+| Management | Read-only overview |
+| Client | View projects, approve drawings/materials |
+
+## Key Features
+
+- **Dual-Path Workflow:** Items follow either Production (requires drawing approval) or Procurement (order tracking) paths
+- **Drawing Revisions:** Track drawing versions (A, B, C...) with client feedback
+- **Material Approval:** Client approval workflow for material selections
+- **Progress Reports:** Generate and share reports with photos
+- **Activity Logging:** Full audit trail of all actions
+- **Role-Based Access:** Row Level Security with Supabase RLS
+
+## Scripts
+
+```bash
+npm run dev       # Development server
+npm run build     # Production build
+npm run start     # Start production
+npm run lint      # Run ESLint
+npm run test      # Run tests
+```
+
+## Deployment
+
+The app is configured for deployment on Vercel. Connect your GitHub repository to Vercel for automatic deployments.
+
+## Contributing
+
+1. Create a feature branch
+2. Make changes following existing patterns
+3. Test all user roles
+4. Submit pull request
+
+## License
+
+Proprietary - Formula International

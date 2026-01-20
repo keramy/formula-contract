@@ -156,28 +156,32 @@ export async function getReportDetail(reportId: string): Promise<Report | null> 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data: report, error: reportError } = await supabase
-    .from("reports")
-    .select(`
-      id, project_id, report_type, is_published, published_at,
-      share_with_client, share_internal, created_by, updated_by, created_at, updated_at,
-      creator:users!reports_created_by_fkey(name),
-      updater:users!reports_updated_by_fkey(name)
-    `)
-    .eq("id", reportId)
-    .single();
+  // Fetch report and lines in PARALLEL
+  const [reportResult, linesResult] = await Promise.all([
+    supabase
+      .from("reports")
+      .select(`
+        id, project_id, report_type, is_published, published_at,
+        share_with_client, share_internal, created_by, updated_by, created_at, updated_at,
+        creator:users!reports_created_by_fkey(name),
+        updater:users!reports_updated_by_fkey(name)
+      `)
+      .eq("id", reportId)
+      .single(),
+    supabase
+      .from("report_lines")
+      .select("id, report_id, line_order, title, description, photos, created_at, updated_at")
+      .eq("report_id", reportId)
+      .order("line_order", { ascending: true }),
+  ]);
+
+  const { data: report, error: reportError } = reportResult;
+  const { data: lines, error: linesError } = linesResult;
 
   if (reportError || !report) {
     console.error("Error fetching report:", reportError?.message);
     return null;
   }
-
-  // Fetch report lines
-  const { data: lines, error: linesError } = await supabase
-    .from("report_lines")
-    .select("id, report_id, line_order, title, description, photos, created_at, updated_at")
-    .eq("report_id", reportId)
-    .order("line_order", { ascending: true });
 
   if (linesError) {
     console.error("Error fetching report lines:", linesError.message);

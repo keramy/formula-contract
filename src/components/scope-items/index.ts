@@ -5,3 +5,5 @@ export { DownloadTemplateButton } from "./download-template-button";
 export { ScopeItemImageUpload } from "./scope-item-image-upload";
 export { ExcelImport } from "./excel-import";
 export { ExcelExport } from "./excel-export";
+export { ScopeItemSheet } from "./scope-item-sheet";
+export { ScopeItemAddButton } from "./scope-item-add-button";

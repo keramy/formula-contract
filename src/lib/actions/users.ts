@@ -126,6 +126,110 @@ async function sendWelcomeEmail(
 }
 
 // ============================================================================
+// JWT Metadata Sync
+// ============================================================================
+
+/**
+ * Sync user profile data to Supabase Auth user_metadata (JWT claims)
+ *
+ * This allows middleware to read role/is_active from the JWT token
+ * instead of querying the database on every request.
+ *
+ * IMPORTANT: Call this whenever role or is_active changes!
+ */
+export async function syncUserAuthMetadata(
+  userId: string,
+  data: { role?: string; is_active?: boolean }
+): Promise<ActionResult> {
+  try {
+    const supabase = createAdminClient();
+
+    // Get current metadata to merge with new values
+    const { data: userData, error: getUserError } = await supabase.auth.admin.getUserById(userId);
+
+    if (getUserError || !userData.user) {
+      console.error("Failed to get user for metadata sync:", getUserError);
+      return { success: false, error: "User not found in auth system" };
+    }
+
+    // Merge new data with existing metadata
+    const currentMetadata = userData.user.user_metadata || {};
+    const newMetadata = {
+      ...currentMetadata,
+      ...(data.role !== undefined && { role: data.role }),
+      ...(data.is_active !== undefined && { is_active: data.is_active }),
+      metadata_synced_at: new Date().toISOString(),
+    };
+
+    const { error: updateError } = await supabase.auth.admin.updateUserById(userId, {
+      user_metadata: newMetadata,
+    });
+
+    if (updateError) {
+      console.error("Failed to sync user metadata:", updateError);
+      return { success: false, error: updateError.message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Sync user metadata error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to sync metadata",
+    };
+  }
+}
+
+/**
+ * Bulk sync all users' metadata to JWT claims
+ * Run this once to migrate existing users, or periodically as a safety net
+ */
+export async function syncAllUsersMetadata(): Promise<{
+  success: boolean;
+  synced: number;
+  failed: number;
+  errors: string[];
+}> {
+  const supabase = createAdminClient();
+  const results = { success: true, synced: 0, failed: 0, errors: [] as string[] };
+
+  try {
+    // Get all users from the users table
+    const { data: users, error } = await supabase
+      .from("users")
+      .select("id, role, is_active");
+
+    if (error || !users) {
+      return { ...results, success: false, errors: [error?.message || "Failed to fetch users"] };
+    }
+
+    // Sync each user's metadata
+    for (const user of users) {
+      const syncResult = await syncUserAuthMetadata(user.id, {
+        role: user.role,
+        is_active: user.is_active,
+      });
+
+      if (syncResult.success) {
+        results.synced++;
+      } else {
+        results.failed++;
+        results.errors.push(`${user.id}: ${syncResult.error}`);
+      }
+    }
+
+    results.success = results.failed === 0;
+    return results;
+  } catch (error) {
+    return {
+      ...results,
+      success: false,
+      errors: [error instanceof Error ? error.message : "Unknown error"],
+    };
+  }
+}
+
+// ============================================================================
 // User Management Operations
 // ============================================================================
 
@@ -182,7 +286,9 @@ export async function inviteUser(data: {
       user_metadata: {
         name: sanitizedName,
         role: data.role,
+        is_active: true, // Stored in JWT for middleware to read without DB query
         must_change_password: true, // Force password change on first login
+        metadata_synced_at: new Date().toISOString(),
       },
     });
 
@@ -237,6 +343,7 @@ export async function inviteUser(data: {
 
 /**
  * Update an existing user's profile
+ * Also syncs role to JWT metadata for middleware performance
  */
 export async function updateUser(
   userId: string,
@@ -253,6 +360,7 @@ export async function updateUser(
 
     const supabase = createAdminClient();
 
+    // Update users table
     const { error } = await supabase
       .from("users")
       .update({
@@ -265,6 +373,13 @@ export async function updateUser(
     if (error) {
       console.error("Update user error:", error);
       return { success: false, error: error.message };
+    }
+
+    // Sync role to JWT metadata (allows middleware to skip DB query)
+    const syncResult = await syncUserAuthMetadata(userId, { role: data.role });
+    if (!syncResult.success) {
+      console.warn("Failed to sync user metadata, middleware will fall back to DB:", syncResult.error);
+      // Don't fail the update if metadata sync fails - middleware has fallback
     }
 
     revalidatePath("/users");
@@ -280,7 +395,7 @@ export async function updateUser(
 
 /**
  * Activate or deactivate a user
- * Also bans/unbans in Supabase Auth to fully block login
+ * Also bans/unbans in Supabase Auth and syncs to JWT metadata
  */
 export async function toggleUserActive(
   userId: string,
@@ -300,16 +415,30 @@ export async function toggleUserActive(
       return { success: false, error: error.message };
     }
 
-    // Also ban/unban in Supabase Auth to fully block login
+    // Sync is_active to JWT metadata AND handle ban status in one update
+    // This allows middleware to check is_active from JWT without DB query
+    const { data: userData } = await supabase.auth.admin.getUserById(userId);
+    const currentMetadata = userData?.user?.user_metadata || {};
+
     if (!isActive) {
-      // Ban user for ~100 years (effectively permanent)
+      // Ban user AND update metadata
       await supabase.auth.admin.updateUserById(userId, {
-        ban_duration: "876000h",
+        ban_duration: "876000h", // ~100 years (effectively permanent)
+        user_metadata: {
+          ...currentMetadata,
+          is_active: false,
+          metadata_synced_at: new Date().toISOString(),
+        },
       });
     } else {
-      // Unban user
+      // Unban user AND update metadata
       await supabase.auth.admin.updateUserById(userId, {
         ban_duration: "none",
+        user_metadata: {
+          ...currentMetadata,
+          is_active: true,
+          metadata_synced_at: new Date().toISOString(),
+        },
       });
     }
 

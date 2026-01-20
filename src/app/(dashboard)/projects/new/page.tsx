@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { ProjectForm } from "../project-form";
+import { ProjectWizard } from "./project-wizard";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowLeftIcon } from "lucide-react";
@@ -7,15 +7,22 @@ import { ArrowLeftIcon } from "lucide-react";
 export default async function NewProjectPage() {
   const supabase = await createClient();
 
-  // Fetch clients for dropdown
-  const { data: clients } = await supabase
-    .from("clients")
-    .select("id, company_name")
-    .eq("is_deleted", false)
-    .order("company_name");
+  // Fetch clients and users in parallel
+  const [{ data: clients }, { data: users }] = await Promise.all([
+    supabase
+      .from("clients")
+      .select("id, company_name")
+      .eq("is_deleted", false)
+      .order("company_name"),
+    supabase
+      .from("users")
+      .select("id, name, email, role")
+      .eq("is_active", true)
+      .order("name"),
+  ]);
 
   return (
-    <div className="p-6 max-w-2xl">
+    <div className="p-6 max-w-3xl">
       {/* Page Header */}
       <div className="mb-6">
         <Button variant="ghost" size="sm" asChild className="mb-4 -ml-2">
@@ -28,8 +35,8 @@ export default async function NewProjectPage() {
         <p className="text-muted-foreground">Create a new furniture manufacturing project</p>
       </div>
 
-      {/* Form */}
-      <ProjectForm clients={clients || []} />
+      {/* Multi-Step Wizard */}
+      <ProjectWizard clients={clients || []} users={users || []} />
     </div>
   );
 }

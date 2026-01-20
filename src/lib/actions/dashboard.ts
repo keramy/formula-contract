@@ -1,0 +1,404 @@
+"use server";
+
+import { createClient } from "@/lib/supabase/server";
+
+export interface TaskSummary {
+  pendingMaterialApprovals: number;
+  rejectedDrawings: number;
+  draftReports: number;
+  overdueMilestones: number;
+  total: number;
+}
+
+export interface AtRiskProject {
+  id: string;
+  name: string;
+  project_code: string;
+  client_name: string | null;
+  overdueCount: number;
+  rejectedDrawingsCount: number;
+  riskLevel: "high" | "medium" | "low";
+}
+
+export interface PendingApproval {
+  id: string;
+  type: "drawing" | "material";
+  title: string;
+  projectId: string;
+  projectName: string;
+  projectCode: string;
+  sentAt: string;
+}
+
+export interface ClientProjectProgress {
+  id: string;
+  name: string;
+  project_code: string;
+  status: string;
+  progress: number;
+  totalItems: number;
+  completedItems: number;
+  pendingApprovals: number;
+}
+
+/**
+ * Get aggregated task counts for PM/Admin dashboards
+ * Shows what needs attention right now
+ */
+export async function getMyTasks(): Promise<TaskSummary> {
+  const supabase = await createClient();
+  const now = new Date().toISOString();
+
+  // Parallel fetch for all task counts
+  const [
+    { count: pendingMaterialApprovals },
+    { count: rejectedDrawings },
+    { count: draftReports },
+    { count: overdueMilestones },
+  ] = await Promise.all([
+    // Materials pending client approval (status = sent_to_client)
+    supabase
+      .from("materials")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "sent_to_client")
+      .eq("is_deleted", false),
+    // Drawings rejected (need revision)
+    supabase
+      .from("drawings")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "rejected"),
+    // Reports in draft status
+    supabase
+      .from("reports")
+      .select("*", { count: "exact", head: true })
+      .eq("is_published", false),
+    // Overdue milestones (due_date < now and not completed)
+    supabase
+      .from("milestones")
+      .select("*", { count: "exact", head: true })
+      .eq("is_completed", false)
+      .lt("due_date", now),
+  ]);
+
+  const total =
+    (pendingMaterialApprovals || 0) +
+    (rejectedDrawings || 0) +
+    (draftReports || 0) +
+    (overdueMilestones || 0);
+
+  return {
+    pendingMaterialApprovals: pendingMaterialApprovals || 0,
+    rejectedDrawings: rejectedDrawings || 0,
+    draftReports: draftReports || 0,
+    overdueMilestones: overdueMilestones || 0,
+    total,
+  };
+}
+
+/**
+ * Get projects that have risk indicators
+ * Used for PM/Admin dashboards to prioritize attention
+ */
+export async function getAtRiskProjects(): Promise<AtRiskProject[]> {
+  const supabase = await createClient();
+  const now = new Date().toISOString();
+
+  // Get active projects with their client info
+  const { data: projects } = await supabase
+    .from("projects")
+    .select("id, name, project_code, client_id")
+    .eq("is_deleted", false)
+    .in("status", ["active", "tender"])
+    .limit(50);
+
+  if (!projects || projects.length === 0) {
+    return [];
+  }
+
+  const projectIds = projects.map((p) => p.id);
+  const clientIds = projects.map((p) => p.client_id).filter(Boolean) as string[];
+
+  // Get client names separately
+  const { data: clients } = clientIds.length > 0
+    ? await supabase
+        .from("clients")
+        .select("id, company_name")
+        .in("id", clientIds)
+    : { data: [] };
+
+  const clientMap = new Map(clients?.map(c => [c.id, c.company_name]) || []);
+
+  // Get risk data in parallel
+  const [
+    { data: overdueMilestones },
+    { data: rejectedDrawings },
+  ] = await Promise.all([
+    // Overdue milestones per project
+    supabase
+      .from("milestones")
+      .select("project_id")
+      .in("project_id", projectIds)
+      .eq("is_completed", false)
+      .lt("due_date", now),
+    // Rejected drawings - get via scope_items
+    supabase
+      .from("drawings")
+      .select("item_id")
+      .eq("status", "rejected"),
+  ]);
+
+  // Get project_ids for rejected drawings via scope_items
+  const rejectedItemIds = rejectedDrawings?.map(d => d.item_id) || [];
+  let rejectedByProject = new Map<string, number>();
+
+  if (rejectedItemIds.length > 0) {
+    const { data: scopeItems } = await supabase
+      .from("scope_items")
+      .select("id, project_id")
+      .in("id", rejectedItemIds);
+
+    scopeItems?.forEach((item) => {
+      const count = rejectedByProject.get(item.project_id) || 0;
+      rejectedByProject.set(item.project_id, count + 1);
+    });
+  }
+
+  // Count overdue milestones per project
+  const overdueByProject = new Map<string, number>();
+  overdueMilestones?.forEach((milestone) => {
+    const count = overdueByProject.get(milestone.project_id) || 0;
+    overdueByProject.set(milestone.project_id, count + 1);
+  });
+
+  // Build at-risk projects list
+  const atRiskProjects: AtRiskProject[] = [];
+
+  for (const project of projects) {
+    const overdueCount = overdueByProject.get(project.id) || 0;
+    const rejectedCount = rejectedByProject.get(project.id) || 0;
+
+    // Only include projects with actual risk indicators
+    if (overdueCount > 0 || rejectedCount > 0) {
+      // Determine risk level
+      let riskLevel: "high" | "medium" | "low" = "low";
+      if (overdueCount >= 5 || rejectedCount >= 3) {
+        riskLevel = "high";
+      } else if (overdueCount >= 2 || rejectedCount >= 1) {
+        riskLevel = "medium";
+      }
+
+      atRiskProjects.push({
+        id: project.id,
+        name: project.name,
+        project_code: project.project_code,
+        client_name: project.client_id ? clientMap.get(project.client_id) || null : null,
+        overdueCount,
+        rejectedDrawingsCount: rejectedCount,
+        riskLevel,
+      });
+    }
+  }
+
+  // Sort by risk level (high first) then by overdue count
+  return atRiskProjects.sort((a, b) => {
+    const riskOrder = { high: 0, medium: 1, low: 2 };
+    if (riskOrder[a.riskLevel] !== riskOrder[b.riskLevel]) {
+      return riskOrder[a.riskLevel] - riskOrder[b.riskLevel];
+    }
+    return b.overdueCount - a.overdueCount;
+  });
+}
+
+/**
+ * Get pending approvals for client dashboard
+ * Shows drawings/materials awaiting client response
+ */
+export async function getPendingApprovals(userId: string): Promise<PendingApproval[]> {
+  const supabase = await createClient();
+
+  // Get projects assigned to this user (client)
+  const { data: assignments } = await supabase
+    .from("project_assignments")
+    .select("project_id")
+    .eq("user_id", userId);
+
+  if (!assignments || assignments.length === 0) {
+    return [];
+  }
+
+  const projectIds = assignments.map((a) => a.project_id);
+
+  // Get project info
+  const { data: projects } = await supabase
+    .from("projects")
+    .select("id, name, project_code")
+    .in("id", projectIds);
+
+  const projectMap = new Map(projects?.map(p => [p.id, { name: p.name, code: p.project_code }]) || []);
+
+  // Get pending drawings via scope_items
+  const { data: scopeItems } = await supabase
+    .from("scope_items")
+    .select("id, project_id, name")
+    .in("project_id", projectIds)
+    .eq("is_deleted", false);
+
+  const scopeItemIds = scopeItems?.map(s => s.id) || [];
+  const scopeItemMap = new Map(scopeItems?.map(s => [s.id, { project_id: s.project_id, name: s.name }]) || []);
+
+  // Get drawings with sent_to_client status
+  const { data: pendingDrawings } = scopeItemIds.length > 0
+    ? await supabase
+        .from("drawings")
+        .select("id, item_id, sent_to_client_at")
+        .eq("status", "sent_to_client")
+        .in("item_id", scopeItemIds)
+        .order("sent_to_client_at", { ascending: false })
+        .limit(10)
+    : { data: [] };
+
+  // Get pending materials (sent_to_client status)
+  const { data: pendingMaterials } = await supabase
+    .from("materials")
+    .select("id, name, project_id, sent_to_client_at")
+    .eq("status", "sent_to_client")
+    .in("project_id", projectIds)
+    .eq("is_deleted", false)
+    .order("sent_to_client_at", { ascending: false })
+    .limit(10);
+
+  const approvals: PendingApproval[] = [];
+
+  // Map drawings
+  if (pendingDrawings) {
+    for (const drawing of pendingDrawings) {
+      const scopeItem = scopeItemMap.get(drawing.item_id);
+      if (scopeItem) {
+        const project = projectMap.get(scopeItem.project_id);
+        if (project) {
+          approvals.push({
+            id: drawing.id,
+            type: "drawing",
+            title: scopeItem.name || "Drawing",
+            projectId: scopeItem.project_id,
+            projectName: project.name,
+            projectCode: project.code,
+            sentAt: drawing.sent_to_client_at || new Date().toISOString(),
+          });
+        }
+      }
+    }
+  }
+
+  // Map materials
+  if (pendingMaterials) {
+    for (const material of pendingMaterials) {
+      const project = projectMap.get(material.project_id);
+      if (project) {
+        approvals.push({
+          id: material.id,
+          type: "material",
+          title: material.name,
+          projectId: material.project_id,
+          projectName: project.name,
+          projectCode: project.code,
+          sentAt: material.sent_to_client_at || new Date().toISOString(),
+        });
+      }
+    }
+  }
+
+  // Sort by date
+  return approvals.sort(
+    (a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime()
+  );
+}
+
+/**
+ * Get project progress for client dashboard
+ * Shows simplified view of client's assigned projects
+ */
+export async function getClientProjectProgress(userId: string): Promise<ClientProjectProgress[]> {
+  const supabase = await createClient();
+
+  // Get projects assigned to this user
+  const { data: assignments } = await supabase
+    .from("project_assignments")
+    .select("project_id")
+    .eq("user_id", userId);
+
+  if (!assignments || assignments.length === 0) {
+    return [];
+  }
+
+  const projectIds = assignments.map((a) => a.project_id);
+
+  // Get projects and scope items for progress calculation
+  const [{ data: projects }, { data: scopeItems }] = await Promise.all([
+    supabase
+      .from("projects")
+      .select("id, name, project_code, status")
+      .in("id", projectIds)
+      .eq("is_deleted", false)
+      .order("updated_at", { ascending: false }),
+    supabase
+      .from("scope_items")
+      .select("id, project_id, status")
+      .in("project_id", projectIds)
+      .eq("is_deleted", false),
+  ]);
+
+  if (!projects) {
+    return [];
+  }
+
+  // Get scope item IDs to check for pending drawings
+  const scopeItemIds = scopeItems?.map(s => s.id) || [];
+
+  // Get pending drawings count
+  const { data: pendingDrawings } = scopeItemIds.length > 0
+    ? await supabase
+        .from("drawings")
+        .select("item_id")
+        .eq("status", "sent_to_client")
+        .in("item_id", scopeItemIds)
+    : { data: [] };
+
+  // Calculate progress per project
+  const progressMap = new Map<string, { total: number; completed: number }>();
+  scopeItems?.forEach((item) => {
+    const stats = progressMap.get(item.project_id) || { total: 0, completed: 0 };
+    stats.total++;
+    if (item.status === "complete") {
+      stats.completed++;
+    }
+    progressMap.set(item.project_id, stats);
+  });
+
+  // Map pending drawings to projects via scope_items
+  const scopeItemToProject = new Map(scopeItems?.map(s => [s.id, s.project_id]) || []);
+  const pendingApprovalMap = new Map<string, number>();
+  pendingDrawings?.forEach((drawing) => {
+    const projectId = scopeItemToProject.get(drawing.item_id);
+    if (projectId) {
+      const count = pendingApprovalMap.get(projectId) || 0;
+      pendingApprovalMap.set(projectId, count + 1);
+    }
+  });
+
+  return projects.map((project) => {
+    const stats = progressMap.get(project.id) || { total: 0, completed: 0 };
+    const progress = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
+
+    return {
+      id: project.id,
+      name: project.name,
+      project_code: project.project_code,
+      status: project.status,
+      progress,
+      totalItems: stats.total,
+      completedItems: stats.completed,
+      pendingApprovals: pendingApprovalMap.get(project.id) || 0,
+    };
+  });
+}

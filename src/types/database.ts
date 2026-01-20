@@ -720,6 +720,36 @@ export interface Database {
         };
         Relationships: [];
       };
+      drafts: {
+        Row: {
+          id: string;
+          user_id: string;
+          entity_type: string;
+          entity_id: string | null;
+          data: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          entity_type: string;
+          entity_id?: string | null;
+          data: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          entity_type?: string;
+          entity_id?: string | null;
+          data?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {};
     Functions: {};
@@ -753,6 +783,7 @@ export type ReportLine = Database["public"]["Tables"]["report_lines"]["Row"];
 export type ReportShare = Database["public"]["Tables"]["report_shares"]["Row"];
 export type Notification = Database["public"]["Tables"]["notifications"]["Row"];
 export type ActivityLog = Database["public"]["Tables"]["activity_log"]["Row"];
+export type Draft = Database["public"]["Tables"]["drafts"]["Row"];
 
 // Insert types
 export type UserInsert = Database["public"]["Tables"]["users"]["Insert"];

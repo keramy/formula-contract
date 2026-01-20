@@ -145,21 +145,112 @@ export default async function ScopeItemDetailPage({
   const { id: projectId, itemId } = await params;
   const supabase = await createClient();
 
-  // Get current user and role
-  const { data: { user } } = await supabase.auth.getUser();
-  let userRole = "pm";
-  if (user) {
-    const { data: profile } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-    if (profile) {
-      userRole = profile.role;
-    }
+  // ============================================================================
+  // PHASE 1: Run all independent queries in parallel
+  // ============================================================================
+  const [
+    { data: { user } },
+    { data: scopeItemData, error: scopeItemError },
+    { data: childrenData },
+    { data: itemMaterialsData },
+    { data: allMaterialsData },
+    { data: drawingData },
+  ] = await Promise.all([
+    // Auth user
+    supabase.auth.getUser(),
+    // Scope item with project info
+    supabase
+      .from("scope_items")
+      .select(`
+        id, item_code, name, description, width, depth, height, unit, quantity,
+        unit_cost, initial_total_cost, unit_sales_price, total_sales_price,
+        item_path, status, notes, production_percentage,
+        procurement_status, is_installed, installed_at, images, parent_id,
+        project:projects(id, name, project_code, currency)
+      `)
+      .eq("id", itemId)
+      .eq("project_id", projectId)
+      .eq("is_deleted", false)
+      .single(),
+    // Child items
+    supabase
+      .from("scope_items")
+      .select("id, item_code, name, item_path, status")
+      .eq("parent_id", itemId)
+      .eq("is_deleted", false)
+      .order("item_code", { ascending: true }),
+    // Item materials
+    supabase
+      .from("item_materials")
+      .select("material_id")
+      .eq("item_id", itemId),
+    // All materials in project
+    supabase
+      .from("materials")
+      .select("id, material_code, name, specification, supplier, images, status")
+      .eq("project_id", projectId)
+      .eq("is_deleted", false)
+      .order("material_code"),
+    // Drawing (fetch regardless - will be null if not production or doesn't exist)
+    supabase
+      .from("drawings")
+      .select(`
+        id, status, current_revision, sent_to_client_at, client_response_at,
+        client_comments, pm_override, pm_override_reason,
+        approved_by:users!drawings_approved_by_fkey(name),
+        pm_override_by:users!drawings_pm_override_by_fkey(name)
+      `)
+      .eq("item_id", itemId)
+      .single(),
+  ]);
+
+  const scopeItem = scopeItemData as ScopeItem | null;
+
+  if (scopeItemError || !scopeItem) {
+    notFound();
   }
 
-  // For client users, verify they have access to this project
+  const childItems = (childrenData || []) as RelatedItem[];
+  const drawing = (scopeItem.item_path === "production" ? drawingData : null) as Drawing | null;
+
+  // ============================================================================
+  // PHASE 2: Queries that depend on Phase 1 results (run in parallel)
+  // ============================================================================
+  const [userRoleResult, parentItemResult, revisionsResult] = await Promise.all([
+    // User role (depends on user.id)
+    user
+      ? supabase.from("users").select("role").eq("id", user.id).single()
+      : Promise.resolve({ data: null }),
+    // Parent item (depends on scopeItem.parent_id)
+    scopeItem.parent_id
+      ? supabase
+          .from("scope_items")
+          .select("id, item_code, name, item_path, status")
+          .eq("id", scopeItem.parent_id)
+          .eq("is_deleted", false)
+          .single()
+      : Promise.resolve({ data: null }),
+    // Drawing revisions (depends on drawing.id)
+    drawing
+      ? supabase
+          .from("drawing_revisions")
+          .select(`
+            id, revision, file_url, file_name, file_size,
+            cad_file_url, cad_file_name, notes, created_at,
+            uploaded_by
+          `)
+          .eq("drawing_id", drawing.id)
+          .order("created_at", { ascending: false })
+      : Promise.resolve({ data: null }),
+  ]);
+
+  const userRole = userRoleResult.data?.role || "pm";
+  const parentItem = (parentItemResult.data as RelatedItem | null);
+  const revisions = (revisionsResult.data || []) as DrawingRevision[];
+
+  // ============================================================================
+  // PHASE 3: Client access check (depends on userRole)
+  // ============================================================================
   if (userRole === "client" && user) {
     const { data: assignment } = await supabase
       .from("project_assignments")
@@ -175,108 +266,15 @@ export default async function ScopeItemDetailPage({
 
   // Role-based permissions
   const canEdit = ["admin", "pm"].includes(userRole);
-  const canUploadDrawings = ["admin", "pm", "production", "client"].includes(userRole); // Clients can upload drawings
-  const canApproveDrawings = ["admin", "pm", "client"].includes(userRole); // Clients can approve drawings
+  const canUploadDrawings = ["admin", "pm", "production", "client"].includes(userRole);
+  const canApproveDrawings = ["admin", "pm", "client"].includes(userRole);
   const canEditProgress = ["admin", "pm", "production"].includes(userRole);
   const canManageMaterials = ["admin", "pm"].includes(userRole);
   const canToggleInstallation = ["admin", "pm"].includes(userRole);
   const canEditProcurement = ["admin", "pm", "procurement"].includes(userRole);
 
-  // Fetch scope item with project info
-  const { data, error } = await supabase
-    .from("scope_items")
-    .select(`
-      id, item_code, name, description, width, depth, height, unit, quantity,
-      unit_cost, initial_total_cost, unit_sales_price, total_sales_price,
-      item_path, status, notes, production_percentage,
-      procurement_status, is_installed, installed_at, images, parent_id,
-      project:projects(id, name, project_code, currency)
-    `)
-    .eq("id", itemId)
-    .eq("project_id", projectId)
-    .eq("is_deleted", false)
-    .single();
-
-  const scopeItem = data as ScopeItem | null;
-
-  if (error || !scopeItem) {
-    notFound();
-  }
-
-  // Fetch parent item if this is a child (has parent_id)
-  let parentItem: RelatedItem | null = null;
-  if (scopeItem.parent_id) {
-    const { data: parentData } = await supabase
-      .from("scope_items")
-      .select("id, item_code, name, item_path, status")
-      .eq("id", scopeItem.parent_id)
-      .eq("is_deleted", false)
-      .single();
-
-    if (parentData) {
-      parentItem = parentData as RelatedItem;
-    }
-  }
-
-  // Fetch child items if this item has children
-  const { data: childrenData } = await supabase
-    .from("scope_items")
-    .select("id, item_code, name, item_path, status")
-    .eq("parent_id", itemId)
-    .eq("is_deleted", false)
-    .order("item_code", { ascending: true });
-
-  const childItems = (childrenData || []) as RelatedItem[];
-
-  // Fetch drawing and revisions if this is a production item
-  let drawing: Drawing | null = null;
-  let revisions: DrawingRevision[] = [];
-
-  if (scopeItem.item_path === "production") {
-    const { data: drawingData } = await supabase
-      .from("drawings")
-      .select(`
-        id, status, current_revision, sent_to_client_at, client_response_at,
-        client_comments, pm_override, pm_override_reason,
-        approved_by:users!drawings_approved_by_fkey(name),
-        pm_override_by:users!drawings_pm_override_by_fkey(name)
-      `)
-      .eq("item_id", itemId)
-      .single();
-
-    drawing = drawingData as Drawing | null;
-
-    if (drawing) {
-      const { data: revisionsData } = await supabase
-        .from("drawing_revisions")
-        .select(`
-          id, revision, file_url, file_name, file_size,
-          cad_file_url, cad_file_name, notes, created_at,
-          uploaded_by
-        `)
-        .eq("drawing_id", drawing.id)
-        .order("created_at", { ascending: false });
-
-      revisions = (revisionsData || []) as DrawingRevision[];
-    }
-  }
-
-  // Fetch materials assigned to this item
-  const { data: itemMaterialsData } = await supabase
-    .from("item_materials")
-    .select("material_id")
-    .eq("item_id", itemId);
-
+  // Process materials data
   const assignedMaterialIds = (itemMaterialsData || []).map((im) => im.material_id);
-
-  // Fetch all materials in this project
-  const { data: allMaterialsData } = await supabase
-    .from("materials")
-    .select("id, material_code, name, specification, supplier, images, status")
-    .eq("project_id", projectId)
-    .eq("is_deleted", false)
-    .order("material_code");
-
   const allMaterials = (allMaterialsData || []) as Material[];
 
   // Split into assigned and available

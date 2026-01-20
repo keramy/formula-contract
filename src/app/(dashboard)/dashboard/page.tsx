@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getUserProfileFromJWT } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { GlassCard, GradientIcon, StatusBadge } from "@/components/ui/ui-helpers";
@@ -15,6 +15,11 @@ import {
 } from "lucide-react";
 import { DashboardHeader } from "./dashboard-header";
 import { getCachedDashboardStats, getCachedRecentProjects } from "@/lib/cache";
+import { getMyTasks, getAtRiskProjects, getPendingApprovals, getClientProjectProgress } from "@/lib/actions/dashboard";
+import { MyTasksWidget } from "@/components/dashboard/my-tasks-widget";
+import { AtRiskProjects } from "@/components/dashboard/at-risk-projects";
+import { PendingApprovalsWidget } from "@/components/dashboard/pending-approvals-widget";
+import { ClientProjectProgressWidget } from "@/components/dashboard/client-project-progress";
 
 // Status configuration for badges
 const statusConfig: Record<string, { variant: "info" | "success" | "warning" | "default" | "danger"; label: string }> = {
@@ -33,59 +38,81 @@ export default async function DashboardPage() {
   // This dramatically speeds up the slow COUNT queries
   const supabase = await createClient();
 
-  // Run user auth and cached stats in parallel
+  // First get auth to determine role
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // PERFORMANCE: Get user profile from JWT metadata (avoids ~3s DB query!)
+  let userId = user?.id || "";
+  let userName = "User";
+  let userRole = "pm";
+
+  if (user) {
+    const profile = await getUserProfileFromJWT(user, supabase);
+    userName = profile.name;
+    userRole = profile.role;
+  }
+
+  const isClient = userRole === "client";
+  const isPMOrAdmin = ["admin", "pm"].includes(userRole);
+
+  // Run role-specific data fetches in parallel
   const [
-    authResult,
     cachedStats,
     recentProjects,
+    tasksData,
+    atRiskData,
+    pendingApprovalsData,
+    clientProjectsData,
   ] = await Promise.all([
-    // 1. User auth + profile (not cached - user-specific)
-    (async () => {
-      const start = performance.now();
-      const { data: { user } } = await supabase.auth.getUser();
-      let userName = "User";
-      let userRole = "pm";
-
-      if (user) {
-        const { data: profile } = await supabase
-          .from("users")
-          .select("name, role")
-          .eq("id", user.id)
-          .single();
-        if (profile) {
-          userName = profile.name || "User";
-          userRole = profile.role;
-        }
-      }
-      console.log(`  👤 Auth + Profile: ${(performance.now() - start).toFixed(0)}ms`);
-      return { userName, userRole };
-    })(),
-    // 2. Cached dashboard stats (60s cache)
-    (async () => {
-      const start = performance.now();
-      const stats = await getCachedDashboardStats();
-      console.log(`  📊 Cached Stats: ${(performance.now() - start).toFixed(0)}ms`);
-      return stats;
-    })(),
-    // 3. Cached recent projects (60s cache)
-    (async () => {
-      const start = performance.now();
-      const projects = await getCachedRecentProjects();
-      console.log(`  📋 Cached Recent: ${(performance.now() - start).toFixed(0)}ms`);
-      return projects;
-    })(),
+    // Cached dashboard stats (60s cache) - PM/Admin only
+    isPMOrAdmin ? getCachedDashboardStats() : Promise.resolve({ projectCounts: { total: 0, tender: 0, active: 0, on_hold: 0, completed: 0, cancelled: 0 }, clientCount: 0, userCount: 0 }),
+    // Cached recent projects (60s cache) - PM/Admin only
+    isPMOrAdmin ? getCachedRecentProjects() : Promise.resolve([]),
+    // My Tasks - PM/Admin only
+    isPMOrAdmin ? getMyTasks() : Promise.resolve({ pendingMaterialApprovals: 0, rejectedDrawings: 0, draftReports: 0, overdueMilestones: 0, total: 0 }),
+    // At-Risk Projects - PM/Admin only
+    isPMOrAdmin ? getAtRiskProjects() : Promise.resolve([]),
+    // Pending Approvals - Client only
+    isClient ? getPendingApprovals(userId) : Promise.resolve([]),
+    // Client Project Progress - Client only
+    isClient ? getClientProjectProgress(userId) : Promise.resolve([]),
   ]);
 
-  const { userName, userRole } = authResult;
   const { projectCounts, clientCount, userCount } = cachedStats;
-
-  // Recent projects already have client data merged from cache
   const projectsWithClients = recentProjects;
 
   console.log(`📊 [PROFILE] Dashboard Total: ${(performance.now() - pageStart).toFixed(0)}ms\n`);
 
-  const canCreateProject = ["admin", "pm"].includes(userRole);
+  const canCreateProject = isPMOrAdmin;
 
+  // ============================================================================
+  // CLIENT DASHBOARD - Simplified view for clients
+  // ============================================================================
+  if (isClient) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50/50 via-white to-gray-50/50">
+        <div className="p-6 space-y-6">
+          {/* Header */}
+          <DashboardHeader userName={userName} />
+
+          {/* Client Project Progress Cards */}
+          <div className="grid gap-6">
+            <ClientProjectProgressWidget projects={clientProjectsData} />
+          </div>
+
+          {/* Pending Approvals & Activity */}
+          <div className="grid gap-6 lg:grid-cols-2">
+            <PendingApprovalsWidget approvals={pendingApprovalsData} />
+            <ActivityFeed limit={8} maxHeight="350px" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // PM/ADMIN DASHBOARD - Full mission control view
+  // ============================================================================
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50/50 via-white to-gray-50/50">
       <div className="p-6 space-y-6">
@@ -150,6 +177,12 @@ export default async function DashboardPage() {
               </div>
             </CardContent>
           </GlassCard>
+        </div>
+
+        {/* Tasks & At-Risk Projects Row */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          <MyTasksWidget tasks={tasksData} />
+          <AtRiskProjects projects={atRiskData} />
         </div>
 
         {/* Main Content Grid */}

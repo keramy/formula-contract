@@ -126,27 +126,30 @@ export async function getScopeItem(
       return { success: false, error: "Not authenticated" };
     }
 
-    // First get the scope item
-    const { data: scopeItem, error: scopeError } = await supabase
-      .from("scope_items")
-      .select("*")
-      .eq("id", itemId)
-      .eq("is_deleted", false)
-      .single();
+    // Fetch scope item and materials in PARALLEL
+    const [scopeItemResult, itemMaterialsResult] = await Promise.all([
+      supabase
+        .from("scope_items")
+        .select("*")
+        .eq("id", itemId)
+        .eq("is_deleted", false)
+        .single(),
+      supabase
+        .from("item_materials")
+        .select(`
+          material_id,
+          materials(id, material_code, name, status)
+        `)
+        .eq("item_id", itemId),
+    ]);
+
+    const { data: scopeItem, error: scopeError } = scopeItemResult;
+    const { data: itemMaterials, error: materialsError } = itemMaterialsResult;
 
     if (scopeError) {
       console.error("Failed to fetch scope item:", scopeError);
       return { success: false, error: scopeError.message };
     }
-
-    // Then get the materials
-    const { data: itemMaterials, error: materialsError } = await supabase
-      .from("item_materials")
-      .select(`
-        material_id,
-        materials(id, material_code, name, status)
-      `)
-      .eq("item_id", itemId);
 
     if (materialsError) {
       console.error("Failed to fetch item materials:", materialsError);
@@ -771,12 +774,22 @@ export async function getActualTotalCost(
       return { success: false, error: "Not authenticated" };
     }
 
-    // Get children with cost info
-    const { data: children, error: childrenError } = await supabase
-      .from("scope_items")
-      .select("unit_cost, quantity")
-      .eq("parent_id", itemId)
-      .eq("is_deleted", false);
+    // Fetch children AND own item in PARALLEL (we'll use one or the other)
+    const [childrenResult, itemResult] = await Promise.all([
+      supabase
+        .from("scope_items")
+        .select("unit_cost, quantity")
+        .eq("parent_id", itemId)
+        .eq("is_deleted", false),
+      supabase
+        .from("scope_items")
+        .select("unit_cost, quantity")
+        .eq("id", itemId)
+        .single(),
+    ]);
+
+    const { data: children, error: childrenError } = childrenResult;
+    const { data: item, error: itemError } = itemResult;
 
     if (childrenError) {
       console.error("Failed to fetch children for cost calculation:", childrenError);
@@ -792,13 +805,7 @@ export async function getActualTotalCost(
       return { success: true, data: { actualCost: totalCost, hasChildren: true } };
     }
 
-    // No children - get own cost
-    const { data: item, error: itemError } = await supabase
-      .from("scope_items")
-      .select("unit_cost, quantity")
-      .eq("id", itemId)
-      .single();
-
+    // No children - use own cost
     if (itemError || !item) {
       console.error("Failed to fetch item for cost calculation:", itemError);
       return { success: false, error: itemError?.message || "Item not found" };

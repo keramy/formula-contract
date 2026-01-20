@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -54,7 +55,12 @@ const statusLabels: Record<string, string> = {
   rejected: "Rejected",
 };
 
-export function MaterialCard({
+// ============================================================================
+// PERFORMANCE: Wrapped with React.memo to prevent unnecessary re-renders
+// Combined with useCallback handlers in parent, this ensures MaterialCard
+// only re-renders when its specific props actually change
+// ============================================================================
+export const MaterialCard = memo(function MaterialCard({
   material,
   onEdit,
   onDelete,
@@ -183,4 +189,4 @@ export function MaterialCard({
       </div>
     </Card>
   );
-}
+});

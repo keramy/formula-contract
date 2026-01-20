@@ -1,10 +1,7 @@
 import { Suspense } from "react";
-import { createClient } from "@/lib/supabase/server";
-import Link from "next/link";
-import { ProjectsTable } from "./projects-table";
-import { ProjectsFilter } from "./projects-filter";
+import { createClient, getUserRoleFromJWT } from "@/lib/supabase/server";
+import { ProjectsListClient } from "./projects-list-client";
 import { ProjectsPageHeader } from "./projects-page-header";
-import type { ProjectStatus } from "@/types/database";
 
 interface Project {
   id: string;
@@ -19,58 +16,65 @@ interface Project {
   completedItems?: number;
 }
 
-export default async function ProjectsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ status?: string; search?: string }>;
-}) {
-  const params = await searchParams;
+export default async function ProjectsPage() {
   const supabase = await createClient();
 
-  // Get current user role
+  // ============================================================================
+  // PHASE 1: Get auth user and role from JWT (avoids ~3s DB query!)
+  // ============================================================================
   const { data: { user } } = await supabase.auth.getUser();
-  let userRole = "pm";
-  let userId = "";
-  if (user) {
-    userId = user.id;
-    const { data: profile } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-    if (profile) {
-      userRole = profile.role;
-    }
-  }
+  const userId = user?.id || "";
 
-  // Check if user can create projects
+  // PERFORMANCE: Get role from JWT metadata instead of DB
+  const userRole = user ? await getUserRoleFromJWT(user, supabase) : "pm";
+
+  // ============================================================================
+  // PHASE 2: Fetch assignments, projects, scope items, and clients in PARALLEL
+  // (Note: removed profile query - now using JWT metadata above)
+  // ============================================================================
+  const [
+    { data: assignments },
+    { data: allProjects, error },
+    { data: allScopeItems },
+    { data: allClients },
+  ] = await Promise.all([
+    // Project assignments (for client filtering)
+    user
+      ? supabase.from("project_assignments").select("project_id").eq("user_id", user.id)
+      : Promise.resolve({ data: null }),
+    // All projects with client info
+    supabase
+      .from("projects")
+      .select(`*, client:clients(id, company_name)`)
+      .eq("is_deleted", false)
+      .order("created_at", { ascending: false }),
+    // All scope items for progress calculation
+    supabase
+      .from("scope_items")
+      .select("project_id, status")
+      .eq("is_deleted", false),
+    // All clients for filter dropdown
+    supabase
+      .from("clients")
+      .select("id, company_name")
+      .order("company_name", { ascending: true }),
+  ]);
+
   const canCreateProject = ["admin", "pm"].includes(userRole);
+  const assignedProjectIds = (assignments || []).map(a => a.project_id);
 
-  // For client users, get their assigned project IDs first
-  let assignedProjectIds: string[] = [];
-  if (userRole === "client" && userId) {
-    const { data: assignments } = await supabase
-      .from("project_assignments")
-      .select("project_id")
-      .eq("user_id", userId);
-
-    assignedProjectIds = (assignments || []).map(a => a.project_id);
+  if (error) {
+    console.error("Error fetching projects:", error);
   }
 
-  // Build query
-  let query = supabase
-    .from("projects")
-    .select(`
-      *,
-      client:clients(id, company_name)
-    `)
-    .eq("is_deleted", false)
-    .order("created_at", { ascending: false });
+  // ============================================================================
+  // Filter and process data (client-side - fast)
+  // ============================================================================
 
-  // For clients, filter to only assigned projects
+  // For client users, filter to only assigned projects
+  let projectsData = (allProjects || []) as unknown as Project[];
   if (userRole === "client") {
     if (assignedProjectIds.length === 0) {
-      // No assigned projects, return empty array
       return (
         <div className="p-6">
           <ProjectsPageHeader
@@ -84,67 +88,46 @@ export default async function ProjectsPage({
         </div>
       );
     }
-    query = query.in("id", assignedProjectIds);
+    projectsData = projectsData.filter(p => assignedProjectIds.includes(p.id));
   }
 
-  // Apply filters
-  if (params.status && params.status !== "all") {
-    query = query.eq("status", params.status as ProjectStatus);
-  }
+  // Calculate progress for each project from scope items
+  let projects = projectsData;
+  if (allScopeItems && projects.length > 0) {
+    const projectIds = new Set(projects.map(p => p.id));
 
-  if (params.search) {
-    query = query.or(`name.ilike.%${params.search}%,project_code.ilike.%${params.search}%`);
-  }
+    // Group items by project and calculate progress
+    const progressMap = new Map<string, { total: number; completed: number }>();
 
-  const { data, error } = await query;
-  let projects = (data || []) as unknown as Project[];
+    for (const item of allScopeItems) {
+      if (!projectIds.has(item.project_id)) continue; // Skip items from other projects
 
-  if (error) {
-    console.error("Error fetching projects:", error);
-  }
-
-  // Fetch scope items to calculate progress for each project
-  if (projects.length > 0) {
-    const projectIds = projects.map(p => p.id);
-
-    const { data: scopeItemsData } = await supabase
-      .from("scope_items")
-      .select("project_id, status")
-      .in("project_id", projectIds)
-      .eq("is_deleted", false);
-
-    if (scopeItemsData) {
-      // Group items by project and calculate progress
-      const progressMap = new Map<string, { total: number; completed: number }>();
-
-      for (const item of scopeItemsData) {
-        const existing = progressMap.get(item.project_id) || { total: 0, completed: 0 };
-        existing.total++;
-        if (item.status === "complete") {
-          existing.completed++;
-        }
-        progressMap.set(item.project_id, existing);
+      const existing = progressMap.get(item.project_id) || { total: 0, completed: 0 };
+      existing.total++;
+      if (item.status === "complete") {
+        existing.completed++;
       }
+      progressMap.set(item.project_id, existing);
+    }
 
-      // Add progress data to projects
-      projects = projects.map(project => {
-        const stats = progressMap.get(project.id);
-        if (stats && stats.total > 0) {
-          return {
-            ...project,
-            progress: Math.round((stats.completed / stats.total) * 100),
-            totalItems: stats.total,
-            completedItems: stats.completed,
-          };
-        }
+    // Add progress data to projects
+    projects = projects.map(project => {
+      const stats = progressMap.get(project.id);
+      if (stats && stats.total > 0) {
         return {
           ...project,
-          progress: 0,
-          totalItems: 0,
-          completedItems: 0,
+          progress: Math.round((stats.completed / stats.total) * 100),
+          totalItems: stats.total,
+          completedItems: stats.completed,
         };
-      });
-    }
+      }
+      return {
+        ...project,
+        progress: 0,
+        totalItems: 0,
+        completedItems: 0,
+      };
+    });
   }
 
   return (
@@ -158,12 +141,9 @@ export default async function ProjectsPage({
         canCreateProject={canCreateProject}
       />
 
-      {/* Filters */}
-      <ProjectsFilter />
-
-      {/* Projects Table */}
+      {/* Client-side filtering for instant response */}
       <Suspense fallback={<div className="py-8 text-center text-muted-foreground">Loading projects...</div>}>
-        <ProjectsTable projects={projects} />
+        <ProjectsListClient projects={projects} clients={allClients || []} />
       </Suspense>
     </div>
   );

@@ -1,220 +1,196 @@
 # Formula Contract - Project Intelligence
 
-> **Last Updated:** January 17, 2026
-
-## Project Overview
-
-**What:** Project Management System for furniture manufacturing (Formula Contract)
-**Core Flow:** Tender → Active → Scope Items → Drawings/Materials Approval → Production/Procurement → Installation → Close
-**Style:** Notion-inspired (clean, minimal, generous whitespace)
-**Supabase Plan:** Pro (upgraded Jan 2026)
-**Region:** Mumbai (ap-south-1) - migration to EU planned
+> **Last Updated:** January 20, 2026
+> **Supabase Project:** `lsuiaqrpkhejeavsrsqc` (contract-eu, eu-central-1)
 
 ---
 
-## Architecture Decisions
+## What is This App?
 
-### Tech Stack
-- **Frontend:** Next.js 16 + React 19 + TypeScript
-- **Styling:** Tailwind CSS v4 + shadcn/ui (premium bundui kit)
-- **Backend:** Supabase Pro (PostgreSQL + Auth + Storage + RLS)
-- **State:** Zustand for client state, React Query for server state
-- **Forms:** react-hook-form + zod validation
-- **Tables:** @tanstack/react-table
-- **Testing:** Playwright (e2e), Lighthouse (performance)
-- **CI/CD:** GitHub Actions
+**Formula Contract** is a Project Management System for Formula International's furniture manufacturing business. It tracks the entire project lifecycle from tender to installation, managing scope items, drawings, materials, and progress reports.
 
-### Routing Structure
+### Core Users
+- **PM (Project Manager):** Creates projects, manages scope items, uploads drawings, generates reports
+- **Client:** Views project progress, approves/rejects drawings and materials
+- **Admin:** Full access, user management
+- **Production:** Updates production progress percentages
+- **Procurement:** Manages procurement path items, marks as ordered/received
+- **Management:** Read-only overview of all projects
+
+### Core Flow
 ```
-/login                    # Public - Auth
-/forgot-password          # Public - Password reset
-/dashboard                # Protected - PM dashboard
-/projects                 # Protected - Project list
-/projects/[id]            # Protected - Project detail (tabbed)
-/projects/[id]/scope      # Tab - Scope items
-/projects/[id]/drawings   # Tab - Drawings
-/projects/[id]/materials  # Tab - Materials
-/projects/[id]/reports    # Tab - Reports
-/users                    # Admin only
-/settings                 # User settings
+Tender → Active → Scope Items → Drawings/Materials Approval → Production/Procurement → Installation → Complete
 ```
 
 ---
 
-## Database Schema Patterns
+## Tech Stack
 
-### Core Entities (17 tables)
-1. **users** - Internal users (6 roles)
-2. **clients** - External client companies
-3. **projects** - Main entity, has status lifecycle
-4. **project_assignments** - M:M users to projects
-5. **milestones** - Project milestones with alerts
-6. **scope_items** - Line items (dual path: production/procurement)
-7. **drawings** - Drawing approval tracking per item
-8. **drawing_revisions** - Revision history (A, B, C...)
-9. **materials** - Material samples for approval
-10. **item_materials** - M:M items to materials
-11. **snagging** - Installation punch list
-12. **reports** - Weekly/progress reports
-13. **report_lines** - Report content with photos
-14. **notifications** - In-app notifications
-15. **activity_log** - Audit trail
+| Layer | Technology |
+|-------|------------|
+| Framework | Next.js 14+ (App Router) |
+| Language | TypeScript |
+| Styling | Tailwind CSS v4 + shadcn/ui |
+| Database | Supabase (PostgreSQL + Auth + Storage + RLS) |
+| Server State | React Query (TanStack Query) |
+| Client State | Zustand |
+| Forms | react-hook-form + zod |
+| Tables | @tanstack/react-table |
+| Deployment | Vercel |
+
+---
+
+## Project Structure
+
+```
+formula-contract/
+├── src/
+│   ├── app/                      # Next.js App Router
+│   │   ├── (auth)/               # Auth pages (login, forgot-password, etc.)
+│   │   ├── (dashboard)/          # Protected pages with sidebar
+│   │   │   ├── dashboard/        # Main dashboard
+│   │   │   ├── projects/         # Project list and details
+│   │   │   │   └── [id]/         # Project detail with tabs
+│   │   │   │       ├── scope/    # Scope items tab
+│   │   │   │       └── reports/  # Reports tab
+│   │   │   ├── clients/          # Client management
+│   │   │   ├── users/            # User management (admin only)
+│   │   │   └── settings/         # User settings
+│   │   └── auth/callback/        # Supabase auth callback
+│   │
+│   ├── components/
+│   │   ├── ui/                   # shadcn/ui components
+│   │   ├── layout/               # App layout (sidebar, header)
+│   │   ├── projects/             # Project-related components
+│   │   ├── scope-items/          # Scope item components
+│   │   ├── drawings/             # Drawing management
+│   │   ├── materials/            # Material management
+│   │   ├── reports/              # Report components
+│   │   ├── notifications/        # Notification dropdown
+│   │   ├── dashboard/            # Dashboard widgets
+│   │   └── forms/                # Shared form components
+│   │
+│   ├── lib/
+│   │   ├── actions/              # Server actions (mutations)
+│   │   ├── supabase/             # Supabase client (server/client)
+│   │   ├── react-query/          # React Query hooks
+│   │   ├── activity-log/         # Activity logging utilities
+│   │   └── notifications/        # Notification utilities
+│   │
+│   ├── hooks/                    # Custom React hooks
+│   └── types/                    # TypeScript type definitions
+│
+├── supabase/
+│   └── migrations/               # Database migrations (001-012)
+│
+└── docs/                         # Documentation
+    ├── DATABASE.md               # Schema documentation
+    ├── ARCHITECTURE.md           # Technical decisions
+    └── ROADMAP.md                # Future plans
+```
+
+---
+
+## Database Schema (17 Tables)
+
+### Core Entities
+
+| Table | Purpose | Key Fields |
+|-------|---------|------------|
+| `users` | Internal users | id, email, name, role, is_active |
+| `clients` | External client companies | id, company_name, contact_person |
+| `projects` | Main entity | id, project_code, name, client_id, status, currency |
+| `scope_items` | Line items (furniture pieces) | id, project_id, item_code, item_path, status, unit_cost, initial_total_cost |
+| `drawings` | Drawing approval per item | id, item_id, status, current_revision |
+| `drawing_revisions` | Revision history | id, drawing_id, revision (A, B, C...), file_url |
+| `materials` | Material samples | id, project_id, name, status, images |
+| `reports` | Progress reports | id, project_id, is_published, share_with_client |
+| `report_lines` | Report content | id, report_id, title, description, photos |
+
+### Supporting Entities
+
+| Table | Purpose |
+|-------|---------|
+| `project_assignments` | M:M users to projects |
+| `item_materials` | M:M items to materials |
+| `milestones` | Project milestones with alerts |
+| `snagging` | Installation punch list |
+| `notifications` | In-app notifications |
+| `activity_log` | Audit trail |
+| `drafts` | Autosaved form data |
+| `report_shares` | Report sharing permissions |
 
 ### Key Enums
+
 ```typescript
 UserRole: "admin" | "pm" | "production" | "procurement" | "management" | "client"
 ProjectStatus: "tender" | "active" | "on_hold" | "completed" | "cancelled"
 ItemPath: "production" | "procurement"
-ItemStatus: "pending" | "in_design" | "awaiting_approval" | "approved" | "in_production" | "complete"
+ItemStatus: "pending" | "in_design" | "awaiting_approval" | "approved" | "in_production" | "complete" | "on_hold" | "cancelled"
 DrawingStatus: "not_uploaded" | "uploaded" | "sent_to_client" | "approved" | "rejected" | "approved_with_comments"
+MaterialStatus: "pending" | "sent_to_client" | "approved" | "rejected"
+ProcurementStatus: "pm_approval" | "not_ordered" | "ordered" | "received"
+Currency: "TRY" | "USD" | "EUR"
 ```
 
-### The Dual Path Pattern (Critical!)
-Every scope_item has an `item_path`:
-- **Production:** Requires drawing + material approval → In Production → Complete
-- **Procurement:** PM approval → Order tracking → Received
+---
+
+## Critical Business Rules
+
+### The Dual Path Pattern
+Every `scope_item` has an `item_path` that determines its workflow:
+
+**Production Path:**
+```
+PENDING → IN_DESIGN → AWAITING_APPROVAL → APPROVED → IN_PRODUCTION → COMPLETE
+                            ↓
+                        REJECTED (back to IN_DESIGN)
+```
+- Requires drawing upload and client approval
+- Requires material selection and approval
+- Tracks production_percentage (0-100%)
+
+**Procurement Path:**
+```
+PM_APPROVAL → NOT_ORDERED → ORDERED → RECEIVED
+```
+- PM approves for ordering
+- Tracks order status
+- No drawing required
+
+### Cost Tracking (IMPORTANT!)
+
+**Two separate cost concepts:**
+- `initial_total_cost`: Baseline budget, set ONCE at item creation, NEVER updated
+- `unit_cost × quantity`: Current actual cost, can be updated anytime
+
+**Bug Fix Applied (Jan 20, 2026):** The `scope-item-sheet.tsx` was incorrectly recalculating `initial_total_cost` on every save. Now it's only set during INSERT, not UPDATE.
+
+### Drawing Approval Cycle
+1. PM uploads drawing (revision A)
+2. PM sends to client
+3. Client reviews and responds: Approve / Reject / Approve with Comments
+4. If rejected: New revision (B), repeat
+5. PM can override with documented reason (audit logged)
+
+### Soft Deletes
+All main entities use `is_deleted` flag. Always filter with `.eq("is_deleted", false)`.
 
 ---
 
 ## Code Patterns
 
-### Component Naming
+### Server Actions (Mutations)
 ```typescript
-// Page components: PascalCase with Page suffix
-ProjectsPage, DashboardPage, LoginPage
-
-// Feature components: PascalCase descriptive
-ProjectCard, ScopeItemRow, DrawingUploader
-
-// UI components: From shadcn - use as-is
-Button, Card, Dialog, Sheet, Table
-```
-
-### File Naming
-```
-kebab-case.tsx     # Components
-kebab-case.ts      # Utilities, hooks
-UPPER_CASE.md      # Documentation
-```
-
-### Data Fetching Pattern
-```typescript
-// Server Components for initial data
-async function ProjectPage({ params }) {
-  const supabase = await createClient();
-  const { data: project } = await supabase
-    .from("projects")
-    .select("*, client:clients(*)")
-    .eq("id", params.id)
-    .single();
-
-  return <ProjectDetail project={project} />;
-}
-
-// Client Components for mutations
-"use client";
-function UpdateProjectForm({ project }) {
-  const [pending, startTransition] = useTransition();
-  // Server action for mutation
-}
-```
-
-### Form Pattern
-```typescript
-// Always use react-hook-form + zod
-const schema = z.object({
-  name: z.string().min(1, "Required"),
-  status: z.enum(["tender", "active", "on_hold"]),
-});
-
-function ProjectForm() {
-  const form = useForm<z.infer<typeof schema>>({
-    resolver: zodResolver(schema),
-  });
-}
-```
-
-### Status Badge Pattern
-```tsx
-// Use predefined CSS classes from globals.css
-<Badge className="status-active">Active</Badge>
-<Badge className="status-completed">Completed</Badge>
-<Badge className="path-production">Production</Badge>
-<Badge className="approval-approved">Approved</Badge>
-```
-
----
-
-## Supabase Security Patterns
-
-### Function Security (CRITICAL)
-```sql
--- Always add SET search_path = public to prevent schema injection
-CREATE OR REPLACE FUNCTION public.my_function()
-RETURNS boolean
-LANGUAGE plpgsql
-SECURITY DEFINER
-STABLE
-SET search_path = public  -- REQUIRED for security
-AS $$ ... $$;
-```
-
-### RLS Performance Optimization
-```sql
--- BAD: auth.uid() evaluated per row (O(n))
-USING (user_id = auth.uid())
-
--- GOOD: auth.uid() evaluated once via InitPlan (O(1))
-USING (user_id = (SELECT auth.uid()))
-
--- Also wrap function calls that internally use auth.uid()
-USING ((SELECT is_admin()) OR is_active = true)
-```
-
-### RLS Policy Best Practices
-```sql
--- Avoid FOR ALL policies - they cause double evaluation on SELECT
--- Instead, use specific operations:
-CREATE POLICY "Insert X" ON table FOR INSERT WITH CHECK (...);
-CREATE POLICY "Update X" ON table FOR UPDATE USING (...);
-CREATE POLICY "Delete X" ON table FOR DELETE USING (...);
--- Leave View/Select handled by a single SELECT policy
-```
-
-### Helper Functions (SECURITY DEFINER required)
-These functions run with elevated privileges to allow RLS policies to work:
-- `get_user_role()` - Returns current user's role
-- `is_assigned_to_project(uuid)` - Checks project assignment
-- `is_client_for_project(uuid)` - Checks if user is client for project
-- `is_admin()` - Checks if user has admin role
-
----
-
-## Server Actions Architecture
-
-### Directory Structure
-```
-src/lib/actions/
-├── index.ts              # Central exports
-├── auth.ts               # Login, logout, password reset
-├── users.ts              # User CRUD operations
-├── project-assignments.ts # Team assignment operations
-├── reports.ts            # Report CRUD + sharing
-├── materials.ts          # Material CRUD + bulk import
-└── scope-items.ts        # Scope item operations
-```
-
-### Server Action Pattern
-```typescript
+// src/lib/actions/example.ts
 "use server";
-
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
 export async function updateSomething(id: string, data: FormData) {
   const supabase = await createClient();
 
-  // 1. Get authenticated user
+  // 1. Check authentication
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
@@ -238,203 +214,151 @@ export async function updateSomething(id: string, data: FormData) {
 ### React Query Integration
 ```typescript
 // src/lib/react-query/materials.ts
+export function useMaterials(projectId: string) {
+  return useQuery({
+    queryKey: ["materials", projectId],
+    queryFn: () => getMaterials(projectId),
+  });
+}
+
 export function useCreateMaterial() {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: (data) => createMaterial(data),
+    mutationFn: createMaterial,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["materials"] });
       toast.success("Material created");
-    },
-    onError: (error) => {
-      toast.error(error.message);
     },
   });
 }
 ```
 
----
-
-## Database Migrations
-
-### Migration File Naming
-```
-supabase/migrations/
-├── 001_performance_indexes.sql
-├── 002_client_safe_views.sql
-├── 003_fix_function_search_paths.sql
-├── 004_fix_rls_init_plan.sql
-├── 005_add_fk_indexes.sql
-├── 006_consolidate_rls_policies.sql
-└── 007_fix_remaining_advisor_issues.sql
-```
-
-### Running Migrations
-1. Test locally with `supabase db push` (if using CLI)
-2. Or run directly in Supabase Dashboard SQL Editor
-3. Always check Supabase Advisor after migrations
-
-### Foreign Key Indexing
-Always create indexes on FK columns for JOIN performance:
-```sql
-CREATE INDEX IF NOT EXISTS idx_table_fk_column
-  ON public.table(fk_column);
-
--- For nullable FKs, use partial index:
-CREATE INDEX IF NOT EXISTS idx_table_fk_column
-  ON public.table(fk_column)
-  WHERE fk_column IS NOT NULL;
-```
-
----
-
-## UI/UX Guidelines
-
-### Notion-Style Principles
-1. **Generous whitespace** - Don't crowd elements
-2. **Subtle borders** - Use `border-border` (light gray)
-3. **Minimal shadows** - `shadow-sm` for cards, `shadow-md` for modals
-4. **Clean typography** - Inter font, clear hierarchy
-5. **Inline editing** - Prefer inline over modals where possible
-
-### Color Usage
-```
-Primary (Blue #2563EB)    → Actions, links, active states
-Success (Green #10B981)   → Approved, complete, installed
-Warning (Amber #F59E0B)   → Pending, attention needed
-Destructive (Red #EF4444) → Rejected, cancelled, delete
-Muted (Gray)              → Secondary text, backgrounds
-```
-
-### Component Spacing
-```
-Page container: px-6 py-6
-Card padding: p-6
-Button: px-4 py-2
-Table cell: px-4 py-3
-Form gap: gap-6 (vertical)
-```
-
----
-
-## Business Logic
-
-### Project Lifecycle
-```
-TENDER → ACTIVE → ON_HOLD (optional) → COMPLETED
-                ↓
-            CANCELLED
-```
-
-### Item Status Flow (Production Path)
-```
-PENDING → IN_DESIGN → AWAITING_APPROVAL → APPROVED → IN_PRODUCTION → COMPLETE
-                            ↓
-                        REJECTED (back to IN_DESIGN)
-```
-
-### Drawing Approval Cycle
-```
-1. PM uploads drawing (revision A)
-2. PM sends to client
-3. Client reviews in portal
-4. Client: Approve / Reject / Approve with Comments
-5. If rejected: New revision (B), repeat
-6. PM can override with reason (audit logged)
-```
-
-### Calculated Fields
+### Form Pattern
 ```typescript
-// Project contract value
-contract_value_calculated = SUM(scope_items.total_price)
+const schema = z.object({
+  name: z.string().min(1, "Required"),
+  status: z.enum(["pending", "approved"]),
+});
 
-// Project progress
-progress = (items_complete / total_items) * 100
+function MyForm() {
+  const form = useForm<z.infer<typeof schema>>({
+    resolver: zodResolver(schema),
+    defaultValues: { name: "", status: "pending" },
+  });
 
-// Item total price
-total_price = unit_price * quantity
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)}>
+        <FormField name="name" control={form.control} render={...} />
+      </form>
+    </Form>
+  );
+}
+```
+
+### Sheet Pattern (Quick Edit)
+```typescript
+// Use Sheet for quick add/edit from tables
+<Sheet open={open} onOpenChange={setOpen}>
+  <SheetContent className="w-full sm:max-w-lg">
+    <SheetHeader>
+      <SheetTitle>Add Item</SheetTitle>
+    </SheetHeader>
+    {/* Form content */}
+    <SheetFooter>
+      <Button onClick={handleSubmit}>Save</Button>
+    </SheetFooter>
+  </SheetContent>
+</Sheet>
 ```
 
 ---
 
-## Role Permissions
+## Supabase Security (CRITICAL)
 
-| Action | Admin | PM | Production | Procurement | Management | Client |
-|--------|-------|-----|------------|-------------|------------|--------|
-| Create Project | ✓ | ✓ | - | - | - | - |
-| Edit Project | ✓ | ✓ | - | - | - | - |
-| View All Projects | ✓ | - | - | - | ✓ | - |
-| Manage Users | ✓ | - | - | - | - | - |
-| Upload Drawings | ✓ | ✓ | ✓ | - | - | - |
-| Approve Drawings | - | - | - | - | - | ✓ |
-| Update Production % | ✓ | ✓ | ✓ | - | - | - |
-| Mark Ordered | ✓ | ✓ | - | ✓ | - | - |
+### RLS Performance - Always Use InitPlan
+```sql
+-- BAD: auth.uid() evaluated per row (O(n))
+USING (user_id = auth.uid())
 
----
-
-## File Storage Structure (Supabase Storage)
-
-```
-drawings/
-  {project_id}/
-    {item_id}/
-      {revision}_drawing.pdf
-      {revision}_cad.dwg
-      {revision}_markup.pdf
-
-materials/
-  {project_id}/
-    {material_id}/
-      image_1.jpg
-      image_2.jpg
-
-reports/
-  {project_id}/
-    {report_id}/
-      photo_1.jpg
-
-snagging/
-  {project_id}/
-    {snag_id}/
-      photo_1.jpg
+-- GOOD: auth.uid() evaluated once via InitPlan (O(1))
+USING (user_id = (SELECT auth.uid()))
 ```
 
+### Function Security
+```sql
+-- Always set search_path to prevent schema injection
+CREATE OR REPLACE FUNCTION public.my_function()
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+STABLE
+SET search_path = public  -- REQUIRED!
+AS $$ ... $$;
+```
+
+### RLS Helper Functions (SECURITY DEFINER)
+- `get_user_role()` - Returns current user's role
+- `is_assigned_to_project(uuid)` - Checks project assignment
+- `is_client_for_project(uuid)` - Checks if user is client
+- `is_admin()` - Checks admin role
+
 ---
 
-## Testing Checklist
+## Common Tasks
 
-Before any feature is complete:
-- [ ] Works for all relevant user roles
-- [ ] Form validation shows proper errors
-- [ ] Loading states displayed
-- [ ] Error states handled gracefully
-- [ ] Mobile responsive
-- [ ] Activity logged where required
-- [ ] Notifications created where specified
+### Adding a New Scope Item Field
+1. Add migration: `supabase/migrations/XXX_add_field.sql`
+2. Update types: `src/types/database.ts`
+3. Update form: `src/components/scope-items/scope-item-sheet.tsx`
+4. Update display: relevant table/detail components
+
+### Creating a Migration
+```sql
+-- supabase/migrations/XXX_description.sql
+ALTER TABLE scope_items ADD COLUMN new_field text;
+
+-- Always add index for FK columns
+CREATE INDEX IF NOT EXISTS idx_table_fk ON table(fk_column);
+```
+
+### Adding a Server Action
+1. Create in `src/lib/actions/[entity].ts`
+2. Add React Query hook in `src/lib/react-query/[entity].ts`
+3. Use in component with `useMutation`
 
 ---
 
-## Common Gotchas
+## Important Gotchas
 
-1. **Always check `is_deleted`** - Soft delete pattern used
+1. **Always check `is_deleted`** - Soft delete pattern used everywhere
 2. **Currency matters** - Projects have currency field (TRY/USD/EUR)
 3. **Drawing revisions are immutable** - Never edit, create new revision
 4. **Client portal is read-only** - Clients can only view and approve/reject
 5. **PM override needs reason** - Can't skip approval without documented reason
-6. **RLS functions need SECURITY DEFINER** - Otherwise they can't read user table
-7. **Always use `(SELECT auth.uid())`** - Never bare `auth.uid()` in RLS policies
-8. **Functions need `SET search_path`** - Prevents schema injection attacks
-9. **Avoid FOR ALL policies** - Causes double evaluation, use specific operations
-10. **Server actions for mutations** - Never use createClient() in client components
+6. **Never update `initial_total_cost`** - Only set during item creation
+7. **Always use `(SELECT auth.uid())`** - Never bare `auth.uid()` in RLS
+8. **Functions need `SET search_path`** - Security requirement
+9. **Server actions for mutations** - Never mutate from client components
+10. **React Query for server state** - Don't duplicate in useState
 
 ---
 
-## Quick Reference
+## File Storage (Supabase Storage)
 
-### Supabase Queries
+```
+drawings/{project_id}/{item_id}/{revision}_drawing.pdf
+materials/{project_id}/{material_id}/image_1.jpg
+reports/{project_id}/{report_id}/photo_1.jpg
+scope-items/{project_id}/{item_id}/image_1.jpg
+```
+
+---
+
+## Quick Supabase Queries
+
 ```typescript
-// Get project with relations
+// Get project with all relations
 const { data } = await supabase
   .from("projects")
   .select(`
@@ -447,45 +371,53 @@ const { data } = await supabase
   .eq("is_deleted", false)
   .single();
 
-// Get user's assigned projects
+// Get scope items with materials
 const { data } = await supabase
-  .from("projects")
-  .select("*")
-  .eq("is_deleted", false)
-  .in("id", userProjectIds);
-```
-
-### Status Update Pattern
-```typescript
-// Always log activity on status changes
-async function updateStatus(itemId: string, newStatus: ItemStatus) {
-  const { data, error } = await supabase
-    .from("scope_items")
-    .update({ status: newStatus, updated_at: new Date().toISOString() })
-    .eq("id", itemId)
-    .select()
-    .single();
-
-  if (data) {
-    await logActivity("status_change", "scope_item", itemId, {
-      old_status: oldStatus,
-      new_status: newStatus,
-    });
-  }
-}
+  .from("scope_items")
+  .select(`
+    *,
+    drawing:drawings(*),
+    item_materials(material:materials(*))
+  `)
+  .eq("project_id", projectId)
+  .eq("is_deleted", false);
 ```
 
 ---
 
-## Implementation Priority (MVP)
+## Testing Checklist
 
-1. **Auth** - Login, logout, password reset
-2. **Projects CRUD** - List, create, edit, archive
-3. **Scope Items** - Add items, set path, basic status
-4. **Drawings** - Upload, revision, send to client
-5. **Materials** - Add, images, send to client
-6. **Client Portal** - View-only, approve/reject
-7. **Installation** - Mark installed, snagging
-8. **Reports** - Create, add lines, publish
-9. **Dashboard** - PM overview
-10. **Notifications** - In-app alerts
+Before any feature is complete:
+- [ ] Works for all relevant user roles
+- [ ] Form validation shows proper errors
+- [ ] Loading states displayed
+- [ ] Error states handled gracefully
+- [ ] Mobile responsive (test at 375px width)
+- [ ] Activity logged where required
+- [ ] Notifications created where specified
+- [ ] `is_deleted` filter applied in queries
+
+---
+
+## Current Status (Jan 2026)
+
+### Completed
+- Auth (login, logout, password reset)
+- Projects CRUD with client assignment
+- Scope items (dual path, status workflow)
+- Drawings (upload, revisions, approval cycle)
+- Materials (images, approval)
+- Reports (create, lines, publish, share)
+- Notifications system
+- Activity logging
+- Dashboard with stats
+
+### In Progress
+- UX improvements (see docs/ROADMAP.md)
+- Cost tracking refinements
+
+### Planned
+- Mobile optimization
+- Command menu (Cmd+K)
+- Role-specific dashboards
+- Autosave/draft system

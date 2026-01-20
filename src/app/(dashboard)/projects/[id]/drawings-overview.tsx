@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +23,10 @@ import {
   ArrowRightIcon,
   FactoryIcon,
   PenToolIcon,
+  UploadIcon,
+  PlusIcon,
 } from "lucide-react";
+import { DrawingUploadSheet } from "@/components/drawings/drawing-upload-sheet";
 import { formatDistanceToNow } from "date-fns";
 
 interface Drawing {
@@ -57,6 +61,10 @@ const statusConfig: Record<string, { variant: StatusVariant; label: string }> = 
 };
 
 export function DrawingsOverview({ projectId, productionItems, drawings }: DrawingsOverviewProps) {
+  // Sheet state
+  const [uploadSheetOpen, setUploadSheetOpen] = useState(false);
+  const [preselectedItemId, setPreselectedItemId] = useState<string | undefined>(undefined);
+
   // Create a map of drawings by item_id
   const drawingsByItemId = new Map(drawings.map((d) => [d.item_id, d]));
 
@@ -120,12 +128,24 @@ export function DrawingsOverview({ projectId, productionItems, drawings }: Drawi
   return (
     <div className="space-y-4">
       {/* Section Header */}
-      <div className="flex items-center gap-2 mb-2">
-        <GradientIcon icon={<PenToolIcon className="size-4" />} color="teal" size="sm" />
-        <div>
-          <h3 className="text-lg font-medium">Drawings</h3>
-          <p className="text-sm text-muted-foreground">Manage technical drawings for production items</p>
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <GradientIcon icon={<PenToolIcon className="size-4" />} color="teal" size="sm" />
+          <div>
+            <h3 className="text-lg font-medium">Drawings</h3>
+            <p className="text-sm text-muted-foreground">Manage technical drawings for production items</p>
+          </div>
         </div>
+        <Button
+          onClick={() => {
+            setPreselectedItemId(undefined);
+            setUploadSheetOpen(true);
+          }}
+          className="bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700"
+        >
+          <UploadIcon className="size-4" />
+          Upload Drawing
+        </Button>
       </div>
 
       {/* Stats Cards */}
@@ -278,17 +298,31 @@ export function DrawingsOverview({ projectId, productionItems, drawings }: Drawi
                         </StatusBadge>
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          asChild
-                          className="hover:text-teal-600 hover:bg-teal-50"
-                        >
-                          <Link href={`/projects/${projectId}/scope/${item.id}`}>
-                            View
-                            <ArrowRightIcon className="size-3 ml-1" />
-                          </Link>
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setPreselectedItemId(item.id);
+                              setUploadSheetOpen(true);
+                            }}
+                            className="hover:text-teal-600 hover:bg-teal-50"
+                          >
+                            <UploadIcon className="size-3 mr-1" />
+                            {item.drawing ? "New Rev" : "Upload"}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            asChild
+                            className="hover:text-teal-600 hover:bg-teal-50"
+                          >
+                            <Link href={`/projects/${projectId}/scope/${item.id}`}>
+                              View
+                              <ArrowRightIcon className="size-3 ml-1" />
+                            </Link>
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -298,6 +332,24 @@ export function DrawingsOverview({ projectId, productionItems, drawings }: Drawi
           </div>
         </CardContent>
       </GlassCard>
+
+      {/* Drawing Upload Sheet */}
+      <DrawingUploadSheet
+        projectId={projectId}
+        scopeItems={productionItems.map((item) => {
+          const drawing = drawingsByItemId.get(item.id);
+          return {
+            id: item.id,
+            item_code: item.item_code,
+            name: item.name,
+            hasDrawing: !!drawing,
+            currentRevision: drawing?.current_revision || null,
+          };
+        })}
+        open={uploadSheetOpen}
+        onOpenChange={setUploadSheetOpen}
+        preselectedItemId={preselectedItemId}
+      />
     </div>
   );
 }

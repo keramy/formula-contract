@@ -16,12 +16,42 @@ import { MaterialsStatusChart } from "./materials-status-chart";
 export default async function ReportsPage() {
   const supabase = await createClient();
 
-  // Fetch projects summary
-  const { data: projects } = await supabase
-    .from("projects")
-    .select("id, status, name")
-    .eq("is_deleted", false);
+  // ============================================================================
+  // Fetch all data in PARALLEL - all queries are independent
+  // ============================================================================
+  const [
+    { data: projects },
+    { data: scopeItems },
+    { data: materials },
+    { data: snagging },
+    { data: milestones },
+  ] = await Promise.all([
+    // Projects summary
+    supabase
+      .from("projects")
+      .select("id, status, name")
+      .eq("is_deleted", false),
+    // Scope items for production progress
+    supabase
+      .from("scope_items")
+      .select("id, item_path, production_percentage, status, project_id")
+      .eq("is_deleted", false),
+    // Materials summary
+    supabase
+      .from("materials")
+      .select("id, status")
+      .eq("is_deleted", false),
+    // Snagging summary
+    supabase
+      .from("snagging")
+      .select("id, is_resolved"),
+    // Milestones summary
+    supabase
+      .from("milestones")
+      .select("id, is_completed, due_date"),
+  ]);
 
+  // Process project stats
   const projectStats = {
     total: projects?.length || 0,
     tender: projects?.filter(p => p.status === "tender").length || 0,
@@ -31,12 +61,7 @@ export default async function ReportsPage() {
     cancelled: projects?.filter(p => p.status === "cancelled").length || 0,
   };
 
-  // Fetch scope items for production progress
-  const { data: scopeItems } = await supabase
-    .from("scope_items")
-    .select("id, item_path, production_percentage, status, project_id")
-    .eq("is_deleted", false);
-
+  // Process production stats
   const productionItems = scopeItems?.filter(item => item.item_path === "production") || [];
   const avgProductionProgress = productionItems.length > 0
     ? Math.round(productionItems.reduce((sum, item) => sum + (item.production_percentage || 0), 0) / productionItems.length)
@@ -50,12 +75,7 @@ export default async function ReportsPage() {
     avgProgress: avgProductionProgress,
   };
 
-  // Fetch materials summary
-  const { data: materials } = await supabase
-    .from("materials")
-    .select("id, status")
-    .eq("is_deleted", false);
-
+  // Process material stats
   const materialStats = {
     total: materials?.length || 0,
     pending: materials?.filter(m => m.status === "pending").length || 0,
@@ -63,22 +83,14 @@ export default async function ReportsPage() {
     rejected: materials?.filter(m => m.status === "rejected").length || 0,
   };
 
-  // Fetch snagging summary
-  const { data: snagging } = await supabase
-    .from("snagging")
-    .select("id, is_resolved");
-
+  // Process snagging stats
   const snaggingStats = {
     total: snagging?.length || 0,
     open: snagging?.filter(s => !s.is_resolved).length || 0,
     resolved: snagging?.filter(s => s.is_resolved).length || 0,
   };
 
-  // Fetch milestones summary
-  const { data: milestones } = await supabase
-    .from("milestones")
-    .select("id, is_completed, due_date");
-
+  // Process milestone stats
   const now = new Date();
   const milestoneStats = {
     total: milestones?.length || 0,

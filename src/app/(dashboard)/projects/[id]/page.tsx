@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getUserRoleFromJWT } from "@/lib/supabase/server";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,7 +27,7 @@ import { ReportsOverview } from "./reports-overview";
 import { ProjectDetailHeader } from "./project-detail-header";
 import { getProjectAssignments } from "@/lib/actions/project-assignments";
 import { getProjectReports } from "@/lib/actions/reports";
-import { DownloadTemplateButton, ExcelImport, ExcelExport } from "@/components/scope-items";
+import { DownloadTemplateButton, ExcelImport, ExcelExport, ScopeItemAddButton } from "@/components/scope-items";
 import { ActivityFeed } from "@/components/activity-log/activity-feed";
 import { GlassCard, GradientIcon } from "@/components/ui/ui-helpers";
 
@@ -159,14 +159,8 @@ export default async function ProjectDetailPage({
     notFound();
   }
 
-  // Get user role
-  const { data: profile } = await supabase
-    .from("users")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  const userRole = profile?.role || "pm";
+  // PERFORMANCE: Get user role from JWT metadata (avoids ~3s DB query!)
+  const userRole = await getUserRoleFromJWT(user, supabase);
 
   // For client users, verify they have access to this project
   if (userRole === "client") {
@@ -540,12 +534,10 @@ export default async function ProjectDetailPage({
                 projectName={project.name}
               />
               {canAddItems && (
-                <Button asChild className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700">
-                  <Link href={`/projects/${id}/scope/new`}>
-                    <PlusIcon className="size-4" />
-                    Add Item
-                  </Link>
-                </Button>
+                <ScopeItemAddButton
+                  projectId={id}
+                  projectCurrency={project.currency}
+                />
               )}
             </div>
           </div>
