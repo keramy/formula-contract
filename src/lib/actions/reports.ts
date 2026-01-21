@@ -83,23 +83,35 @@ async function sendReportPublishedNotification(
   const supabase = await createClient();
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
-  // Get all users assigned to this project
-  const { data: assignments, error } = await supabase
+  // Get all user IDs assigned to this project
+  const { data: assignments, error: assignmentsError } = await supabase
     .from("project_assignments")
-    .select(`
-      user:users!project_assignments_user_id_fkey(id, name, email, is_active)
-    `)
+    .select("user_id")
     .eq("project_id", projectId);
 
-  if (error || !assignments) {
-    console.error("Error fetching project team for notifications:", error?.message);
+  if (assignmentsError || !assignments || assignments.length === 0) {
+    console.error("Error fetching project assignments:", assignmentsError?.message);
     return { sent: 0, failed: 0 };
   }
 
-  // Extract active users (exclude the publisher - they don't need to be notified about their own action)
-  const users = assignments
-    .filter(a => a.user && a.user.is_active && a.user.id !== publisherId)
-    .map(a => a.user as { id: string; name: string; email: string });
+  // Get user details for assigned users (excluding publisher, only active users)
+  const userIds = assignments.map(a => a.user_id).filter(id => id !== publisherId);
+
+  if (userIds.length === 0) {
+    console.log("No other users to notify for project:", projectId);
+    return { sent: 0, failed: 0 };
+  }
+
+  const { data: users, error: usersError } = await supabase
+    .from("users")
+    .select("id, name, email")
+    .in("id", userIds)
+    .eq("is_active", true);
+
+  if (usersError || !users) {
+    console.error("Error fetching user details for notifications:", usersError?.message);
+    return { sent: 0, failed: 0 };
+  }
 
   if (users.length === 0) {
     console.log("No other active users to notify for project:", projectId);
