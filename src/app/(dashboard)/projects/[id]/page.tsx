@@ -550,7 +550,7 @@ export default async function ProjectDetailPage({
               {canImportExcel && (
                 <>
                   <DownloadTemplateButton projectCode={project.project_code} />
-                  <ExcelImport projectId={id} projectCode={project.project_code} />
+                  <ExcelImport projectId={projectId} projectCode={project.project_code} />
                 </>
               )}
               <ExcelExport
@@ -560,14 +560,14 @@ export default async function ProjectDetailPage({
               />
               {canAddItems && (
                 <ScopeItemAddButton
-                  projectId={id}
+                  projectId={projectId}
                   projectCurrency={project.currency}
                 />
               )}
             </div>
           </div>
           <ScopeItemsTable
-            projectId={id}
+            projectId={projectId}
             items={scopeItems}
             materials={materials.map((m) => ({
               id: m.id,
@@ -582,7 +582,7 @@ export default async function ProjectDetailPage({
         {/* Drawings Tab */}
         <TabsContent value="drawings">
           <DrawingsOverview
-            projectId={id}
+            projectId={projectId}
             productionItems={productionItems.map((item) => ({
               id: item.id,
               item_code: item.item_code,
@@ -597,7 +597,7 @@ export default async function ProjectDetailPage({
         {/* Materials Tab */}
         <TabsContent value="materials">
           <MaterialsOverview
-            projectId={id}
+            projectId={projectId}
             projectCode={project.project_code}
             projectName={project.name}
             materials={materialsWithAssignments}
@@ -613,7 +613,7 @@ export default async function ProjectDetailPage({
         {/* Snagging Tab */}
         <TabsContent value="snagging">
           <SnaggingOverview
-            projectId={id}
+            projectId={projectId}
             snaggingItems={snaggingItems}
             scopeItems={scopeItems.map((item) => ({
               id: item.id,
@@ -626,7 +626,7 @@ export default async function ProjectDetailPage({
         {/* Milestones Tab */}
         <TabsContent value="milestones">
           <MilestonesOverview
-            projectId={id}
+            projectId={projectId}
             milestones={milestones}
           />
         </TabsContent>
@@ -634,7 +634,7 @@ export default async function ProjectDetailPage({
         {/* Reports Tab */}
         <TabsContent value="reports">
           <ReportsOverview
-            projectId={id}
+            projectId={projectId}
             projectName={project.name}
             projectCode={project.project_code}
             reports={reports}
@@ -645,7 +645,7 @@ export default async function ProjectDetailPage({
         {/* Team Tab */}
         <TabsContent value="team">
           <TeamOverview
-            projectId={id}
+            projectId={projectId}
             assignments={assignments as any}
             canManageTeam={canManageTeam}
           />
@@ -653,7 +653,7 @@ export default async function ProjectDetailPage({
 
         {/* Activity Tab */}
         <TabsContent value="activity">
-          <ActivityFeed projectId={id} limit={50} maxHeight="600px" />
+          <ActivityFeed projectId={projectId} limit={50} maxHeight="600px" />
         </TabsContent>
       </Tabs>
     </div>
