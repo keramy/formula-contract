@@ -1,32 +1,30 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { useSidebar } from "@/components/ui/sidebar";
+import { useEffect } from "react";
+import { LayoutDashboardIcon } from "lucide-react";
 import { GradientIcon } from "@/components/ui/ui-helpers";
-import { PanelLeftIcon, LayoutDashboardIcon } from "lucide-react";
+import { usePageHeader } from "@/components/layout/app-header";
 
 interface DashboardHeaderProps {
   userName: string;
 }
 
+/**
+ * Sets the page header content for the Dashboard page.
+ * The actual header is rendered by AppHeader in the layout.
+ */
 export function DashboardHeader({ userName }: DashboardHeaderProps) {
-  const { toggleSidebar } = useSidebar();
+  const { setContent } = usePageHeader();
 
-  return (
-    <div className="flex items-center gap-3">
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={toggleSidebar}
-        className="size-9 shrink-0"
-      >
-        <PanelLeftIcon className="size-5" />
-      </Button>
-      <GradientIcon icon={<LayoutDashboardIcon className="size-5" />} color="violet" />
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">Welcome back, {userName}</p>
-      </div>
-    </div>
-  );
+  useEffect(() => {
+    setContent({
+      icon: <GradientIcon icon={<LayoutDashboardIcon className="size-4" />} color="violet" size="sm" />,
+      title: "Dashboard",
+      description: `Welcome back, ${userName}`,
+    });
+    return () => setContent({});
+  }, [userName, setContent]);
+
+  // This component only sets context, renders nothing
+  return null;
 }

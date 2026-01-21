@@ -143,7 +143,7 @@ export default async function ProjectsPage() {
 
       {/* Client-side filtering for instant response */}
       <Suspense fallback={<div className="py-8 text-center text-muted-foreground">Loading projects...</div>}>
-        <ProjectsListClient projects={projects} clients={allClients || []} />
+        <ProjectsListClient projects={projects} clients={allClients || []} canCreateProject={canCreateProject} />
       </Suspense>
     </div>
   );

@@ -1,31 +1,22 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { useSidebar } from "@/components/ui/sidebar";
-import { PanelLeftIcon, UsersIcon } from "lucide-react";
+import { useEffect } from "react";
+import { UsersIcon } from "lucide-react";
 import { GradientIcon } from "@/components/ui/ui-helpers";
+import { usePageHeader } from "@/components/layout/app-header";
 
 export function UsersPageHeader() {
-  const { toggleSidebar } = useSidebar();
+  const { setContent } = usePageHeader();
 
-  return (
-    <div className="flex items-center gap-3 mb-6">
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={toggleSidebar}
-        className="size-9 shrink-0"
-      >
-        <PanelLeftIcon className="size-5" />
-      </Button>
-      <GradientIcon
-        icon={<UsersIcon className="size-5" />}
-        color="coral"
-      />
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Users</h1>
-        <p className="text-sm text-muted-foreground">Manage team members and permissions</p>
-      </div>
-    </div>
-  );
+  useEffect(() => {
+    setContent({
+      icon: <GradientIcon icon={<UsersIcon className="size-4" />} color="coral" size="sm" />,
+      title: "Users",
+      description: "Manage team members and permissions",
+    });
+    return () => setContent({});
+  }, [setContent]);
+
+  // No action buttons for this page
+  return null;
 }

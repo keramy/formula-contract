@@ -82,6 +82,10 @@
   --sidebar-border: var(--base-200);
   --sidebar-ring: var(--primary);
 
+  /* Sidebar Dimensions */
+  --sidebar-width: 16rem;
+  --sidebar-width-icon: 3rem;
+
   /* Font */
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
 }

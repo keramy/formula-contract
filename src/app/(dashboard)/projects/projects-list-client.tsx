@@ -18,7 +18,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { SearchIcon, XIcon, CalendarIcon, Building2Icon } from "lucide-react";
+import { SearchIcon, XIcon, CalendarIcon, Building2Icon, PlusIcon } from "lucide-react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { ProjectsTable } from "./projects-table";
 import { ProjectCard } from "@/components/projects/project-card";
@@ -46,6 +47,7 @@ interface Client {
 interface ProjectsListClientProps {
   projects: Project[];
   clients?: Client[];
+  canCreateProject?: boolean;
 }
 
 // Status options with colors matching the design system
@@ -68,7 +70,7 @@ const activeStatusStyles: Record<string, string> = {
   cancelled: "bg-red-600 text-white hover:bg-red-500 border-red-600",
 };
 
-export function ProjectsListClient({ projects, clients = [] }: ProjectsListClientProps) {
+export function ProjectsListClient({ projects, clients = [], canCreateProject = false }: ProjectsListClientProps) {
   const searchParams = useSearchParams();
 
   // Initialize state from URL params (for bookmarking support)
@@ -310,6 +312,19 @@ export function ProjectsListClient({ projects, clients = [] }: ProjectsListClien
             >
               <XIcon className="size-4" />
               Clear{activeFilterCount > 1 ? ` (${activeFilterCount})` : ""}
+            </Button>
+          )}
+
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* New Project Button */}
+          {canCreateProject && (
+            <Button asChild size="sm" className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700">
+              <Link href="/projects/new">
+                <PlusIcon className="size-4" />
+                New Project
+              </Link>
             </Button>
           )}
         </div>

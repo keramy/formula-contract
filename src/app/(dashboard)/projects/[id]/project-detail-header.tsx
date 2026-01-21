@@ -1,10 +1,11 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { useSidebar } from "@/components/ui/sidebar";
-import { ArrowLeftIcon, PanelLeftIcon, PencilIcon, FolderKanbanIcon } from "lucide-react";
+import { ArrowLeftIcon, PencilIcon, FolderKanbanIcon } from "lucide-react";
 import { GradientIcon, StatusBadge } from "@/components/ui/ui-helpers";
+import { usePageHeader } from "@/components/layout/app-header";
 
 type StatusVariant = "info" | "success" | "warning" | "default" | "danger";
 
@@ -22,7 +23,7 @@ interface ProjectDetailHeaderProps {
   projectCode: string;
   status: string;
   canEdit: boolean;
-  showEditButton?: boolean; // New prop - defaults to false
+  showEditButton?: boolean;
 }
 
 export function ProjectDetailHeader({
@@ -31,45 +32,38 @@ export function ProjectDetailHeader({
   projectCode,
   status,
   canEdit,
-  showEditButton = false, // Only show Edit button when explicitly requested
+  showEditButton = false,
 }: ProjectDetailHeaderProps) {
-  const { toggleSidebar } = useSidebar();
+  const { setContent } = usePageHeader();
   const config = statusConfig[status] || { variant: "default" as StatusVariant, label: status };
 
+  // Set the header content
+  useEffect(() => {
+    setContent({
+      icon: <GradientIcon icon={<FolderKanbanIcon className="size-4" />} color="violet" size="sm" />,
+      title: projectName,
+      description: projectCode,
+    });
+    return () => setContent({});
+  }, [projectName, projectCode, setContent]);
+
+  // Render navigation and action buttons below the header
   return (
-    <div className="flex items-center justify-between gap-4 mb-6">
+    <div className="flex items-center justify-between gap-4 mb-4">
       <div className="flex items-center gap-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={toggleSidebar}
-          className="size-9 shrink-0"
-        >
-          <PanelLeftIcon className="size-5" />
-        </Button>
-        <Button variant="ghost" size="sm" asChild className="-ml-2">
+        <Button variant="ghost" size="sm" asChild>
           <Link href="/projects" className="text-muted-foreground hover:text-foreground">
             <ArrowLeftIcon className="size-4 mr-1" />
             Projects
           </Link>
         </Button>
-        <div className="h-6 w-px bg-border mx-1" />
-        <GradientIcon
-          icon={<FolderKanbanIcon className="size-5" />}
-          color="violet"
-        />
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-semibold tracking-tight">{projectName}</h1>
-            <StatusBadge variant={config.variant} dot>
-              {config.label}
-            </StatusBadge>
-          </div>
-          <p className="text-sm text-muted-foreground font-mono">{projectCode}</p>
-        </div>
+        <div className="h-5 w-px bg-border" />
+        <StatusBadge variant={config.variant} dot>
+          {config.label}
+        </StatusBadge>
       </div>
       {canEdit && showEditButton && (
-        <Button asChild className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700">
+        <Button asChild size="sm" className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700">
           <Link href={`/projects/${projectId}/edit`}>
             <PencilIcon className="size-4" />
             Edit Project

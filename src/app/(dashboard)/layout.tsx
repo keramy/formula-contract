@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { CommandMenu } from "@/components/layout/command-menu";
-import { MobileHeader } from "@/components/layout/mobile-header";
+import { AppHeader, PageHeaderProvider } from "@/components/layout/app-header";
 
 interface UserProfile {
   id: string;
@@ -40,15 +40,20 @@ export default async function DashboardLayout({
   };
 
   return (
-    <SidebarProvider>
-      <AppSidebar user={userData} />
-      <SidebarInset className="overflow-auto">
-        {/* Mobile header with hamburger menu - only visible on mobile */}
-        <MobileHeader />
-        {children}
-      </SidebarInset>
-      {/* Global Command Menu - Cmd+K to open */}
-      <CommandMenu userRole={userData.role} />
-    </SidebarProvider>
+    <PageHeaderProvider>
+      <SidebarProvider>
+        <AppSidebar user={userData} />
+        <SidebarInset className="flex flex-col overflow-hidden">
+          {/* Unified top header with toggle, page info, search, notifications */}
+          <AppHeader />
+          {/* Page content */}
+          <div className="flex-1 overflow-auto">
+            {children}
+          </div>
+        </SidebarInset>
+        {/* Global Command Menu - Cmd+K to open */}
+        <CommandMenu userRole={userData.role} />
+      </SidebarProvider>
+    </PageHeaderProvider>
   );
 }

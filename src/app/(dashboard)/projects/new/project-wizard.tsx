@@ -114,7 +114,8 @@ export function ProjectWizard({ clients, users }: ProjectWizardProps) {
       const supabase = createClient();
 
       // If creating new client, do that first
-      let clientId = selectedClientId || null;
+      // Handle "none" value as no client selected
+      let clientId = (selectedClientId && selectedClientId !== "none") ? selectedClientId : null;
 
       if (clientMode === "new" && newClientData.company_name) {
         const { data: newClient, error: clientError } = await supabase
@@ -353,7 +354,7 @@ export function ProjectWizard({ clients, users }: ProjectWizardProps) {
                       <SelectValue placeholder="Select a client (optional)" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">No client</SelectItem>
+                      <SelectItem value="none">No client</SelectItem>
                       {clients.map((client) => (
                         <SelectItem key={client.id} value={client.id}>
                           {client.company_name}
@@ -545,7 +546,7 @@ export function ProjectWizard({ clients, users }: ProjectWizardProps) {
                       </Badge>
                       {newClientData.company_name}
                     </p>
-                  ) : selectedClientId ? (
+                  ) : selectedClientId && selectedClientId !== "none" ? (
                     <p className="text-sm">
                       {clients.find((c) => c.id === selectedClientId)?.company_name}
                     </p>
