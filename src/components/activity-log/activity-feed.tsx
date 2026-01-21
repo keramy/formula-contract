@@ -32,173 +32,181 @@ import { ACTIVITY_ACTIONS } from "@/lib/activity-log/constants";
 
 type GradientColor = "coral" | "teal" | "violet" | "amber" | "rose" | "emerald" | "sky" | "slate";
 
-const actionConfig: Record<string, { icon: React.ReactNode; gradientColor: GradientColor; label: string }> = {
+// Action config with natural language verbs
+// Format: "has {verb}" to create sentences like "John has created ITEM-001 on project Moodup"
+const actionConfig: Record<string, { icon: React.ReactNode; gradientColor: GradientColor; verb: string; entityLabel?: string }> = {
   // Project actions
   [ACTIVITY_ACTIONS.PROJECT_CREATED]: {
     icon: <PlusIcon className="size-3.5" />,
     gradientColor: "emerald",
-    label: "Created project",
+    verb: "created",
+    entityLabel: "project",
   },
   [ACTIVITY_ACTIONS.PROJECT_UPDATED]: {
     icon: <EditIcon className="size-3.5" />,
     gradientColor: "violet",
-    label: "Updated project",
+    verb: "updated",
+    entityLabel: "project",
   },
   [ACTIVITY_ACTIONS.PROJECT_STATUS_CHANGED]: {
     icon: <ActivityIcon className="size-3.5" />,
     gradientColor: "amber",
-    label: "Changed project status",
+    verb: "changed status of",
+    entityLabel: "project",
   },
   [ACTIVITY_ACTIONS.PROJECT_DELETED]: {
     icon: <TrashIcon className="size-3.5" />,
     gradientColor: "rose",
-    label: "Deleted project",
+    verb: "deleted",
+    entityLabel: "project",
   },
 
   // User actions
   [ACTIVITY_ACTIONS.USER_CREATED]: {
     icon: <UserIcon className="size-3.5" />,
     gradientColor: "emerald",
-    label: "Created user",
+    verb: "created user",
   },
   [ACTIVITY_ACTIONS.USER_UPDATED]: {
     icon: <UserIcon className="size-3.5" />,
     gradientColor: "sky",
-    label: "Updated user",
+    verb: "updated user",
   },
   [ACTIVITY_ACTIONS.USER_DEACTIVATED]: {
     icon: <UserIcon className="size-3.5" />,
     gradientColor: "rose",
-    label: "Deactivated user",
+    verb: "deactivated user",
   },
   [ACTIVITY_ACTIONS.USER_ASSIGNED]: {
     icon: <UserIcon className="size-3.5" />,
     gradientColor: "violet",
-    label: "Assigned user to project",
+    verb: "assigned",
+    entityLabel: "to",
   },
   [ACTIVITY_ACTIONS.USER_UNASSIGNED]: {
     icon: <UserIcon className="size-3.5" />,
     gradientColor: "coral",
-    label: "Removed user from project",
+    verb: "removed",
+    entityLabel: "from",
   },
 
   // Scope item actions
   [ACTIVITY_ACTIONS.ITEM_CREATED]: {
     icon: <PlusIcon className="size-3.5" />,
     gradientColor: "emerald",
-    label: "Created scope item",
+    verb: "created",
   },
   [ACTIVITY_ACTIONS.ITEM_UPDATED]: {
     icon: <EditIcon className="size-3.5" />,
     gradientColor: "sky",
-    label: "Updated scope item",
+    verb: "updated",
   },
   [ACTIVITY_ACTIONS.ITEM_DELETED]: {
     icon: <TrashIcon className="size-3.5" />,
     gradientColor: "rose",
-    label: "Deleted scope item",
+    verb: "deleted",
   },
   [ACTIVITY_ACTIONS.ITEM_STATUS_CHANGED]: {
     icon: <ActivityIcon className="size-3.5" />,
     gradientColor: "amber",
-    label: "Changed item status",
+    verb: "changed status of",
   },
 
   // Drawing actions
   [ACTIVITY_ACTIONS.DRAWING_UPLOADED]: {
     icon: <UploadIcon className="size-3.5" />,
     gradientColor: "sky",
-    label: "Uploaded drawing",
+    verb: "uploaded drawing for",
   },
   [ACTIVITY_ACTIONS.DRAWING_SENT_TO_CLIENT]: {
     icon: <SendIcon className="size-3.5" />,
     gradientColor: "amber",
-    label: "Sent drawing to client",
+    verb: "sent drawing to client for",
   },
   [ACTIVITY_ACTIONS.DRAWING_APPROVED]: {
     icon: <CheckCircleIcon className="size-3.5" />,
     gradientColor: "emerald",
-    label: "Approved drawing",
+    verb: "approved drawing for",
   },
   [ACTIVITY_ACTIONS.DRAWING_REJECTED]: {
     icon: <XCircleIcon className="size-3.5" />,
     gradientColor: "rose",
-    label: "Rejected drawing",
+    verb: "rejected drawing for",
   },
   [ACTIVITY_ACTIONS.DRAWING_PM_OVERRIDE]: {
     icon: <CheckCircleIcon className="size-3.5" />,
     gradientColor: "coral",
-    label: "PM override on drawing",
+    verb: "PM override approved drawing for",
   },
 
   // Material actions
   [ACTIVITY_ACTIONS.MATERIAL_CREATED]: {
     icon: <PackageIcon className="size-3.5" />,
     gradientColor: "teal",
-    label: "Created material",
+    verb: "created material",
   },
   [ACTIVITY_ACTIONS.MATERIAL_UPDATED]: {
     icon: <PackageIcon className="size-3.5" />,
     gradientColor: "sky",
-    label: "Updated material",
+    verb: "updated material",
   },
   [ACTIVITY_ACTIONS.MATERIAL_SENT_TO_CLIENT]: {
     icon: <SendIcon className="size-3.5" />,
     gradientColor: "amber",
-    label: "Sent material to client",
+    verb: "sent material to client",
   },
   [ACTIVITY_ACTIONS.MATERIAL_APPROVED]: {
     icon: <CheckCircleIcon className="size-3.5" />,
     gradientColor: "emerald",
-    label: "Approved material",
+    verb: "approved material",
   },
   [ACTIVITY_ACTIONS.MATERIAL_REJECTED]: {
     icon: <XCircleIcon className="size-3.5" />,
     gradientColor: "rose",
-    label: "Rejected material",
+    verb: "rejected material",
   },
 
   // Report actions
   [ACTIVITY_ACTIONS.REPORT_CREATED]: {
     icon: <FileTextIcon className="size-3.5" />,
     gradientColor: "violet",
-    label: "Created report",
+    verb: "created report",
   },
   [ACTIVITY_ACTIONS.REPORT_PUBLISHED]: {
     icon: <FileTextIcon className="size-3.5" />,
     gradientColor: "teal",
-    label: "Published report",
+    verb: "published report",
   },
 
   // Client actions
   [ACTIVITY_ACTIONS.CLIENT_CREATED]: {
     icon: <UserIcon className="size-3.5" />,
     gradientColor: "teal",
-    label: "Created client",
+    verb: "created client",
   },
   [ACTIVITY_ACTIONS.CLIENT_UPDATED]: {
     icon: <UserIcon className="size-3.5" />,
     gradientColor: "sky",
-    label: "Updated client",
+    verb: "updated client",
   },
 
   // Auth actions
   [ACTIVITY_ACTIONS.USER_LOGIN]: {
     icon: <UserIcon className="size-3.5" />,
     gradientColor: "emerald",
-    label: "User logged in",
+    verb: "logged in",
   },
   [ACTIVITY_ACTIONS.PASSWORD_CHANGED]: {
     icon: <UserIcon className="size-3.5" />,
     gradientColor: "amber",
-    label: "Changed password",
+    verb: "changed password",
   },
 };
 
 const defaultConfig = {
   icon: <ActivityIcon className="size-3.5" />,
   gradientColor: "slate" as GradientColor,
-  label: "Activity",
+  verb: "performed action on",
 };
 
 interface ActivityFeedProps {
@@ -238,20 +246,66 @@ export function ActivityFeed({
     return actionConfig[action] || defaultConfig;
   };
 
+  // Get entity identifier (item code, material code, name, etc.)
   const getEntityLabel = (activity: ActivityLog) => {
     const details = activity.details as Record<string, string> | null;
 
-    if (details?.name) {
-      return details.name;
-    }
-    if (details?.item_code) {
-      return details.item_code;
-    }
-    if (details?.project_code) {
-      return details.project_code;
+    // Prefer code over name for clarity
+    if (details?.item_code) return details.item_code;
+    if (details?.material_code) return details.material_code;
+    if (details?.project_code) return details.project_code;
+    if (details?.name) return details.name;
+
+    return null;
+  };
+
+  // Build natural sentence: "John has updated ITEM-001 on project Moodup"
+  const buildActivitySentence = (activity: ActivityLog, config: { verb: string; entityLabel?: string }) => {
+    const userName = activity.user?.name || "System";
+    const verb = config.verb;
+    const entityLabel = getEntityLabel(activity);
+    const projectName = activity.project?.name;
+    const projectCode = activity.project?.project_code;
+
+    // For project-level actions, show project name directly
+    if (activity.entity_type === "project" && (config as any).entityLabel === "project") {
+      return (
+        <>
+          <span className="font-semibold">{userName}</span>
+          {" has "}
+          <span className="text-muted-foreground">{verb}</span>
+          {entityLabel && (
+            <>
+              {" "}
+              <span className="font-semibold">{entityLabel}</span>
+            </>
+          )}
+        </>
+      );
     }
 
-    return activity.entity_type;
+    // For other actions: "John has updated ITEM-001 on project Moodup"
+    return (
+      <>
+        <span className="font-semibold">{userName}</span>
+        {" has "}
+        <span className="text-muted-foreground">{verb}</span>
+        {entityLabel && (
+          <>
+            {" "}
+            <span className="font-semibold">{entityLabel}</span>
+          </>
+        )}
+        {projectName && (
+          <>
+            {" "}
+            <span className="text-muted-foreground">on project</span>
+            {" "}
+            <span className="font-semibold">{projectName}</span>
+          </>
+        )}
+      </>
+    );
   };
 
   if (isLoading) {
@@ -314,37 +368,14 @@ export function ActivityFeed({
                       {/* Content */}
                       <div className="flex-1 min-w-0 pb-1">
                         <div className="bg-gray-50/50 rounded-lg p-3 group-hover:bg-gray-100/70 transition-colors">
-                          <p className="text-sm">
-                            <span className="font-semibold text-foreground">
-                              {activity.user?.name || "System"}
-                            </span>{" "}
-                            <span className="text-muted-foreground">
-                              {config.label.toLowerCase()}
-                            </span>
-                            {getEntityLabel(activity) && (
-                              <>
-                                {" "}
-                                <span className="font-semibold text-foreground">
-                                  {getEntityLabel(activity)}
-                                </span>
-                              </>
-                            )}
+                          <p className="text-sm leading-relaxed">
+                            {buildActivitySentence(activity, config)}
                           </p>
-                          <div className="flex items-center gap-2 mt-2">
-                            {activity.project && (
-                              <Badge
-                                variant="secondary"
-                                className="text-xs font-mono bg-violet-100 text-violet-700 hover:bg-violet-100"
-                              >
-                                {activity.project.project_code}
-                              </Badge>
-                            )}
-                            <span className="text-xs text-muted-foreground">
-                              {formatDistanceToNow(new Date(activity.created_at), {
-                                addSuffix: true,
-                              })}
-                            </span>
-                          </div>
+                          <p className="text-xs text-muted-foreground mt-1.5">
+                            {formatDistanceToNow(new Date(activity.created_at), {
+                              addSuffix: true,
+                            })}
+                          </p>
                         </div>
                       </div>
                     </div>

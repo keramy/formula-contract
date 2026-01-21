@@ -82,7 +82,7 @@ export function CommandMenu({ userRole = "pm" }: CommandMenuProps) {
 
   const debouncedQuery = useDebounce(query, 200);
 
-  // Handle keyboard shortcut
+  // Handle keyboard shortcut (Cmd+K / Ctrl+K)
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
@@ -93,6 +93,13 @@ export function CommandMenu({ userRole = "pm" }: CommandMenuProps) {
 
     document.addEventListener("keydown", down);
     return () => document.removeEventListener("keydown", down);
+  }, []);
+
+  // Handle custom event from search bar click
+  useEffect(() => {
+    const handleOpenSearch = () => setOpen(true);
+    window.addEventListener("open-command-menu", handleOpenSearch);
+    return () => window.removeEventListener("open-command-menu", handleOpenSearch);
   }, []);
 
   // Load recent items when dialog opens

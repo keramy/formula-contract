@@ -58,6 +58,7 @@ const gradientIconVariants = cva(
   {
     variants: {
       size: {
+        xs: "p-1 size-6",
         sm: "p-1.5 size-8",
         default: "p-2 size-10",
         lg: "p-3 size-12",

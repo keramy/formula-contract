@@ -44,6 +44,91 @@ export interface ClientProjectProgress {
   pendingApprovals: number;
 }
 
+export interface DashboardStats {
+  projectCounts: {
+    total: number;
+    tender: number;
+    active: number;
+    on_hold: number;
+    completed: number;
+    cancelled: number;
+  };
+  recentProjects: Array<{
+    id: string;
+    slug: string | null;
+    project_code: string;
+    name: string;
+    status: string;
+    client: { company_name: string | null } | null;
+  }>;
+}
+
+/**
+ * Get dashboard stats filtered by assigned project IDs
+ * Used for PM, Production, Procurement roles who only see their projects
+ */
+export async function getMyDashboardStats(assignedProjectIds: string[]): Promise<DashboardStats> {
+  const supabase = await createClient();
+
+  if (assignedProjectIds.length === 0) {
+    return {
+      projectCounts: { total: 0, tender: 0, active: 0, on_hold: 0, completed: 0, cancelled: 0 },
+      recentProjects: [],
+    };
+  }
+
+  // Fetch projects and clients in parallel
+  const [{ data: projectsData }, { data: clientsData }] = await Promise.all([
+    supabase
+      .from("projects")
+      .select("id, slug, project_code, name, status, client_id")
+      .eq("is_deleted", false)
+      .in("id", assignedProjectIds)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("clients")
+      .select("id, company_name"),
+  ]);
+
+  // Type assertion for projects with slug (column added by migration 015)
+  const projects = (projectsData as unknown as Array<{
+    id: string;
+    slug: string | null;
+    project_code: string;
+    name: string;
+    status: string;
+    client_id: string | null;
+  }>) || [];
+
+  // Build client map
+  const clientMap = new Map<string, string>();
+  clientsData?.forEach((c: { id: string; company_name: string }) => {
+    clientMap.set(c.id, c.company_name);
+  });
+
+  // Calculate status counts
+  const projectCounts = {
+    total: projects.length,
+    tender: projects.filter(p => p.status === "tender").length,
+    active: projects.filter(p => p.status === "active").length,
+    on_hold: projects.filter(p => p.status === "on_hold").length,
+    completed: projects.filter(p => p.status === "completed").length,
+    cancelled: projects.filter(p => p.status === "cancelled").length,
+  };
+
+  // Get recent 5 projects with client info
+  const recentProjects = projects.slice(0, 5).map(p => ({
+    id: p.id,
+    slug: p.slug,
+    project_code: p.project_code,
+    name: p.name,
+    status: p.status,
+    client: p.client_id ? { company_name: clientMap.get(p.client_id) || null } : null,
+  }));
+
+  return { projectCounts, recentProjects };
+}
+
 /**
  * Get aggregated task counts for PM/Admin dashboards
  * Shows what needs attention right now

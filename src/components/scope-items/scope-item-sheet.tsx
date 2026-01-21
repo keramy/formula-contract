@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ScopeItemImageUpload } from "@/components/scope-items/scope-item-image-upload";
+import { InstallationStatusEditor } from "@/components/scope-items/installation-status-editor";
 import type { ItemPath, ItemStatus } from "@/types/database";
 
 interface ScopeItemSheetProps {
@@ -154,6 +155,7 @@ export function ScopeItemSheet({
   // Read-only data (only for editing existing items)
   const [productionProgress, setProductionProgress] = useState(0);
   const [isInstalled, setIsInstalled] = useState(false);
+  const [installedAt, setInstalledAt] = useState<string | null>(null);
   const [drawing, setDrawing] = useState<Drawing | null>(null);
   const [materials, setMaterials] = useState<Material[]>([]);
 
@@ -183,6 +185,7 @@ export function ScopeItemSheet({
     setErrors({});
     setProductionProgress(0);
     setIsInstalled(false);
+    setInstalledAt(null);
     setDrawing(null);
     setMaterials([]);
   };
@@ -233,6 +236,7 @@ export function ScopeItemSheet({
         setImages(item.images || []);
         setProductionProgress(item.production_percentage || 0);
         setIsInstalled(item.is_installed || false);
+        setInstalledAt(item.installed_at || null);
       }
 
       if (drawingResult.data) {
@@ -699,14 +703,18 @@ export function ScopeItemSheet({
                       </div>
                     )}
 
-                    {/* Installation Status */}
-                    <div className="p-3 rounded-lg bg-muted/50 border">
-                      <div className="flex items-center gap-2">
-                        <CheckCircleIcon className={`size-4 ${isInstalled ? "text-emerald-600" : "text-muted-foreground"}`} />
-                        <span className="text-sm font-medium">
-                          {isInstalled ? "Installed" : "Not Installed"}
-                        </span>
+                    {/* Installation Status - Interactive toggle */}
+                    <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-100">
+                      <div className="flex items-center gap-2 mb-2 text-emerald-700">
+                        <CheckCircleIcon className="size-4" />
+                        <span className="text-sm font-medium">Installation Status</span>
                       </div>
+                      <InstallationStatusEditor
+                        scopeItemId={itemId!}
+                        isInstalled={isInstalled}
+                        installedAt={installedAt}
+                        readOnly={isViewOnly}
+                      />
                     </div>
                   </div>
                 </>

@@ -47,10 +47,13 @@ export function usePageHeader() {
 
 interface AppHeaderProps {
   className?: string;
-  onSearchClick?: () => void;
 }
 
-export function AppHeader({ className, onSearchClick }: AppHeaderProps) {
+export function AppHeader({ className }: AppHeaderProps) {
+  const handleSearchClick = () => {
+    // Dispatch custom event to open CommandMenu
+    window.dispatchEvent(new CustomEvent("open-command-menu"));
+  };
   const { isMobile } = useSidebar();
   const headerContext = useContext(PageHeaderContext);
   const content = headerContext?.content || {};
@@ -92,7 +95,7 @@ export function AppHeader({ className, onSearchClick }: AppHeaderProps) {
       <div className="flex-1 flex justify-center max-w-xl mx-auto">
         <Button
           variant="outline"
-          onClick={onSearchClick}
+          onClick={handleSearchClick}
           className="w-full max-w-md h-9 px-3 justify-start text-muted-foreground font-normal bg-gray-50/50 border-gray-200 hover:bg-gray-100 hover:border-gray-300"
         >
           <SearchIcon className="size-4 mr-2 shrink-0" />
