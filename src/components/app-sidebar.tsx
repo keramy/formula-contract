@@ -24,10 +24,10 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarRail,
   SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { UserMenu } from "@/components/user-menu";
-import { NotificationsDropdown } from "@/components/notifications/notifications-dropdown";
 
 interface AppSidebarProps {
   user: {
@@ -139,21 +139,17 @@ export function AppSidebar({ user }: AppSidebarProps) {
   const filteredManagementItems = managementNavItems.filter(item => canAccess(item.href, user.role));
 
   return (
-    <Sidebar className="border-r-0">
-      {/* Header with Gradient Logo and Notifications */}
+    <Sidebar collapsible="icon" className="border-r-0">
+      {/* Header with Gradient Logo */}
       <SidebarHeader className="border-b border-sidebar-border/50">
-        <div className="flex items-center justify-between px-2 py-2">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 text-white font-bold text-sm shadow-lg shadow-violet-500/25">
-              FC
-            </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-semibold tracking-tight">Formula Contract</span>
-              <span className="text-xs text-muted-foreground">Project Management</span>
-            </div>
+        <div className="flex items-center gap-3 px-2 py-2">
+          <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 text-white font-bold text-sm shadow-lg shadow-violet-500/25 shrink-0">
+            FC
           </div>
-          {/* Notifications Bell */}
-          <NotificationsDropdown />
+          <div className="flex flex-col min-w-0 group-data-[collapsible=icon]:hidden">
+            <span className="text-sm font-semibold tracking-tight truncate">Formula Contract</span>
+            <span className="text-xs text-muted-foreground truncate">Project Management</span>
+          </div>
         </div>
       </SidebarHeader>
 
@@ -162,7 +158,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
         {/* Main Navigation */}
         {filteredMainItems.length > 0 && (
           <SidebarGroup>
-            <SidebarGroupLabel className="text-xs font-medium text-muted-foreground/70 uppercase tracking-wider px-2">
+            <SidebarGroupLabel className="text-xs font-medium text-muted-foreground/70 uppercase tracking-wider px-2 group-data-[collapsible=icon]:hidden">
               Main
             </SidebarGroupLabel>
             <SidebarGroupContent>
@@ -200,7 +196,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
 
             {/* Management Navigation */}
             <SidebarGroup>
-              <SidebarGroupLabel className="text-xs font-medium text-muted-foreground/70 uppercase tracking-wider px-2">
+              <SidebarGroupLabel className="text-xs font-medium text-muted-foreground/70 uppercase tracking-wider px-2 group-data-[collapsible=icon]:hidden">
                 Management
               </SidebarGroupLabel>
               <SidebarGroupContent>
@@ -242,6 +238,9 @@ export function AppSidebar({ user }: AppSidebarProps) {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
+
+      {/* Rail for collapse/expand on hover at edge */}
+      <SidebarRail />
     </Sidebar>
   );
 }

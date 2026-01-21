@@ -10,23 +10,32 @@ interface MobileHeaderProps {
 }
 
 /**
- * Mobile header that displays:
- * - Hamburger menu trigger to open the sidebar sheet
- * - App branding
- * - Notifications dropdown
- *
- * Only visible on mobile screens (md:hidden)
+ * Unified header component:
+ * - Mobile: Shows hamburger menu, app branding, and notifications
+ * - Desktop: Shows just notifications bell in top-right corner
  */
 export function MobileHeader({ className }: MobileHeaderProps) {
   const { isMobile } = useSidebar();
 
-  // Only render on mobile
-  if (!isMobile) return null;
+  // Desktop: minimal header with just notifications
+  if (!isMobile) {
+    return (
+      <header
+        className={cn(
+          "sticky top-0 z-40 flex h-14 items-center justify-end border-b bg-white/95 backdrop-blur-sm px-6",
+          className
+        )}
+      >
+        <NotificationsDropdown />
+      </header>
+    );
+  }
 
+  // Mobile: full header with hamburger, branding, and notifications
   return (
     <header
       className={cn(
-        "sticky top-0 z-40 flex h-14 items-center gap-3 border-b bg-white/95 backdrop-blur-sm px-4 md:hidden",
+        "sticky top-0 z-40 flex h-14 items-center gap-3 border-b bg-white/95 backdrop-blur-sm px-4",
         className
       )}
     >
