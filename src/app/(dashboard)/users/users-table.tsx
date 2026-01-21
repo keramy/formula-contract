@@ -251,7 +251,7 @@ export function UsersTable({ users }: UsersTableProps) {
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {user.last_login_at
-                        ? format(new Date(user.last_login_at), "MMM d, yyyy")
+                        ? format(new Date(user.last_login_at), "MMM d, yyyy 'at' h:mm a")
                         : "Never"}
                     </TableCell>
                     <TableCell>

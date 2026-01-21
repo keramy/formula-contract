@@ -72,19 +72,22 @@ export default async function ProjectsPage() {
   // Filter and process data (client-side - fast)
   // ============================================================================
 
-  // For client users, filter to only assigned projects
+  // Admin and Management see ALL projects
+  // Everyone else (PM, production, procurement, client) sees only assigned projects
   let projectsData = (allProjects || []) as unknown as Project[];
-  if (userRole === "client") {
+  const canSeeAllProjects = ["admin", "management"].includes(userRole);
+
+  if (!canSeeAllProjects) {
     if (assignedProjectIds.length === 0) {
       return (
         <div className="p-6">
           <ProjectsPageHeader
             title="My Projects"
             subtitle="View your assigned projects"
-            canCreateProject={false}
+            canCreateProject={canCreateProject}
           />
           <div className="py-8 text-center text-muted-foreground">
-            No projects assigned yet. Please contact your project manager.
+            No projects assigned yet. Please contact your administrator.
           </div>
         </div>
       );
@@ -135,10 +138,10 @@ export default async function ProjectsPage() {
     <div className="p-6">
       {/* Page Header */}
       <ProjectsPageHeader
-        title={userRole === "client" ? "My Projects" : "Projects"}
-        subtitle={userRole === "client"
-          ? "View your assigned projects and track progress"
-          : "Manage your furniture manufacturing projects"}
+        title={canSeeAllProjects ? "Projects" : "My Projects"}
+        subtitle={canSeeAllProjects
+          ? "Manage your furniture manufacturing projects"
+          : "View your assigned projects and track progress"}
         canCreateProject={canCreateProject}
       />
 
