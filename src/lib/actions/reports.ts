@@ -141,55 +141,83 @@ async function sendReportPublishedNotification(
         await resend.emails.send({
           from: "Formula Contract <noreply@formulacontractpm.com>",
           to: user.email,
-          subject: `New Report Published: ${projectName}`,
+          subject: `📊 New Report Published: ${projectName}`,
           html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <div style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); color: white; padding: 24px; text-align: center; border-radius: 8px 8px 0 0;">
-                <h1 style="margin: 0; font-size: 24px;">📊 New Report Published</h1>
-              </div>
-
-              <div style="padding: 30px; background-color: #f9fafb; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
-                <p style="color: #374151; font-size: 16px; margin-top: 0;">Hi ${user.name},</p>
-
-                <p style="color: #6b7280; font-size: 15px;">
-                  A new <strong>${reportType}</strong> report has been published for your project.
-                </p>
-
-                <div style="background-color: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 24px 0;">
-                  <table style="width: 100%; border-collapse: collapse;">
-                    <tr>
-                      <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Project:</td>
-                      <td style="padding: 8px 0; color: #111827; font-weight: 600; font-size: 14px;">${projectName}</td>
-                    </tr>
-                    <tr>
-                      <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Project Code:</td>
-                      <td style="padding: 8px 0; color: #111827; font-family: monospace; font-size: 14px;">${projectCode}</td>
-                    </tr>
-                    <tr>
-                      <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Report Type:</td>
-                      <td style="padding: 8px 0; color: #111827; font-size: 14px; text-transform: capitalize;">${reportType}</td>
-                    </tr>
-                    <tr>
-                      <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Published By:</td>
-                      <td style="padding: 8px 0; color: #111827; font-size: 14px;">${publisherName}</td>
-                    </tr>
-                  </table>
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            </head>
+            <body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+              <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+                <!-- Header -->
+                <div style="background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 50%, #5b21b6 100%); padding: 40px 30px; text-align: center; border-radius: 16px 16px 0 0;">
+                  <div style="display: inline-block; background: rgba(255,255,255,0.15); padding: 12px 24px; border-radius: 50px; margin-bottom: 16px;">
+                    <span style="color: white; font-size: 14px; font-weight: 600; letter-spacing: 1px;">FORMULA CONTRACT</span>
+                  </div>
+                  <h1 style="margin: 0; color: white; font-size: 28px; font-weight: 700;">📊 New Report Published</h1>
+                  <p style="margin: 12px 0 0 0; color: rgba(255,255,255,0.85); font-size: 16px;">A new report is ready for your review</p>
                 </div>
 
-                <a href="${siteUrl}/projects/${projectId}?tab=reports"
-                   style="display: inline-block; background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;">
-                  View Report
-                </a>
+                <!-- Main Content -->
+                <div style="background-color: white; padding: 40px 30px; border-radius: 0 0 16px 16px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);">
+                  <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 24px 0;">
+                    Hi <strong>${user.name}</strong>,
+                  </p>
+                  <p style="color: #6b7280; font-size: 15px; line-height: 1.6; margin: 0 0 24px 0;">
+                    A new <strong style="color: #7c3aed;">${reportType}</strong> report has been published for your project. Click below to view the details.
+                  </p>
 
-                <p style="color: #9ca3af; font-size: 13px; margin-top: 24px; margin-bottom: 0;">
-                  You're receiving this because you're a team member on this project.
-                </p>
-              </div>
+                  <!-- Report Details Box -->
+                  <div style="background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%); border: 1px solid #ddd6fe; border-radius: 12px; padding: 24px; margin: 24px 0;">
+                    <div style="display: flex; margin-bottom: 16px; border-bottom: 1px solid #ddd6fe; padding-bottom: 16px;">
+                      <div style="flex: 1;">
+                        <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Project</p>
+                        <p style="margin: 0; color: #111827; font-size: 16px; font-weight: 600;">${projectName}</p>
+                      </div>
+                      <div>
+                        <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Code</p>
+                        <code style="display: inline-block; background: white; color: #7c3aed; padding: 4px 12px; border-radius: 4px; font-size: 14px; font-weight: 600;">${projectCode}</code>
+                      </div>
+                    </div>
+                    <div style="display: flex;">
+                      <div style="flex: 1;">
+                        <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Report Type</p>
+                        <p style="margin: 0; color: #111827; font-size: 15px; font-weight: 500; text-transform: capitalize;">${reportType}</p>
+                      </div>
+                      <div style="flex: 1;">
+                        <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Published By</p>
+                        <p style="margin: 0; color: #111827; font-size: 15px; font-weight: 500;">${publisherName}</p>
+                      </div>
+                    </div>
+                  </div>
 
-              <div style="padding: 16px; text-align: center; color: #9ca3af; font-size: 12px;">
-                <p style="margin: 0;">Formula Contract • Project Management System</p>
+                  <!-- CTA Button -->
+                  <div style="text-align: center; margin-top: 32px;">
+                    <a href="${siteUrl}/projects/${projectId}?tab=reports"
+                       style="display: inline-block; background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); color: white; padding: 16px 40px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 14px rgba(124, 58, 237, 0.4);">
+                      View Report →
+                    </a>
+                  </div>
+
+                  <!-- Info Notice -->
+                  <p style="color: #9ca3af; font-size: 13px; margin-top: 32px; margin-bottom: 0; text-align: center;">
+                    You're receiving this because you're a team member on this project.
+                  </p>
+                </div>
+
+                <!-- Footer -->
+                <div style="text-align: center; padding: 32px 20px;">
+                  <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px; font-weight: 600;">Formula Contract</p>
+                  <p style="margin: 0 0 16px 0; color: #9ca3af; font-size: 13px;">Project Management for Furniture Manufacturing</p>
+                  <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                    <a href="https://formulacontractpm.com" style="color: #7c3aed; text-decoration: none;">formulacontractpm.com</a>
+                  </p>
+                </div>
               </div>
-            </div>
+            </body>
+            </html>
           `,
         });
       }
