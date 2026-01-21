@@ -471,18 +471,20 @@ export default async function ProjectDetailPage({
               </CardContent>
             </GlassCard>
 
-            {/* Contract Value */}
-            <GlassCard>
-              <CardHeader className="flex flex-row items-center gap-3 pb-2">
-                <GradientIcon icon={<BanknoteIcon className="size-4" />} size="sm" color="emerald" />
-                <CardTitle className="text-sm font-medium">Contract Value</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="font-semibold text-lg">
-                  {formatCurrency(project.contract_value_manual, project.currency)}
-                </p>
-              </CardContent>
-            </GlassCard>
+            {/* Contract Value - Hidden from clients */}
+            {!isClient && (
+              <GlassCard>
+                <CardHeader className="flex flex-row items-center gap-3 pb-2">
+                  <GradientIcon icon={<BanknoteIcon className="size-4" />} size="sm" color="emerald" />
+                  <CardTitle className="text-sm font-medium">Contract Value</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="font-semibold text-lg">
+                    {formatCurrency(project.contract_value_manual, project.currency)}
+                  </p>
+                </CardContent>
+              </GlassCard>
+            )}
 
             {/* Scope Summary */}
             <GlassCard>
@@ -518,7 +520,7 @@ export default async function ProjectDetailPage({
             <div>
               <h3 className="text-lg font-medium">Scope Items</h3>
               <p className="text-sm text-muted-foreground">
-                {scopeItems.length} items totaling {formatCurrency(totalValue, project.currency)}
+                {scopeItems.length} items{!isClient && ` totaling ${formatCurrency(totalValue, project.currency)}`}
               </p>
             </div>
             <div className="flex gap-2">
@@ -550,6 +552,7 @@ export default async function ProjectDetailPage({
               name: m.name,
             }))}
             currency={project.currency}
+            isClient={isClient}
           />
         </TabsContent>
 
@@ -563,6 +566,8 @@ export default async function ProjectDetailPage({
               name: item.name,
             }))}
             drawings={drawings}
+            projectCurrency={project.currency}
+            isClient={isClient}
           />
         </TabsContent>
 

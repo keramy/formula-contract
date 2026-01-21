@@ -8,6 +8,7 @@
  * - Report line management
  * - Publishing/unpublishing
  * - Sharing and photo uploads
+ * - Email notifications on publish
  */
 
 import { createClient } from "@/lib/supabase/server";
@@ -15,6 +16,8 @@ import { revalidatePath } from "next/cache";
 import { logActivity } from "@/lib/activity-log/actions";
 import { ACTIVITY_ACTIONS } from "@/lib/activity-log/constants";
 import { sanitizeText, sanitizeHTML } from "@/lib/sanitize";
+import { createNotification } from "@/lib/notifications/actions";
+import { Resend } from "resend";
 
 // ============================================================================
 // Types
@@ -59,6 +62,135 @@ export interface ActionResult<T = void> {
   success: boolean;
   data?: T;
   error?: string;
+}
+
+// ============================================================================
+// Email Notification Helper
+// ============================================================================
+
+/**
+ * Send notifications (in-app + email) to all project team members when a report is published
+ */
+async function sendReportPublishedNotification(
+  projectId: string,
+  reportId: string,
+  projectName: string,
+  projectCode: string,
+  reportType: string,
+  publisherName: string,
+  publisherId: string
+): Promise<{ sent: number; failed: number }> {
+  const supabase = await createClient();
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+
+  // Get all users assigned to this project
+  const { data: assignments, error } = await supabase
+    .from("project_assignments")
+    .select(`
+      user:users!project_assignments_user_id_fkey(id, name, email, is_active)
+    `)
+    .eq("project_id", projectId);
+
+  if (error || !assignments) {
+    console.error("Error fetching project team for notifications:", error?.message);
+    return { sent: 0, failed: 0 };
+  }
+
+  // Extract active users (exclude the publisher - they don't need to be notified about their own action)
+  const users = assignments
+    .filter(a => a.user && a.user.is_active && a.user.id !== publisherId)
+    .map(a => a.user as { id: string; name: string; email: string });
+
+  if (users.length === 0) {
+    console.log("No other active users to notify for project:", projectId);
+    return { sent: 0, failed: 0 };
+  }
+
+  let sent = 0;
+  let failed = 0;
+
+  // Create in-app notifications and send emails to each team member
+  for (const user of users) {
+    try {
+      // 1. Create in-app notification (bell icon)
+      await createNotification({
+        userId: user.id,
+        type: "report_published",
+        title: `New ${reportType} report published`,
+        message: `${publisherName} published a new report for ${projectName}`,
+        projectId: projectId,
+        reportId: reportId,
+      });
+
+      // 2. Send email notification (if Resend is configured)
+      const apiKey = process.env.RESEND_API_KEY;
+      if (apiKey && user.email) {
+        const resend = new Resend(apiKey);
+        await resend.emails.send({
+          from: "Formula Contract <onboarding@resend.dev>", // Use verified domain in production
+          to: user.email,
+          subject: `New Report Published: ${projectName}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <div style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); color: white; padding: 24px; text-align: center; border-radius: 8px 8px 0 0;">
+                <h1 style="margin: 0; font-size: 24px;">📊 New Report Published</h1>
+              </div>
+
+              <div style="padding: 30px; background-color: #f9fafb; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
+                <p style="color: #374151; font-size: 16px; margin-top: 0;">Hi ${user.name},</p>
+
+                <p style="color: #6b7280; font-size: 15px;">
+                  A new <strong>${reportType}</strong> report has been published for your project.
+                </p>
+
+                <div style="background-color: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 24px 0;">
+                  <table style="width: 100%; border-collapse: collapse;">
+                    <tr>
+                      <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Project:</td>
+                      <td style="padding: 8px 0; color: #111827; font-weight: 600; font-size: 14px;">${projectName}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Project Code:</td>
+                      <td style="padding: 8px 0; color: #111827; font-family: monospace; font-size: 14px;">${projectCode}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Report Type:</td>
+                      <td style="padding: 8px 0; color: #111827; font-size: 14px; text-transform: capitalize;">${reportType}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Published By:</td>
+                      <td style="padding: 8px 0; color: #111827; font-size: 14px;">${publisherName}</td>
+                    </tr>
+                  </table>
+                </div>
+
+                <a href="${siteUrl}/projects/${projectId}?tab=reports"
+                   style="display: inline-block; background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;">
+                  View Report
+                </a>
+
+                <p style="color: #9ca3af; font-size: 13px; margin-top: 24px; margin-bottom: 0;">
+                  You're receiving this because you're a team member on this project.
+                </p>
+              </div>
+
+              <div style="padding: 16px; text-align: center; color: #9ca3af; font-size: 12px;">
+                <p style="margin: 0;">Formula Contract • Project Management System</p>
+              </div>
+            </div>
+          `,
+        });
+      }
+
+      sent++;
+    } catch (notifyError) {
+      console.error(`Failed to send report notification to ${user.email}:`, notifyError);
+      failed++;
+    }
+  }
+
+  console.log(`Report notifications: ${sent} sent, ${failed} failed`);
+  return { sent, failed };
 }
 
 // ============================================================================
@@ -383,7 +515,7 @@ export async function deleteReport(reportId: string): Promise<ActionResult> {
 // ============================================================================
 
 /**
- * Publish a report
+ * Publish a report and notify all project team members via email
  */
 export async function publishReport(reportId: string): Promise<ActionResult> {
   const supabase = await createClient();
@@ -391,12 +523,29 @@ export async function publishReport(reportId: string): Promise<ActionResult> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { success: false, error: "Not authenticated" };
 
-  // Get project ID for revalidation and logging
+  // Get report details including project info for notifications
   const { data: report } = await supabase
     .from("reports")
-    .select("project_id")
+    .select(`
+      project_id,
+      report_type,
+      project:projects!reports_project_id_fkey(name, project_code)
+    `)
     .eq("id", reportId)
     .single();
+
+  if (!report) {
+    return { success: false, error: "Report not found" };
+  }
+
+  // Get the publisher's name
+  const { data: publisher } = await supabase
+    .from("users")
+    .select("name")
+    .eq("id", user.id)
+    .single();
+
+  const publisherName = publisher?.name || "A team member";
 
   const { error } = await supabase
     .from("reports")
@@ -412,7 +561,7 @@ export async function publishReport(reportId: string): Promise<ActionResult> {
   }
 
   // Log activity
-  if (report?.project_id) {
+  if (report.project_id) {
     await logActivity({
       action: ACTIVITY_ACTIONS.REPORT_PUBLISHED,
       entityType: "report",
@@ -420,6 +569,23 @@ export async function publishReport(reportId: string): Promise<ActionResult> {
       projectId: report.project_id,
     });
     revalidatePath(`/projects/${report.project_id}`);
+
+    // Send in-app + email notifications to all project team members
+    // This runs async and doesn't block the response
+    const project = report.project as { name: string; project_code: string } | null;
+    if (project) {
+      sendReportPublishedNotification(
+        report.project_id,
+        reportId,
+        project.name,
+        project.project_code,
+        report.report_type,
+        publisherName,
+        user.id
+      ).catch(err => {
+        console.error("Error sending report notifications:", err);
+      });
+    }
   }
 
   return { success: true };

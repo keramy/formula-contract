@@ -49,6 +49,8 @@ interface ScopeItemSheetProps {
   /** Pass itemId to edit an existing item (will fetch complete data) */
   itemId?: string | null;
   onSuccess?: () => void;
+  /** When true, shows view-only mode with no pricing info (for clients) */
+  isClient?: boolean;
 }
 
 interface ScopeItemData {
@@ -124,11 +126,14 @@ export function ScopeItemSheet({
   onOpenChange,
   itemId,
   onSuccess,
+  isClient = false,
 }: ScopeItemSheetProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [isLoading, setIsLoading] = useState(false);
   const isEditing = !!itemId;
+  // Clients can only view, never edit
+  const isViewOnly = isClient;
 
   // Form state
   const [formData, setFormData] = useState({
@@ -359,10 +364,10 @@ export function ScopeItemSheet({
             <GradientIcon icon={<ClipboardListIcon className="size-5" />} color="violet" size="sm" />
             <div>
               <SheetTitle className="text-lg">
-                {isEditing ? "Edit Scope Item" : "Add Scope Item"}
+                {isViewOnly ? "View Scope Item" : isEditing ? "Edit Scope Item" : "Add Scope Item"}
               </SheetTitle>
               <SheetDescription>
-                {isEditing
+                {isEditing || isViewOnly
                   ? `${formData.item_code} • ${formData.name}`
                   : "Add a new item to this project"}
               </SheetDescription>
@@ -382,7 +387,7 @@ export function ScopeItemSheet({
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="item_code" className="text-sm font-medium">
-                    Item Code <span className="text-red-500">*</span>
+                    Item Code {!isViewOnly && <span className="text-red-500">*</span>}
                   </Label>
                   <Input
                     id="item_code"
@@ -390,6 +395,7 @@ export function ScopeItemSheet({
                     value={formData.item_code}
                     onChange={(e) => handleChange("item_code", e.target.value)}
                     className={`font-mono ${errors.item_code ? "border-red-500" : ""}`}
+                    disabled={isViewOnly}
                   />
                   {errors.item_code && (
                     <p className="text-xs text-red-500">{errors.item_code}</p>
@@ -398,7 +404,7 @@ export function ScopeItemSheet({
 
                 <div className="space-y-2">
                   <Label htmlFor="name" className="text-sm font-medium">
-                    Name <span className="text-red-500">*</span>
+                    Name {!isViewOnly && <span className="text-red-500">*</span>}
                   </Label>
                   <Input
                     id="name"
@@ -406,6 +412,7 @@ export function ScopeItemSheet({
                     value={formData.name}
                     onChange={(e) => handleChange("name", e.target.value)}
                     className={errors.name ? "border-red-500" : ""}
+                    disabled={isViewOnly}
                   />
                   {errors.name && (
                     <p className="text-xs text-red-500">{errors.name}</p>
@@ -425,6 +432,7 @@ export function ScopeItemSheet({
                   onChange={(e) => handleChange("description", e.target.value)}
                   rows={2}
                   className="resize-none"
+                  disabled={isViewOnly}
                 />
               </div>
 
@@ -435,6 +443,7 @@ export function ScopeItemSheet({
                   <Select
                     value={formData.item_path}
                     onValueChange={(value) => handleChange("item_path", value)}
+                    disabled={isViewOnly}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -461,6 +470,7 @@ export function ScopeItemSheet({
                   <Select
                     value={formData.status}
                     onValueChange={(value) => handleChange("status", value)}
+                    disabled={isViewOnly}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -483,6 +493,7 @@ export function ScopeItemSheet({
                   <Select
                     value={formData.unit}
                     onValueChange={(value) => handleChange("unit", value)}
+                    disabled={isViewOnly}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -499,7 +510,7 @@ export function ScopeItemSheet({
 
                 <div className="space-y-2">
                   <Label htmlFor="quantity" className="text-sm font-medium">
-                    Quantity <span className="text-red-500">*</span>
+                    Quantity {!isViewOnly && <span className="text-red-500">*</span>}
                   </Label>
                   <Input
                     id="quantity"
@@ -508,6 +519,7 @@ export function ScopeItemSheet({
                     value={formData.quantity}
                     onChange={(e) => handleChange("quantity", e.target.value)}
                     className={errors.quantity ? "border-red-500" : ""}
+                    disabled={isViewOnly}
                   />
                   {errors.quantity && (
                     <p className="text-xs text-red-500">{errors.quantity}</p>
@@ -515,64 +527,68 @@ export function ScopeItemSheet({
                 </div>
               </div>
 
-              {/* Pricing */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium">Pricing</Label>
-                  <span className="text-xs px-2 py-1 rounded-full bg-muted font-medium">
-                    {projectCurrency} ({currencySymbol})
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <Input
-                      id="unit_cost"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="Unit cost"
-                      value={formData.unit_cost}
-                      onChange={(e) => handleChange("unit_cost", e.target.value)}
-                    />
-                    <p className="text-xs text-muted-foreground">Our cost per unit</p>
+              {/* Pricing - Hidden from clients */}
+              {!isClient && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">Pricing</Label>
+                    <span className="text-xs px-2 py-1 rounded-full bg-muted font-medium">
+                      {projectCurrency} ({currencySymbol})
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <Input
+                        id="unit_cost"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="Unit cost"
+                        value={formData.unit_cost}
+                        onChange={(e) => handleChange("unit_cost", e.target.value)}
+                        disabled={isViewOnly}
+                      />
+                      <p className="text-xs text-muted-foreground">Our cost per unit</p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Input
+                        id="unit_sales_price"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="Sales price"
+                        value={formData.unit_sales_price}
+                        onChange={(e) => handleChange("unit_sales_price", e.target.value)}
+                        disabled={isViewOnly}
+                      />
+                      <p className="text-xs text-muted-foreground">Client pays per unit</p>
+                    </div>
                   </div>
 
-                  <div className="space-y-1">
-                    <Input
-                      id="unit_sales_price"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="Sales price"
-                      value={formData.unit_sales_price}
-                      onChange={(e) => handleChange("unit_sales_price", e.target.value)}
-                    />
-                    <p className="text-xs text-muted-foreground">Client pays per unit</p>
-                  </div>
+                  {/* Totals */}
+                  {(totalCost > 0 || totalSalesPrice > 0) && (
+                    <div className="p-3 rounded-lg bg-muted/50 grid grid-cols-2 gap-4 text-sm">
+                      {totalCost > 0 && (
+                        <div>
+                          <span className="text-muted-foreground">Total Cost:</span>
+                          <span className="ml-2 font-medium text-red-600">
+                            {currencySymbol}{totalCost.toLocaleString()}
+                          </span>
+                        </div>
+                      )}
+                      {totalSalesPrice > 0 && (
+                        <div>
+                          <span className="text-muted-foreground">Total Price:</span>
+                          <span className="ml-2 font-medium text-green-600">
+                            {currencySymbol}{totalSalesPrice.toLocaleString()}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-
-                {/* Totals */}
-                {(totalCost > 0 || totalSalesPrice > 0) && (
-                  <div className="p-3 rounded-lg bg-muted/50 grid grid-cols-2 gap-4 text-sm">
-                    {totalCost > 0 && (
-                      <div>
-                        <span className="text-muted-foreground">Total Cost:</span>
-                        <span className="ml-2 font-medium text-red-600">
-                          {currencySymbol}{totalCost.toLocaleString()}
-                        </span>
-                      </div>
-                    )}
-                    {totalSalesPrice > 0 && (
-                      <div>
-                        <span className="text-muted-foreground">Total Price:</span>
-                        <span className="ml-2 font-medium text-green-600">
-                          {currencySymbol}{totalSalesPrice.toLocaleString()}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+              )}
 
               {/* Notes */}
               <div className="space-y-2">
@@ -584,16 +600,34 @@ export function ScopeItemSheet({
                   onChange={(e) => handleChange("notes", e.target.value)}
                   rows={2}
                   className="resize-none"
+                  disabled={isViewOnly}
                 />
               </div>
 
-              {/* Images */}
+              {/* Images - show as view-only for clients */}
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Images</Label>
-                <ScopeItemImageUpload
-                  images={images}
-                  onChange={setImages}
-                />
+                {isViewOnly ? (
+                  images.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {images.map((url, idx) => (
+                        <img
+                          key={idx}
+                          src={url}
+                          alt={`Item image ${idx + 1}`}
+                          className="w-20 h-20 object-cover rounded-lg border"
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No images</p>
+                  )
+                ) : (
+                  <ScopeItemImageUpload
+                    images={images}
+                    onChange={setImages}
+                  />
+                )}
               </div>
 
               {/* Read-only Status Section (only shown when editing) */}
@@ -683,30 +717,40 @@ export function ScopeItemSheet({
 
         {/* Footer */}
         <SheetFooter className="px-6 py-4 border-t bg-muted/30 shrink-0">
-          <div className="flex gap-3 w-full">
+          {isViewOnly ? (
             <Button
               variant="outline"
               onClick={() => onOpenChange(false)}
-              disabled={isPending || isLoading}
-              className="flex-1"
+              className="w-full"
             >
-              Cancel
+              Close
             </Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={isPending || isLoading || !formData.item_code.trim() || !formData.name.trim()}
-              className="flex-1 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700"
-            >
-              {isPending ? (
-                <Spinner className="size-4 mr-2" />
-              ) : isEditing ? (
-                <SaveIcon className="size-4 mr-2" />
-              ) : (
-                <PlusIcon className="size-4 mr-2" />
-              )}
-              {isEditing ? "Save Changes" : "Add Item"}
-            </Button>
-          </div>
+          ) : (
+            <div className="flex gap-3 w-full">
+              <Button
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={isPending || isLoading}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSubmit}
+                disabled={isPending || isLoading || !formData.item_code.trim() || !formData.name.trim()}
+                className="flex-1 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700"
+              >
+                {isPending ? (
+                  <Spinner className="size-4 mr-2" />
+                ) : isEditing ? (
+                  <SaveIcon className="size-4 mr-2" />
+                ) : (
+                  <PlusIcon className="size-4 mr-2" />
+                )}
+                {isEditing ? "Save Changes" : "Add Item"}
+              </Button>
+            </div>
+          )}
         </SheetFooter>
       </SheetContent>
     </Sheet>

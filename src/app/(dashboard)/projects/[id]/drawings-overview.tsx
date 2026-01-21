@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,13 +19,13 @@ import {
   ClockIcon,
   CheckCircleIcon,
   XCircleIcon,
-  ArrowRightIcon,
+  EyeIcon,
   FactoryIcon,
   PenToolIcon,
   UploadIcon,
-  PlusIcon,
 } from "lucide-react";
 import { DrawingUploadSheet } from "@/components/drawings/drawing-upload-sheet";
+import { ScopeItemSheet } from "@/components/scope-items/scope-item-sheet";
 import { formatDistanceToNow } from "date-fns";
 
 interface Drawing {
@@ -47,6 +46,8 @@ interface DrawingsOverviewProps {
   projectId: string;
   productionItems: ProductionItem[];
   drawings: Drawing[];
+  projectCurrency?: string;
+  isClient?: boolean;
 }
 
 type StatusVariant = "info" | "success" | "warning" | "default" | "danger";
@@ -60,10 +61,20 @@ const statusConfig: Record<string, { variant: StatusVariant; label: string }> = 
   rejected: { variant: "danger", label: "Rejected" },
 };
 
-export function DrawingsOverview({ projectId, productionItems, drawings }: DrawingsOverviewProps) {
-  // Sheet state
+export function DrawingsOverview({ projectId, productionItems, drawings, projectCurrency = "TRY", isClient = false }: DrawingsOverviewProps) {
+  // Sheet states
   const [uploadSheetOpen, setUploadSheetOpen] = useState(false);
   const [preselectedItemId, setPreselectedItemId] = useState<string | undefined>(undefined);
+
+  // View item sheet state
+  const [viewSheetOpen, setViewSheetOpen] = useState(false);
+  const [viewItemId, setViewItemId] = useState<string | null>(null);
+
+  // Open the view sheet for an item
+  const openViewSheet = (itemId: string) => {
+    setViewItemId(itemId);
+    setViewSheetOpen(true);
+  };
 
   // Create a map of drawings by item_id
   const drawingsByItemId = new Map(drawings.map((d) => [d.item_id, d]));
@@ -133,7 +144,9 @@ export function DrawingsOverview({ projectId, productionItems, drawings }: Drawi
           <GradientIcon icon={<PenToolIcon className="size-4" />} color="teal" size="sm" />
           <div>
             <h3 className="text-lg font-medium">Drawings</h3>
-            <p className="text-sm text-muted-foreground">Manage technical drawings for production items</p>
+            <p className="text-sm text-muted-foreground">
+              {isClient ? "Review and respond to drawings" : "Manage technical drawings for production items"}
+            </p>
           </div>
         </div>
         <Button
@@ -202,54 +215,74 @@ export function DrawingsOverview({ projectId, productionItems, drawings }: Drawi
       </div>
 
       {/* Needs Attention Section */}
-      {needsAttention.length > 0 && (
-        <GlassCard>
-          <CardHeader className="py-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-gradient-to-br from-orange-500/10 to-amber-500/10">
-                <AlertTriangleIcon className="size-3.5 text-orange-600" />
-              </div>
-              Needs Attention
-              <StatusBadge variant="warning">{needsAttention.length}</StatusBadge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-1">
-              {needsAttention.slice(0, 5).map((item) => (
-                <Link
-                  key={item.id}
-                  href={`/projects/${projectId}/scope/${item.id}`}
-                  className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors group"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono text-sm text-muted-foreground bg-gray-100 px-2 py-0.5 rounded">
-                      {item.item_code}
-                    </span>
-                    <span className="font-medium">{item.name}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {!item.drawing || item.drawing.status === "not_uploaded" ? (
-                      <span className="text-sm text-orange-600">No drawing uploaded</span>
-                    ) : item.drawing.status === "rejected" ? (
-                      <span className="text-sm text-rose-600">Rejected - needs revision</span>
-                    ) : item.drawing.status === "sent_to_client" && item.drawing.sent_to_client_at ? (
-                      <span className="text-sm text-amber-600">
-                        Awaiting client ({formatDistanceToNow(new Date(item.drawing.sent_to_client_at), { addSuffix: false })})
+      {(() => {
+        // For clients: only show items sent to them for review
+        // For PM/Admin: show all items needing attention
+        const itemsToShow = isClient
+          ? needsAttention.filter((item) => item.drawing?.status === "sent_to_client")
+          : needsAttention;
+
+        if (itemsToShow.length === 0) return null;
+
+        return (
+          <GlassCard>
+            <CardHeader className="py-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-gradient-to-br from-orange-500/10 to-amber-500/10">
+                  <AlertTriangleIcon className="size-3.5 text-orange-600" />
+                </div>
+                {isClient ? "Awaiting Your Review" : "Needs Attention"}
+                <StatusBadge variant="warning">{itemsToShow.length}</StatusBadge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="space-y-1">
+                {itemsToShow.slice(0, 5).map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => openViewSheet(item.id)}
+                    className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors group w-full text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono text-sm text-muted-foreground bg-gray-100 px-2 py-0.5 rounded">
+                        {item.item_code}
                       </span>
-                    ) : null}
-                    <ArrowRightIcon className="size-4 text-muted-foreground group-hover:text-teal-600 transition-colors" />
-                  </div>
-                </Link>
-              ))}
-              {needsAttention.length > 5 && (
-                <p className="text-sm text-muted-foreground text-center py-2">
-                  +{needsAttention.length - 5} more items need attention
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </GlassCard>
-      )}
+                      <span className="font-medium">{item.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {isClient ? (
+                        <span className="text-sm text-amber-600">
+                          Sent {item.drawing?.sent_to_client_at
+                            ? formatDistanceToNow(new Date(item.drawing.sent_to_client_at), { addSuffix: true })
+                            : "recently"}
+                        </span>
+                      ) : (
+                        <>
+                          {!item.drawing || item.drawing.status === "not_uploaded" ? (
+                            <span className="text-sm text-orange-600">No drawing uploaded</span>
+                          ) : item.drawing.status === "rejected" ? (
+                            <span className="text-sm text-rose-600">Rejected - needs revision</span>
+                          ) : item.drawing.status === "sent_to_client" && item.drawing.sent_to_client_at ? (
+                            <span className="text-sm text-amber-600">
+                              Awaiting client ({formatDistanceToNow(new Date(item.drawing.sent_to_client_at), { addSuffix: false })})
+                            </span>
+                          ) : null}
+                        </>
+                      )}
+                      <EyeIcon className="size-4 text-muted-foreground group-hover:text-teal-600 transition-colors" />
+                    </div>
+                  </button>
+                ))}
+                {itemsToShow.length > 5 && (
+                  <p className="text-sm text-muted-foreground text-center py-2">
+                    +{itemsToShow.length - 5} more items {isClient ? "awaiting your review" : "need attention"}
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </GlassCard>
+        );
+      })()}
 
       {/* All Production Items Table */}
       <GlassCard>
@@ -314,13 +347,11 @@ export function DrawingsOverview({ projectId, productionItems, drawings }: Drawi
                           <Button
                             variant="ghost"
                             size="sm"
-                            asChild
+                            onClick={() => openViewSheet(item.id)}
                             className="hover:text-teal-600 hover:bg-teal-50"
                           >
-                            <Link href={`/projects/${projectId}/scope/${item.id}`}>
-                              View
-                              <ArrowRightIcon className="size-3 ml-1" />
-                            </Link>
+                            <EyeIcon className="size-3 mr-1" />
+                            View
                           </Button>
                         </div>
                       </TableCell>
@@ -333,7 +364,7 @@ export function DrawingsOverview({ projectId, productionItems, drawings }: Drawi
         </CardContent>
       </GlassCard>
 
-      {/* Drawing Upload Sheet */}
+      {/* Drawing Upload Sheet - Clients can also upload (for markups/responses) */}
       <DrawingUploadSheet
         projectId={projectId}
         scopeItems={productionItems.map((item) => {
@@ -349,6 +380,16 @@ export function DrawingsOverview({ projectId, productionItems, drawings }: Drawi
         open={uploadSheetOpen}
         onOpenChange={setUploadSheetOpen}
         preselectedItemId={preselectedItemId}
+      />
+
+      {/* View Item Sheet - Opens when clicking View on any item */}
+      <ScopeItemSheet
+        projectId={projectId}
+        projectCurrency={projectCurrency}
+        open={viewSheetOpen}
+        onOpenChange={setViewSheetOpen}
+        itemId={viewItemId}
+        isClient={isClient}
       />
     </div>
   );

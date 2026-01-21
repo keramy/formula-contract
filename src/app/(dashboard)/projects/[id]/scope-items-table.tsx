@@ -139,6 +139,7 @@ interface ScopeItemsTableProps {
   items: ScopeItem[];
   materials: Material[];
   currency?: string;
+  isClient?: boolean; // Hide sensitive cost data from clients
 }
 
 const currencySymbols: Record<string, string> = {
@@ -312,7 +313,7 @@ interface ScopeItemRowProps {
   item: HierarchicalScopeItem;
   isSelected: boolean;
   projectId: string;
-  visibleColumns: Set<string>;
+  isColumnVisible: (columnId: string) => boolean;
   formatCurrency: (value: number | null) => string;
   onToggleSelect: (id: string) => void;
   onOpenSplitDialog: (item: ScopeItem) => void;
@@ -325,7 +326,7 @@ const ScopeItemRow = memo(function ScopeItemRow({
   item,
   isSelected,
   projectId,
-  visibleColumns,
+  isColumnVisible,
   formatCurrency,
   onToggleSelect,
   onOpenSplitDialog,
@@ -333,7 +334,6 @@ const ScopeItemRow = memo(function ScopeItemRow({
   onEditItem,
   onViewItem,
 }: ScopeItemRowProps) {
-  const isColumnVisible = (columnId: string) => visibleColumns.has(columnId);
 
   return (
     <TableRow
@@ -609,7 +609,7 @@ function organizeHierarchically(items: ScopeItem[]): HierarchicalScopeItem[] {
   return result;
 }
 
-export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" }: ScopeItemsTableProps) {
+export function ScopeItemsTable({ projectId, items, materials, currency = "TRY", isClient = false }: ScopeItemsTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -687,10 +687,23 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
     }
   }, []);
 
+  // Columns hidden from clients (cost/pricing data)
+  const clientHiddenColumns = useMemo(() =>
+    new Set(["unit_cost", "initial_cost", "actual_cost", "sales_price"]),
+    []
+  );
+
   // Check if a column is visible - memoized
+  // Also hides cost columns from client users
   const isColumnVisible = useCallback(
-    (columnId: string) => visibleColumns.has(columnId),
-    [visibleColumns]
+    (columnId: string) => {
+      // Always hide cost columns from clients
+      if (isClient && clientHiddenColumns.has(columnId)) {
+        return false;
+      }
+      return visibleColumns.has(columnId);
+    },
+    [visibleColumns, isClient, clientHiddenColumns]
   );
 
   // ============================================================================
@@ -957,26 +970,31 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
           <span className="text-sm font-medium">Items:</span>
           <span className="text-sm font-bold text-violet-700">{items.length}</span>
         </div>
-        <div className="h-4 w-px bg-violet-200 dark:bg-violet-800" />
-        <div className="flex items-center gap-2" title="Total Sales Price (what client pays)">
-          <BanknoteIcon className="size-4 text-emerald-600" />
-          <span className="text-sm font-medium">Sales:</span>
-          <span className="text-sm font-bold text-emerald-700">{formatCurrency(totalSalesPrice)}</span>
-        </div>
-        <div className="h-4 w-px bg-violet-200 dark:bg-violet-800" />
-        <div className="flex items-center gap-2" title="Total Actual Cost (what we pay)">
-          <BanknoteIcon className="size-4 text-orange-600" />
-          <span className="text-sm font-medium">Actual Cost:</span>
-          <span className="text-sm font-bold text-orange-700">{formatCurrency(totalActualCost)}</span>
-        </div>
-        {totalInitialCost > 0 && (
+        {/* Hide cost/sales info from clients */}
+        {!isClient && (
           <>
             <div className="h-4 w-px bg-violet-200 dark:bg-violet-800" />
-            <div className="flex items-center gap-2" title="Total Initial Cost (locked snapshot)">
-              <BanknoteIcon className="size-4 text-gray-500" />
-              <span className="text-sm font-medium">Initial:</span>
-              <span className="text-sm font-bold text-gray-600">{formatCurrency(totalInitialCost)}</span>
+            <div className="flex items-center gap-2" title="Total Sales Price (what client pays)">
+              <BanknoteIcon className="size-4 text-emerald-600" />
+              <span className="text-sm font-medium">Sales:</span>
+              <span className="text-sm font-bold text-emerald-700">{formatCurrency(totalSalesPrice)}</span>
             </div>
+            <div className="h-4 w-px bg-violet-200 dark:bg-violet-800" />
+            <div className="flex items-center gap-2" title="Total Actual Cost (what we pay)">
+              <BanknoteIcon className="size-4 text-orange-600" />
+              <span className="text-sm font-medium">Actual Cost:</span>
+              <span className="text-sm font-bold text-orange-700">{formatCurrency(totalActualCost)}</span>
+            </div>
+            {totalInitialCost > 0 && (
+              <>
+                <div className="h-4 w-px bg-violet-200 dark:bg-violet-800" />
+                <div className="flex items-center gap-2" title="Total Initial Cost (locked snapshot)">
+                  <BanknoteIcon className="size-4 text-gray-500" />
+                  <span className="text-sm font-medium">Initial:</span>
+                  <span className="text-sm font-bold text-gray-600">{formatCurrency(totalInitialCost)}</span>
+                </div>
+              </>
+            )}
           </>
         )}
         <div className="h-4 w-px bg-violet-200 dark:bg-violet-800" />
@@ -1012,7 +1030,9 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
                   </Button>
                 </div>
                 <div className="space-y-1">
-                  {COLUMNS.map((column) => (
+                  {COLUMNS
+                    .filter(column => !isClient || !clientHiddenColumns.has(column.id))
+                    .map((column) => (
                     <label
                       key={column.id}
                       className="flex items-center gap-2 p-1.5 hover:bg-muted rounded cursor-pointer"
@@ -1193,7 +1213,7 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY" 
                 item={item}
                 isSelected={selectedIds.has(item.id)}
                 projectId={projectId}
-                visibleColumns={visibleColumns}
+                isColumnVisible={isColumnVisible}
                 formatCurrency={formatCurrency}
                 onToggleSelect={toggleSelect}
                 onOpenSplitDialog={openSplitDialog}
