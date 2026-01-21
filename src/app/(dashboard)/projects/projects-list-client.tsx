@@ -28,6 +28,7 @@ import type { DateRange } from "react-day-picker";
 
 interface Project {
   id: string;
+  slug: string | null;
   project_code: string;
   name: string;
   status: string;

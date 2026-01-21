@@ -139,7 +139,7 @@ async function sendReportPublishedNotification(
       if (apiKey && user.email) {
         const resend = new Resend(apiKey);
         await resend.emails.send({
-          from: "Formula Contract <onboarding@resend.dev>", // Use verified domain in production
+          from: "Formula Contract <noreply@formulacontractpm.com>",
           to: user.email,
           subject: `New Report Published: ${projectName}`,
           html: `

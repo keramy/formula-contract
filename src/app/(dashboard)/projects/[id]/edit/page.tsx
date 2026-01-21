@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { resolveProjectIdentifier } from "@/lib/slug";
 import { ProjectForm } from "../../project-form";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -7,6 +8,7 @@ import { ArrowLeftIcon } from "lucide-react";
 
 interface Project {
   id: string;
+  slug: string | null;
   project_code: string;
   name: string;
   description: string | null;
@@ -22,14 +24,22 @@ export default async function EditProjectPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = await params;
+  const { id: idOrSlug } = await params;
   const supabase = await createClient();
+
+  // Resolve project identifier (could be slug or UUID)
+  const projectInfo = await resolveProjectIdentifier(supabase, idOrSlug);
+  if (!projectInfo) {
+    notFound();
+  }
+  const { projectId, projectSlug } = projectInfo;
+  const projectUrlId = projectSlug || projectId;
 
   // Fetch the project
   const { data, error: projectError } = await supabase
     .from("projects")
-    .select("id, project_code, name, description, client_id, status, installation_date, contract_value_manual, currency")
-    .eq("id", id)
+    .select("id, slug, project_code, name, description, client_id, status, installation_date, contract_value_manual, currency")
+    .eq("id", projectId)
     .single();
 
   const project = data as Project | null;
@@ -50,7 +60,7 @@ export default async function EditProjectPage({
       {/* Page Header */}
       <div className="mb-6">
         <Button variant="ghost" size="sm" asChild className="mb-4 -ml-2">
-          <Link href={`/projects/${id}`}>
+          <Link href={`/projects/${projectUrlId}`}>
             <ArrowLeftIcon className="size-4" />
             Back to Project
           </Link>

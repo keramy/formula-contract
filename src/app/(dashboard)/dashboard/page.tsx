@@ -210,7 +210,7 @@ export default async function DashboardPage() {
                   return (
                     <Link
                       key={project.id}
-                      href={`/projects/${project.id}`}
+                      href={`/projects/${project.slug || project.id}`}
                       className="group block p-3 rounded-lg bg-gray-50/50 hover:bg-gray-100/70 transition-colors"
                     >
                       <div className="flex items-center justify-between">

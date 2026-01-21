@@ -72,7 +72,7 @@ export function PendingApprovalsWidget({ approvals }: PendingApprovalsWidgetProp
           return (
             <Link
               key={`${approval.type}-${approval.id}`}
-              href={`/projects/${approval.projectId}`}
+              href={`/projects/${approval.projectSlug || approval.projectId}`}
               className="group block p-3 rounded-lg bg-amber-50/50 border border-amber-100 hover:bg-amber-100/70 transition-colors"
             >
               <div className="flex items-start gap-3">

@@ -75,7 +75,7 @@ async function sendWelcomeEmail(
 
   try {
     await resend.emails.send({
-      from: "Formula Contract <onboarding@resend.dev>", // Use your verified domain in production
+      from: "Formula Contract <noreply@formulacontractpm.com>",
       to: email,
       subject: "Welcome to Formula Contract - Your Account Details",
       html: `

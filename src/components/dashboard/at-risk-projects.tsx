@@ -84,7 +84,7 @@ export function AtRiskProjects({ projects }: AtRiskProjectsProps) {
           return (
             <Link
               key={project.id}
-              href={`/projects/${project.id}`}
+              href={`/projects/${project.slug || project.id}`}
               className={`group block p-3 rounded-lg border transition-all hover:shadow-md ${config.bgColor}`}
             >
               <div className="flex items-start justify-between mb-2">

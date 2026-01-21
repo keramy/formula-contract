@@ -72,13 +72,17 @@ export const getCachedRecentProjects = unstable_cache(
     const start = performance.now();
     const supabase = createServiceRoleClient();
 
-    // Get recent projects
-    const { data: projects } = await supabase
+    // Get recent projects (includes slug for URL-friendly links)
+    // Note: slug column added by migration 015_add_project_slug.sql
+    const { data: projectsData } = await supabase
       .from("projects")
-      .select("id, project_code, name, status, client_id")
+      .select("id, slug, project_code, name, status, client_id")
       .eq("is_deleted", false)
       .order("created_at", { ascending: false })
       .limit(5);
+
+    // Type assertion for projects with slug (column added by migration)
+    const projects = projectsData as { id: string; slug: string | null; project_code: string; name: string; status: string; client_id: string | null }[] | null;
 
     if (!projects || projects.length === 0) {
       console.log(`  📊 [CACHE] Recent projects: 0 found in ${(performance.now() - start).toFixed(0)}ms`);
@@ -103,6 +107,7 @@ export const getCachedRecentProjects = unstable_cache(
     // Merge client data
     const projectsWithClients = projects.map(project => ({
       id: project.id,
+      slug: project.slug,
       project_code: project.project_code,
       name: project.name,
       status: project.status,

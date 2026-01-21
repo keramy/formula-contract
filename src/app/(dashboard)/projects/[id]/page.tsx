@@ -30,6 +30,7 @@ import { getProjectReports } from "@/lib/actions/reports";
 import { DownloadTemplateButton, ExcelImport, ExcelExport, ScopeItemAddButton } from "@/components/scope-items";
 import { ActivityFeed } from "@/components/activity-log/activity-feed";
 import { GlassCard, GradientIcon } from "@/components/ui/ui-helpers";
+import { isUUID } from "@/lib/slug";
 
 interface ProjectClient {
   id: string;
@@ -43,6 +44,7 @@ interface Project {
   id: string;
   project_code: string;
   name: string;
+  slug: string | null;
   description: string | null;
   status: string;
   installation_date: string | null;
@@ -162,12 +164,30 @@ export default async function ProjectDetailPage({
   // PERFORMANCE: Get user role from JWT metadata (avoids ~3s DB query!)
   const userRole = await getUserRoleFromJWT(user, supabase);
 
+  // Determine if the parameter is a UUID or slug
+  const isIdUUID = isUUID(id);
+
+  // Lookup project ID by slug if needed (for access checks)
+  let projectId = id;
+  if (!isIdUUID) {
+    const { data: projectBySlug } = await supabase
+      .from("projects")
+      .select("id")
+      .eq("slug", id)
+      .single();
+
+    if (!projectBySlug) {
+      notFound();
+    }
+    projectId = projectBySlug.id;
+  }
+
   // For client users, verify they have access to this project
   if (userRole === "client") {
     const { data: assignment } = await supabase
       .from("project_assignments")
       .select("id")
-      .eq("project_id", id)
+      .eq("project_id", projectId)
       .eq("user_id", user.id)
       .single();
 
@@ -193,16 +213,16 @@ export default async function ProjectDetailPage({
     reportsResult,
     assignmentsResult,
   ] = await Promise.all([
-    // 1. Project with Client
+    // 1. Project with Client (includes slug for URL generation)
     (async () => {
       const start = performance.now();
       const result = await supabase
         .from("projects")
         .select(`
-          id, project_code, name, description, status, installation_date, contract_value_manual, currency,
+          id, project_code, name, slug, description, status, installation_date, contract_value_manual, currency,
           client:clients(id, company_name, contact_person, email, phone)
         `)
-        .eq("id", id)
+        .eq("id", projectId)
         .single();
       console.log(`  📁 Project with Client: ${(performance.now() - start).toFixed(0)}ms`);
       return result;
@@ -214,7 +234,7 @@ export default async function ProjectDetailPage({
       const result = await supabase
         .from("scope_items")
         .select("id, item_code, name, description, width, depth, height, item_path, status, quantity, unit, unit_cost, initial_total_cost, unit_sales_price, total_sales_price, production_percentage, is_installed, notes, images, created_at, parent_id")
-        .eq("project_id", id)
+        .eq("project_id", projectId)
         .eq("is_deleted", false)
         .order("created_at", { ascending: true });
       console.log(`  📋 Scope Items: ${(performance.now() - start).toFixed(0)}ms`);
@@ -229,7 +249,7 @@ export default async function ProjectDetailPage({
           id, material_code, name, specification, supplier, images, status,
           item_materials(item_id, material_id)
         `)
-        .eq("project_id", id)
+        .eq("project_id", projectId)
         .eq("is_deleted", false)
         .order("material_code");
       console.log(`  📦 Materials: ${(performance.now() - start).toFixed(0)}ms`);
@@ -247,7 +267,7 @@ export default async function ProjectDetailPage({
           creator:users!snagging_created_by_fkey(name),
           resolver:users!snagging_resolved_by_fkey(name)
         `)
-        .eq("project_id", id)
+        .eq("project_id", projectId)
         .order("created_at", { ascending: false });
       console.log(`  🔧 Snagging: ${(performance.now() - start).toFixed(0)}ms`);
       return result;
@@ -258,7 +278,7 @@ export default async function ProjectDetailPage({
       const result = await supabase
         .from("milestones")
         .select("id, project_id, name, description, due_date, is_completed, completed_at, alert_days_before")
-        .eq("project_id", id)
+        .eq("project_id", projectId)
         .order("due_date");
       console.log(`  🎯 Milestones: ${(performance.now() - start).toFixed(0)}ms`);
       return result;
@@ -266,14 +286,14 @@ export default async function ProjectDetailPage({
     // 6. Reports
     (async () => {
       const start = performance.now();
-      const result = await getProjectReports(id);
+      const result = await getProjectReports(projectId);
       console.log(`  📄 Reports: ${(performance.now() - start).toFixed(0)}ms`);
       return result;
     })(),
     // 7. Assignments
     (async () => {
       const start = performance.now();
-      const result = await getProjectAssignments(id);
+      const result = await getProjectAssignments(projectId);
       console.log(`  👥 Assignments: ${(performance.now() - start).toFixed(0)}ms`);
       return result;
     })(),
@@ -286,6 +306,9 @@ export default async function ProjectDetailPage({
   if (projectResult.error || !project) {
     notFound();
   }
+
+  // Use slug for URLs (with fallback to id for backwards compatibility)
+  const projectUrlId = project.slug || project.id;
 
   // Extract scope items
   const scopeItems = (scopeItemsResult.data || []) as ScopeItem[];
@@ -360,7 +383,7 @@ export default async function ProjectDetailPage({
     <div className="p-6">
       {/* Header - Edit button removed from header, now only in Overview tab */}
       <ProjectDetailHeader
-        projectId={id}
+        projectId={projectUrlId}
         projectName={project.name}
         projectCode={project.project_code}
         status={project.status}
@@ -427,7 +450,7 @@ export default async function ProjectDetailPage({
           {canEdit && (
             <div className="flex justify-end">
               <Button asChild className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700">
-                <Link href={`/projects/${id}/edit`}>
+                <Link href={`/projects/${projectUrlId}/edit`}>
                   <PencilIcon className="size-4" />
                   Edit Project
                 </Link>

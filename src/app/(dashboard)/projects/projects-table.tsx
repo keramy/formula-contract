@@ -24,6 +24,7 @@ import { GlassCard, StatusBadge, EmptyState, GradientAvatar } from "@/components
 
 interface Project {
   id: string;
+  slug: string | null;
   project_code: string;
   name: string;
   status: string;
@@ -91,7 +92,7 @@ export function ProjectsTable({ projects }: ProjectsTableProps) {
               >
                 <TableCell className="py-4">
                   <Link
-                    href={`/projects/${project.id}`}
+                    href={`/projects/${project.slug || project.id}`}
                     className="flex items-center gap-3 group/link"
                   >
                     <GradientAvatar name={project.name} size="sm" colorIndex={index % 8} />
@@ -144,13 +145,13 @@ export function ProjectsTable({ projects }: ProjectsTableProps) {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48">
                       <DropdownMenuItem asChild>
-                        <Link href={`/projects/${project.id}`} className="cursor-pointer">
+                        <Link href={`/projects/${project.slug || project.id}`} className="cursor-pointer">
                           <EyeIcon className="size-4 mr-2" />
                           View Details
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
-                        <Link href={`/projects/${project.id}/edit`} className="cursor-pointer">
+                        <Link href={`/projects/${project.slug || project.id}/edit`} className="cursor-pointer">
                           <PencilIcon className="size-4 mr-2" />
                           Edit Project
                         </Link>

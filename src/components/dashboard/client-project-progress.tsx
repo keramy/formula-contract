@@ -75,7 +75,7 @@ export function ClientProjectProgressWidget({ projects }: ClientProjectProgressP
             return (
               <Link
                 key={project.id}
-                href={`/projects/${project.id}`}
+                href={`/projects/${project.slug || project.id}`}
                 className="group block p-4 rounded-xl bg-gradient-to-br from-white to-gray-50/50 border border-gray-100 hover:shadow-lg hover:border-violet-200 transition-all"
               >
                 <div className="flex items-start justify-between mb-3">

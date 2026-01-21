@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { resolveProjectIdentifier } from "@/lib/slug";
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -55,6 +56,7 @@ interface ScopeItem {
   project: {
     id: string;
     name: string;
+    slug: string | null;
     project_code: string;
     currency: string;
   };
@@ -142,8 +144,17 @@ export default async function ScopeItemDetailPage({
 }: {
   params: Promise<{ id: string; itemId: string }>;
 }) {
-  const { id: projectId, itemId } = await params;
+  const { id: projectIdOrSlug, itemId } = await params;
   const supabase = await createClient();
+
+  // Resolve project identifier (could be slug or UUID)
+  const projectInfo = await resolveProjectIdentifier(supabase, projectIdOrSlug);
+  if (!projectInfo) {
+    notFound();
+  }
+  const { projectId, projectSlug } = projectInfo;
+  // Use slug for URLs (with fallback to id)
+  const projectUrlId = projectSlug || projectId;
 
   // ============================================================================
   // PHASE 1: Run all independent queries in parallel
@@ -166,7 +177,7 @@ export default async function ScopeItemDetailPage({
         unit_cost, initial_total_cost, unit_sales_price, total_sales_price,
         item_path, status, notes, production_percentage,
         procurement_status, is_installed, installed_at, images, parent_id,
-        project:projects(id, name, project_code, currency)
+        project:projects(id, name, slug, project_code, currency)
       `)
       .eq("id", itemId)
       .eq("project_id", projectId)
@@ -296,7 +307,7 @@ export default async function ScopeItemDetailPage({
     <div className="min-h-screen bg-gradient-to-br from-gray-50/50 via-white to-gray-50/50 p-6">
       {/* Header */}
       <ScopeItemHeader
-        projectId={projectId}
+        projectId={projectUrlId}
         projectName={scopeItem.project.name}
         itemId={itemId}
         itemName={scopeItem.name}
@@ -336,7 +347,7 @@ export default async function ScopeItemDetailPage({
                       </div>
                     </div>
                     <Link
-                      href={`/projects/${projectId}/scope/${parentItem.id}`}
+                      href={`/projects/${projectUrlId}/scope/${parentItem.id}`}
                       className="inline-flex items-center gap-1 text-xs text-violet-600 hover:text-violet-700 hover:underline"
                     >
                       View
@@ -367,7 +378,7 @@ export default async function ScopeItemDetailPage({
                           </div>
                         </div>
                         <Link
-                          href={`/projects/${projectId}/scope/${child.id}`}
+                          href={`/projects/${projectUrlId}/scope/${child.id}`}
                           className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 hover:underline"
                         >
                           View

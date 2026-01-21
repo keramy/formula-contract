@@ -25,6 +25,7 @@ import {
 
 interface Project {
   id: string;
+  slug: string | null;
   project_code: string;
   name: string;
   status: string;
@@ -74,13 +75,13 @@ export function ProjectCard({ project }: ProjectCardProps) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem asChild>
-                <Link href={`/projects/${project.id}`}>
+                <Link href={`/projects/${project.slug || project.id}`}>
                   <EyeIcon className="size-4 mr-2" />
                   View
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link href={`/projects/${project.id}/edit`}>
+                <Link href={`/projects/${project.slug || project.id}/edit`}>
                   <EditIcon className="size-4 mr-2" />
                   Edit
                 </Link>
@@ -95,7 +96,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
 
         {/* Project Name */}
         <Link
-          href={`/projects/${project.id}`}
+          href={`/projects/${project.slug || project.id}`}
           className="block group"
         >
           <h3 className="font-semibold text-base mb-1 group-hover:text-violet-700 transition-colors line-clamp-2">

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { resolveProjectIdentifier } from "@/lib/slug";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowLeftIcon } from "lucide-react";
@@ -34,8 +35,16 @@ export default async function EditScopeItemPage({
 }: {
   params: Promise<{ id: string; itemId: string }>;
 }) {
-  const { id: projectId, itemId } = await params;
+  const { id: projectIdOrSlug, itemId } = await params;
   const supabase = await createClient();
+
+  // Resolve project identifier (could be slug or UUID)
+  const projectInfo = await resolveProjectIdentifier(supabase, projectIdOrSlug);
+  if (!projectInfo) {
+    notFound();
+  }
+  const { projectId, projectSlug } = projectInfo;
+  const projectUrlId = projectSlug || projectId;
 
   // Fetch scope item with project currency
   const { data, error } = await supabase
@@ -62,7 +71,7 @@ export default async function EditScopeItemPage({
       {/* Page Header */}
       <div className="mb-6">
         <Button variant="ghost" size="sm" asChild className="mb-4 -ml-2">
-          <Link href={`/projects/${projectId}/scope/${itemId}`}>
+          <Link href={`/projects/${projectUrlId}/scope/${itemId}`}>
             <ArrowLeftIcon className="size-4" />
             Back to Item
           </Link>

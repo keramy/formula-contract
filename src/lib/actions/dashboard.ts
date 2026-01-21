@@ -12,6 +12,7 @@ export interface TaskSummary {
 
 export interface AtRiskProject {
   id: string;
+  slug: string | null;
   name: string;
   project_code: string;
   client_name: string | null;
@@ -25,6 +26,7 @@ export interface PendingApproval {
   type: "drawing" | "material";
   title: string;
   projectId: string;
+  projectSlug: string | null;
   projectName: string;
   projectCode: string;
   sentAt: string;
@@ -32,6 +34,7 @@ export interface PendingApproval {
 
 export interface ClientProjectProgress {
   id: string;
+  slug: string | null;
   name: string;
   project_code: string;
   status: string;
@@ -103,13 +106,17 @@ export async function getAtRiskProjects(): Promise<AtRiskProject[]> {
   const supabase = await createClient();
   const now = new Date().toISOString();
 
-  // Get active projects with their client info
-  const { data: projects } = await supabase
+  // Get active projects with their client info (includes slug for URLs)
+  // Note: slug column added by migration 015_add_project_slug.sql
+  const { data: projectsData } = await supabase
     .from("projects")
-    .select("id, name, project_code, client_id")
+    .select("id, slug, name, project_code, client_id")
     .eq("is_deleted", false)
     .in("status", ["active", "tender"])
     .limit(50);
+
+  // Type assertion for projects with slug (column added by migration)
+  const projects = projectsData as { id: string; slug: string | null; name: string; project_code: string; client_id: string | null }[] | null;
 
   if (!projects || projects.length === 0) {
     return [];
@@ -189,6 +196,7 @@ export async function getAtRiskProjects(): Promise<AtRiskProject[]> {
 
       atRiskProjects.push({
         id: project.id,
+        slug: project.slug,
         name: project.name,
         project_code: project.project_code,
         client_name: project.client_id ? clientMap.get(project.client_id) || null : null,
@@ -228,13 +236,15 @@ export async function getPendingApprovals(userId: string): Promise<PendingApprov
 
   const projectIds = assignments.map((a) => a.project_id);
 
-  // Get project info
-  const { data: projects } = await supabase
+  // Get project info (includes slug for URLs)
+  // Note: slug column added by migration 015_add_project_slug.sql
+  const { data: projectsData } = await supabase
     .from("projects")
-    .select("id, name, project_code")
+    .select("id, slug, name, project_code")
     .in("id", projectIds);
 
-  const projectMap = new Map(projects?.map(p => [p.id, { name: p.name, code: p.project_code }]) || []);
+  const projects = projectsData as { id: string; slug: string | null; name: string; project_code: string }[] | null;
+  const projectMap = new Map(projects?.map(p => [p.id, { slug: p.slug, name: p.name, code: p.project_code }]) || []);
 
   // Get pending drawings via scope_items
   const { data: scopeItems } = await supabase
@@ -281,6 +291,7 @@ export async function getPendingApprovals(userId: string): Promise<PendingApprov
             type: "drawing",
             title: scopeItem.name || "Drawing",
             projectId: scopeItem.project_id,
+            projectSlug: project.slug,
             projectName: project.name,
             projectCode: project.code,
             sentAt: drawing.sent_to_client_at || new Date().toISOString(),
@@ -300,6 +311,7 @@ export async function getPendingApprovals(userId: string): Promise<PendingApprov
           type: "material",
           title: material.name,
           projectId: material.project_id,
+          projectSlug: project.slug,
           projectName: project.name,
           projectCode: project.code,
           sentAt: material.sent_to_client_at || new Date().toISOString(),
@@ -333,11 +345,12 @@ export async function getClientProjectProgress(userId: string): Promise<ClientPr
 
   const projectIds = assignments.map((a) => a.project_id);
 
-  // Get projects and scope items for progress calculation
-  const [{ data: projects }, { data: scopeItems }] = await Promise.all([
+  // Get projects and scope items for progress calculation (includes slug for URLs)
+  // Note: slug column added by migration 015_add_project_slug.sql
+  const [{ data: projectsData }, { data: scopeItems }] = await Promise.all([
     supabase
       .from("projects")
-      .select("id, name, project_code, status")
+      .select("id, slug, name, project_code, status")
       .in("id", projectIds)
       .eq("is_deleted", false)
       .order("updated_at", { ascending: false }),
@@ -347,6 +360,9 @@ export async function getClientProjectProgress(userId: string): Promise<ClientPr
       .in("project_id", projectIds)
       .eq("is_deleted", false),
   ]);
+
+  // Type assertion for projects with slug (column added by migration)
+  const projects = projectsData as { id: string; slug: string | null; name: string; project_code: string; status: string }[] | null;
 
   if (!projects) {
     return [];
@@ -392,6 +408,7 @@ export async function getClientProjectProgress(userId: string): Promise<ClientPr
 
     return {
       id: project.id,
+      slug: project.slug,
       name: project.name,
       project_code: project.project_code,
       status: project.status,

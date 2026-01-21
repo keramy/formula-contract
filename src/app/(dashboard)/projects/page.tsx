@@ -5,6 +5,7 @@ import { ProjectsPageHeader } from "./projects-page-header";
 
 interface Project {
   id: string;
+  slug: string | null;
   project_code: string;
   name: string;
   status: string;
