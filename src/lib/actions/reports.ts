@@ -538,11 +538,7 @@ export async function publishReport(reportId: string): Promise<ActionResult> {
   // Get report details including project info for notifications
   const { data: report } = await supabase
     .from("reports")
-    .select(`
-      project_id,
-      report_type,
-      project:projects!reports_project_id_fkey(name, project_code)
-    `)
+    .select("project_id, report_type")
     .eq("id", reportId)
     .single();
 
@@ -550,14 +546,16 @@ export async function publishReport(reportId: string): Promise<ActionResult> {
     return { success: false, error: "Report not found" };
   }
 
-  // Get the publisher's name
-  const { data: publisher } = await supabase
-    .from("users")
-    .select("name")
-    .eq("id", user.id)
-    .single();
+  // Get project details and publisher name in parallel
+  const [projectResult, publisherResult] = await Promise.all([
+    report.project_id
+      ? supabase.from("projects").select("name, project_code").eq("id", report.project_id).single()
+      : Promise.resolve({ data: null }),
+    supabase.from("users").select("name").eq("id", user.id).single(),
+  ]);
 
-  const publisherName = publisher?.name || "A team member";
+  const project = projectResult.data;
+  const publisherName = publisherResult.data?.name || "A team member";
 
   const { error } = await supabase
     .from("reports")
@@ -584,7 +582,6 @@ export async function publishReport(reportId: string): Promise<ActionResult> {
 
     // Send in-app + email notifications to all project team members
     // This runs async and doesn't block the response
-    const project = report.project as { name: string; project_code: string } | null;
     if (project) {
       sendReportPublishedNotification(
         report.project_id,
