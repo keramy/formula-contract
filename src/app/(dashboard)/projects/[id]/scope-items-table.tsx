@@ -106,9 +106,12 @@ interface ScopeItem {
   status: string;
   quantity: number;
   unit: string;
-  // Cost tracking fields (what WE pay)
-  unit_cost: number | null;
+  // Initial cost (budgeted, set once at creation)
+  initial_unit_cost: number | null;
   initial_total_cost: number | null;
+  // Actual cost (entered manually later)
+  actual_unit_cost: number | null;
+  actual_total_cost: number | null;
   // Sales price fields (what CLIENT pays)
   unit_sales_price: number | null;
   total_sales_price: number | null;
@@ -215,10 +218,15 @@ const COLUMNS: ColumnConfig[] = [
   { id: "path", label: "Path", defaultVisible: true },
   { id: "status", label: "Status", defaultVisible: true },
   { id: "quantity", label: "Qty", defaultVisible: true },
-  { id: "unit_cost", label: "Unit Cost", defaultVisible: false },
-  { id: "initial_cost", label: "Initial Cost", defaultVisible: false },
-  { id: "actual_cost", label: "Cost", defaultVisible: true },
-  { id: "sales_price", label: "Sales", defaultVisible: true },
+  // Initial cost (budgeted)
+  { id: "initial_unit_cost", label: "Init Unit", defaultVisible: false },
+  { id: "initial_total_cost", label: "Init Total", defaultVisible: true },
+  // Actual cost
+  { id: "actual_unit_cost", label: "Act Unit", defaultVisible: false },
+  { id: "actual_total_cost", label: "Act Total", defaultVisible: false },
+  // Sales (what client pays)
+  { id: "unit_sales_price", label: "Sale Unit", defaultVisible: false },
+  { id: "total_sales_price", label: "Sale Total", defaultVisible: true },
   { id: "progress", label: "Progress", defaultVisible: true },
   { id: "installed", label: "Installed", defaultVisible: false },
 ];
@@ -402,29 +410,47 @@ const ScopeItemRow = memo(function ScopeItemRow({
           {item.quantity} {item.unit}
         </TableCell>
       )}
-      {isColumnVisible("unit_cost") && (
-        <TableCell className="text-right font-mono text-sm">
+      {isColumnVisible("initial_unit_cost") && (
+        <TableCell className="text-right font-mono text-sm text-blue-600">
           {item.hasChildren ? (
             <span className="text-muted-foreground">-</span>
           ) : (
-            formatCurrency(item.unit_cost)
+            formatCurrency(item.initial_unit_cost)
           )}
         </TableCell>
       )}
-      {isColumnVisible("initial_cost") && (
-        <TableCell className="text-right font-mono text-sm text-muted-foreground">
+      {isColumnVisible("initial_total_cost") && (
+        <TableCell className="text-right font-mono text-sm text-blue-600">
           {formatCurrency(item.initial_total_cost)}
         </TableCell>
       )}
-      {isColumnVisible("actual_cost") && (
-        <TableCell className="text-right font-mono text-sm">
-          <span className={item.hasChildren ? "text-orange-600 font-semibold" : ""}>
-            {formatCurrency(item.actualTotalCost || null)}
+      {isColumnVisible("actual_unit_cost") && (
+        <TableCell className="text-right font-mono text-sm text-amber-600">
+          {item.hasChildren ? (
+            <span className="text-muted-foreground">-</span>
+          ) : (
+            formatCurrency(item.actual_unit_cost)
+          )}
+        </TableCell>
+      )}
+      {isColumnVisible("actual_total_cost") && (
+        <TableCell className="text-right font-mono text-sm text-amber-600">
+          <span className={item.hasChildren ? "font-semibold" : ""}>
+            {formatCurrency(item.actualTotalCost)}
           </span>
         </TableCell>
       )}
-      {isColumnVisible("sales_price") && (
-        <TableCell className="text-right font-mono text-sm">
+      {isColumnVisible("unit_sales_price") && (
+        <TableCell className="text-right font-mono text-sm text-green-600">
+          {item.hasChildren ? (
+            <span className="text-muted-foreground">-</span>
+          ) : (
+            formatCurrency(item.unit_sales_price)
+          )}
+        </TableCell>
+      )}
+      {isColumnVisible("total_sales_price") && (
+        <TableCell className="text-right font-mono text-sm text-green-600">
           {formatCurrency(item.total_sales_price)}
         </TableCell>
       )}
@@ -570,14 +596,15 @@ function organizeHierarchically(items: ScopeItem[]): HierarchicalScopeItem[] {
     const children = childrenMap.get(parent.id) || [];
     const hasChildren = children.length > 0;
 
-    // Calculate actual cost: sum of children's costs if has children, else own cost
+    // Calculate computed actual cost: sum of children's costs if has children
+    // Always calculate from actual_unit_cost * quantity for accuracy
     let actualTotalCost: number;
     if (hasChildren) {
       actualTotalCost = children.reduce((sum, child) => {
-        return sum + ((child.unit_cost || 0) * (child.quantity || 0));
+        return sum + ((child.actual_unit_cost || 0) * (child.quantity || 0));
       }, 0);
     } else {
-      actualTotalCost = (parent.unit_cost || 0) * (parent.quantity || 0);
+      actualTotalCost = (parent.actual_unit_cost || 0) * (parent.quantity || 0);
     }
 
     // Add parent item
@@ -593,7 +620,7 @@ function organizeHierarchically(items: ScopeItem[]): HierarchicalScopeItem[] {
 
     // Add children immediately after parent
     children.forEach((child, index) => {
-      const childActualCost = (child.unit_cost || 0) * (child.quantity || 0);
+      const childActualCost = (child.actual_unit_cost || 0) * (child.quantity || 0);
       result.push({
         ...child,
         isChild: true,
@@ -689,7 +716,7 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
 
   // Columns hidden from clients (cost/pricing data)
   const clientHiddenColumns = useMemo(() =>
-    new Set(["unit_cost", "initial_cost", "actual_cost", "sales_price"]),
+    new Set(["initial_unit_cost", "initial_total_cost", "actual_unit_cost", "actual_total_cost", "sales_price"]),
     []
   );
 
@@ -1197,10 +1224,12 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
               {isColumnVisible("path") && <TableHead>Path</TableHead>}
               {isColumnVisible("status") && <TableHead>Status</TableHead>}
               {isColumnVisible("quantity") && <TableHead className="text-right">Qty</TableHead>}
-              {isColumnVisible("unit_cost") && <TableHead className="text-right" title="Unit Cost (per item)">Unit Cost</TableHead>}
-              {isColumnVisible("initial_cost") && <TableHead className="text-right" title="Initial Total Cost (locked snapshot)">Initial</TableHead>}
-              {isColumnVisible("actual_cost") && <TableHead className="text-right" title="Actual Cost (aggregated for parents)">Cost</TableHead>}
-              {isColumnVisible("sales_price") && <TableHead className="text-right" title="Sales Price (what client pays)">Sales</TableHead>}
+              {isColumnVisible("initial_unit_cost") && <TableHead className="text-right text-blue-600" title="Initial Unit Cost (budgeted, per item)">Init Unit</TableHead>}
+              {isColumnVisible("initial_total_cost") && <TableHead className="text-right text-blue-600" title="Initial Total Cost (budgeted, locked)">Init Total</TableHead>}
+              {isColumnVisible("actual_unit_cost") && <TableHead className="text-right text-amber-600" title="Actual Unit Cost (real cost per item)">Act Unit</TableHead>}
+              {isColumnVisible("actual_total_cost") && <TableHead className="text-right text-amber-600" title="Actual Total Cost (real cost)">Act Total</TableHead>}
+              {isColumnVisible("unit_sales_price") && <TableHead className="text-right text-green-600" title="Unit Sales Price (per item)">Sale Unit</TableHead>}
+              {isColumnVisible("total_sales_price") && <TableHead className="text-right text-green-600" title="Total Sales Price (unit × qty)">Sale Total</TableHead>}
               {isColumnVisible("progress") && <TableHead className="w-[100px]">Progress</TableHead>}
               {isColumnVisible("installed") && <TableHead className="text-center">Installed</TableHead>}
               <TableHead className="w-[50px]"></TableHead>

@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,6 +23,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { format } from "date-fns";
+import { toast } from "sonner";
+import { createMilestone, updateMilestone } from "@/lib/actions/milestones";
 
 interface Milestone {
   id: string;
@@ -84,7 +85,6 @@ export function MilestoneFormDialog({
     if (!name.trim() || !dueDate) return;
 
     setIsLoading(true);
-    const supabase = createClient();
 
     try {
       const data = {
@@ -95,25 +95,24 @@ export function MilestoneFormDialog({
         alert_days_before: parseInt(alertDays) || 7,
       };
 
+      let result;
       if (isEditing && editItem) {
-        const { error } = await supabase
-          .from("milestones")
-          .update(data)
-          .eq("id", editItem.id);
-
-        if (error) throw error;
+        result = await updateMilestone(editItem.id, data);
       } else {
-        const { error } = await supabase
-          .from("milestones")
-          .insert(data);
-
-        if (error) throw error;
+        result = await createMilestone(data);
       }
 
+      if (!result.success) {
+        toast.error(result.error || "Failed to save milestone");
+        return;
+      }
+
+      toast.success(isEditing ? "Milestone updated" : "Milestone created");
       handleClose();
       router.refresh();
     } catch (error) {
       console.error("Failed to save milestone:", error);
+      toast.error("Failed to save milestone");
     } finally {
       setIsLoading(false);
     }

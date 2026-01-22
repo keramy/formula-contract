@@ -14,11 +14,12 @@ import {
 } from "lucide-react";
 import { DashboardHeader } from "./dashboard-header";
 import { getCachedDashboardStats, getCachedRecentProjects } from "@/lib/cache";
-import { getMyTasks, getAtRiskProjects, getPendingApprovals, getClientProjectProgress, getMyDashboardStats } from "@/lib/actions/dashboard";
+import { getMyTasks, getAtRiskProjects, getPendingApprovals, getClientProjectProgress, getMyDashboardStats, getDashboardMilestones } from "@/lib/actions/dashboard";
 import { MyTasksWidget } from "@/components/dashboard/my-tasks-widget";
 import { AtRiskProjects } from "@/components/dashboard/at-risk-projects";
 import { PendingApprovalsWidget } from "@/components/dashboard/pending-approvals-widget";
 import { ClientProjectProgressWidget } from "@/components/dashboard/client-project-progress";
+import { UpcomingMilestonesWidget } from "@/components/dashboard/upcoming-milestones-widget";
 
 // Status configuration for compact pills
 const statusConfig: Record<string, { variant: "info" | "success" | "warning" | "default" | "danger"; label: string }> = {
@@ -90,6 +91,7 @@ export default async function DashboardPage() {
     atRiskData,
     pendingApprovalsData,
     clientProjectsData,
+    milestonesData,
   ] = await Promise.all([
     // My Tasks - operational roles only
     isOperationalRole || canSeeAllProjects
@@ -103,6 +105,8 @@ export default async function DashboardPage() {
     isClient ? getPendingApprovals(userId) : Promise.resolve([]),
     // Client Project Progress - Client only
     isClient ? getClientProjectProgress(userId) : Promise.resolve([]),
+    // Upcoming Milestones - non-client users
+    !isClient ? getDashboardMilestones() : Promise.resolve([]),
   ]);
 
   console.log(`📊 [PROFILE] Dashboard Total: ${(performance.now() - pageStart).toFixed(0)}ms\n`);
@@ -201,10 +205,11 @@ export default async function DashboardPage() {
           </CardContent>
         </GlassCard>
 
-        {/* Tasks & At-Risk Projects Row */}
-        <div className="grid gap-5 lg:grid-cols-2">
+        {/* Tasks, At-Risk Projects & Milestones Row */}
+        <div className="grid gap-5 lg:grid-cols-3">
           <MyTasksWidget tasks={tasksData} />
           <AtRiskProjects projects={atRiskData} />
+          <UpcomingMilestonesWidget milestones={milestonesData} />
         </div>
 
         {/* Recent Projects & Activity Feed */}

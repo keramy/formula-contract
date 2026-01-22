@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Dialog,
   DialogContent,
@@ -23,9 +25,14 @@ import {
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { UploadIcon, FileSpreadsheetIcon, AlertTriangleIcon, CheckCircleIcon, XCircleIcon } from "lucide-react";
+import { UploadIcon, FileSpreadsheetIcon, AlertTriangleIcon, CheckCircleIcon, XCircleIcon, RefreshCwIcon, GitMergeIcon } from "lucide-react";
 import { parseScopeItemsExcel, type ParseResult, type ParsedScopeItem } from "@/lib/excel-template";
+import { clearProjectScopeItems } from "@/lib/actions/scope-items";
+import { logActivity } from "@/lib/activity-log/actions";
+import { ACTIVITY_ACTIONS } from "@/lib/activity-log/constants";
 import type { ScopeItemInsert } from "@/types/database";
+
+type ImportMode = "merge" | "replace";
 
 interface ExcelImportProps {
   projectId: string;
@@ -48,8 +55,30 @@ export function ExcelImport({ projectId, projectCode }: ExcelImportProps) {
     inserted: number;
     updated: number;
     failed: number;
+    deleted: number;
     errors: string[];
   } | null>(null);
+
+  // Import mode: merge (upsert) or replace (delete all first)
+  const [importMode, setImportMode] = useState<ImportMode>("merge");
+  const [existingItemsCount, setExistingItemsCount] = useState<number>(0);
+
+  // Fetch existing items count when dialog opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchExistingItemsCount();
+    }
+  }, [isOpen]);
+
+  const fetchExistingItemsCount = async () => {
+    const supabase = createClient();
+    const { count } = await supabase
+      .from("scope_items")
+      .select("*", { count: "exact", head: true })
+      .eq("project_id", projectId)
+      .eq("is_deleted", false);
+    setExistingItemsCount(count || 0);
+  };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -91,11 +120,22 @@ export function ExcelImport({ projectId, projectCode }: ExcelImportProps) {
       inserted: 0,
       updated: 0,
       failed: 0,
+      deleted: 0,
       errors: [] as string[],
     };
 
     try {
       const supabase = createClient();
+
+      // If Replace mode, soft-delete all existing items first using server action
+      if (importMode === "replace" && existingItemsCount > 0) {
+        const clearResult = await clearProjectScopeItems(projectId);
+
+        if (!clearResult.success) {
+          throw new Error(`Failed to clear existing items: ${clearResult.error}`);
+        }
+        results.deleted = clearResult.data?.deletedCount || existingItemsCount;
+      }
 
       // Import items one by one with upsert logic
       for (const item of parseResult.items) {
@@ -110,19 +150,19 @@ export function ExcelImport({ projectId, projectCode }: ExcelImportProps) {
             .single();
 
           if (existing) {
-            // UPDATE existing item - preserve item_path, status, production_percentage
+            // UPDATE existing item - preserve initial costs (locked baseline), path, status
+            // Only update: name, description, unit, quantity, sales prices
+            // NOTE: initial_unit_cost and initial_total_cost are NEVER updated
             const { error: updateError } = await supabase
               .from("scope_items")
               .update({
                 name: item.name,
                 description: item.description,
-                width: item.width,
-                depth: item.depth,
-                height: item.height,
                 unit: item.unit,
                 quantity: item.quantity,
-                // Map unit_price from Excel to unit_sales_price in database
-                unit_sales_price: item.unit_price,
+                // Update sales price and recalculate total
+                unit_sales_price: item.unit_sales_price,
+                total_sales_price: item.unit_sales_price ? item.unit_sales_price * item.quantity : null,
                 notes: item.notes,
               })
               .eq("id", existing.id);
@@ -134,19 +174,22 @@ export function ExcelImport({ projectId, projectCode }: ExcelImportProps) {
               results.updated++;
             }
           } else {
-            // INSERT new item
-            // Map unit_price from Excel to unit_sales_price in database
+            // INSERT new item with calculated totals
+            // Set initial costs (locked baseline) - actual costs entered manually later
             const scopeItem: ScopeItemInsert = {
               project_id: projectId,
               item_code: item.item_code,
               name: item.name,
               description: item.description,
-              width: item.width,
-              depth: item.depth,
-              height: item.height,
               unit: item.unit,
               quantity: item.quantity,
-              unit_sales_price: item.unit_price,
+              // Initial cost (budgeted, set once, never changes)
+              initial_unit_cost: item.initial_unit_cost,
+              initial_total_cost: item.initial_unit_cost ? item.initial_unit_cost * item.quantity : null,
+              // Sales price
+              unit_sales_price: item.unit_sales_price,
+              total_sales_price: item.unit_sales_price ? item.unit_sales_price * item.quantity : null,
+              // Actual cost is NOT set during import - entered manually later
               item_path: item.item_path,
               status: item.status,
               notes: item.notes,
@@ -173,6 +216,21 @@ export function ExcelImport({ projectId, projectCode }: ExcelImportProps) {
 
       setImportResults(results);
       setStep("complete");
+
+      // Log activity if any items were imported
+      if (results.inserted > 0 || results.updated > 0) {
+        await logActivity({
+          action: ACTIVITY_ACTIONS.ITEMS_IMPORTED,
+          entityType: "scope_item",
+          projectId,
+          details: {
+            inserted: results.inserted,
+            updated: results.updated,
+            deleted: results.deleted,
+            mode: importMode,
+          },
+        });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to import items");
       setStep("preview");
@@ -189,11 +247,12 @@ export function ExcelImport({ projectId, projectCode }: ExcelImportProps) {
       setParseResult(null);
       setImportResults(null);
       setError(null);
+      setImportMode("merge");
       if (fileInputRef.current) fileInputRef.current.value = "";
     }, 200);
 
-    // Refresh page if items were imported or updated
-    if (importResults && (importResults.inserted > 0 || importResults.updated > 0)) {
+    // Refresh page if items were imported, updated, or deleted
+    if (importResults && (importResults.inserted > 0 || importResults.updated > 0 || importResults.deleted > 0)) {
       router.refresh();
     }
   };
@@ -202,6 +261,7 @@ export function ExcelImport({ projectId, projectCode }: ExcelImportProps) {
     setStep("upload");
     setParseResult(null);
     setError(null);
+    setImportMode("merge");
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -278,6 +338,58 @@ export function ExcelImport({ projectId, projectCode }: ExcelImportProps) {
         {/* Preview Step */}
         {step === "preview" && parseResult && (
           <div className="flex-1 min-h-0 space-y-4">
+            {/* Import Mode Selection - only show if there are existing items */}
+            {existingItemsCount > 0 && (
+            <div className="p-4 rounded-lg border bg-muted/30">
+              <Label className="text-sm font-medium mb-3 block">Import Mode</Label>
+              <RadioGroup
+                value={importMode}
+                onValueChange={(value) => setImportMode(value as ImportMode)}
+                className="space-y-2"
+              >
+                <div className="flex items-start gap-3 p-2 rounded-md hover:bg-muted/50">
+                  <RadioGroupItem value="merge" id="merge" className="mt-0.5" />
+                  <Label htmlFor="merge" className="cursor-pointer flex-1">
+                    <div className="flex items-center gap-2">
+                      <GitMergeIcon className="size-4 text-blue-500" />
+                      <span className="font-medium">Merge with existing items</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Update items with matching codes, add new ones
+                    </p>
+                  </Label>
+                </div>
+                <div className="flex items-start gap-3 p-2 rounded-md hover:bg-muted/50">
+                  <RadioGroupItem value="replace" id="replace" className="mt-0.5" />
+                  <Label htmlFor="replace" className="cursor-pointer flex-1">
+                    <div className="flex items-center gap-2">
+                      <RefreshCwIcon className="size-4 text-amber-500" />
+                      <span className="font-medium">Replace all items</span>
+                      {existingItemsCount > 0 && (
+                        <Badge variant="secondary" className="text-xs">
+                          {existingItemsCount} existing
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Delete all existing scope items, then import fresh
+                    </p>
+                  </Label>
+                </div>
+              </RadioGroup>
+
+              {/* Warning for Replace mode */}
+              {importMode === "replace" && (
+                <div className="mt-3 p-2 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-700 text-sm flex items-start gap-2">
+                  <AlertTriangleIcon className="size-4 mt-0.5 shrink-0" />
+                  <span>
+                    This will <strong>permanently delete</strong> all {existingItemsCount} existing items before importing.
+                  </span>
+                </div>
+              )}
+            </div>
+            )}
+
             {/* Errors */}
             {parseResult.errors.length > 0 && (
               <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20">
@@ -326,24 +438,28 @@ export function ExcelImport({ projectId, projectCode }: ExcelImportProps) {
                     <TableRow>
                       <TableHead className="w-[100px]">Code</TableHead>
                       <TableHead>Name</TableHead>
-                      <TableHead className="w-[80px]">Qty</TableHead>
-                      <TableHead className="w-[100px]">Path</TableHead>
-                      <TableHead className="w-[100px]">Status</TableHead>
+                      <TableHead className="w-[60px]">Qty</TableHead>
+                      <TableHead className="w-[100px] text-right">Initial Cost</TableHead>
+                      <TableHead className="w-[100px] text-right">Sale Price</TableHead>
+                      <TableHead className="w-[90px]">Path</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {parseResult.items.map((item, i) => (
                       <TableRow key={i}>
                         <TableCell className="font-mono text-sm">{item.item_code}</TableCell>
-                        <TableCell>{item.name}</TableCell>
+                        <TableCell className="max-w-[150px] truncate">{item.name}</TableCell>
                         <TableCell>{item.quantity}</TableCell>
-                        <TableCell>
-                          <Badge variant={item.item_path === "production" ? "default" : "secondary"}>
-                            {item.item_path}
-                          </Badge>
+                        <TableCell className="text-right text-muted-foreground">
+                          {item.initial_unit_cost ? item.initial_unit_cost.toLocaleString() : "-"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {item.unit_sales_price ? item.unit_sales_price.toLocaleString() : "-"}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline">{item.status}</Badge>
+                          <Badge variant={item.item_path === "production" ? "default" : "secondary"} className="text-xs">
+                            {item.item_path}
+                          </Badge>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -388,7 +504,13 @@ export function ExcelImport({ projectId, projectCode }: ExcelImportProps) {
               <p className="text-lg font-medium">Import Complete</p>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className={`grid gap-4 ${importResults.deleted > 0 ? 'grid-cols-4' : 'grid-cols-3'}`}>
+              {importResults.deleted > 0 && (
+                <div className="p-4 rounded-md bg-amber-500/10 border border-amber-500/20 text-center">
+                  <p className="text-2xl font-bold text-amber-600">{importResults.deleted}</p>
+                  <p className="text-sm text-muted-foreground">Deleted</p>
+                </div>
+              )}
               <div className="p-4 rounded-md bg-green-500/10 border border-green-500/20 text-center">
                 <p className="text-2xl font-bold text-green-600">{importResults.inserted}</p>
                 <p className="text-sm text-muted-foreground">Inserted</p>

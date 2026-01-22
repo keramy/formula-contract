@@ -44,6 +44,15 @@ export const ACTIVITY_ACTIONS = {
   // Auth actions
   USER_LOGIN: "user_login",
   PASSWORD_CHANGED: "password_changed",
+
+  // Milestone actions
+  MILESTONE_CREATED: "milestone_created",
+  MILESTONE_UPDATED: "milestone_updated",
+  MILESTONE_COMPLETED: "milestone_completed",
+  MILESTONE_DELETED: "milestone_deleted",
+
+  // Bulk actions
+  ITEMS_IMPORTED: "items_imported",
 } as const;
 
 export type ActivityAction = (typeof ACTIVITY_ACTIONS)[keyof typeof ACTIVITY_ACTIONS];

@@ -7,12 +7,14 @@
  * - Listing project team members
  * - Finding available users to assign
  * - Assigning/removing users from projects
+ * - Email and in-app notifications
  */
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { logActivity } from "@/lib/activity-log/actions";
 import { ACTIVITY_ACTIONS } from "@/lib/activity-log/constants";
+import { Resend } from "resend";
 
 // ============================================================================
 // Types
@@ -139,8 +141,8 @@ export async function assignUserToProject(
     return { success: false, error: "Not authenticated" };
   }
 
-  // Check if already assigned AND get user details in PARALLEL
-  const [existingResult, assignedUserResult] = await Promise.all([
+  // Check if already assigned AND get user/project details in PARALLEL
+  const [existingResult, assignedUserResult, projectResult, assignerResult] = await Promise.all([
     supabase
       .from("project_assignments")
       .select("id")
@@ -149,13 +151,25 @@ export async function assignUserToProject(
       .single(),
     supabase
       .from("users")
-      .select("name")
+      .select("name, email")
       .eq("id", userId)
+      .single(),
+    supabase
+      .from("projects")
+      .select("name, project_code")
+      .eq("id", projectId)
+      .single(),
+    supabase
+      .from("users")
+      .select("name")
+      .eq("id", user.id)
       .single(),
   ]);
 
   const { data: existing } = existingResult;
   const { data: assignedUser } = assignedUserResult;
+  const { data: project } = projectResult;
+  const { data: assigner } = assignerResult;
 
   if (existing) {
     return { success: false, error: "User is already assigned to this project" };
@@ -182,6 +196,28 @@ export async function assignUserToProject(
     projectId,
     details: { name: assignedUser?.name || "Unknown user" },
   });
+
+  // Create in-app notification for the assigned user
+  if (project) {
+    await supabase.from("notifications").insert({
+      user_id: userId,
+      type: "project_assigned",
+      title: `You've been assigned to ${project.name}`,
+      message: `${assigner?.name || "Someone"} added you to project ${project.project_code}`,
+      link: `/projects/${projectId}`,
+      project_id: projectId,
+    });
+
+    // Send email notification
+    await sendAssignmentEmail(
+      assignedUser?.email,
+      assignedUser?.name || "Team Member",
+      project.name,
+      project.project_code,
+      assigner?.name || "A team member",
+      projectId
+    );
+  }
 
   revalidatePath(`/projects/${projectId}`);
   return { success: true };
@@ -225,4 +261,79 @@ export async function removeUserFromProject(
 
   revalidatePath(`/projects/${projectId}`);
   return { success: true };
+}
+
+// ============================================================================
+// Email Helper
+// ============================================================================
+
+async function sendAssignmentEmail(
+  email: string | undefined,
+  userName: string,
+  projectName: string,
+  projectCode: string,
+  assignerName: string,
+  projectId: string
+) {
+  if (!email) return;
+
+  const resendApiKey = process.env.RESEND_API_KEY;
+  if (!resendApiKey) {
+    console.warn("RESEND_API_KEY not configured, skipping assignment email");
+    return;
+  }
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://formula-contract.vercel.app";
+  const projectUrl = `${siteUrl}/projects/${projectId}`;
+
+  try {
+    const resend = new Resend(resendApiKey);
+    await resend.emails.send({
+      from: "Formula Contract <notifications@updates.formulacontract.com>",
+      to: email,
+      subject: `You've been assigned to ${projectName}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f4f4f5; margin: 0; padding: 20px;">
+          <div style="max-width: 560px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <div style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); padding: 32px; text-align: center;">
+              <h1 style="color: white; margin: 0; font-size: 24px; font-weight: 600;">Project Assignment</h1>
+            </div>
+            <div style="padding: 32px;">
+              <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 16px;">
+                Hi ${userName},
+              </p>
+              <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 24px;">
+                <strong>${assignerName}</strong> has assigned you to the project:
+              </p>
+              <div style="background: #f9fafb; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+                <p style="margin: 0 0 8px; font-size: 18px; font-weight: 600; color: #111827;">
+                  ${projectName}
+                </p>
+                <p style="margin: 0; font-size: 14px; color: #6b7280;">
+                  Project Code: ${projectCode}
+                </p>
+              </div>
+              <a href="${projectUrl}" style="display: inline-block; background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); color: white; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+                View Project
+              </a>
+            </div>
+            <div style="padding: 20px 32px; background: #f9fafb; text-align: center;">
+              <p style="margin: 0; font-size: 12px; color: #9ca3af;">
+                Formula Contract - Project Management System
+              </p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+    });
+  } catch (error) {
+    console.error("Error sending assignment email:", error);
+  }
 }

@@ -244,10 +244,13 @@ export interface Database {
           height: number | null;
           unit: string;
           quantity: number;
-          // Cost tracking fields (what WE pay)
-          unit_cost: number | null;
+          // Initial cost (budgeted, set once at creation, never changes)
+          initial_unit_cost: number | null;
           initial_total_cost: number | null;
-          // Sales price fields (what CLIENT pays) - renamed from unit_price/total_price
+          // Actual cost (real cost, entered manually later)
+          actual_unit_cost: number | null;
+          actual_total_cost: number | null;
+          // Sales price fields (what CLIENT pays)
           unit_sales_price: number | null;
           total_sales_price: number | null;
           item_path: ItemPath;
@@ -276,8 +279,10 @@ export interface Database {
           height?: number | null;
           unit?: string;
           quantity?: number;
-          unit_cost?: number | null;
+          initial_unit_cost?: number | null;
           initial_total_cost?: number | null;
+          actual_unit_cost?: number | null;
+          actual_total_cost?: number | null;
           unit_sales_price?: number | null;
           total_sales_price?: number | null;
           item_path?: ItemPath;
@@ -306,8 +311,10 @@ export interface Database {
           height?: number | null;
           unit?: string;
           quantity?: number;
-          unit_cost?: number | null;
+          initial_unit_cost?: number | null;
           initial_total_cost?: number | null;
+          actual_unit_cost?: number | null;
+          actual_total_cost?: number | null;
           unit_sales_price?: number | null;
           total_sales_price?: number | null;
           item_path?: ItemPath;

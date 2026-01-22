@@ -41,9 +41,12 @@ interface ScopeItemFormProps {
     height: number | null;
     unit: string;
     quantity: number;
-    // Cost fields (what we pay)
-    unit_cost: number | null;
+    // Initial cost (budgeted, set once)
+    initial_unit_cost: number | null;
     initial_total_cost: number | null;
+    // Actual cost (entered later)
+    actual_unit_cost: number | null;
+    actual_total_cost: number | null;
     // Sales price fields (what client pays)
     unit_sales_price: number | null;
     item_path: string;
@@ -82,9 +85,11 @@ export function ScopeItemForm({ projectId, projectCurrency = "TRY", initialData 
     // Dimensions removed from form - kept in database for backward compatibility
     unit: initialData?.unit || "pcs",
     quantity: initialData?.quantity?.toString() || "1",
-    // Cost tracking (what we pay)
-    unit_cost: initialData?.unit_cost?.toString() || "",
-    // Sales price (what client pays) - renamed from unit_price
+    // Initial cost (budgeted, set once)
+    initial_unit_cost: initialData?.initial_unit_cost?.toString() || "",
+    // Actual cost (entered later)
+    actual_unit_cost: initialData?.actual_unit_cost?.toString() || "",
+    // Sales price (what client pays)
     unit_sales_price: initialData?.unit_sales_price?.toString() || "",
     item_path: initialData?.item_path || "production",
     status: initialData?.status || "pending",
@@ -130,7 +135,8 @@ export function ScopeItemForm({ projectId, projectCurrency = "TRY", initialData 
     // Prepare data for validation
     // Dimensions removed from form - preserve existing values if editing, null for new items
     const quantity = parseIntWithDefault(formData.quantity, 1);
-    const unitCost = parseOptionalNumber(formData.unit_cost);
+    const initialUnitCost = parseOptionalNumber(formData.initial_unit_cost);
+    const actualUnitCost = parseOptionalNumber(formData.actual_unit_cost);
 
     const dataToValidate = {
       item_code: formData.item_code,
@@ -141,8 +147,10 @@ export function ScopeItemForm({ projectId, projectCurrency = "TRY", initialData 
       height: initialData?.height ?? null,
       unit: formData.unit,
       quantity,
-      // Cost tracking
-      unit_cost: unitCost,
+      // Initial cost (budgeted)
+      initial_unit_cost: initialUnitCost,
+      // Actual cost
+      actual_unit_cost: actualUnitCost,
       // Sales price (to client)
       unit_sales_price: parseOptionalNumber(formData.unit_sales_price),
       item_path: formData.item_path,
@@ -164,12 +172,11 @@ export function ScopeItemForm({ projectId, projectCurrency = "TRY", initialData 
     try {
       const supabase = createClient();
 
-      // Calculate initial_total_cost only on first creation (not on edit)
-      // This is a locked snapshot of the cost when the item was first created
-      const shouldSetInitialCost = !isEditing && validation.data.unit_cost !== null;
-      const initialTotalCost = shouldSetInitialCost
-        ? (validation.data.unit_cost || 0) * validation.data.quantity
-        : undefined;
+      // Calculate totals
+      const qty = validation.data.quantity;
+      const initUnitCost = validation.data.initial_unit_cost;
+      const actUnitCost = validation.data.actual_unit_cost;
+      const salesPrice = validation.data.unit_sales_price;
 
       // Type-safe item data
       const itemData: ScopeItemInsert = {
@@ -181,12 +188,18 @@ export function ScopeItemForm({ projectId, projectCurrency = "TRY", initialData 
         depth: validation.data.depth,
         height: validation.data.height,
         unit: validation.data.unit,
-        quantity: validation.data.quantity,
-        // Cost tracking
-        unit_cost: validation.data.unit_cost,
-        ...(initialTotalCost !== undefined && { initial_total_cost: initialTotalCost }),
+        quantity: qty,
+        // Initial cost (set once, never changes after creation)
+        ...(isEditing ? {} : {
+          initial_unit_cost: initUnitCost,
+          initial_total_cost: initUnitCost ? initUnitCost * qty : null,
+        }),
+        // Actual cost (can be updated anytime)
+        actual_unit_cost: actUnitCost,
+        actual_total_cost: actUnitCost ? actUnitCost * qty : null,
         // Sales price (to client)
-        unit_sales_price: validation.data.unit_sales_price,
+        unit_sales_price: salesPrice,
+        total_sales_price: salesPrice ? salesPrice * qty : null,
         item_path: validation.data.item_path,
         status: validation.data.status,
         notes: validation.data.notes,
@@ -326,60 +339,85 @@ export function ScopeItemForm({ projectId, projectCurrency = "TRY", initialData 
             </div>
           </div>
 
-          {/* Cost & Pricing */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="unit_cost">Unit Cost (Our Cost)</Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                  {currencySymbols[currency] || currency}
-                </span>
-                <Input
-                  id="unit_cost"
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  className="pl-8"
-                  value={formData.unit_cost}
-                  onChange={(e) => handleChange("unit_cost", e.target.value)}
-                  disabled={isLoading}
-                />
+          {/* Initial Cost - Only editable when creating */}
+          <div className="p-4 rounded-lg border bg-blue-50/50 space-y-4">
+            <p className="text-sm font-medium text-blue-700">Initial Cost (Budgeted){isEditing && " - Locked"}</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="initial_unit_cost">Initial Unit Cost</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                    {currencySymbols[currency] || currency}
+                  </span>
+                  <Input
+                    id="initial_unit_cost"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    className={`pl-8 ${isEditing ? "bg-muted" : ""}`}
+                    value={formData.initial_unit_cost}
+                    onChange={(e) => handleChange("initial_unit_cost", e.target.value)}
+                    disabled={isLoading || isEditing}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">Budgeted cost per unit</p>
               </div>
-              <p className="text-xs text-muted-foreground">What we pay per unit</p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="unit_sales_price">Unit Sales Price (Client Pays)</Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                  {currencySymbols[currency] || currency}
-                </span>
-                <Input
-                  id="unit_sales_price"
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  className="pl-8"
-                  value={formData.unit_sales_price}
-                  onChange={(e) => handleChange("unit_sales_price", e.target.value)}
-                  disabled={isLoading}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">What client pays per unit</p>
             </div>
           </div>
 
-          {/* Show Initial Cost info if editing and it's set */}
-          {isEditing && initialData?.initial_total_cost !== null && initialData?.initial_total_cost !== undefined && (
-            <div className="p-3 rounded-lg bg-muted/50 border">
-              <p className="text-sm text-muted-foreground">
-                <span className="font-medium">Initial Cost (locked):</span>{" "}
-                <span className="font-mono">{currencySymbols[currency] || currency}{initialData.initial_total_cost.toLocaleString()}</span>
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                This is the cost snapshot when the item was first created and cannot be changed.
-              </p>
+          {/* Actual Cost - Only shown when editing */}
+          {isEditing && (
+            <div className="p-4 rounded-lg border bg-amber-50/50 space-y-4">
+              <p className="text-sm font-medium text-amber-700">Actual Cost</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="actual_unit_cost">Actual Unit Cost</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                      {currencySymbols[currency] || currency}
+                    </span>
+                    <Input
+                      id="actual_unit_cost"
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      className="pl-8"
+                      value={formData.actual_unit_cost}
+                      onChange={(e) => handleChange("actual_unit_cost", e.target.value)}
+                      disabled={isLoading}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">Real cost per unit</p>
+                </div>
+              </div>
             </div>
           )}
+
+          {/* Sales Price */}
+          <div className="p-4 rounded-lg border bg-green-50/50 space-y-4">
+            <p className="text-sm font-medium text-green-700">Sales Price</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="unit_sales_price">Unit Sales Price (Client Pays)</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                    {currencySymbols[currency] || currency}
+                  </span>
+                  <Input
+                    id="unit_sales_price"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    className="pl-8"
+                    value={formData.unit_sales_price}
+                    onChange={(e) => handleChange("unit_sales_price", e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+              <p className="text-xs text-muted-foreground">What client pays per unit</p>
+              </div>
+            </div>
+          </div>
 
           {/* Path & Status */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

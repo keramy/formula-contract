@@ -22,6 +22,8 @@ import {
   TrashIcon,
   PackageIcon,
   FileTextIcon,
+  CalendarIcon,
+  UploadCloudIcon,
 } from "lucide-react";
 import {
   getActivityLogs,
@@ -200,6 +202,35 @@ const actionConfig: Record<string, { icon: React.ReactNode; gradientColor: Gradi
     icon: <UserIcon className="size-3.5" />,
     gradientColor: "amber",
     verb: "changed password",
+  },
+
+  // Milestone actions
+  [ACTIVITY_ACTIONS.MILESTONE_CREATED]: {
+    icon: <CalendarIcon className="size-3.5" />,
+    gradientColor: "violet",
+    verb: "created milestone",
+  },
+  [ACTIVITY_ACTIONS.MILESTONE_UPDATED]: {
+    icon: <CalendarIcon className="size-3.5" />,
+    gradientColor: "sky",
+    verb: "updated milestone",
+  },
+  [ACTIVITY_ACTIONS.MILESTONE_COMPLETED]: {
+    icon: <CheckCircleIcon className="size-3.5" />,
+    gradientColor: "emerald",
+    verb: "completed milestone",
+  },
+  [ACTIVITY_ACTIONS.MILESTONE_DELETED]: {
+    icon: <TrashIcon className="size-3.5" />,
+    gradientColor: "rose",
+    verb: "deleted milestone",
+  },
+
+  // Bulk actions
+  [ACTIVITY_ACTIONS.ITEMS_IMPORTED]: {
+    icon: <UploadCloudIcon className="size-3.5" />,
+    gradientColor: "teal",
+    verb: "imported scope items to",
   },
 };
 

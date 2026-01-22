@@ -93,10 +93,12 @@ export const scopeItemSchema = z.object({
   depth: z.number().min(0, "Depth must be positive").optional().nullable(),
   height: z.number().min(0, "Height must be positive").optional().nullable(),
   unit: unitSchema.default("pcs"),
-  quantity: z.number().int().min(1, "Quantity must be at least 1").default(1),
-  // Cost tracking (what we pay)
-  unit_cost: z.number().min(0, "Cost must be positive").optional().nullable(),
-  // Sales price (what client pays) - renamed from unit_price
+  quantity: z.number().min(0.01, "Quantity must be greater than 0").default(1),
+  // Initial cost (budgeted, set once at creation)
+  initial_unit_cost: z.number().min(0, "Initial cost must be positive").optional().nullable(),
+  // Actual cost (entered later)
+  actual_unit_cost: z.number().min(0, "Actual cost must be positive").optional().nullable(),
+  // Sales price (what client pays)
   unit_sales_price: z.number().min(0, "Price must be positive").optional().nullable(),
   item_path: itemPathSchema.default("production"),
   status: itemStatusSchema.default("pending"),

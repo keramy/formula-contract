@@ -17,12 +17,10 @@ export const SCOPE_ITEMS_COLUMNS = [
   "item_code",
   "name",
   "description",
-  "width",
-  "depth",
-  "height",
   "unit",
   "quantity",
-  "unit_price",
+  "initial_unit_cost",
+  "unit_sales_price",
   "notes",
 ] as const;
 
@@ -32,12 +30,10 @@ export const SCOPE_ITEMS_EXAMPLE_ROW: Record<ScopeItemColumn, string> = {
   item_code: "ITEM-001",
   name: "Reception Desk",
   description: "Main entrance reception desk with storage",
-  width: "180",
-  depth: "80",
-  height: "110",
   unit: "pcs",
   quantity: "1",
-  unit_price: "5000",
+  initial_unit_cost: "3500",
+  unit_sales_price: "5000",
   notes: "Include cable management",
 };
 
@@ -45,12 +41,10 @@ export const SCOPE_ITEMS_HEADER_DESCRIPTIONS: Record<ScopeItemColumn, string> = 
   item_code: "Unique item identifier (e.g., ITEM-001)",
   name: "Item name (required)",
   description: "Optional description",
-  width: "Width in cm (optional)",
-  depth: "Depth in cm (optional)",
-  height: "Height in cm (optional)",
   unit: "pcs, set, m, m2, or lot (default: pcs)",
   quantity: "Number of items (default: 1)",
-  unit_price: "Price per unit (optional)",
+  initial_unit_cost: "Budgeted cost per unit (set once, never changes)",
+  unit_sales_price: "Sale price per unit to client (optional)",
   notes: "Additional notes (optional)",
 };
 
@@ -71,12 +65,10 @@ export interface ParsedScopeItem {
   item_code: string;
   name: string;
   description: string | null;
-  width: number | null;
-  depth: number | null;
-  height: number | null;
   unit: (typeof VALID_UNITS)[number];
   quantity: number;
-  unit_price: number | null;
+  initial_unit_cost: number | null;
+  unit_sales_price: number | null;
   item_path: (typeof VALID_ITEM_PATHS)[number];
   status: (typeof VALID_STATUSES)[number];
   notes: string | null;
@@ -108,12 +100,10 @@ export async function generateScopeItemsExcel() {
     { wch: 15 }, // item_code
     { wch: 25 }, // name
     { wch: 40 }, // description
-    { wch: 10 }, // width
-    { wch: 10 }, // depth
-    { wch: 10 }, // height
     { wch: 8 },  // unit
     { wch: 10 }, // quantity
-    { wch: 12 }, // unit_price
+    { wch: 12 }, // unit_cost
+    { wch: 15 }, // unit_sales_price
     { wch: 30 }, // notes
   ];
 
@@ -127,19 +117,20 @@ export async function generateScopeItemsExcel() {
     ["item_code", "Unique identifier for the item", "Yes", "Any text (e.g., ITEM-001)"],
     ["name", "Name of the item", "Yes", "Any text"],
     ["description", "Detailed description", "No", "Any text"],
-    ["width", "Width in centimeters", "No", "Number"],
-    ["depth", "Depth in centimeters", "No", "Number"],
-    ["height", "Height in centimeters", "No", "Number"],
     ["unit", "Unit of measurement", "No", "pcs, set, m, m2, lot (default: pcs)"],
-    ["quantity", "Number of items", "No", "Positive integer (default: 1)"],
-    ["unit_price", "Price per unit", "No", "Number"],
+    ["quantity", "Quantity (supports decimals)", "No", "Number, e.g., 1, 4.8, 12,5 (default: 1)"],
+    ["initial_unit_cost", "Budgeted cost per unit (set once)", "No", "Number (e.g., 3500)"],
+    ["unit_sales_price", "Sale price per unit to client", "No", "Number (e.g., 5000)"],
     ["notes", "Additional notes", "No", "Any text"],
     [""],
     ["IMPORTANT:"],
     ["- item_code and name are required fields"],
+    ["- Each item_code must be UNIQUE - duplicates will be skipped with a warning"],
     ["- First row must be the header row"],
     ["- Save as .xlsx format"],
-    ["- Item path and status can be set after import using bulk edit"],
+    ["- Initial total cost is auto-calculated: initial_unit_cost × quantity"],
+    ["- Actual cost can be entered later through the app"],
+    ["- Item path and status can be set after import"],
   ];
   const instructionSheet = XLSX.utils.aoa_to_sheet(instructionRows);
   instructionSheet["!cols"] = [
@@ -165,12 +156,16 @@ export async function downloadScopeItemsTemplate(projectCode: string = "PROJECT"
 
 /**
  * Parse an Excel file and extract scope items
+ * Includes duplicate item_code detection
  */
 export async function parseScopeItemsExcel(file: ArrayBuffer): Promise<ParseResult> {
   const XLSX = await getXLSX();
   const errors: { row: number; message: string }[] = [];
   const warnings: { row: number; message: string }[] = [];
   const items: ParsedScopeItem[] = [];
+
+  // Track seen item_codes to detect duplicates within the Excel file
+  const seenItemCodes = new Map<string, number>(); // item_code -> first row number
 
   try {
     const workbook = XLSX.read(file, { type: "array" });
@@ -212,17 +207,28 @@ export async function parseScopeItemsExcel(file: ArrayBuffer): Promise<ParseResu
         return;
       }
 
+      const itemCode = String(row.item_code).trim();
+
+      // Check for duplicate item_code within the Excel file
+      if (seenItemCodes.has(itemCode)) {
+        const firstRow = seenItemCodes.get(itemCode)!;
+        errors.push({
+          row: rowNum,
+          message: `Duplicate item_code "${itemCode}" - first seen in row ${firstRow}. Each item_code must be unique.`
+        });
+        return;
+      }
+      seenItemCodes.set(itemCode, rowNum);
+
       // Parse and validate each field
       const item: ParsedScopeItem = {
-        item_code: String(row.item_code).trim(),
+        item_code: itemCode,
         name: String(row.name).trim(),
         description: row.description ? String(row.description).trim() : null,
-        width: parseNumber(row.width),
-        depth: parseNumber(row.depth),
-        height: parseNumber(row.height),
         unit: parseUnit(row.unit, rowNum, warnings),
         quantity: parseQuantity(row.quantity, rowNum, warnings),
-        unit_price: parseNumber(row.unit_price),
+        initial_unit_cost: parseNumber(row.initial_unit_cost),
+        unit_sales_price: parseNumber(row.unit_sales_price),
         item_path: parseItemPath(row.item_path, rowNum, warnings),
         status: parseStatus(row.status, rowNum, warnings),
         notes: row.notes ? String(row.notes).trim() : null,
@@ -259,11 +265,51 @@ export async function parseScopeItemsExcel(file: ArrayBuffer): Promise<ParseResu
   }
 }
 
+/**
+ * Normalize numeric string to handle both comma and dot as decimal separator
+ * Handles: "4.8", "4,8", "1.234,56" (European), "1,234.56" (US)
+ */
+function normalizeNumber(value: unknown): number {
+  if (typeof value === "number") return value;
+  if (typeof value !== "string") return NaN;
+
+  let str = value.trim();
+
+  // If contains both comma and dot, determine which is decimal separator
+  const hasComma = str.includes(",");
+  const hasDot = str.includes(".");
+
+  if (hasComma && hasDot) {
+    // Whichever comes last is the decimal separator
+    const lastComma = str.lastIndexOf(",");
+    const lastDot = str.lastIndexOf(".");
+    if (lastComma > lastDot) {
+      // European: 1.234,56 → 1234.56
+      str = str.replace(/\./g, "").replace(",", ".");
+    } else {
+      // US: 1,234.56 → 1234.56
+      str = str.replace(/,/g, "");
+    }
+  } else if (hasComma) {
+    // Only comma: could be "4,8" (decimal) or "1,234" (thousands)
+    // If single comma with 1-2 digits after, treat as decimal
+    const parts = str.split(",");
+    if (parts.length === 2 && parts[1].length <= 2) {
+      str = str.replace(",", ".");
+    } else {
+      str = str.replace(/,/g, "");
+    }
+  }
+  // If only dot, it's already correct format
+
+  return Number(str);
+}
+
 function parseNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === "") {
     return null;
   }
-  const num = Number(value);
+  const num = normalizeNumber(value);
   return isNaN(num) ? null : num;
 }
 
@@ -275,12 +321,13 @@ function parseQuantity(
   if (value === null || value === undefined || value === "") {
     return 1;
   }
-  const num = Number(value);
-  if (isNaN(num) || num < 1) {
+  const num = normalizeNumber(value);
+  if (isNaN(num) || num <= 0) {
     warnings.push({ row, message: `Invalid quantity "${value}", using default: 1` });
     return 1;
   }
-  return Math.floor(num);
+  // Round to 2 decimal places for cleaner values
+  return Math.round(num * 100) / 100;
 }
 
 function parseUnit(
@@ -332,14 +379,14 @@ export interface ExportScopeItem {
   item_code: string;
   name: string;
   description: string | null;
-  width: number | null;
-  depth: number | null;
-  height: number | null;
   unit: string;
   quantity: number;
-  // Cost tracking fields (what WE pay)
-  unit_cost: number | null;
+  // Initial cost (budgeted, set once)
+  initial_unit_cost: number | null;
   initial_total_cost: number | null;
+  // Actual cost (entered manually later)
+  actual_unit_cost: number | null;
+  actual_total_cost: number | null;
   // Sales price fields (what CLIENT pays)
   unit_sales_price: number | null;
   total_sales_price: number | null;
@@ -353,13 +400,12 @@ const EXPORT_COLUMNS = [
   "item_code",
   "name",
   "description",
-  "width",
-  "depth",
-  "height",
   "unit",
   "quantity",
-  "unit_cost",
+  "initial_unit_cost",
   "initial_total_cost",
+  "actual_unit_cost",
+  "actual_total_cost",
   "unit_sales_price",
   "total_sales_price",
   "item_path",
@@ -372,15 +418,14 @@ const EXPORT_HEADERS = [
   "Item Code",
   "Name",
   "Description",
-  "Width (cm)",
-  "Depth (cm)",
-  "Height (cm)",
   "Unit",
   "Quantity",
-  "Unit Cost",
-  "Initial Cost",
-  "Sales Price",
-  "Total Sales",
+  "Initial Unit Cost",
+  "Initial Total Cost",
+  "Actual Unit Cost",
+  "Actual Total Cost",
+  "Unit Sales Price",
+  "Total Sales Price",
   "Path",
   "Status",
   "Progress %",
@@ -413,14 +458,13 @@ export async function exportScopeItemsExcel(
     { wch: 15 }, // item_code
     { wch: 30 }, // name
     { wch: 40 }, // description
-    { wch: 12 }, // width
-    { wch: 12 }, // depth
-    { wch: 12 }, // height
     { wch: 8 },  // unit
     { wch: 10 }, // quantity
-    { wch: 12 }, // unit_cost
-    { wch: 14 }, // initial_total_cost
-    { wch: 12 }, // unit_sales_price
+    { wch: 16 }, // initial_unit_cost
+    { wch: 16 }, // initial_total_cost
+    { wch: 16 }, // actual_unit_cost
+    { wch: 16 }, // actual_total_cost
+    { wch: 14 }, // unit_sales_price
     { wch: 14 }, // total_sales_price
     { wch: 12 }, // item_path
     { wch: 15 }, // status

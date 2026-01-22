@@ -61,8 +61,15 @@ interface ScopeItemData {
   description: string | null;
   unit: string;
   quantity: number;
-  unit_cost: number | null;
+  // Initial cost (budgeted, set once at creation)
+  initial_unit_cost: number | null;
+  initial_total_cost: number | null;
+  // Actual cost (entered manually later)
+  actual_unit_cost: number | null;
+  actual_total_cost: number | null;
+  // Sales price
   unit_sales_price: number | null;
+  total_sales_price: number | null;
   item_path: string;
   status: string;
   notes: string | null;
@@ -143,11 +150,17 @@ export function ScopeItemSheet({
     description: "",
     unit: "pcs",
     quantity: "1",
-    unit_cost: "",
+    initial_unit_cost: "",
+    actual_unit_cost: "",
     unit_sales_price: "",
     item_path: "production",
     status: "pending",
     notes: "",
+  });
+  // Store original initial costs (read-only after creation)
+  const [initialCostLocked, setInitialCostLocked] = useState({
+    unit_cost: null as number | null,
+    total_cost: null as number | null,
   });
   const [images, setImages] = useState<string[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -175,12 +188,14 @@ export function ScopeItemSheet({
       description: "",
       unit: "pcs",
       quantity: "1",
-      unit_cost: "",
+      initial_unit_cost: "",
+      actual_unit_cost: "",
       unit_sales_price: "",
       item_path: "production",
       status: "pending",
       notes: "",
     });
+    setInitialCostLocked({ unit_cost: null, total_cost: null });
     setImages([]);
     setErrors({});
     setProductionProgress(0);
@@ -201,7 +216,8 @@ export function ScopeItemSheet({
           .from("scope_items")
           .select(`
             id, item_code, name, description, unit, quantity,
-            unit_cost, unit_sales_price, item_path, status,
+            initial_unit_cost, initial_total_cost, actual_unit_cost, actual_total_cost,
+            unit_sales_price, total_sales_price, item_path, status,
             notes, images, production_percentage, is_installed, installed_at
           `)
           .eq("id", id)
@@ -227,11 +243,17 @@ export function ScopeItemSheet({
           description: item.description || "",
           unit: item.unit || "pcs",
           quantity: item.quantity?.toString() || "1",
-          unit_cost: item.unit_cost?.toString() || "",
+          initial_unit_cost: item.initial_unit_cost?.toString() || "",
+          actual_unit_cost: item.actual_unit_cost?.toString() || "",
           unit_sales_price: item.unit_sales_price?.toString() || "",
           item_path: item.item_path || "production",
           status: item.status || "pending",
           notes: item.notes || "",
+        });
+        // Lock initial costs - they're read-only after creation
+        setInitialCostLocked({
+          unit_cost: item.initial_unit_cost,
+          total_cost: item.initial_total_cost,
         });
         setImages(item.images || []);
         setProductionProgress(item.production_percentage || 0);
@@ -298,43 +320,61 @@ export function ScopeItemSheet({
         const supabase = createClient();
 
         const quantity = parseInt(formData.quantity) || 1;
-        const unitCost = formData.unit_cost ? parseFloat(formData.unit_cost) : null;
+        const initialUnitCost = formData.initial_unit_cost ? parseFloat(formData.initial_unit_cost) : null;
+        const actualUnitCost = formData.actual_unit_cost ? parseFloat(formData.actual_unit_cost) : null;
         const unitSalesPrice = formData.unit_sales_price ? parseFloat(formData.unit_sales_price) : null;
 
-        // Base item data - shared fields for both insert and update
-        // NOTE: initial_total_cost is intentionally excluded here
-        // It should only be set once during item creation, never updated
-        const baseItemData = {
-          item_code: formData.item_code.trim(),
-          name: formData.name.trim(),
-          description: formData.description.trim() || null,
-          unit: formData.unit,
-          quantity,
-          unit_cost: unitCost,
-          unit_sales_price: unitSalesPrice,
-          total_sales_price: unitSalesPrice ? unitSalesPrice * quantity : null,
-          item_path: formData.item_path as ItemPath,
-          status: formData.status as ItemStatus,
-          notes: formData.notes.trim() || null,
-          images: images.length > 0 ? images : null,
-        };
-
         if (isEditing && itemId) {
-          // UPDATE: Do NOT touch initial_total_cost - preserve the original baseline
+          // UPDATE: Do NOT touch initial costs - they're locked after creation
+          // Only update: actual costs, sales prices, and other editable fields
+          const updateData = {
+            item_code: formData.item_code.trim(),
+            name: formData.name.trim(),
+            description: formData.description.trim() || null,
+            unit: formData.unit,
+            quantity,
+            // Actual cost (editable)
+            actual_unit_cost: actualUnitCost,
+            actual_total_cost: actualUnitCost ? actualUnitCost * quantity : null,
+            // Sales price (editable)
+            unit_sales_price: unitSalesPrice,
+            total_sales_price: unitSalesPrice ? unitSalesPrice * quantity : null,
+            item_path: formData.item_path as ItemPath,
+            status: formData.status as ItemStatus,
+            notes: formData.notes.trim() || null,
+            images: images.length > 0 ? images : null,
+          };
+
           const { error } = await supabase
             .from("scope_items")
-            .update(baseItemData)
+            .update(updateData)
             .eq("id", itemId);
 
           if (error) throw error;
           toast.success("Scope item updated");
         } else {
-          // INSERT: Set initial_total_cost once at creation time
-          const { error } = await supabase.from("scope_items").insert({
-            ...baseItemData,
+          // INSERT: Set initial costs once at creation time (locked forever after)
+          const insertData = {
             project_id: projectId,
-            initial_total_cost: unitCost ? unitCost * quantity : null,
-          });
+            item_code: formData.item_code.trim(),
+            name: formData.name.trim(),
+            description: formData.description.trim() || null,
+            unit: formData.unit,
+            quantity,
+            // Initial cost (set once, never changes)
+            initial_unit_cost: initialUnitCost,
+            initial_total_cost: initialUnitCost ? initialUnitCost * quantity : null,
+            // Sales price
+            unit_sales_price: unitSalesPrice,
+            total_sales_price: unitSalesPrice ? unitSalesPrice * quantity : null,
+            // Actual cost NOT set during creation - entered later
+            item_path: formData.item_path as ItemPath,
+            status: formData.status as ItemStatus,
+            notes: formData.notes.trim() || null,
+            images: images.length > 0 ? images : null,
+          };
+
+          const { error } = await supabase.from("scope_items").insert(insertData);
 
           if (error) throw error;
           toast.success("Scope item created");
@@ -354,9 +394,11 @@ export function ScopeItemSheet({
 
   // Calculate totals
   const quantity = parseInt(formData.quantity) || 0;
-  const unitCost = parseFloat(formData.unit_cost) || 0;
+  const initialUnitCost = parseFloat(formData.initial_unit_cost) || 0;
+  const actualUnitCost = parseFloat(formData.actual_unit_cost) || 0;
   const unitSalesPrice = parseFloat(formData.unit_sales_price) || 0;
-  const totalCost = unitCost * quantity;
+  const initialTotalCost = initialUnitCost * quantity;
+  const actualTotalCost = actualUnitCost * quantity;
   const totalSalesPrice = unitSalesPrice * quantity;
 
   return (
@@ -533,64 +575,108 @@ export function ScopeItemSheet({
 
               {/* Pricing - Hidden from clients */}
               {!isClient && (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <Label className="text-sm font-medium">Pricing</Label>
                     <span className="text-xs px-2 py-1 rounded-full bg-muted font-medium">
                       {projectCurrency} ({currencySymbol})
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <Input
-                        id="unit_cost"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        placeholder="Unit cost"
-                        value={formData.unit_cost}
-                        onChange={(e) => handleChange("unit_cost", e.target.value)}
-                        disabled={isViewOnly}
-                      />
-                      <p className="text-xs text-muted-foreground">Our cost per unit</p>
-                    </div>
 
-                    <div className="space-y-1">
-                      <Input
-                        id="unit_sales_price"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        placeholder="Sales price"
-                        value={formData.unit_sales_price}
-                        onChange={(e) => handleChange("unit_sales_price", e.target.value)}
-                        disabled={isViewOnly}
-                      />
-                      <p className="text-xs text-muted-foreground">Client pays per unit</p>
+                  {/* Initial Cost - Editable only when creating, read-only when editing */}
+                  <div className="p-3 rounded-lg border bg-blue-50/50 space-y-2">
+                    <p className="text-xs font-medium text-blue-700">
+                      Initial Cost {isEditing && "(Locked)"}
+                    </p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <Input
+                          id="initial_unit_cost"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder="Unit cost"
+                          value={isEditing ? (initialCostLocked.unit_cost?.toString() || "") : formData.initial_unit_cost}
+                          onChange={(e) => handleChange("initial_unit_cost", e.target.value)}
+                          disabled={isViewOnly || isEditing}
+                          className={isEditing ? "bg-muted" : ""}
+                        />
+                        <p className="text-xs text-muted-foreground">Per unit</p>
+                      </div>
+                      <div className="space-y-1">
+                        <Input
+                          type="text"
+                          value={isEditing
+                            ? (initialCostLocked.total_cost ? `${currencySymbol}${initialCostLocked.total_cost.toLocaleString()}` : "-")
+                            : (initialTotalCost > 0 ? `${currencySymbol}${initialTotalCost.toLocaleString()}` : "-")
+                          }
+                          disabled
+                          className="bg-muted"
+                        />
+                        <p className="text-xs text-muted-foreground">Total (auto)</p>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Totals */}
-                  {(totalCost > 0 || totalSalesPrice > 0) && (
-                    <div className="p-3 rounded-lg bg-muted/50 grid grid-cols-2 gap-4 text-sm">
-                      {totalCost > 0 && (
-                        <div>
-                          <span className="text-muted-foreground">Total Cost:</span>
-                          <span className="ml-2 font-medium text-red-600">
-                            {currencySymbol}{totalCost.toLocaleString()}
-                          </span>
+                  {/* Actual Cost - Only shown when editing */}
+                  {isEditing && (
+                    <div className="p-3 rounded-lg border bg-amber-50/50 space-y-2">
+                      <p className="text-xs font-medium text-amber-700">Actual Cost</p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <Input
+                            id="actual_unit_cost"
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            placeholder="Actual unit cost"
+                            value={formData.actual_unit_cost}
+                            onChange={(e) => handleChange("actual_unit_cost", e.target.value)}
+                            disabled={isViewOnly}
+                          />
+                          <p className="text-xs text-muted-foreground">Per unit</p>
                         </div>
-                      )}
-                      {totalSalesPrice > 0 && (
-                        <div>
-                          <span className="text-muted-foreground">Total Price:</span>
-                          <span className="ml-2 font-medium text-green-600">
-                            {currencySymbol}{totalSalesPrice.toLocaleString()}
-                          </span>
+                        <div className="space-y-1">
+                          <Input
+                            type="text"
+                            value={actualTotalCost > 0 ? `${currencySymbol}${actualTotalCost.toLocaleString()}` : "-"}
+                            disabled
+                            className="bg-muted"
+                          />
+                          <p className="text-xs text-muted-foreground">Total (auto)</p>
                         </div>
-                      )}
+                      </div>
                     </div>
                   )}
+
+                  {/* Sales Price */}
+                  <div className="p-3 rounded-lg border bg-green-50/50 space-y-2">
+                    <p className="text-xs font-medium text-green-700">Sales Price</p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <Input
+                          id="unit_sales_price"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder="Unit price"
+                          value={formData.unit_sales_price}
+                          onChange={(e) => handleChange("unit_sales_price", e.target.value)}
+                          disabled={isViewOnly}
+                        />
+                        <p className="text-xs text-muted-foreground">Per unit</p>
+                      </div>
+                      <div className="space-y-1">
+                        <Input
+                          type="text"
+                          value={totalSalesPrice > 0 ? `${currencySymbol}${totalSalesPrice.toLocaleString()}` : "-"}
+                          disabled
+                          className="bg-muted"
+                        />
+                        <p className="text-xs text-muted-foreground">Total (auto)</p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 

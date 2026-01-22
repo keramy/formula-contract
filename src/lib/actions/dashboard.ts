@@ -504,3 +504,73 @@ export async function getClientProjectProgress(userId: string): Promise<ClientPr
     };
   });
 }
+
+/**
+ * Get upcoming and overdue milestones for dashboard
+ * Includes project info for display
+ */
+export interface DashboardMilestone {
+  id: string;
+  project_id: string;
+  name: string;
+  due_date: string;
+  is_completed: boolean;
+  project?: {
+    name: string;
+    project_code: string;
+    slug: string | null;
+  };
+}
+
+export async function getDashboardMilestones(): Promise<DashboardMilestone[]> {
+  const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  // Get all milestones from all projects (admin/management will see all)
+  // For now, get all incomplete milestones sorted by due date
+  const today = new Date().toISOString().split("T")[0];
+
+  // Get milestones due in next 30 days or overdue
+  const thirtyDaysFromNow = new Date();
+  thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+  const thirtyDaysLater = thirtyDaysFromNow.toISOString().split("T")[0];
+
+  // First get milestones
+  const { data: milestones, error } = await supabase
+    .from("milestones")
+    .select("id, project_id, name, due_date, is_completed")
+    .eq("is_completed", false)
+    .lte("due_date", thirtyDaysLater)
+    .order("due_date", { ascending: true })
+    .limit(10);
+
+  if (error) {
+    console.error("Error fetching dashboard milestones:", error);
+    return [];
+  }
+
+  if (!milestones || milestones.length === 0) {
+    return [];
+  }
+
+  // Get project info for these milestones
+  const projectIds = [...new Set(milestones.map(m => m.project_id))];
+  const { data: projectsData } = await supabase
+    .from("projects")
+    .select("id, name, project_code, slug")
+    .in("id", projectIds);
+
+  // Type assertion for projects with slug (column added by migration)
+  const projects = projectsData as { id: string; name: string; project_code: string; slug: string | null }[] | null;
+
+  const projectMap = new Map(
+    (projects || []).map(p => [p.id, { name: p.name, project_code: p.project_code, slug: p.slug }])
+  );
+
+  return milestones.map(m => ({
+    ...m,
+    project: projectMap.get(m.project_id),
+  })) as DashboardMilestone[];
+}

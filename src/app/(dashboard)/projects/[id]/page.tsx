@@ -65,9 +65,12 @@ interface ScopeItem {
   status: string;
   quantity: number;
   unit: string;
-  // Cost tracking fields (what WE pay)
-  unit_cost: number | null;
+  // Initial cost (budgeted, set once at creation)
+  initial_unit_cost: number | null;
   initial_total_cost: number | null;
+  // Actual cost (entered manually later)
+  actual_unit_cost: number | null;
+  actual_total_cost: number | null;
   // Sales price fields (what CLIENT pays)
   unit_sales_price: number | null;
   total_sales_price: number | null;
@@ -233,7 +236,7 @@ export default async function ProjectDetailPage({
       const start = performance.now();
       const result = await supabase
         .from("scope_items")
-        .select("id, item_code, name, description, width, depth, height, item_path, status, quantity, unit, unit_cost, initial_total_cost, unit_sales_price, total_sales_price, production_percentage, is_installed, notes, images, created_at, parent_id")
+        .select("id, item_code, name, description, width, depth, height, item_path, status, quantity, unit, initial_unit_cost, initial_total_cost, actual_unit_cost, actual_total_cost, unit_sales_price, total_sales_price, production_percentage, is_installed, notes, images, created_at, parent_id")
         .eq("project_id", projectId)
         .eq("is_deleted", false)
         .order("created_at", { ascending: true });

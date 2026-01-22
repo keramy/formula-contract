@@ -30,7 +30,8 @@ export type ScopeItemField =
   | "item_path"
   | "unit"
   | "unit_sales_price"
-  | "unit_cost"
+  | "initial_unit_cost"
+  | "actual_unit_cost"
   | "quantity"
   | "is_installed"
   | "production_percentage";
@@ -45,9 +46,12 @@ export interface ScopeItem {
   status: string;
   quantity: number;
   unit: string;
-  // Cost tracking fields (what WE pay)
-  unit_cost: number | null;
+  // Initial cost (budgeted, set once at creation, never changes)
+  initial_unit_cost: number | null;
   initial_total_cost: number | null;
+  // Actual cost (real cost, entered manually later)
+  actual_unit_cost: number | null;
+  actual_total_cost: number | null;
   // Sales price fields (what CLIENT pays)
   unit_sales_price: number | null;
   total_sales_price: number | null;
@@ -208,7 +212,8 @@ export async function bulkUpdateScopeItems(
       "item_path",
       "unit",
       "unit_sales_price",
-      "unit_cost",
+      "initial_unit_cost",
+      "actual_unit_cost",
       "quantity",
       "is_installed",
       "production_percentage",
@@ -345,7 +350,8 @@ export async function updateScopeItemField(
       "item_path",
       "unit",
       "unit_sales_price",
-      "unit_cost",
+      "initial_unit_cost",
+      "actual_unit_cost",
       "quantity",
       "is_installed",
       "production_percentage",
@@ -513,6 +519,79 @@ export async function deleteScopeItem(
   } catch (error) {
     console.error("deleteScopeItem error:", error);
     return { success: false, error: "Failed to delete item" };
+  }
+}
+
+/**
+ * Clear all scope items for a project (soft delete)
+ * Used by Excel import "Replace" mode
+ */
+export async function clearProjectScopeItems(
+  projectId: string
+): Promise<ActionResult<{ deletedCount: number }>> {
+  try {
+    const supabase = await createClient();
+
+    // Check authentication
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, error: "Not authenticated" };
+    }
+
+    // Verify user has access to this project
+    const { data: project, error: projectError } = await supabase
+      .from("projects")
+      .select("id, name, project_code")
+      .eq("id", projectId)
+      .eq("is_deleted", false)
+      .single();
+
+    if (projectError || !project) {
+      return { success: false, error: "Project not found or access denied" };
+    }
+
+    // Count ALL items (including soft-deleted) - we need to clear everything
+    // because the unique constraint applies to ALL rows, not just active ones
+    const { count } = await supabase
+      .from("scope_items")
+      .select("*", { count: "exact", head: true })
+      .eq("project_id", projectId);
+
+    if (!count || count === 0) {
+      return { success: true, data: { deletedCount: 0 } };
+    }
+
+    // Use service role client for hard delete to bypass RLS
+    // Hard delete ALL items (including soft-deleted) because unique constraint
+    // on (project_id, item_code) applies to entire table
+    const serviceClient = createServiceRoleClient();
+    const { error } = await serviceClient
+      .from("scope_items")
+      .delete()
+      .eq("project_id", projectId);
+
+    if (error) {
+      console.error("Clear scope items failed:", error);
+      return { success: false, error: error.message };
+    }
+
+    // Log activity
+    await logActivity({
+      projectId: projectId,
+      action: "scope_items_cleared",
+      entityType: "project",
+      entityId: projectId,
+      details: {
+        project_code: project.project_code,
+        items_deleted: count,
+        reason: "Excel import replace mode"
+      },
+    });
+
+    return { success: true, data: { deletedCount: count } };
+  } catch (error) {
+    console.error("clearProjectScopeItems error:", error);
+    return { success: false, error: "Failed to clear items" };
   }
 }
 
@@ -778,12 +857,12 @@ export async function getActualTotalCost(
     const [childrenResult, itemResult] = await Promise.all([
       supabase
         .from("scope_items")
-        .select("unit_cost, quantity")
+        .select("actual_unit_cost, quantity")
         .eq("parent_id", itemId)
         .eq("is_deleted", false),
       supabase
         .from("scope_items")
-        .select("unit_cost, quantity")
+        .select("actual_unit_cost, quantity")
         .eq("id", itemId)
         .single(),
     ]);
@@ -796,22 +875,22 @@ export async function getActualTotalCost(
       return { success: false, error: childrenError.message };
     }
 
-    // If has children, aggregate their costs
+    // If has children, aggregate their actual costs
     if (children && children.length > 0) {
       const totalCost = children.reduce((sum, child) => {
-        const childCost = (child.unit_cost || 0) * (child.quantity || 0);
+        const childCost = (child.actual_unit_cost || 0) * (child.quantity || 0);
         return sum + childCost;
       }, 0);
       return { success: true, data: { actualCost: totalCost, hasChildren: true } };
     }
 
-    // No children - use own cost
+    // No children - use own actual cost
     if (itemError || !item) {
       console.error("Failed to fetch item for cost calculation:", itemError);
       return { success: false, error: itemError?.message || "Item not found" };
     }
 
-    const ownCost = (item.unit_cost || 0) * (item.quantity || 0);
+    const ownCost = (item.actual_unit_cost || 0) * (item.quantity || 0);
     return { success: true, data: { actualCost: ownCost, hasChildren: false } };
   } catch (error) {
     console.error("getActualTotalCost error:", error);
@@ -863,20 +942,20 @@ export async function getScopeItemsWithCosts(
       const children = childrenByParent.get(item.id) || [];
       const hasChildren = children.length > 0;
 
-      let actualTotalCost: number;
+      let computedActualCost: number;
       if (hasChildren) {
-        // Sum children's costs
-        actualTotalCost = children.reduce((sum, child) => {
-          return sum + ((child.unit_cost || 0) * (child.quantity || 0));
+        // Sum children's actual costs
+        computedActualCost = children.reduce((sum, child) => {
+          return sum + ((child.actual_unit_cost || 0) * (child.quantity || 0));
         }, 0);
       } else {
-        // Own cost
-        actualTotalCost = (item.unit_cost || 0) * (item.quantity || 0);
+        // Own actual cost
+        computedActualCost = (item.actual_unit_cost || 0) * (item.quantity || 0);
       }
 
       return {
         ...item,
-        actual_total_cost: actualTotalCost,
+        actual_total_cost: computedActualCost,
         has_children: hasChildren,
       } as ScopeItem & { actual_total_cost: number; has_children: boolean };
     });

@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { completeMilestone, deleteMilestone } from "@/lib/actions/milestones";
 import { GlassCard, GradientIcon, StatusBadge, EmptyState } from "@/components/ui/ui-helpers";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -86,18 +88,20 @@ export function MilestonesOverview({
     if (!deleteItemId) return;
 
     setIsLoading(true);
-    const supabase = createClient();
 
     try {
-      const { error } = await supabase
-        .from("milestones")
-        .delete()
-        .eq("id", deleteItemId);
+      const result = await deleteMilestone(deleteItemId);
 
-      if (error) throw error;
+      if (!result.success) {
+        toast.error(result.error || "Failed to delete milestone");
+        return;
+      }
+
+      toast.success("Milestone deleted");
       router.refresh();
     } catch (error) {
       console.error("Failed to delete milestone:", error);
+      toast.error("Failed to delete milestone");
     } finally {
       setIsLoading(false);
       setDeleteDialogOpen(false);
@@ -107,21 +111,21 @@ export function MilestonesOverview({
 
   const handleToggleComplete = async (milestone: Milestone) => {
     setIsLoading(true);
-    const supabase = createClient();
 
     try {
-      const { error } = await supabase
-        .from("milestones")
-        .update({
-          is_completed: !milestone.is_completed,
-          completed_at: !milestone.is_completed ? new Date().toISOString() : null,
-        })
-        .eq("id", milestone.id);
+      const isCompleting = !milestone.is_completed;
+      const result = await completeMilestone(milestone.id, isCompleting);
 
-      if (error) throw error;
+      if (!result.success) {
+        toast.error(result.error || "Failed to update milestone");
+        return;
+      }
+
+      toast.success(isCompleting ? "Milestone completed! 🎉" : "Milestone reopened");
       router.refresh();
     } catch (error) {
       console.error("Failed to update milestone:", error);
+      toast.error("Failed to update milestone");
     } finally {
       setIsLoading(false);
     }
