@@ -48,6 +48,7 @@ const typeConfig: Record<string, { icon: React.ReactNode; color: GradientColor }
   material_rejected: { icon: <AlertCircleIcon className="size-3.5" />, color: "rose" },
   project_assigned: { icon: <FolderIcon className="size-3.5" />, color: "violet" },
   milestone_due: { icon: <ClockIcon className="size-3.5" />, color: "coral" },
+  report_published: { icon: <FileIcon className="size-3.5" />, color: "teal" },
   default: { icon: <BellIcon className="size-3.5" />, color: "slate" },
 };
 

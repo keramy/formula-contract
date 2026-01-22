@@ -16,7 +16,6 @@ import { revalidatePath } from "next/cache";
 import { logActivity } from "@/lib/activity-log/actions";
 import { ACTIVITY_ACTIONS } from "@/lib/activity-log/constants";
 import { sanitizeText, sanitizeHTML } from "@/lib/sanitize";
-import { createNotification } from "@/lib/notifications/actions";
 import { Resend } from "resend";
 
 // ============================================================================
@@ -83,6 +82,8 @@ async function sendReportPublishedNotification(
   const supabase = await createClient();
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
+  console.log("[Report Notification] Starting for project:", projectId, "publisher:", publisherId);
+
   // Get all user IDs assigned to this project
   const { data: assignments, error: assignmentsError } = await supabase
     .from("project_assignments")
@@ -90,17 +91,21 @@ async function sendReportPublishedNotification(
     .eq("project_id", projectId);
 
   if (assignmentsError || !assignments || assignments.length === 0) {
-    console.error("Error fetching project assignments:", assignmentsError?.message);
+    console.error("[Report Notification] No assignments found:", assignmentsError?.message);
     return { sent: 0, failed: 0 };
   }
+
+  console.log("[Report Notification] Found assignments:", assignments.length, "users:", assignments.map(a => a.user_id));
 
   // Get user details for assigned users (excluding publisher, only active users)
   const userIds = assignments.map(a => a.user_id).filter(id => id !== publisherId);
 
   if (userIds.length === 0) {
-    console.log("No other users to notify for project:", projectId);
+    console.log("[Report Notification] No OTHER users to notify (you are the only one assigned)");
     return { sent: 0, failed: 0 };
   }
+
+  console.log("[Report Notification] Users to notify (excluding publisher):", userIds);
 
   const { data: users, error: usersError } = await supabase
     .from("users")
@@ -109,14 +114,16 @@ async function sendReportPublishedNotification(
     .eq("is_active", true);
 
   if (usersError || !users) {
-    console.error("Error fetching user details for notifications:", usersError?.message);
+    console.error("[Report Notification] Error fetching users:", usersError?.message);
     return { sent: 0, failed: 0 };
   }
 
   if (users.length === 0) {
-    console.log("No other active users to notify for project:", projectId);
+    console.log("[Report Notification] No active users found to notify");
     return { sent: 0, failed: 0 };
   }
+
+  console.log("[Report Notification] Will send to:", users.map(u => u.email));
 
   let sent = 0;
   let failed = 0;
@@ -124,19 +131,23 @@ async function sendReportPublishedNotification(
   // Create in-app notifications and send emails to each team member
   for (const user of users) {
     try {
-      // 1. Create in-app notification (bell icon)
-      await createNotification({
-        userId: user.id,
+      // 1. Create in-app notification (bell icon) - use direct insert like assignment flow
+      await supabase.from("notifications").insert({
+        user_id: user.id,
         type: "report_published",
         title: `New ${reportType} report published`,
         message: `${publisherName} published a new report for ${projectName}`,
-        projectId: projectId,
-        reportId: reportId,
+        project_id: projectId,
+        report_id: reportId,
+        link: `/projects/${projectId}?tab=reports`,
       });
 
       // 2. Send email notification (if Resend is configured)
       const apiKey = process.env.RESEND_API_KEY;
+      console.log("[Report Notification] Checking email for:", user.email, "API key exists:", !!apiKey);
+
       if (apiKey && user.email) {
+        console.log("[Report Notification] Sending email to:", user.email);
         const resend = new Resend(apiKey);
         await resend.emails.send({
           from: "Formula Contract <noreply@formulacontractpm.com>",
@@ -220,11 +231,12 @@ async function sendReportPublishedNotification(
             </html>
           `,
         });
+        console.log("[Report Notification] Email sent successfully to:", user.email);
       }
 
       sent++;
     } catch (notifyError) {
-      console.error(`Failed to send report notification to ${user.email}:`, notifyError);
+      console.error(`[Report Notification] FAILED for ${user.email}:`, notifyError);
       failed++;
     }
   }
@@ -609,19 +621,21 @@ export async function publishReport(reportId: string): Promise<ActionResult> {
     revalidatePath(`/projects/${report.project_id}`);
 
     // Send in-app + email notifications to all project team members
-    // This runs async and doesn't block the response
     if (project) {
-      sendReportPublishedNotification(
-        report.project_id,
-        reportId,
-        project.name,
-        project.project_code,
-        report.report_type,
-        publisherName,
-        user.id
-      ).catch(err => {
+      try {
+        await sendReportPublishedNotification(
+          report.project_id,
+          reportId,
+          project.name,
+          project.project_code,
+          report.report_type,
+          publisherName,
+          user.id
+        );
+      } catch (err) {
+        // Log but don't fail the publish operation
         console.error("Error sending report notifications:", err);
-      });
+      }
     }
   }
 

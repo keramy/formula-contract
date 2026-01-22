@@ -61,6 +61,7 @@ import { createClient } from "@/lib/supabase/client";
 import {
   getProjectTeamMembers,
   updateReportShares,
+  publishReport,
 } from "@/lib/actions/reports";
 
 // Shared report components
@@ -224,15 +225,15 @@ export function ReportCreationModal({
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Create the report
+      // Create the report (always as draft first)
       const { data: newReport, error: reportError } = await supabase
         .from("reports")
         .insert({
           project_id: projectId,
           report_type: reportType,
           created_by: user.id,
-          is_published: publish,
-          published_at: publish ? new Date().toISOString() : null,
+          is_published: false,
+          published_at: null,
           share_with_client: shareWithClient,
           share_internal: shareInternal,
         })
@@ -259,6 +260,11 @@ export function ReportCreationModal({
       // Save report shares if any users selected
       if (selectedShareUsers.length > 0) {
         await updateReportShares(newReport.id, selectedShareUsers);
+      }
+
+      // If publishing, call publishReport to log activity and send notifications
+      if (publish) {
+        await publishReport(newReport.id);
       }
 
       // Close modal and refresh
