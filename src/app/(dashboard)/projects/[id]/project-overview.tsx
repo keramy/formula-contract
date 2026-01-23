@@ -37,6 +37,8 @@ interface ProjectClient {
 
 interface ScopeItem {
   id: string;
+  item_code: string;
+  name: string;
   item_path: "production" | "procurement";
   production_percentage: number;
   is_installed: boolean;
@@ -181,8 +183,15 @@ export function ProjectOverview({
   const rejectedDrawingsList = drawingsForProduction.filter((d) => d.status === "rejected");
   const pendingMaterialsList = materials.filter((m) => m.status === "pending");
 
+  // Check for MISSING items (not just broken ones)
+  // Production items that have NO drawing uploaded at all
+  const itemsWithDrawings = new Set(drawings.map((d) => d.item_id));
+  const productionItemsWithoutDrawings = productionItems.filter((i) => !itemsWithDrawings.has(i.id));
+
   // Attention items with details for tooltips
   const attentionItems: { label: string; count: number; color: string; tab: string; details: string[] }[] = [];
+
+  // === CRITICAL (Red) - Things that are broken or overdue ===
   if (overdueMilestonesList.length > 0) {
     attentionItems.push({
       label: "overdue milestone",
@@ -201,6 +210,8 @@ export function ProjectOverview({
       details: rejectedDrawingsList.map((d) => d.item_code || d.item_id),
     });
   }
+
+  // === WARNING (Amber) - Things that need action ===
   if (pendingMaterialsList.length > 0) {
     attentionItems.push({
       label: "pending material",
@@ -217,6 +228,35 @@ export function ProjectOverview({
       color: "text-amber-600",
       tab: "snagging",
       details: openSnaggingList.slice(0, 5).map((s) => s.description?.slice(0, 40) || "Issue"),
+    });
+  }
+
+  // === MISSING (Sky/Blue) - Things not started yet ===
+  if (productionItemsWithoutDrawings.length > 0) {
+    attentionItems.push({
+      label: "item without drawing",
+      count: productionItemsWithoutDrawings.length,
+      color: "text-sky-600",
+      tab: "drawings",
+      details: productionItemsWithoutDrawings.map((i) => `${i.item_code} - ${i.name}`),
+    });
+  }
+  if (scopeItems.length > 0 && materials.length === 0) {
+    attentionItems.push({
+      label: "no materials added",
+      count: 1,
+      color: "text-sky-600",
+      tab: "materials",
+      details: ["Add materials to track approvals"],
+    });
+  }
+  if (milestones.length === 0) {
+    attentionItems.push({
+      label: "no milestones set",
+      count: 1,
+      color: "text-sky-600",
+      tab: "milestones",
+      details: ["Set milestones to track project timeline"],
     });
   }
 

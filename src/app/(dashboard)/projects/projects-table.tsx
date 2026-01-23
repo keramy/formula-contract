@@ -17,10 +17,25 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontalIcon, EyeIcon, PencilIcon, ArchiveIcon, FolderKanbanIcon, ArrowRightIcon } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  MoreHorizontalIcon,
+  PencilIcon,
+  ArchiveIcon,
+  FolderKanbanIcon,
+  ArrowUpIcon,
+  ArrowDownIcon,
+  ArrowUpDownIcon,
+  AlertCircleIcon,
+} from "lucide-react";
 import { Progress } from "@/components/ui/progress";
-import { formatDistanceToNow } from "date-fns";
-import { GlassCard, StatusBadge, EmptyState, GradientAvatar } from "@/components/ui/ui-helpers";
+import { format, formatDistanceToNow, isPast, differenceInDays } from "date-fns";
+import { GlassCard, StatusBadge, EmptyState } from "@/components/ui/ui-helpers";
 
 interface Project {
   id: string;
@@ -34,10 +49,19 @@ interface Project {
   progress?: number;
   totalItems?: number;
   completedItems?: number;
+  hasAttention?: boolean;
+  attentionCount?: number;
 }
+
+export type SortField = "project_code" | "name" | "client" | "status" | "progress" | "installation_date";
+export type SortDirection = "asc" | "desc";
 
 interface ProjectsTableProps {
   projects: Project[];
+  sortField?: SortField;
+  sortDirection?: SortDirection;
+  onSort?: (field: SortField) => void;
+  onEdit?: (projectId: string) => void;
 }
 
 type StatusVariant = "info" | "success" | "warning" | "default" | "danger";
@@ -50,7 +74,43 @@ const statusConfig: Record<string, { variant: StatusVariant; label: string }> = 
   cancelled: { variant: "danger", label: "Cancelled" },
 };
 
-export function ProjectsTable({ projects }: ProjectsTableProps) {
+function SortableHeader({
+  children,
+  field,
+  currentField,
+  direction,
+  onSort,
+  className = "",
+}: {
+  children: React.ReactNode;
+  field: SortField;
+  currentField?: SortField;
+  direction?: SortDirection;
+  onSort?: (field: SortField) => void;
+  className?: string;
+}) {
+  const isActive = currentField === field;
+
+  return (
+    <button
+      onClick={() => onSort?.(field)}
+      className={`flex items-center gap-1 hover:text-foreground transition-colors ${className}`}
+    >
+      {children}
+      {isActive ? (
+        direction === "asc" ? (
+          <ArrowUpIcon className="size-3.5" />
+        ) : (
+          <ArrowDownIcon className="size-3.5" />
+        )
+      ) : (
+        <ArrowUpDownIcon className="size-3.5 opacity-40" />
+      )}
+    </button>
+  );
+}
+
+export function ProjectsTable({ projects, sortField, sortDirection, onSort, onEdit }: ProjectsTableProps) {
   if (projects.length === 0) {
     return (
       <GlassCard>
@@ -73,11 +133,37 @@ export function ProjectsTable({ projects }: ProjectsTableProps) {
       <Table>
         <TableHeader>
           <TableRow className="hover:bg-transparent border-b border-gray-100">
-            <TableHead className="py-4">Project</TableHead>
-            <TableHead>Client</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Progress</TableHead>
-            <TableHead>Created</TableHead>
+            <TableHead className="py-4 w-[50px] text-center">#</TableHead>
+            <TableHead className="w-[100px]">
+              <SortableHeader field="project_code" currentField={sortField} direction={sortDirection} onSort={onSort}>
+                Code
+              </SortableHeader>
+            </TableHead>
+            <TableHead>
+              <SortableHeader field="name" currentField={sortField} direction={sortDirection} onSort={onSort}>
+                Project Name
+              </SortableHeader>
+            </TableHead>
+            <TableHead>
+              <SortableHeader field="client" currentField={sortField} direction={sortDirection} onSort={onSort}>
+                Client
+              </SortableHeader>
+            </TableHead>
+            <TableHead className="w-[110px]">
+              <SortableHeader field="status" currentField={sortField} direction={sortDirection} onSort={onSort}>
+                Status
+              </SortableHeader>
+            </TableHead>
+            <TableHead className="w-[140px]">
+              <SortableHeader field="progress" currentField={sortField} direction={sortDirection} onSort={onSort}>
+                Progress
+              </SortableHeader>
+            </TableHead>
+            <TableHead className="w-[140px]">
+              <SortableHeader field="installation_date" currentField={sortField} direction={sortDirection} onSort={onSort}>
+                Installation
+              </SortableHeader>
+            </TableHead>
             <TableHead className="w-[50px]"></TableHead>
           </TableRow>
         </TableHeader>
@@ -85,53 +171,124 @@ export function ProjectsTable({ projects }: ProjectsTableProps) {
           {projects.map((project, index) => {
             const config = statusConfig[project.status] || { variant: "default" as StatusVariant, label: project.status };
 
+            // Installation date formatting
+            let installationDisplay: React.ReactNode = (
+              <span className="text-muted-foreground italic">Not set</span>
+            );
+            let installationClass = "text-muted-foreground";
+
+            if (project.installation_date) {
+              const installDate = new Date(project.installation_date);
+              const daysUntil = differenceInDays(installDate, new Date());
+
+              if (isPast(installDate) && project.status !== "completed") {
+                installationClass = "text-rose-600 font-medium";
+                installationDisplay = (
+                  <div>
+                    <div>{format(installDate, "MMM d, yyyy")}</div>
+                    <div className="text-xs">Overdue</div>
+                  </div>
+                );
+              } else if (daysUntil <= 14 && daysUntil >= 0) {
+                installationClass = "text-amber-600 font-medium";
+                installationDisplay = (
+                  <div>
+                    <div>{format(installDate, "MMM d, yyyy")}</div>
+                    <div className="text-xs">{daysUntil === 0 ? "Today!" : `${daysUntil} days`}</div>
+                  </div>
+                );
+              } else {
+                installationDisplay = (
+                  <div>
+                    <div>{format(installDate, "MMM d, yyyy")}</div>
+                    {daysUntil > 0 && <div className="text-xs text-muted-foreground">{daysUntil} days</div>}
+                  </div>
+                );
+              }
+            }
+
             return (
               <TableRow
                 key={project.id}
                 className="group hover:bg-gray-50/50 border-b border-gray-50 last:border-0"
               >
+                {/* Row Number */}
+                <TableCell className="py-4 text-center text-muted-foreground text-sm font-mono">
+                  {index + 1}
+                </TableCell>
+
+                {/* Project Code */}
                 <TableCell className="py-4">
                   <Link
                     href={`/projects/${project.slug || project.id}`}
-                    className="flex items-center gap-3 group/link"
+                    className="font-mono text-sm text-violet-600 hover:text-violet-700 hover:underline"
                   >
-                    <GradientAvatar name={project.name} size="sm" colorIndex={index % 8} />
-                    <div>
-                      <div className="font-medium group-hover/link:text-violet-600 transition-colors flex items-center gap-1">
-                        {project.name}
-                        <ArrowRightIcon className="size-3 opacity-0 -translate-x-1 group-hover/link:opacity-100 group-hover/link:translate-x-0 transition-all" />
-                      </div>
-                      <div className="text-xs text-muted-foreground font-mono">
-                        {project.project_code}
-                      </div>
-                    </div>
+                    {project.project_code}
                   </Link>
                 </TableCell>
+
+                {/* Project Name with Attention Dot */}
+                <TableCell className="py-4">
+                  <Link
+                    href={`/projects/${project.slug || project.id}`}
+                    className="flex items-center gap-2 group/link"
+                  >
+                    <span className="font-medium group-hover/link:text-violet-600 group-hover/link:underline transition-colors">
+                      {project.name}
+                    </span>
+                    {project.hasAttention && (
+                      <TooltipProvider delayDuration={200}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="flex items-center justify-center size-5 rounded-full bg-amber-100">
+                              <AlertCircleIcon className="size-3.5 text-amber-600" />
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            <span className="text-xs">
+                              {project.attentionCount || 1} item{(project.attentionCount || 1) > 1 ? "s" : ""} need attention
+                            </span>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
+                  </Link>
+                </TableCell>
+
+                {/* Client */}
                 <TableCell className="text-muted-foreground">
                   {project.client?.company_name || (
                     <span className="text-gray-400 italic">No client</span>
                   )}
                 </TableCell>
+
+                {/* Status */}
                 <TableCell>
                   <StatusBadge variant={config.variant} dot>
                     {config.label}
                   </StatusBadge>
                 </TableCell>
+
+                {/* Progress - Percentage with bar */}
                 <TableCell>
                   {project.totalItems !== undefined && project.totalItems > 0 ? (
-                    <div className="flex items-center gap-2 min-w-[120px]">
-                      <Progress value={project.progress || 0} className="h-2 flex-1" />
-                      <span className="text-xs text-muted-foreground w-12 text-right">
-                        {project.completedItems}/{project.totalItems}
+                    <div className="flex items-center gap-2">
+                      <Progress value={project.progress || 0} className="h-2 flex-1 max-w-[80px]" />
+                      <span className="text-sm font-medium w-10 text-right">
+                        {project.progress || 0}%
                       </span>
                     </div>
                   ) : (
                     <span className="text-xs text-muted-foreground italic">No items</span>
                   )}
                 </TableCell>
-                <TableCell className="text-muted-foreground text-sm">
-                  {formatDistanceToNow(new Date(project.created_at), { addSuffix: true })}
+
+                {/* Installation Date */}
+                <TableCell className={`text-sm ${installationClass}`}>
+                  {installationDisplay}
                 </TableCell>
+
+                {/* Actions */}
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -144,17 +301,12 @@ export function ProjectsTable({ projects }: ProjectsTableProps) {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48">
-                      <DropdownMenuItem asChild>
-                        <Link href={`/projects/${project.slug || project.id}`} className="cursor-pointer">
-                          <EyeIcon className="size-4 mr-2" />
-                          View Details
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link href={`/projects/${project.slug || project.id}/edit`} className="cursor-pointer">
-                          <PencilIcon className="size-4 mr-2" />
-                          Edit Project
-                        </Link>
+                      <DropdownMenuItem
+                        onClick={() => onEdit?.(project.id)}
+                        className="cursor-pointer"
+                      >
+                        <PencilIcon className="size-4 mr-2" />
+                        Edit Project
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem className="text-destructive focus:text-destructive cursor-pointer">

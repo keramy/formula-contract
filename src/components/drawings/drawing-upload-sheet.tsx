@@ -254,14 +254,14 @@ export function DrawingUploadSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-md bg-blue-100">
+      <SheetContent className="w-full sm:max-w-lg overflow-y-auto p-0">
+        <SheetHeader className="px-6 pt-6 pb-4 border-b bg-gradient-to-r from-blue-50 to-cyan-50">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-blue-100">
               <FileImageIcon className="size-5 text-blue-600" />
             </div>
             <div>
-              <SheetTitle>Upload Drawing</SheetTitle>
+              <SheetTitle className="text-lg">Upload Drawing</SheetTitle>
               <SheetDescription>
                 Upload a drawing file for a scope item
               </SheetDescription>
@@ -269,7 +269,7 @@ export function DrawingUploadSheet({
           </div>
         </SheetHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 py-6">
+        <form onSubmit={handleSubmit} className="px-6 py-6 space-y-4">
           {error && (
             <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-sm">
               {error}
@@ -394,7 +394,7 @@ export function DrawingUploadSheet({
           </div>
         </form>
 
-        <SheetFooter>
+        <SheetFooter className="px-6 py-4 border-t">
           <Button
             type="button"
             variant="outline"

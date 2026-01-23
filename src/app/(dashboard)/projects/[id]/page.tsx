@@ -490,6 +490,8 @@ export default async function ProjectDetailPage({
             }}
             scopeItems={scopeItems.map((item) => ({
               id: item.id,
+              item_code: item.item_code,
+              name: item.name,
               item_path: item.item_path,
               production_percentage: item.production_percentage,
               is_installed: item.is_installed,

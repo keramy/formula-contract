@@ -18,10 +18,11 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { SearchIcon, XIcon, CalendarIcon, Building2Icon, PlusIcon } from "lucide-react";
+import { SearchIcon, XIcon, CalendarIcon, Building2Icon, PlusIcon, FilterIcon } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { ProjectsTable } from "./projects-table";
+import { ProjectsTable, type SortField, type SortDirection } from "./projects-table";
+import { ProjectEditSheet } from "./project-edit-sheet";
 import { ProjectCard } from "@/components/projects/project-card";
 import { ResponsiveDataView, ViewToggle } from "@/components/ui/responsive-data-view";
 import type { DateRange } from "react-day-picker";
@@ -38,6 +39,8 @@ interface Project {
   progress?: number;
   totalItems?: number;
   completedItems?: number;
+  hasAttention?: boolean;
+  attentionCount?: number;
 }
 
 interface Client {
@@ -51,25 +54,15 @@ interface ProjectsListClientProps {
   canCreateProject?: boolean;
 }
 
-// Status options with colors matching the design system
+// Status options for dropdown
 const statusOptions = [
-  { value: "all", label: "All", color: "bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-200" },
-  { value: "tender", label: "Tender", color: "bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200" },
-  { value: "active", label: "Active", color: "bg-green-50 text-green-700 hover:bg-green-100 border-green-200" },
-  { value: "on_hold", label: "On Hold", color: "bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-200" },
-  { value: "completed", label: "Completed", color: "bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-300" },
-  { value: "cancelled", label: "Cancelled", color: "bg-red-50 text-red-700 hover:bg-red-100 border-red-200" },
+  { value: "all", label: "All Statuses" },
+  { value: "tender", label: "Tender" },
+  { value: "active", label: "Active" },
+  { value: "on_hold", label: "On Hold" },
+  { value: "completed", label: "Completed" },
+  { value: "cancelled", label: "Cancelled" },
 ];
-
-// Active state styles for chips
-const activeStatusStyles: Record<string, string> = {
-  all: "bg-gray-800 text-white hover:bg-gray-700 border-gray-800",
-  tender: "bg-blue-600 text-white hover:bg-blue-500 border-blue-600",
-  active: "bg-green-600 text-white hover:bg-green-500 border-green-600",
-  on_hold: "bg-amber-500 text-white hover:bg-amber-400 border-amber-500",
-  completed: "bg-slate-600 text-white hover:bg-slate-500 border-slate-600",
-  cancelled: "bg-red-600 text-white hover:bg-red-500 border-red-600",
-};
 
 export function ProjectsListClient({ projects, clients = [], canCreateProject = false }: ProjectsListClientProps) {
   const searchParams = useSearchParams();
@@ -90,8 +83,21 @@ export function ProjectsListClient({ projects, clients = [], canCreateProject = 
     return undefined;
   });
 
+  // Sorting state
+  const [sortField, setSortField] = useState<SortField | undefined>(undefined);
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+
   // View toggle state for manual override
   const [viewOverride, setViewOverride] = useState<"table" | "cards" | undefined>(undefined);
+
+  // Edit sheet state
+  const [editSheetOpen, setEditSheetOpen] = useState(false);
+  const [editProjectId, setEditProjectId] = useState<string | null>(null);
+
+  const handleEditProject = useCallback((projectId: string) => {
+    setEditProjectId(projectId);
+    setEditSheetOpen(true);
+  }, []);
 
   // Extract unique clients from projects if not provided
   const uniqueClients = useMemo(() => {
@@ -107,7 +113,7 @@ export function ProjectsListClient({ projects, clients = [], canCreateProject = 
     );
   }, [projects, clients]);
 
-  // Filter projects client-side (instant!)
+  // Filter and sort projects client-side (instant!)
   const filteredProjects = useMemo(() => {
     let result = projects;
 
@@ -149,8 +155,73 @@ export function ProjectsListClient({ projects, clients = [], canCreateProject = 
       );
     }
 
+    // Sort results
+    if (sortField) {
+      result = [...result].sort((a, b) => {
+        let aVal: string | number | null = null;
+        let bVal: string | number | null = null;
+
+        switch (sortField) {
+          case "project_code":
+            aVal = a.project_code.toLowerCase();
+            bVal = b.project_code.toLowerCase();
+            break;
+          case "name":
+            aVal = a.name.toLowerCase();
+            bVal = b.name.toLowerCase();
+            break;
+          case "client":
+            aVal = a.client?.company_name.toLowerCase() || "";
+            bVal = b.client?.company_name.toLowerCase() || "";
+            break;
+          case "status":
+            aVal = a.status;
+            bVal = b.status;
+            break;
+          case "progress":
+            aVal = a.progress || 0;
+            bVal = b.progress || 0;
+            break;
+          case "installation_date":
+            aVal = a.installation_date ? new Date(a.installation_date).getTime() : 0;
+            bVal = b.installation_date ? new Date(b.installation_date).getTime() : 0;
+            break;
+        }
+
+        if (aVal === null || bVal === null) return 0;
+
+        if (typeof aVal === "string" && typeof bVal === "string") {
+          return sortDirection === "asc"
+            ? aVal.localeCompare(bVal)
+            : bVal.localeCompare(aVal);
+        }
+
+        if (typeof aVal === "number" && typeof bVal === "number") {
+          return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+        }
+
+        return 0;
+      });
+    }
+
     return result;
-  }, [projects, status, clientId, dateRange, search]);
+  }, [projects, status, clientId, dateRange, search, sortField, sortDirection]);
+
+  // Handle sort
+  const handleSort = useCallback((field: SortField) => {
+    if (sortField === field) {
+      // Toggle direction or clear
+      if (sortDirection === "asc") {
+        setSortDirection("desc");
+      } else {
+        setSortField(undefined);
+        setSortDirection("asc");
+      }
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  }, [sortField, sortDirection]);
 
   // Update URL for bookmarking (debounced, non-blocking)
   const syncToUrl = useCallback(
@@ -210,6 +281,8 @@ export function ProjectsListClient({ projects, clients = [], canCreateProject = 
     setStatus("all");
     setClientId("all");
     setDateRange(undefined);
+    setSortField(undefined);
+    setSortDirection("asc");
     window.history.replaceState(null, "", "/projects");
   };
 
@@ -223,9 +296,18 @@ export function ProjectsListClient({ projects, clients = [], canCreateProject = 
     search.trim(),
   ].filter(Boolean).length;
 
+  // Count projects by status for display
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    projects.forEach((p) => {
+      counts[p.status] = (counts[p.status] || 0) + 1;
+    });
+    return counts;
+  }, [projects]);
+
   return (
     <>
-      {/* Search Bar */}
+      {/* Filters Row */}
       <div className="flex flex-col gap-4 mb-6">
         <div className="flex flex-col sm:flex-row gap-3">
           {/* Search Input */}
@@ -237,6 +319,28 @@ export function ProjectsListClient({ projects, clients = [], canCreateProject = 
               onChange={(e) => handleSearchChange(e.target.value)}
               className="pl-9 bg-white/50 border-gray-200 focus:bg-white transition-colors"
             />
+          </div>
+
+          {/* Status Filter Dropdown */}
+          <div className="flex items-center gap-2">
+            <FilterIcon className="size-4 text-muted-foreground hidden sm:block" />
+            <Select value={status} onValueChange={handleStatusChange}>
+              <SelectTrigger className="w-full sm:w-[160px] bg-white/50 border-gray-200">
+                <SelectValue placeholder="All Statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                {statusOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                    {option.value !== "all" && statusCounts[option.value] > 0 && (
+                      <span className="ml-2 text-muted-foreground">
+                        ({statusCounts[option.value]})
+                      </span>
+                    )}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Client Filter */}
@@ -329,30 +433,6 @@ export function ProjectsListClient({ projects, clients = [], canCreateProject = 
             </Button>
           )}
         </div>
-
-        {/* Status Filter Chips */}
-        <div className="flex flex-wrap gap-2">
-          {statusOptions.map((option) => {
-            const isActive = status === option.value;
-            return (
-              <button
-                key={option.value}
-                onClick={() => handleStatusChange(option.value)}
-                className={cn(
-                  "px-3 py-1.5 rounded-full text-sm font-medium border transition-all duration-200",
-                  isActive ? activeStatusStyles[option.value] : option.color
-                )}
-              >
-                {option.label}
-                {option.value !== "all" && (
-                  <span className="ml-1.5 opacity-70">
-                    ({projects.filter((p) => p.status === option.value).length})
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
       </div>
 
       {/* Results count and view toggle */}
@@ -360,6 +440,11 @@ export function ProjectsListClient({ projects, clients = [], canCreateProject = 
         <div className="text-sm text-muted-foreground">
           Showing {filteredProjects.length} of {projects.length} projects
           {hasFilters && " (filtered)"}
+          {sortField && (
+            <span className="ml-2">
+              • Sorted by {sortField.replace("_", " ")} ({sortDirection})
+            </span>
+          )}
         </div>
         {/* Manual view toggle for users who prefer a specific view */}
         <div className="hidden sm:block">
@@ -373,7 +458,15 @@ export function ProjectsListClient({ projects, clients = [], canCreateProject = 
       {/* Responsive Projects View - Table on desktop, Cards on mobile */}
       <ResponsiveDataView
         data={filteredProjects}
-        tableView={<ProjectsTable projects={filteredProjects} />}
+        tableView={
+          <ProjectsTable
+            projects={filteredProjects}
+            sortField={sortField}
+            sortDirection={sortDirection}
+            onSort={handleSort}
+            onEdit={handleEditProject}
+          />
+        }
         renderCard={(project) => (
           <ProjectCard key={project.id} project={project} />
         )}
@@ -392,6 +485,15 @@ export function ProjectsListClient({ projects, clients = [], canCreateProject = 
           </div>
         }
       />
+
+      {/* Edit Project Sheet */}
+      {editProjectId && (
+        <ProjectEditSheet
+          projectId={editProjectId}
+          open={editSheetOpen}
+          onOpenChange={setEditSheetOpen}
+        />
+      )}
     </>
   );
 }

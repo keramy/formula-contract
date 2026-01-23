@@ -15,6 +15,8 @@ interface Project {
   progress?: number; // Percentage of completed items
   totalItems?: number;
   completedItems?: number;
+  hasAttention?: boolean;
+  attentionCount?: number;
 }
 
 export default async function ProjectsPage() {
@@ -38,6 +40,8 @@ export default async function ProjectsPage() {
     { data: allProjects, error },
     { data: allScopeItems },
     { data: allClients },
+    { data: overdueMilestones },
+    { data: openSnagging },
   ] = await Promise.all([
     // Project assignments (for client filtering)
     user
@@ -59,6 +63,17 @@ export default async function ProjectsPage() {
       .from("clients")
       .select("id, company_name")
       .order("company_name", { ascending: true }),
+    // Overdue milestones for attention indicator
+    supabase
+      .from("milestones")
+      .select("project_id")
+      .eq("is_completed", false)
+      .lt("due_date", new Date().toISOString()),
+    // Open snagging issues for attention indicator
+    supabase
+      .from("snagging")
+      .select("project_id")
+      .eq("is_resolved", false),
   ]);
 
   const canCreateProject = ["admin", "pm"].includes(userRole);
@@ -97,6 +112,20 @@ export default async function ProjectsPage() {
 
   // Calculate progress for each project from scope items
   let projects = projectsData;
+
+  // Build attention map from overdue milestones and open snagging
+  const attentionMap = new Map<string, number>();
+  if (overdueMilestones) {
+    for (const m of overdueMilestones) {
+      attentionMap.set(m.project_id, (attentionMap.get(m.project_id) || 0) + 1);
+    }
+  }
+  if (openSnagging) {
+    for (const s of openSnagging) {
+      attentionMap.set(s.project_id, (attentionMap.get(s.project_id) || 0) + 1);
+    }
+  }
+
   if (allScopeItems && projects.length > 0) {
     const projectIds = new Set(projects.map(p => p.id));
 
@@ -114,15 +143,19 @@ export default async function ProjectsPage() {
       progressMap.set(item.project_id, existing);
     }
 
-    // Add progress data to projects
+    // Add progress and attention data to projects
     projects = projects.map(project => {
       const stats = progressMap.get(project.id);
+      const attentionCount = attentionMap.get(project.id) || 0;
+
       if (stats && stats.total > 0) {
         return {
           ...project,
           progress: Math.round((stats.completed / stats.total) * 100),
           totalItems: stats.total,
           completedItems: stats.completed,
+          hasAttention: attentionCount > 0,
+          attentionCount,
         };
       }
       return {
@@ -130,6 +163,21 @@ export default async function ProjectsPage() {
         progress: 0,
         totalItems: 0,
         completedItems: 0,
+        hasAttention: attentionCount > 0,
+        attentionCount,
+      };
+    });
+  } else {
+    // Still add attention data even if no scope items
+    projects = projects.map(project => {
+      const attentionCount = attentionMap.get(project.id) || 0;
+      return {
+        ...project,
+        progress: 0,
+        totalItems: 0,
+        completedItems: 0,
+        hasAttention: attentionCount > 0,
+        attentionCount,
       };
     });
   }
