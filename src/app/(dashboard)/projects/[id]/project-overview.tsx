@@ -1,8 +1,9 @@
 "use client";
 
-import Link from "next/link";
+import { useState } from "react";
 import { format, isPast, differenceInDays } from "date-fns";
 import { Button } from "@/components/ui/button";
+import { ProjectEditSheet } from "../project-edit-sheet";
 import { Progress } from "@/components/ui/progress";
 import { GlassCard, GradientIcon } from "@/components/ui/ui-helpers";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -274,18 +275,31 @@ export function ProjectOverview({
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (overallProgress / 100) * circumference;
 
+  // Edit sheet state
+  const [editSheetOpen, setEditSheetOpen] = useState(false);
+
   return (
     <div className="space-y-6">
       {/* Edit Project Button */}
       {canEdit && (
         <div className="flex justify-end">
-          <Button asChild className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700">
-            <Link href={`/projects/${projectUrlId}/edit`}>
-              <PencilIcon className="size-4" />
-              Edit Project
-            </Link>
+          <Button
+            onClick={() => setEditSheetOpen(true)}
+            className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700"
+          >
+            <PencilIcon className="size-4" />
+            Edit Project
           </Button>
         </div>
+      )}
+
+      {/* Edit Project Sheet */}
+      {canEdit && (
+        <ProjectEditSheet
+          projectId={projectId}
+          open={editSheetOpen}
+          onOpenChange={setEditSheetOpen}
+        />
       )}
 
       {/* Top Section: Progress Ring + Project Info */}

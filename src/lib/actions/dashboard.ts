@@ -522,6 +522,272 @@ export interface DashboardMilestone {
   };
 }
 
+// ============================================================================
+// PRODUCTION ROLE - Queue of items in production
+// ============================================================================
+export interface ProductionQueueItem {
+  id: string;
+  item_code: string;
+  name: string;
+  production_percentage: number;
+  project_id: string;
+  project_name: string;
+  project_code: string;
+  project_slug: string | null;
+}
+
+export interface ProductionQueueSummary {
+  inProduction: ProductionQueueItem[];
+  readyForProduction: ProductionQueueItem[];
+  pendingInstallation: ProductionQueueItem[];
+  totalInProduction: number;
+  totalReady: number;
+  totalPendingInstall: number;
+}
+
+export async function getProductionQueue(): Promise<ProductionQueueSummary> {
+  const supabase = await createClient();
+
+  // Get scope items that are in production path
+  const { data: itemsData } = await supabase
+    .from("scope_items")
+    .select("id, item_code, name, project_id, production_percentage, status, is_installed, item_path")
+    .eq("item_path", "production")
+    .eq("is_deleted", false)
+    .in("status", ["approved", "in_production", "complete"])
+    .order("production_percentage", { ascending: true });
+
+  const items = itemsData || [];
+  const projectIds = [...new Set(items.map(i => i.project_id))];
+
+  // Get project info
+  const { data: projectsData } = projectIds.length > 0
+    ? await supabase
+        .from("projects")
+        .select("id, name, project_code, slug")
+        .in("id", projectIds)
+        .eq("is_deleted", false)
+    : { data: [] };
+
+  const projectMap = new Map(
+    (projectsData as { id: string; name: string; project_code: string; slug: string | null }[] || [])
+      .map(p => [p.id, { name: p.name, code: p.project_code, slug: p.slug }])
+  );
+
+  const inProduction: ProductionQueueItem[] = [];
+  const readyForProduction: ProductionQueueItem[] = [];
+  const pendingInstallation: ProductionQueueItem[] = [];
+
+  for (const item of items) {
+    const project = projectMap.get(item.project_id);
+    if (!project) continue;
+
+    const queueItem: ProductionQueueItem = {
+      id: item.id,
+      item_code: item.item_code,
+      name: item.name,
+      production_percentage: item.production_percentage || 0,
+      project_id: item.project_id,
+      project_name: project.name,
+      project_code: project.code,
+      project_slug: project.slug,
+    };
+
+    // Categorize items
+    if (item.status === "complete" && !item.is_installed) {
+      pendingInstallation.push(queueItem);
+    } else if (item.status === "in_production" || (item.production_percentage > 0 && item.production_percentage < 100)) {
+      inProduction.push(queueItem);
+    } else if (item.status === "approved" && item.production_percentage === 0) {
+      readyForProduction.push(queueItem);
+    }
+  }
+
+  return {
+    inProduction: inProduction.slice(0, 10),
+    readyForProduction: readyForProduction.slice(0, 10),
+    pendingInstallation: pendingInstallation.slice(0, 10),
+    totalInProduction: inProduction.length,
+    totalReady: readyForProduction.length,
+    totalPendingInstall: pendingInstallation.length,
+  };
+}
+
+// ============================================================================
+// PROCUREMENT ROLE - Items needing materials
+// ============================================================================
+export interface ProcurementQueueItem {
+  id: string;
+  item_code: string;
+  name: string;
+  project_id: string;
+  project_name: string;
+  project_code: string;
+  project_slug: string | null;
+  materialsCount: number;
+  pendingMaterials: number;
+}
+
+export interface ProcurementQueueSummary {
+  needsMaterials: ProcurementQueueItem[];
+  pendingApproval: ProcurementQueueItem[];
+  totalNeedsMaterials: number;
+  totalPendingApproval: number;
+}
+
+export async function getProcurementQueue(): Promise<ProcurementQueueSummary> {
+  const supabase = await createClient();
+
+  // Get scope items that are in procurement path
+  const { data: itemsData } = await supabase
+    .from("scope_items")
+    .select("id, item_code, name, project_id, item_path, status")
+    .eq("item_path", "procurement")
+    .eq("is_deleted", false)
+    .not("status", "eq", "complete")
+    .not("status", "eq", "cancelled");
+
+  const items = itemsData || [];
+  const itemIds = items.map(i => i.id);
+  const projectIds = [...new Set(items.map(i => i.project_id))];
+
+  // Get project info
+  const { data: projectsData } = projectIds.length > 0
+    ? await supabase
+        .from("projects")
+        .select("id, name, project_code, slug")
+        .in("id", projectIds)
+        .eq("is_deleted", false)
+    : { data: [] };
+
+  const projectMap = new Map(
+    (projectsData as { id: string; name: string; project_code: string; slug: string | null }[] || [])
+      .map(p => [p.id, { name: p.name, code: p.project_code, slug: p.slug }])
+  );
+
+  // Get materials for these items
+  const { data: itemMaterialsData } = itemIds.length > 0
+    ? await supabase
+        .from("item_materials")
+        .select("item_id, material_id")
+        .in("item_id", itemIds)
+    : { data: [] };
+
+  const materialIds = [...new Set((itemMaterialsData || []).map(im => im.material_id))];
+
+  // Get material statuses
+  const { data: materialsData } = materialIds.length > 0
+    ? await supabase
+        .from("materials")
+        .select("id, status")
+        .in("id", materialIds)
+        .eq("is_deleted", false)
+    : { data: [] };
+
+  const materialStatusMap = new Map(
+    (materialsData || []).map(m => [m.id, m.status])
+  );
+
+  // Count materials per item
+  const itemMaterialsMap = new Map<string, { total: number; pending: number }>();
+  for (const im of itemMaterialsData || []) {
+    const stats = itemMaterialsMap.get(im.item_id) || { total: 0, pending: 0 };
+    stats.total++;
+    const status = materialStatusMap.get(im.material_id);
+    if (status === "pending" || status === "sent_to_client") {
+      stats.pending++;
+    }
+    itemMaterialsMap.set(im.item_id, stats);
+  }
+
+  const needsMaterials: ProcurementQueueItem[] = [];
+  const pendingApproval: ProcurementQueueItem[] = [];
+
+  for (const item of items) {
+    const project = projectMap.get(item.project_id);
+    if (!project) continue;
+
+    const materialStats = itemMaterialsMap.get(item.id) || { total: 0, pending: 0 };
+
+    const queueItem: ProcurementQueueItem = {
+      id: item.id,
+      item_code: item.item_code,
+      name: item.name,
+      project_id: item.project_id,
+      project_name: project.name,
+      project_code: project.code,
+      project_slug: project.slug,
+      materialsCount: materialStats.total,
+      pendingMaterials: materialStats.pending,
+    };
+
+    // Items with no materials assigned
+    if (materialStats.total === 0) {
+      needsMaterials.push(queueItem);
+    }
+    // Items with pending material approvals
+    else if (materialStats.pending > 0) {
+      pendingApproval.push(queueItem);
+    }
+  }
+
+  return {
+    needsMaterials: needsMaterials.slice(0, 10),
+    pendingApproval: pendingApproval.slice(0, 10),
+    totalNeedsMaterials: needsMaterials.length,
+    totalPendingApproval: pendingApproval.length,
+  };
+}
+
+// ============================================================================
+// ADMIN/MANAGEMENT - Financial Overview
+// ============================================================================
+export interface FinancialOverview {
+  totalContractValue: number;
+  byStatus: {
+    tender: number;
+    active: number;
+    completed: number;
+  };
+  currency: string;
+  projectCount: number;
+}
+
+export async function getFinancialOverview(): Promise<FinancialOverview> {
+  const supabase = await createClient();
+
+  const { data: projectsData } = await supabase
+    .from("projects")
+    .select("status, contract_value_manual, currency")
+    .eq("is_deleted", false)
+    .not("status", "eq", "cancelled");
+
+  const projects = projectsData || [];
+
+  let totalContractValue = 0;
+  const byStatus = { tender: 0, active: 0, completed: 0 };
+
+  for (const project of projects) {
+    const value = project.contract_value_manual || 0;
+    totalContractValue += value;
+
+    if (project.status === "tender") {
+      byStatus.tender += value;
+    } else if (project.status === "active" || project.status === "on_hold") {
+      byStatus.active += value;
+    } else if (project.status === "completed") {
+      byStatus.completed += value;
+    }
+  }
+
+  return {
+    totalContractValue,
+    byStatus,
+    currency: "TRY", // Default, could be made configurable
+    projectCount: projects.length,
+  };
+}
+
 export async function getDashboardMilestones(): Promise<DashboardMilestone[]> {
   const supabase = await createClient();
 
