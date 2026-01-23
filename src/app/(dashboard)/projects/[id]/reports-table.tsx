@@ -13,24 +13,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-// Note: Not using Collapsible due to table row structure - using manual state instead
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  ChevronRightIcon,
-  ChevronDownIcon,
   ArrowUpDownIcon,
   ArrowUpIcon,
   ArrowDownIcon,
   PencilIcon,
   TrashIcon,
 } from "lucide-react";
-import { GlassCard, StatusBadge, GradientAvatar, EmptyState } from "@/components/ui/ui-helpers";
-import { ReportLineEditor } from "./report-line-editor";
+import { GlassCard, StatusBadge } from "@/components/ui/ui-helpers";
 import { ReportPDFExport } from "@/components/reports/report-pdf-export";
 import {
   deleteReport,
@@ -74,17 +64,8 @@ const REPORT_TYPE_COLORS: Record<string, string> = {
   final: "bg-emerald-100 text-emerald-700",
 };
 
-type SortField = "report_type" | "is_published" | "created_at" | "updated_at" | "sections" | "creator";
+type SortField = "report_type" | "is_published" | "created_at" | "updated_at" | "creator";
 type SortDirection = "asc" | "desc";
-
-function getInitials(name: string): string {
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-}
 
 export function ReportsTable({
   projectId,
@@ -95,7 +76,6 @@ export function ReportsTable({
   onEditReport,
 }: ReportsTableProps) {
   const router = useRouter();
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [sortField, setSortField] = useState<SortField>("created_at");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [isLoading, setIsLoading] = useState(false);
@@ -123,9 +103,6 @@ export function ReportsTable({
         case "updated_at":
           comparison = new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime();
           break;
-        case "sections":
-          comparison = (a.lines?.length || 0) - (b.lines?.length || 0);
-          break;
         case "creator":
           comparison = (a.creator?.name || "").localeCompare(b.creator?.name || "");
           break;
@@ -142,18 +119,6 @@ export function ReportsTable({
       setSortField(field);
       setSortDirection("desc");
     }
-  };
-
-  const toggleExpand = (reportId: string) => {
-    setExpandedIds((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(reportId)) {
-        newSet.delete(reportId);
-      } else {
-        newSet.add(reportId);
-      }
-      return newSet;
-    });
   };
 
   const handleDeleteClick = (reportId: string) => {
@@ -216,27 +181,24 @@ export function ReportsTable({
   }
 
   return (
-    <TooltipProvider>
+    <>
       <GlassCard className="overflow-hidden">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="w-10"></TableHead>
+                <TableHead className="w-12 text-center">#</TableHead>
                 <SortHeader field="report_type" className="w-28">
                   Type
                 </SortHeader>
                 <SortHeader field="is_published" className="w-24">
                   Status
                 </SortHeader>
-                <TableHead className="w-44">Shared With</TableHead>
-                <SortHeader field="sections" className="w-20 text-center">
-                  Sections
-                </SortHeader>
+                <TableHead className="w-32">Shared With</TableHead>
                 <SortHeader field="creator" className="w-32">
                   Created By
                 </SortHeader>
-                <SortHeader field="created_at" className="w-28">
+                <SortHeader field="created_at" className="w-40">
                   Created
                 </SortHeader>
                 <SortHeader field="updated_at" className="w-40">
@@ -246,171 +208,118 @@ export function ReportsTable({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedReports.map((report) => {
-                const isExpanded = expandedIds.has(report.id);
-                const sharedUsers = report.shared_with || [];
-                const displayUsers = sharedUsers.slice(0, 3);
-                const remainingCount = sharedUsers.length - 3;
+              {sortedReports.map((report, index) => {
+                // Number column: 1 = most recent when sorted by created_at desc
+                const displayNumber = index + 1;
 
                 return (
-                  <React.Fragment key={report.id}>
-                    <TableRow className="group">
-                      {/* Expand Arrow */}
-                      <TableCell className="py-2">
-                        <Button
+                  <TableRow key={report.id} className="group">
+                    {/* Number Column */}
+                    <TableCell className="py-2 text-center">
+                      <span className="text-sm font-medium text-muted-foreground">
+                        {displayNumber}
+                      </span>
+                    </TableCell>
+
+                    {/* Type */}
+                    <TableCell className="py-2">
+                      <span
+                        className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
+                          REPORT_TYPE_COLORS[report.report_type] || "bg-gray-100 text-gray-700"
+                        }`}
+                      >
+                        {REPORT_TYPE_LABELS[report.report_type] || report.report_type}
+                      </span>
+                    </TableCell>
+
+                    {/* Status */}
+                    <TableCell className="py-2">
+                      {report.is_published ? (
+                        <StatusBadge variant="success">Published</StatusBadge>
+                      ) : (
+                        <StatusBadge variant="warning">Draft</StatusBadge>
+                      )}
+                    </TableCell>
+
+                    {/* Shared With - Only Internal/Client badges */}
+                    <TableCell className="py-2">
+                      <div className="flex items-center gap-1">
+                        {report.share_internal && (
+                          <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-violet-100 text-violet-700">
+                            Internal
+                          </span>
+                        )}
+                        {report.share_with_client && (
+                          <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-sky-100 text-sky-700">
+                            Client
+                          </span>
+                        )}
+                        {!report.share_internal && !report.share_with_client && (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </div>
+                    </TableCell>
+
+                    {/* Created By */}
+                    <TableCell className="py-2">
+                      <span className="text-sm">{report.creator?.name || "—"}</span>
+                    </TableCell>
+
+                    {/* Created - with time */}
+                    <TableCell className="py-2">
+                      <span className="text-sm text-muted-foreground">
+                        {format(new Date(report.created_at), "MMM d, yyyy HH:mm")}
+                      </span>
+                    </TableCell>
+
+                    {/* Last Edited */}
+                    <TableCell className="py-2">
+                      {report.updater?.name && report.updated_by !== report.created_by ? (
+                        <span className="text-sm text-muted-foreground">
+                          {report.updater.name} · {format(new Date(report.updated_at), "MMM d, HH:mm")}
+                        </span>
+                      ) : report.updated_at !== report.created_at ? (
+                        <span className="text-sm text-muted-foreground">
+                          {format(new Date(report.updated_at), "MMM d, HH:mm")}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+
+                    {/* Actions */}
+                    <TableCell className="py-2 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <ReportPDFExport
+                          report={report}
+                          projectName={projectName}
+                          projectCode={projectCode}
                           variant="ghost"
                           size="icon"
-                          className="size-7"
-                          onClick={() => toggleExpand(report.id)}
-                        >
-                          {isExpanded ? (
-                            <ChevronDownIcon className="size-4" />
-                          ) : (
-                            <ChevronRightIcon className="size-4" />
-                          )}
-                        </Button>
-                      </TableCell>
-
-                        {/* Type */}
-                        <TableCell className="py-2">
-                          <span
-                            className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
-                              REPORT_TYPE_COLORS[report.report_type] || "bg-gray-100 text-gray-700"
-                            }`}
-                          >
-                            {REPORT_TYPE_LABELS[report.report_type] || report.report_type}
-                          </span>
-                        </TableCell>
-
-                        {/* Status */}
-                        <TableCell className="py-2">
-                          {report.is_published ? (
-                            <StatusBadge variant="success">Published</StatusBadge>
-                          ) : (
-                            <StatusBadge variant="warning">Draft</StatusBadge>
-                          )}
-                        </TableCell>
-
-                        {/* Shared With */}
-                        <TableCell className="py-2">
-                          <div className="flex items-center gap-1">
-                            {displayUsers.length > 0 ? (
-                              <>
-                                {displayUsers.map((user) => (
-                                  <Tooltip key={user.id}>
-                                    <TooltipTrigger asChild>
-                                      <div>
-                                        <GradientAvatar
-                                          name={user.name}
-                                          size="sm"
-                                        />
-                                      </div>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p>{user.name}</p>
-                                      <p className="text-xs text-muted-foreground">{user.email}</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                ))}
-                                {remainingCount > 0 && (
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <div className="size-7 rounded-full bg-slate-200 flex items-center justify-center text-xs font-medium text-slate-600">
-                                        +{remainingCount}
-                                      </div>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      {sharedUsers.slice(3).map((u) => (
-                                        <p key={u.id}>{u.name}</p>
-                                      ))}
-                                    </TooltipContent>
-                                  </Tooltip>
-                                )}
-                              </>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">—</span>
-                            )}
-                          </div>
-                        </TableCell>
-
-                        {/* Sections */}
-                        <TableCell className="py-2 text-center">
-                          <span className="text-sm">{report.lines?.length || 0}</span>
-                        </TableCell>
-
-                        {/* Created By */}
-                        <TableCell className="py-2">
-                          <span className="text-sm">{report.creator?.name || "—"}</span>
-                        </TableCell>
-
-                        {/* Created */}
-                        <TableCell className="py-2">
-                          <span className="text-sm text-muted-foreground">
-                            {format(new Date(report.created_at), "MMM d, yyyy")}
-                          </span>
-                        </TableCell>
-
-                        {/* Last Edited */}
-                        <TableCell className="py-2">
-                          {report.updater?.name && report.updated_by !== report.created_by ? (
-                            <span className="text-sm text-muted-foreground">
-                              {report.updater.name} · {format(new Date(report.updated_at), "MMM d")}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-
-                        {/* Actions */}
-                        <TableCell className="py-2 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <ReportPDFExport
-                              report={report}
-                              projectName={projectName}
-                              projectCode={projectCode}
-                              variant="ghost"
+                        />
+                        {canManageReports && (
+                          <>
+                            <Button
                               size="icon"
-                            />
-                            {canManageReports && (
-                              <>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="size-8 hover:bg-teal-50 hover:text-teal-600"
-                                  onClick={() => onEditReport(report)}
-                                >
-                                  <PencilIcon className="size-4" />
-                                </Button>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="size-8 text-rose-600 hover:text-rose-700 hover:bg-rose-50"
-                                  onClick={() => handleDeleteClick(report.id)}
-                                >
-                                  <TrashIcon className="size-4" />
-                                </Button>
-                              </>
-                            )}
-                          </div>
-                        </TableCell>
-                    </TableRow>
-
-                    {/* Expandable Content - shown when expanded */}
-                    {isExpanded && (
-                      <TableRow className="hover:bg-transparent">
-                        <TableCell colSpan={9} className="p-0">
-                          <div className="bg-slate-50/50 border-t border-b border-slate-100 px-4 py-4">
-                            <ReportLineEditor
-                              projectId={projectId}
-                              reportId={report.id}
-                              lines={report.lines || []}
-                              readOnly={isClient || !canManageReports}
-                            />
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </React.Fragment>
+                              variant="ghost"
+                              className="size-8 hover:bg-teal-50 hover:text-teal-600"
+                              onClick={() => onEditReport(report)}
+                            >
+                              <PencilIcon className="size-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="size-8 text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                              onClick={() => handleDeleteClick(report.id)}
+                            >
+                              <TrashIcon className="size-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
                 );
               })}
             </TableBody>
@@ -447,6 +356,6 @@ export function ReportsTable({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </TooltipProvider>
+    </>
   );
 }

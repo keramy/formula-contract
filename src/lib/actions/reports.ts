@@ -68,7 +68,65 @@ export interface ActionResult<T = void> {
 // ============================================================================
 
 /**
+ * Debug function to see who would receive report notifications
+ */
+export async function debugReportNotificationRecipients(projectId: string, publisherId: string) {
+  const supabase = await createClient();
+
+  // Get all assignments
+  const { data: assignments } = await supabase
+    .from("project_assignments")
+    .select("user_id")
+    .eq("project_id", projectId);
+
+  const allUserIds = assignments?.map(a => a.user_id) || [];
+  const userIdsExcludingPublisher = allUserIds.filter(id => id !== publisherId);
+
+  // Get all user details
+  const { data: allUsers } = await supabase
+    .from("users")
+    .select("id, name, email, role, is_active")
+    .in("id", allUserIds);
+
+  // Categorize users
+  const breakdown = {
+    total_assigned: allUsers?.length || 0,
+    publisher_excluded: allUsers?.find(u => u.id === publisherId),
+    by_role: {} as Record<string, number>,
+    by_status: { active: 0, inactive: 0 },
+    would_receive_email: [] as string[],
+    excluded_reasons: [] as { name: string; reason: string }[],
+  };
+
+  allUsers?.forEach(user => {
+    // Count by role
+    breakdown.by_role[user.role] = (breakdown.by_role[user.role] || 0) + 1;
+
+    // Count by status
+    if (user.is_active) breakdown.by_status.active++;
+    else breakdown.by_status.inactive++;
+
+    // Check if would receive email
+    if (user.id === publisherId) {
+      breakdown.excluded_reasons.push({ name: user.name, reason: "Is the publisher" });
+    } else if (!user.is_active) {
+      breakdown.excluded_reasons.push({ name: user.name, reason: "Inactive user" });
+    } else if (user.role === "client") {
+      breakdown.excluded_reasons.push({ name: user.name, reason: "Client role (excluded by default)" });
+    } else if (!user.email) {
+      breakdown.excluded_reasons.push({ name: user.name, reason: "No email address" });
+    } else {
+      breakdown.would_receive_email.push(`${user.name} (${user.email})`);
+    }
+  });
+
+  console.log("[Debug Report Recipients]", JSON.stringify(breakdown, null, 2));
+  return breakdown;
+}
+
+/**
  * Send notifications (in-app + email) to all project team members when a report is published
+ * @param includeClients - Whether to send notifications to client users (default: false)
  */
 async function sendReportPublishedNotification(
   projectId: string,
@@ -77,12 +135,13 @@ async function sendReportPublishedNotification(
   projectCode: string,
   reportType: string,
   publisherName: string,
-  publisherId: string
+  publisherId: string,
+  includeClients: boolean = false
 ): Promise<{ sent: number; failed: number }> {
   const supabase = await createClient();
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
-  console.log("[Report Notification] Starting for project:", projectId, "publisher:", publisherId);
+  console.log("[Report Notification] Starting for project:", projectId, "publisher:", publisherId, "includeClients:", includeClients);
 
   // Get all user IDs assigned to this project
   const { data: assignments, error: assignmentsError } = await supabase
@@ -95,9 +154,9 @@ async function sendReportPublishedNotification(
     return { sent: 0, failed: 0 };
   }
 
-  console.log("[Report Notification] Found assignments:", assignments.length, "users:", assignments.map(a => a.user_id));
+  console.log("[Report Notification] Found assignments:", assignments.length);
 
-  // Get user details for assigned users (excluding publisher, only active users)
+  // Get user details for assigned users (excluding publisher)
   const userIds = assignments.map(a => a.user_id).filter(id => id !== publisherId);
 
   if (userIds.length === 0) {
@@ -105,13 +164,19 @@ async function sendReportPublishedNotification(
     return { sent: 0, failed: 0 };
   }
 
-  console.log("[Report Notification] Users to notify (excluding publisher):", userIds);
-
-  const { data: users, error: usersError } = await supabase
+  // Build query - filter by active status and optionally exclude clients
+  let query = supabase
     .from("users")
-    .select("id, name, email")
+    .select("id, name, email, role")
     .in("id", userIds)
     .eq("is_active", true);
+
+  // Exclude clients unless explicitly included
+  if (!includeClients) {
+    query = query.neq("role", "client");
+  }
+
+  const { data: users, error: usersError } = await query;
 
   if (usersError || !users) {
     console.error("[Report Notification] Error fetching users:", usersError?.message);
@@ -119,11 +184,11 @@ async function sendReportPublishedNotification(
   }
 
   if (users.length === 0) {
-    console.log("[Report Notification] No active users found to notify");
+    console.log("[Report Notification] No eligible users found to notify");
     return { sent: 0, failed: 0 };
   }
 
-  console.log("[Report Notification] Will send to:", users.map(u => u.email));
+  console.log("[Report Notification] Will send to:", users.length, "users:", users.map(u => `${u.name} (${u.role})`));
 
   let sent = 0;
   let failed = 0;
@@ -568,8 +633,9 @@ export async function deleteReport(reportId: string): Promise<ActionResult> {
 
 /**
  * Publish a report and notify all project team members via email
+ * @param includeClients - Whether to send notifications to client users (default: false)
  */
-export async function publishReport(reportId: string): Promise<ActionResult> {
+export async function publishReport(reportId: string, includeClients: boolean = false): Promise<ActionResult> {
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -630,7 +696,8 @@ export async function publishReport(reportId: string): Promise<ActionResult> {
           project.project_code,
           report.report_type,
           publisherName,
-          user.id
+          user.id,
+          includeClients
         );
       } catch (err) {
         // Log but don't fail the publish operation

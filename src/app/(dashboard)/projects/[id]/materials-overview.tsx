@@ -4,7 +4,6 @@ import { useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/client";
-import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { GlassCard, GradientIcon, EmptyState } from "@/components/ui/ui-helpers";
@@ -21,10 +20,6 @@ import {
 import {
   PackageIcon,
   PlusIcon,
-  ClockIcon,
-  CheckCircleIcon,
-  XCircleIcon,
-  AlertTriangleIcon,
 } from "lucide-react";
 import { MaterialCard, type Material } from "@/components/materials/material-card";
 import { MaterialApproval } from "@/components/materials/material-approval";
@@ -168,35 +163,51 @@ export function MaterialsOverview({
 
   if (materials.length === 0 && scopeItems.length === 0) {
     return (
-      <GlassCard>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <GradientIcon icon={<PackageIcon className="size-4" />} color="teal" size="sm" />
-            Materials
-          </CardTitle>
-          <CardDescription>Track material selections and approvals</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <EmptyState
-            icon={<PackageIcon className="size-6" />}
-            title="No scope items yet"
-            description="Add scope items first to start tracking materials."
-          />
-        </CardContent>
-      </GlassCard>
+      <div className="space-y-4">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <GradientIcon icon={<PackageIcon className="size-5" />} color="teal" size="default" />
+            <div>
+              <h3 className="text-lg font-medium">Materials</h3>
+              <p className="text-sm text-muted-foreground">
+                No scope items yet
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <EmptyState
+          icon={<PackageIcon className="size-6" />}
+          title="No scope items yet"
+          description="Add scope items first to start tracking materials."
+        />
+      </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      {/* Header with Excel buttons */}
+      {/* Header with inline stats */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <GradientIcon icon={<PackageIcon className="size-4" />} color="teal" size="sm" />
+        <div className="flex items-center gap-3">
+          <GradientIcon icon={<PackageIcon className="size-5" />} color="teal" size="default" />
           <div>
             <h3 className="text-lg font-medium">Materials</h3>
             <p className="text-sm text-muted-foreground">
-              {materials.length} material{materials.length !== 1 ? "s" : ""} in this project
+              {stats.total} material{stats.total !== 1 ? "s" : ""}
+              {!isClient && stats.total > 0 && (
+                <>
+                  {" "}({stats.pending > 0 && <span className="text-amber-600">{stats.pending} pending</span>}
+                  {stats.pending > 0 && stats.approved > 0 && ", "}
+                  {stats.approved > 0 && <span className="text-emerald-600">{stats.approved} approved</span>}
+                  {(stats.pending > 0 || stats.approved > 0) && stats.rejected > 0 && ", "}
+                  {stats.rejected > 0 && <span className="text-rose-600">{stats.rejected} rejected</span>})
+                </>
+              )}
+              {isClient && stats.pending > 0 && (
+                <span className="text-amber-600"> ({stats.pending} awaiting your review)</span>
+              )}
             </p>
           </div>
         </div>
@@ -230,53 +241,6 @@ export function MaterialsOverview({
           )}
         </div>
       </div>
-
-      {/* Stats Cards - Updated for PM workflow */}
-      <div className="grid grid-cols-4 gap-4">
-        <GlassCard hover="lift" className="p-4">
-          <div className="flex items-center gap-2 text-muted-foreground mb-1">
-            <GradientIcon icon={<PackageIcon className="size-3.5" />} color="teal" size="sm" />
-            <span className="text-xs font-medium">Total</span>
-          </div>
-          <p className="text-2xl font-bold">{stats.total}</p>
-        </GlassCard>
-
-        <GlassCard hover="lift" className="p-4">
-          <div className="flex items-center gap-2 text-muted-foreground mb-1">
-            <GradientIcon icon={<ClockIcon className="size-3.5" />} color="amber" size="sm" />
-            <span className="text-xs font-medium">Pending</span>
-          </div>
-          <p className="text-2xl font-bold text-amber-600">{stats.pending}</p>
-        </GlassCard>
-
-        <GlassCard hover="lift" className="p-4">
-          <div className="flex items-center gap-2 text-muted-foreground mb-1">
-            <GradientIcon icon={<CheckCircleIcon className="size-3.5" />} color="emerald" size="sm" />
-            <span className="text-xs font-medium">Approved</span>
-          </div>
-          <p className="text-2xl font-bold text-emerald-600">{stats.approved}</p>
-        </GlassCard>
-
-        <GlassCard hover="lift" className="p-4">
-          <div className="flex items-center gap-2 text-muted-foreground mb-1">
-            <GradientIcon icon={<XCircleIcon className="size-3.5" />} color="rose" size="sm" />
-            <span className="text-xs font-medium">Rejected</span>
-          </div>
-          <p className="text-2xl font-bold text-rose-600">{stats.rejected}</p>
-        </GlassCard>
-      </div>
-
-      {/* Pending notice - remind PM to review */}
-      {stats.pending > 0 && (
-        <div className="p-4 rounded-xl bg-amber-50 border border-amber-200">
-          <div className="flex items-center gap-2">
-            <AlertTriangleIcon className="size-5 text-amber-500" />
-            <span className="font-medium text-amber-700">
-              {stats.pending} material{stats.pending !== 1 ? "s" : ""} pending approval
-            </span>
-          </div>
-        </div>
-      )}
 
       {/* Materials List */}
       {materials.length > 0 ? (

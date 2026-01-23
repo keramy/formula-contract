@@ -28,6 +28,8 @@ import {
   TrashIcon,
   CheckIcon,
   CalendarIcon,
+  CircleIcon,
+  CircleDotIcon,
 } from "lucide-react";
 import { format, isPast, differenceInDays } from "date-fns";
 import { MilestoneFormDialog } from "./milestone-form-dialog";
@@ -172,14 +174,23 @@ export function MilestonesOverview({
 
   return (
     <div className="space-y-4">
-      {/* Header */}
+      {/* Header with inline stats */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <GradientIcon icon={<FlagIcon className="size-5" />} color="violet" size="default" />
           <div>
             <h3 className="text-lg font-medium">Milestones</h3>
             <p className="text-sm text-muted-foreground">
-              Track project timeline and key deliverables
+              {stats.total} milestone{stats.total !== 1 ? "s" : ""}
+              {stats.total > 0 && (
+                <>
+                  {" "}({stats.completed > 0 && <span className="text-emerald-600">{stats.completed} completed</span>}
+                  {stats.completed > 0 && stats.upcoming > 0 && ", "}
+                  {stats.upcoming > 0 && <span className="text-sky-600">{stats.upcoming} upcoming</span>}
+                  {(stats.completed > 0 || stats.upcoming > 0) && stats.overdue > 0 && ", "}
+                  {stats.overdue > 0 && <span className="text-rose-600">{stats.overdue} overdue</span>})
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -192,7 +203,7 @@ export function MilestonesOverview({
         </Button>
       </div>
 
-      {/* Progress */}
+      {/* Progress Bar */}
       {milestones.length > 0 && (
         <GlassCard className="p-4">
           <div className="flex items-center justify-between mb-2">
@@ -200,173 +211,139 @@ export function MilestonesOverview({
             <span className="text-sm font-semibold text-violet-600">{progress}%</span>
           </div>
           <Progress value={progress} className="h-2.5 [&>div]:bg-gradient-to-r [&>div]:from-violet-500 [&>div]:to-purple-500" />
-          <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <div className="size-2 rounded-full bg-emerald-500" />
-              {stats.completed} completed
-            </span>
-            <span className="flex items-center gap-1">
-              <div className="size-2 rounded-full bg-sky-500" />
-              {stats.upcoming} upcoming
-            </span>
-            {stats.overdue > 0 && (
-              <span className="flex items-center gap-1 text-rose-600">
-                <div className="size-2 rounded-full bg-rose-500" />
-                {stats.overdue} overdue
-              </span>
-            )}
-          </div>
         </GlassCard>
       )}
 
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-4">
-        <GlassCard hover="lift" className="p-4">
-          <div className="flex items-center gap-2 text-muted-foreground mb-1">
-            <div className="p-1.5 rounded-lg bg-gradient-to-br from-violet-500/10 to-purple-500/10">
-              <FlagIcon className="size-3.5 text-violet-600" />
-            </div>
-            <span className="text-xs font-medium">Total</span>
-          </div>
-          <p className="text-2xl font-bold">{stats.total}</p>
-        </GlassCard>
-
-        <GlassCard hover="lift" className="p-4">
-          <div className="flex items-center gap-2 text-muted-foreground mb-1">
-            <div className="p-1.5 rounded-lg bg-gradient-to-br from-emerald-500/10 to-teal-500/10">
-              <CheckCircleIcon className="size-3.5 text-emerald-600" />
-            </div>
-            <span className="text-xs font-medium">Completed</span>
-          </div>
-          <p className="text-2xl font-bold text-emerald-600">{stats.completed}</p>
-        </GlassCard>
-
-        <GlassCard hover="lift" className="p-4">
-          <div className="flex items-center gap-2 text-muted-foreground mb-1">
-            <div className="p-1.5 rounded-lg bg-gradient-to-br from-sky-500/10 to-blue-500/10">
-              <ClockIcon className="size-3.5 text-sky-600" />
-            </div>
-            <span className="text-xs font-medium">Upcoming</span>
-          </div>
-          <p className="text-2xl font-bold text-sky-600">{stats.upcoming}</p>
-        </GlassCard>
-
-        <GlassCard hover="lift" className="p-4">
-          <div className="flex items-center gap-2 text-muted-foreground mb-1">
-            <div className="p-1.5 rounded-lg bg-gradient-to-br from-rose-500/10 to-red-500/10">
-              <AlertTriangleIcon className="size-3.5 text-rose-600" />
-            </div>
-            <span className="text-xs font-medium">Overdue</span>
-          </div>
-          <p className="text-2xl font-bold text-rose-600">{stats.overdue}</p>
-        </GlassCard>
-      </div>
-
-      {/* Overdue Alert */}
-      {stats.overdue > 0 && (
-        <GlassCard className="p-4 border-rose-200 bg-rose-50/80 dark:bg-rose-900/10 dark:border-rose-800">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-gradient-to-br from-rose-500/20 to-red-500/20">
-              <AlertTriangleIcon className="size-4 text-rose-600" />
-            </div>
-            <span className="font-medium text-rose-700 dark:text-rose-400">
-              {stats.overdue} milestone{stats.overdue !== 1 ? "s" : ""} overdue!
-            </span>
-          </div>
-        </GlassCard>
-      )}
-
-      {/* Milestones List */}
+      {/* Timeline View */}
       {milestones.length > 0 ? (
-        <div className="space-y-3">
-          {sortedMilestones.map((milestone) => {
-            const status = getMilestoneStatus(milestone);
-            const config = statusConfig[status];
-            const daysUntil = differenceInDays(new Date(milestone.due_date), new Date());
+        <div className="relative">
+          {/* Timeline line */}
+          <div className="absolute left-[19px] top-6 bottom-6 w-0.5 bg-gradient-to-b from-violet-200 via-violet-300 to-violet-200" />
 
-            return (
-              <GlassCard key={milestone.id} className={`p-4 ${milestone.is_completed ? "opacity-60" : ""}`}>
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-3">
-                    {/* Checkbox */}
+          <div className="space-y-1">
+            {sortedMilestones.map((milestone, index) => {
+              const status = getMilestoneStatus(milestone);
+              const config = statusConfig[status];
+              const daysUntil = differenceInDays(new Date(milestone.due_date), new Date());
+
+              // Timeline node colors
+              const nodeColors = {
+                completed: "bg-emerald-500 ring-emerald-100",
+                overdue: "bg-rose-500 ring-rose-100 animate-pulse",
+                warning: "bg-amber-500 ring-amber-100",
+                upcoming: "bg-violet-500 ring-violet-100",
+              };
+
+              return (
+                <div key={milestone.id} className="relative flex gap-4 group">
+                  {/* Timeline Node */}
+                  <div className="relative z-10 flex flex-col items-center pt-4">
                     <button
                       onClick={() => handleToggleComplete(milestone)}
                       disabled={isLoading}
-                      className={`mt-0.5 size-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                      className={`size-10 rounded-full ring-4 flex items-center justify-center transition-all shadow-sm ${
                         milestone.is_completed
-                          ? "bg-gradient-to-br from-emerald-500 to-teal-500 border-emerald-500 text-white shadow-sm shadow-emerald-500/30"
-                          : "border-muted-foreground/30 hover:border-violet-500 hover:bg-violet-50"
+                          ? "bg-emerald-500 ring-emerald-100 text-white"
+                          : `${nodeColors[status]} text-white hover:scale-110`
                       }`}
                     >
-                      {milestone.is_completed && <CheckIcon className="size-3" />}
-                    </button>
-
-                    {/* Content */}
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <h4 className={`font-medium ${milestone.is_completed ? "line-through text-muted-foreground" : ""}`}>
-                          {milestone.name}
-                        </h4>
-                        <StatusBadge variant={config.variant}>
-                          {config.icon}
-                          <span className="ml-1">{config.label}</span>
-                        </StatusBadge>
-                      </div>
-
-                      {milestone.description && (
-                        <p className="text-sm text-muted-foreground mb-2">
-                          {milestone.description}
-                        </p>
+                      {milestone.is_completed ? (
+                        <CheckIcon className="size-5" />
+                      ) : status === "overdue" ? (
+                        <AlertTriangleIcon className="size-4" />
+                      ) : status === "warning" ? (
+                        <ClockIcon className="size-4" />
+                      ) : (
+                        <CircleIcon className="size-4" />
                       )}
-
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <CalendarIcon className="size-3" />
-                          {format(new Date(milestone.due_date), "MMM d, yyyy")}
-                        </span>
-                        {!milestone.is_completed && (
-                          <span className={daysUntil < 0 ? "text-rose-600 font-medium" : daysUntil <= 7 ? "text-amber-600" : ""}>
-                            {daysUntil === 0
-                              ? "Due today"
-                              : daysUntil > 0
-                              ? `${daysUntil} days left`
-                              : `${Math.abs(daysUntil)} days overdue`}
-                          </span>
-                        )}
-                        {milestone.is_completed && milestone.completed_at && (
-                          <span className="text-emerald-600">
-                            Completed {format(new Date(milestone.completed_at), "MMM d, yyyy")}
-                          </span>
-                        )}
-                      </div>
-                    </div>
+                    </button>
                   </div>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-1">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleEdit(milestone)}
-                      disabled={isLoading}
-                      className="hover:bg-violet-50 hover:text-violet-600"
+                  {/* Content Card */}
+                  <div className={`flex-1 pb-4 ${index === sortedMilestones.length - 1 ? "pb-0" : ""}`}>
+                    <GlassCard
+                      className={`p-4 transition-all group-hover:shadow-md ${
+                        milestone.is_completed ? "opacity-60" : ""
+                      } ${status === "overdue" ? "border-rose-200 bg-rose-50/50" : ""}`}
                     >
-                      <PencilIcon className="size-3" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleDeleteClick(milestone.id)}
-                      disabled={isLoading}
-                      className="text-rose-600 hover:text-rose-700 hover:bg-rose-50"
-                    >
-                      <TrashIcon className="size-3" />
-                    </Button>
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          {/* Date badge */}
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                              milestone.is_completed
+                                ? "bg-emerald-100 text-emerald-700"
+                                : status === "overdue"
+                                ? "bg-rose-100 text-rose-700"
+                                : status === "warning"
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-violet-100 text-violet-700"
+                            }`}>
+                              {format(new Date(milestone.due_date), "MMM d, yyyy")}
+                            </span>
+                            {!milestone.is_completed && (
+                              <span className={`text-xs ${
+                                daysUntil < 0 ? "text-rose-600 font-semibold" :
+                                daysUntil <= 7 ? "text-amber-600 font-medium" :
+                                "text-muted-foreground"
+                              }`}>
+                                {daysUntil === 0
+                                  ? "Due today!"
+                                  : daysUntil > 0
+                                  ? `${daysUntil} days left`
+                                  : `${Math.abs(daysUntil)} days overdue`}
+                              </span>
+                            )}
+                            {milestone.is_completed && milestone.completed_at && (
+                              <span className="text-xs text-emerald-600">
+                                ✓ Completed {format(new Date(milestone.completed_at), "MMM d")}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Title */}
+                          <h4 className={`font-semibold text-base ${
+                            milestone.is_completed ? "line-through text-muted-foreground" : ""
+                          }`}>
+                            {milestone.name}
+                          </h4>
+
+                          {/* Description */}
+                          {milestone.description && (
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {milestone.description}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => handleEdit(milestone)}
+                            disabled={isLoading}
+                            className="size-8 hover:bg-violet-50 hover:text-violet-600"
+                          >
+                            <PencilIcon className="size-3.5" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => handleDeleteClick(milestone.id)}
+                            disabled={isLoading}
+                            className="size-8 text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                          >
+                            <TrashIcon className="size-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    </GlassCard>
                   </div>
                 </div>
-              </GlassCard>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       ) : (
         <EmptyState

@@ -58,20 +58,14 @@ import {
   ChevronUpIcon,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import {
-  getProjectTeamMembers,
-  updateReportShares,
-  publishReport,
-} from "@/lib/actions/reports";
+import { publishReport } from "@/lib/actions/reports";
 
 // Shared report components
 import {
   REPORT_TYPES,
   type LocalSection,
-  type TeamMember,
 } from "@/components/reports";
 import { SortableSection } from "@/components/reports/sortable-section";
-import { TeamShareSelector } from "@/components/reports/team-share-selector";
 import { SectionFormDialog } from "@/components/reports/section-form-dialog";
 import { DeleteSectionDialog } from "@/components/reports/delete-section-dialog";
 
@@ -110,23 +104,8 @@ export function ReportCreationModal({
   // Expanded state for settings
   const [settingsExpanded, setSettingsExpanded] = useState(true);
 
-  // Team members state for sharing
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [selectedShareUsers, setSelectedShareUsers] = useState<string[]>([]);
-  const [loadingTeam, setLoadingTeam] = useState(false);
-
-  // Fetch team members when modal opens
-  useEffect(() => {
-    async function loadTeamMembers() {
-      if (open && teamMembers.length === 0) {
-        setLoadingTeam(true);
-        const members = await getProjectTeamMembers(projectId);
-        setTeamMembers(members);
-        setLoadingTeam(false);
-      }
-    }
-    loadTeamMembers();
-  }, [open, projectId, teamMembers.length]);
+  // Notification settings - whether to include clients in email notifications
+  const [notifyClients, setNotifyClients] = useState(false);
 
   // DnD sensors
   const sensors = useSensors(
@@ -142,22 +121,13 @@ export function ReportCreationModal({
       setReportType("progress");
       setShareWithClient(false);
       setShareInternal(true);
+      setNotifyClients(false);
       setSections([]);
       setError(null);
       setSectionFormOpen(false);
       setEditingSection(null);
-      setSelectedShareUsers([]);
     }
     onOpenChange(newOpen);
-  };
-
-  // Toggle user selection for sharing
-  const toggleUserSelection = (userId: string) => {
-    setSelectedShareUsers((prev) =>
-      prev.includes(userId)
-        ? prev.filter((id) => id !== userId)
-        : [...prev, userId]
-    );
   };
 
   // Handle drag end
@@ -257,14 +227,10 @@ export function ReportCreationModal({
 
       if (linesError) throw linesError;
 
-      // Save report shares if any users selected
-      if (selectedShareUsers.length > 0) {
-        await updateReportShares(newReport.id, selectedShareUsers);
-      }
-
       // If publishing, call publishReport to log activity and send notifications
+      // Pass notifyClients to determine if clients should receive email notifications
       if (publish) {
-        await publishReport(newReport.id);
+        await publishReport(newReport.id, notifyClients);
       }
 
       // Close modal and refresh
@@ -334,44 +300,60 @@ export function ReportCreationModal({
                     </Select>
                   </div>
 
-                  {/* Share Settings */}
-                  <div className="flex flex-wrap gap-4">
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        id="share-internal"
-                        checked={shareInternal}
-                        onCheckedChange={setShareInternal}
-                      />
-                      <Label
-                        htmlFor="share-internal"
-                        className="text-sm font-normal cursor-pointer"
-                      >
-                        Share internally
-                      </Label>
-                    </div>
+                  {/* Visibility Settings */}
+                  <div className="space-y-3">
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wide">Visibility</Label>
+                    <div className="flex flex-wrap gap-4">
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id="share-internal"
+                          checked={shareInternal}
+                          onCheckedChange={setShareInternal}
+                        />
+                        <Label
+                          htmlFor="share-internal"
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          Share internally
+                        </Label>
+                      </div>
 
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        id="share-client"
-                        checked={shareWithClient}
-                        onCheckedChange={setShareWithClient}
-                      />
-                      <Label
-                        htmlFor="share-client"
-                        className="text-sm font-normal cursor-pointer"
-                      >
-                        Share with client
-                      </Label>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id="share-client"
+                          checked={shareWithClient}
+                          onCheckedChange={setShareWithClient}
+                        />
+                        <Label
+                          htmlFor="share-client"
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          Share with client
+                        </Label>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Team Share Selector */}
-                  <TeamShareSelector
-                    teamMembers={teamMembers}
-                    selectedUserIds={selectedShareUsers}
-                    onToggleUser={toggleUserSelection}
-                    loading={loadingTeam}
-                  />
+                  {/* Email Notification Settings */}
+                  <div className="space-y-3">
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wide">Email Notifications (on publish)</Label>
+                    <p className="text-xs text-muted-foreground">
+                      All team members will be notified by email when you publish this report.
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        id="notify-clients"
+                        checked={notifyClients}
+                        onCheckedChange={setNotifyClients}
+                      />
+                      <Label
+                        htmlFor="notify-clients"
+                        className="text-sm font-normal cursor-pointer"
+                      >
+                        Also notify clients
+                      </Label>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

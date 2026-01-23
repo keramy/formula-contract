@@ -57,21 +57,14 @@ import {
   ChevronUpIcon,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import {
-  getProjectTeamMembers,
-  updateReportShares,
-  type Report,
-  type ReportLine,
-} from "@/lib/actions/reports";
+import { type Report, type ReportLine } from "@/lib/actions/reports";
 
 // Shared report components
 import {
   REPORT_TYPES,
   type LocalSection,
-  type TeamMember,
 } from "@/components/reports";
 import { SortableSection } from "@/components/reports/sortable-section";
-import { TeamShareSelector } from "@/components/reports/team-share-selector";
 import { SectionFormDialog } from "@/components/reports/section-form-dialog";
 import { DeleteSectionDialog } from "@/components/reports/delete-section-dialog";
 
@@ -125,11 +118,6 @@ export function ReportEditModal({
   // Expanded state for settings
   const [settingsExpanded, setSettingsExpanded] = useState(true);
 
-  // Team members state for sharing
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [selectedShareUsers, setSelectedShareUsers] = useState<string[]>([]);
-  const [loadingTeam, setLoadingTeam] = useState(false);
-
   // DnD sensors
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -149,32 +137,8 @@ export function ReportEditModal({
       setError(null);
       setSectionFormOpen(false);
       setEditingSection(null);
-      // Initialize selected users from report's shared_with
-      setSelectedShareUsers(report.shared_with?.map((u) => u.id) || []);
     }
   }, [open, report]);
-
-  // Fetch team members when modal opens
-  useEffect(() => {
-    async function loadTeamMembers() {
-      if (open && teamMembers.length === 0) {
-        setLoadingTeam(true);
-        const members = await getProjectTeamMembers(projectId);
-        setTeamMembers(members);
-        setLoadingTeam(false);
-      }
-    }
-    loadTeamMembers();
-  }, [open, projectId, teamMembers.length]);
-
-  // Toggle user selection for sharing
-  const toggleUserSelection = (userId: string) => {
-    setSelectedShareUsers((prev) =>
-      prev.includes(userId)
-        ? prev.filter((id) => id !== userId)
-        : [...prev, userId]
-    );
-  };
 
   // Handle modal close
   const handleOpenChange = (newOpen: boolean) => {
@@ -316,9 +280,6 @@ export function ReportEditModal({
         }
       }
 
-      // 4. Update report shares
-      await updateReportShares(report.id, selectedShareUsers);
-
       // Close modal and refresh
       handleOpenChange(false);
       router.refresh();
@@ -385,7 +346,7 @@ export function ReportEditModal({
                     </Select>
                   </div>
 
-                  {/* Share Settings */}
+                  {/* Visibility Settings */}
                   <div className="flex flex-wrap gap-4">
                     <div className="flex items-center gap-2">
                       <Switch
@@ -415,14 +376,6 @@ export function ReportEditModal({
                       </Label>
                     </div>
                   </div>
-
-                  {/* Team Share Selector */}
-                  <TeamShareSelector
-                    teamMembers={teamMembers}
-                    selectedUserIds={selectedShareUsers}
-                    onToggleUser={toggleUserSelection}
-                    loading={loadingTeam}
-                  />
                 </div>
               )}
             </div>

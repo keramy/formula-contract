@@ -1,22 +1,12 @@
 import { notFound } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
 import { createClient, getUserRoleFromJWT } from "@/lib/supabase/server";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  CalendarIcon,
-  BuildingIcon,
-  BanknoteIcon,
-  ClipboardListIcon,
-  PlusIcon,
   ActivityIcon,
   FileTextIcon,
-  PencilIcon,
 } from "lucide-react";
-import { format } from "date-fns";
 import { ScopeItemsTable } from "./scope-items-table";
 import { DrawingsOverview } from "./drawings-overview";
 import { MaterialsOverview } from "./materials-overview";
@@ -25,11 +15,11 @@ import { MilestonesOverview } from "./milestones-overview";
 import { TeamOverview } from "./team-overview";
 import { ReportsOverview } from "./reports-overview";
 import { ProjectDetailHeader } from "./project-detail-header";
+import { ProjectOverview } from "./project-overview";
 import { getProjectAssignments } from "@/lib/actions/project-assignments";
 import { getProjectReports } from "@/lib/actions/reports";
 import { DownloadTemplateButton, ExcelImport, ExcelExport, ScopeItemAddButton } from "@/components/scope-items";
 import { ActivityFeed } from "@/components/activity-log/activity-feed";
-import { GlassCard, GradientIcon } from "@/components/ui/ui-helpers";
 import { isUUID } from "@/lib/slug";
 
 interface ProjectClient {
@@ -215,6 +205,7 @@ export default async function ProjectDetailPage({
     milestonesResult,
     reportsResult,
     assignmentsResult,
+    activitiesResult,
   ] = await Promise.all([
     // 1. Project with Client (includes slug for URL generation)
     (async () => {
@@ -300,6 +291,40 @@ export default async function ProjectDetailPage({
       console.log(`  👥 Assignments: ${(performance.now() - start).toFixed(0)}ms`);
       return result;
     })(),
+    // 8. Recent Activities (for Overview dashboard)
+    (async () => {
+      const start = performance.now();
+      const { data } = await supabase
+        .from("activity_log")
+        .select("id, action, entity_type, created_at, user_id")
+        .eq("project_id", projectId)
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      // Get unique user IDs and fetch their names
+      const userIds = [...new Set((data || []).map((a) => a.user_id).filter((id): id is string => id !== null))];
+      let userMap: Record<string, string> = {};
+
+      if (userIds.length > 0) {
+        const { data: users } = await supabase
+          .from("users")
+          .select("id, name")
+          .in("id", userIds);
+        userMap = (users || []).reduce((acc, u) => ({ ...acc, [u.id]: u.name }), {} as Record<string, string>);
+      }
+
+      // Map activities with user names
+      const activitiesWithUsers = (data || []).map((a) => ({
+        id: a.id,
+        action: a.action,
+        entity_type: a.entity_type,
+        created_at: a.created_at,
+        user: a.user_id ? { name: userMap[a.user_id] || "Unknown" } : null,
+      }));
+
+      console.log(`  📝 Recent Activities: ${(performance.now() - start).toFixed(0)}ms`);
+      return { data: activitiesWithUsers };
+    })(),
   ]);
   console.log(`  ⏱️ Parallel queries total: ${(performance.now() - parallelStart).toFixed(0)}ms`);
   console.log(`📊 [PROFILE] Project Detail Total: ${(performance.now() - pageStart).toFixed(0)}ms\n`);
@@ -364,9 +389,10 @@ export default async function ProjectDetailPage({
   // Extract milestones
   const milestones = (milestonesResult.data || []) as Milestone[];
 
-  // Reports and assignments are already extracted from Promise.all
+  // Reports, assignments, and activities are already extracted from Promise.all
   const reports = reportsResult;
   const assignments = assignmentsResult;
+  const recentActivities = activitiesResult.data || [];
   const canManageTeam = ["admin", "pm"].includes(userRole);
 
   const formatCurrency = (value: number | null, currency: string) => {
@@ -448,96 +474,50 @@ export default async function ProjectDetailPage({
         </TabsList>
 
         {/* Overview Tab */}
-        <TabsContent value="overview" className="space-y-4">
-          {/* Edit Project Button - Only visible in Overview tab */}
-          {canEdit && (
-            <div className="flex justify-end">
-              <Button asChild className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700">
-                <Link href={`/projects/${projectUrlId}/edit`}>
-                  <PencilIcon className="size-4" />
-                  Edit Project
-                </Link>
-              </Button>
-            </div>
-          )}
-
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {/* Client Info */}
-            <GlassCard>
-              <CardHeader className="flex flex-row items-center gap-3 pb-2">
-                <GradientIcon icon={<BuildingIcon className="size-4" />} size="sm" color="teal" />
-                <CardTitle className="text-sm font-medium">Client</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {project.client ? (
-                  <div className="space-y-1">
-                    <p className="font-semibold text-lg">{project.client.company_name}</p>
-                    {project.client.contact_person && (
-                      <p className="text-sm text-muted-foreground">{project.client.contact_person}</p>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground italic">No client assigned</p>
-                )}
-              </CardContent>
-            </GlassCard>
-
-            {/* Installation Date */}
-            <GlassCard>
-              <CardHeader className="flex flex-row items-center gap-3 pb-2">
-                <GradientIcon icon={<CalendarIcon className="size-4" />} size="sm" color="coral" />
-                <CardTitle className="text-sm font-medium">Installation Date</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="font-semibold text-lg">
-                  {project.installation_date
-                    ? format(new Date(project.installation_date), "MMM d, yyyy")
-                    : "Not set"}
-                </p>
-              </CardContent>
-            </GlassCard>
-
-            {/* Contract Value - Hidden from clients */}
-            {!isClient && (
-              <GlassCard>
-                <CardHeader className="flex flex-row items-center gap-3 pb-2">
-                  <GradientIcon icon={<BanknoteIcon className="size-4" />} size="sm" color="emerald" />
-                  <CardTitle className="text-sm font-medium">Contract Value</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="font-semibold text-lg">
-                    {formatCurrency(project.contract_value_manual, project.currency)}
-                  </p>
-                </CardContent>
-              </GlassCard>
-            )}
-
-            {/* Scope Summary */}
-            <GlassCard>
-              <CardHeader className="flex flex-row items-center gap-3 pb-2">
-                <GradientIcon icon={<ClipboardListIcon className="size-4" />} size="sm" color="violet" />
-                <CardTitle className="text-sm font-medium">Scope Items</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="font-semibold text-lg">{scopeItems.length} items</p>
-                <p className="text-sm text-muted-foreground">
-                  {productionItems.length} production, {procurementItems.length} procurement
-                </p>
-              </CardContent>
-            </GlassCard>
-          </div>
-
-          {/* Description */}
-          {project.description && (
-            <GlassCard>
-              <CardHeader>
-                <CardTitle className="text-sm font-medium">Description</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">{project.description}</p>
-              </CardContent>
-            </GlassCard>
-          )}
+        <TabsContent value="overview">
+          <ProjectOverview
+            projectId={projectId}
+            projectUrlId={projectUrlId}
+            project={{
+              name: project.name,
+              project_code: project.project_code,
+              description: project.description,
+              status: project.status,
+              installation_date: project.installation_date,
+              contract_value_manual: project.contract_value_manual,
+              currency: project.currency,
+              client: project.client,
+            }}
+            scopeItems={scopeItems.map((item) => ({
+              id: item.id,
+              item_path: item.item_path,
+              production_percentage: item.production_percentage,
+              is_installed: item.is_installed,
+              total_sales_price: item.total_sales_price,
+            }))}
+            drawings={drawings.map((d) => {
+              const item = scopeItems.find((i) => i.id === d.item_id);
+              return {
+                ...d,
+                item_code: item?.item_code,
+              };
+            })}
+            materials={materials.map((m) => ({
+              id: m.id,
+              name: m.name,
+              status: m.status,
+            }))}
+            milestones={milestones}
+            snaggingItems={snaggingItems.map((s) => ({
+              id: s.id,
+              is_resolved: s.is_resolved,
+              description: s.description,
+            }))}
+            assignments={assignments as any}
+            recentActivities={recentActivities}
+            canEdit={canEdit}
+            isClient={isClient}
+          />
         </TabsContent>
 
         {/* Scope Items Tab */}

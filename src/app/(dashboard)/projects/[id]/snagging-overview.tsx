@@ -17,10 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { GlassCard, GradientIcon, StatusBadge, EmptyState } from "@/components/ui/ui-helpers";
 import {
-  AlertTriangleIcon,
   PlusIcon,
-  CheckCircleIcon,
-  ClockIcon,
   ImageIcon,
   PencilIcon,
   TrashIcon,
@@ -66,6 +63,8 @@ interface SnaggingOverviewProps {
   scopeItems: ScopeItem[];
 }
 
+type FilterType = "all" | "open" | "resolved";
+
 export function SnaggingOverview({
   projectId,
   snaggingItems,
@@ -79,6 +78,7 @@ export function SnaggingOverview({
   const [deleteItemId, setDeleteItemId] = useState<string | null>(null);
   const [resolveDialogOpen, setResolveDialogOpen] = useState(false);
   const [resolveItem, setResolveItem] = useState<Snagging | null>(null);
+  const [filter, setFilter] = useState<FilterType>("all");
 
   // Stats
   const stats = {
@@ -86,6 +86,13 @@ export function SnaggingOverview({
     open: snaggingItems.filter((s) => !s.is_resolved).length,
     resolved: snaggingItems.filter((s) => s.is_resolved).length,
   };
+
+  // Filter items based on selected filter
+  const filteredItems = snaggingItems.filter((item) => {
+    if (filter === "open") return !item.is_resolved;
+    if (filter === "resolved") return item.is_resolved;
+    return true;
+  });
 
   const handleAdd = () => {
     setEditItem(null);
@@ -158,14 +165,21 @@ export function SnaggingOverview({
 
   return (
     <div className="space-y-4">
-      {/* Header */}
+      {/* Header with inline stats */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <GradientIcon icon={<BugIcon className="size-5" />} color="rose" size="default" />
           <div>
             <h3 className="text-lg font-medium">Snagging / Defects</h3>
             <p className="text-sm text-muted-foreground">
-              Track and resolve quality issues
+              {stats.total} issue{stats.total !== 1 ? "s" : ""}
+              {stats.total > 0 && (
+                <>
+                  {" "}({stats.open > 0 && <span className="text-amber-600">{stats.open} open</span>}
+                  {stats.open > 0 && stats.resolved > 0 && ", "}
+                  {stats.resolved > 0 && <span className="text-emerald-600">{stats.resolved} resolved</span>})
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -178,57 +192,46 @@ export function SnaggingOverview({
         </Button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
-        <GlassCard hover="lift" className="p-4">
-          <div className="flex items-center gap-2 text-muted-foreground mb-1">
-            <div className="p-1.5 rounded-lg bg-gradient-to-br from-slate-500/10 to-gray-500/10">
-              <BugIcon className="size-3.5 text-slate-600" />
-            </div>
-            <span className="text-xs font-medium">Total Issues</span>
-          </div>
-          <p className="text-2xl font-bold">{stats.total}</p>
-        </GlassCard>
-
-        <GlassCard hover="lift" className="p-4">
-          <div className="flex items-center gap-2 text-muted-foreground mb-1">
-            <div className="p-1.5 rounded-lg bg-gradient-to-br from-amber-500/10 to-yellow-500/10">
-              <ClockIcon className="size-3.5 text-amber-600" />
-            </div>
-            <span className="text-xs font-medium">Open</span>
-          </div>
-          <p className="text-2xl font-bold text-amber-600">{stats.open}</p>
-        </GlassCard>
-
-        <GlassCard hover="lift" className="p-4">
-          <div className="flex items-center gap-2 text-muted-foreground mb-1">
-            <div className="p-1.5 rounded-lg bg-gradient-to-br from-emerald-500/10 to-teal-500/10">
-              <CheckCircleIcon className="size-3.5 text-emerald-600" />
-            </div>
-            <span className="text-xs font-medium">Resolved</span>
-          </div>
-          <p className="text-2xl font-bold text-emerald-600">{stats.resolved}</p>
-        </GlassCard>
-      </div>
-
-      {/* Open Issues Alert */}
-      {stats.open > 0 && (
-        <GlassCard className="p-4 border-amber-200 bg-amber-50/80 dark:bg-amber-900/10 dark:border-amber-800">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-gradient-to-br from-amber-500/20 to-orange-500/20">
-              <AlertTriangleIcon className="size-4 text-amber-600" />
-            </div>
-            <span className="font-medium text-amber-700 dark:text-amber-400">
-              {stats.open} open issue{stats.open !== 1 ? "s" : ""} requiring attention
-            </span>
-          </div>
-        </GlassCard>
+      {/* Filter Tabs */}
+      {snaggingItems.length > 0 && (
+        <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-lg w-fit">
+          <button
+            onClick={() => setFilter("all")}
+            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+              filter === "all"
+                ? "bg-white text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            All ({stats.total})
+          </button>
+          <button
+            onClick={() => setFilter("open")}
+            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+              filter === "open"
+                ? "bg-white text-amber-600 shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Open ({stats.open})
+          </button>
+          <button
+            onClick={() => setFilter("resolved")}
+            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+              filter === "resolved"
+                ? "bg-white text-emerald-600 shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Resolved ({stats.resolved})
+          </button>
+        </div>
       )}
 
       {/* Items List */}
-      {snaggingItems.length > 0 ? (
+      {filteredItems.length > 0 ? (
         <div className="space-y-3">
-          {snaggingItems.map((item) => (
+          {filteredItems.map((item) => (
             <GlassCard key={item.id} className={`p-4 ${item.is_resolved ? "opacity-60" : ""}`}>
               <div className="flex gap-4">
                 {/* Photo thumbnail */}
@@ -326,7 +329,17 @@ export function SnaggingOverview({
             </GlassCard>
           ))}
         </div>
+      ) : snaggingItems.length > 0 ? (
+        // Items exist but none match current filter
+        <EmptyState
+          icon={<BugIcon className="size-6" />}
+          title={filter === "open" ? "No open issues" : "No resolved issues"}
+          description={filter === "open"
+            ? "All issues have been resolved. Great job!"
+            : "No issues have been resolved yet."}
+        />
       ) : (
+        // No items at all
         <EmptyState
           icon={<BugIcon className="size-6" />}
           title="No issues reported"

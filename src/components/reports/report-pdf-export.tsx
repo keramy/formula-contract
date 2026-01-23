@@ -1,8 +1,17 @@
 "use client";
 
+/**
+ * Report PDF Export Component
+ *
+ * Generates professional A4 PDF reports with:
+ * - FC logo placeholder (teal gradient)
+ * - Teal brand accents
+ * - Clean section layout with underlined titles
+ * - 3x2 photo grids per section
+ * - Proper pagination with continuation headers
+ */
+
 import { useState } from "react";
-// OPTIMIZED: Dynamic import - jsPDF is ~100KB, only load when needed
-// import { jsPDF } from "jspdf"; // Removed static import
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { DownloadIcon } from "lucide-react";
@@ -41,7 +50,6 @@ async function loadImageWithDimensions(url: string): Promise<ImageData | null> {
       const img = new window.Image();
 
       img.onload = () => {
-        // Convert to base64
         const canvas = document.createElement("canvas");
         canvas.width = img.width;
         canvas.height = img.height;
@@ -101,7 +109,7 @@ export function ReportPDFExport({
     setIsGenerating(true);
 
     try {
-      // OPTIMIZED: Dynamic import - jsPDF (~100KB) loaded only when user clicks export
+      // Dynamic import - jsPDF (~100KB) loaded only when user clicks export
       const [{ jsPDF }, { loadRobotoFonts }] = await Promise.all([
         import("jspdf"),
         import("@/lib/fonts/roboto-loader"),
@@ -115,299 +123,339 @@ export function ReportPDFExport({
 
       // Load Roboto fonts for Turkish character support
       await loadRobotoFonts(doc);
-      const fontFamily = "Roboto"; // Use Roboto for Turkish support
+      const fontFamily = "Roboto";
 
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      const margin = 20;
+      const pageWidth = doc.internal.pageSize.getWidth(); // 210mm
+      const pageHeight = doc.internal.pageSize.getHeight(); // 297mm
+      const margin = 12;
       const contentWidth = pageWidth - margin * 2;
-      let y = margin;
 
       // Colors
-      const orange = "#f97316";
-      const darkGray = "#1e293b";
-      const mediumGray = "#475569";
-      const lightGray = "#64748b";
-      const violet = "#7c3aed";
-      const sky = "#0284c7";
+      const teal = "#14b8a6";
+      const tealDark = "#0d9488";
+      const black = "#111111";
+      const darkGray = "#333333";
+      const mediumGray = "#666666";
+      const lightGray = "#888888";
+      const borderGray = "#cccccc";
 
-      // Helper to add new page if needed
-      const checkPageBreak = (neededHeight: number) => {
-        if (y + neededHeight > pageHeight - 30) {
+      // Report metadata
+      const reportTypeLabel = REPORT_TYPE_LABELS[report.report_type] || report.report_type;
+      const dateStr = new Date(report.created_at).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+      const creatorName = report.creator?.name || "Unknown";
+      const lastUpdated = new Date(report.updated_at).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+
+      // Track current page for headers
+      let currentPage = 1;
+      let y = margin;
+
+      // Footer height reservation
+      const footerHeight = 15;
+      const maxContentY = pageHeight - margin - footerHeight;
+
+      // === DRAW FC LOGO ===
+      const drawLogo = (x: number, logoY: number, size: number) => {
+        // Teal gradient background (simulated with solid color in PDF)
+        doc.setFillColor(teal);
+        doc.roundedRect(x, logoY, size, size, 2, 2, "F");
+
+        // FC text - larger to fill the logo
+        doc.setFontSize(size * 0.55);
+        doc.setTextColor("#ffffff");
+        doc.setFont(fontFamily, "bold");
+        doc.text("FC", x + size / 2, logoY + size * 0.65, { align: "center" });
+      };
+
+      // === DRAW PAGE 1 HEADER ===
+      const drawPage1Header = () => {
+        const logoSize = 14;
+
+        // Draw logo
+        drawLogo(margin, y, logoSize);
+
+        // Project info (next to logo)
+        const infoX = margin + logoSize + 4;
+
+        // Project name
+        doc.setFontSize(14);
+        doc.setTextColor(black);
+        doc.setFont(fontFamily, "bold");
+        doc.text(projectName, infoX, y + 5);
+
+        // Project code (teal)
+        doc.setFontSize(9);
+        doc.setTextColor(teal);
+        doc.setFont(fontFamily, "bold");
+        doc.text(projectCode, infoX, y + 10);
+
+        // Report type
+        doc.setFontSize(8);
+        doc.setTextColor(mediumGray);
+        doc.setFont(fontFamily, "normal");
+        doc.text(reportTypeLabel.toUpperCase(), infoX, y + 14);
+
+        // Right side - Date info
+        const rightX = pageWidth - margin;
+
+        // "REPORT DATE" label
+        doc.setFontSize(7);
+        doc.setTextColor(teal);
+        doc.setFont(fontFamily, "bold");
+        doc.text("REPORT DATE", rightX, y + 2, { align: "right" });
+
+        // Date
+        doc.setFontSize(10);
+        doc.setTextColor(black);
+        doc.setFont(fontFamily, "bold");
+        doc.text(dateStr, rightX, y + 7, { align: "right" });
+
+        // Created by / Last updated
+        doc.setFontSize(7);
+        doc.setTextColor(mediumGray);
+        doc.setFont(fontFamily, "normal");
+        doc.text(`Created by: ${creatorName}`, rightX, y + 12, { align: "right" });
+        doc.text(`Last updated: ${lastUpdated}`, rightX, y + 16, { align: "right" });
+
+        y += logoSize + 4;
+
+        // Teal header line
+        doc.setDrawColor(teal);
+        doc.setLineWidth(0.5);
+        doc.line(margin, y, pageWidth - margin, y);
+
+        y += 8;
+      };
+
+      // === DRAW PAGE 2+ HEADER ===
+      const drawContinuationHeader = () => {
+        const logoSize = 8;
+
+        // Small logo
+        drawLogo(margin, y, logoSize);
+
+        // Project info inline
+        const infoX = margin + logoSize + 3;
+        doc.setFontSize(8);
+        doc.setTextColor(darkGray);
+        doc.setFont(fontFamily, "bold");
+        doc.text(projectName, infoX, y + 5);
+
+        const nameWidth = doc.getTextWidth(projectName);
+        doc.setFont(fontFamily, "normal");
+        doc.setTextColor(mediumGray);
+        doc.text(` • ${projectCode} • ${reportTypeLabel}`, infoX + nameWidth, y + 5);
+
+        y += logoSize + 2;
+
+        // Thin teal line
+        doc.setDrawColor(teal);
+        doc.setLineWidth(0.3);
+        doc.line(margin, y, pageWidth - margin, y);
+
+        y += 6;
+      };
+
+      // === DRAW FOOTER ===
+      const drawFooter = (pageNum: number, totalPages: number) => {
+        const footerY = pageHeight - margin - 5;
+
+        // Teal line
+        doc.setDrawColor(teal);
+        doc.setLineWidth(0.3);
+        doc.line(margin, footerY - 4, pageWidth - margin, footerY - 4);
+
+        // "Formula Contract" in teal
+        doc.setFontSize(7);
+        doc.setFont(fontFamily, "bold");
+        doc.setTextColor(teal);
+        doc.text("Formula Contract", margin, footerY);
+
+        // Page number
+        doc.setFont(fontFamily, "normal");
+        doc.setTextColor(mediumGray);
+        doc.text(`Page ${pageNum} of ${totalPages}`, pageWidth - margin, footerY, { align: "right" });
+      };
+
+      // === CHECK PAGE BREAK ===
+      const checkPageBreak = (neededHeight: number): boolean => {
+        if (y + neededHeight > maxContentY) {
           doc.addPage();
+          currentPage++;
           y = margin;
+          drawContinuationHeader();
           return true;
         }
         return false;
       };
 
-      // === HEADER ===
-      // Logo
-      doc.setFontSize(24);
-      doc.setTextColor(orange);
-      doc.setFont(fontFamily, "bold");
-      doc.text("FORMULA", margin, y + 8);
+      // === PAGE BORDER ===
+      const drawPageBorder = () => {
+        doc.setDrawColor(darkGray);
+        doc.setLineWidth(0.4);
+        doc.rect(margin - 2, margin - 2, contentWidth + 4, pageHeight - margin * 2 + 4, "S");
+      };
 
-      // Report type and date on the right
-      doc.setFontSize(9);
-      doc.setTextColor(lightGray);
-      doc.setFont(fontFamily, "normal");
-      const reportTypeLabel = REPORT_TYPE_LABELS[report.report_type] || report.report_type;
-      doc.text(reportTypeLabel.toUpperCase(), pageWidth - margin, y + 3, { align: "right" });
+      // ==========================================
+      // START GENERATING PDF
+      // ==========================================
 
-      const dateStr = new Date(report.created_at).toLocaleDateString("en-US", {
-        year: "numeric", month: "long", day: "numeric"
-      });
-      doc.text(dateStr, pageWidth - margin, y + 8, { align: "right" });
-
-      y += 18;
-
-      // Project name
-      doc.setFontSize(18);
-      doc.setTextColor(darkGray);
-      doc.setFont(fontFamily, "bold");
-      doc.text(projectName, margin, y);
-      y += 7;
-
-      // Project code
-      doc.setFontSize(10);
-      doc.setTextColor(mediumGray);
-      doc.setFont(fontFamily, "normal");
-      doc.text(`Project Code: ${projectCode}`, margin, y);
-      y += 6;
-
-      // Created by info
-      if (report.creator?.name) {
-        doc.setFontSize(9);
-        doc.setTextColor(lightGray);
-        doc.text(`Created by: ${report.creator.name}`, margin, y);
-        y += 5;
-      }
-
-      // Last edited by info (only if different from creator or edited after creation)
-      if (report.updater?.name && report.updated_by !== report.created_by) {
-        const editedDate = new Date(report.updated_at).toLocaleDateString("en-US", {
-          year: "numeric", month: "short", day: "numeric"
-        });
-        doc.text(`Last edited by: ${report.updater.name} on ${editedDate}`, margin, y);
-        y += 5;
-      }
-
-      y += 3;
-
-      // Sharing badges (instead of just PUBLISHED/DRAFT)
-      let badgeX = margin;
-
-      if (!report.is_published) {
-        // Draft badge
-        doc.setFillColor("#fef3c7");
-        doc.setFontSize(8);
-        doc.setFont(fontFamily, "bold");
-        const draftWidth = doc.getTextWidth("DRAFT") + 8;
-        doc.roundedRect(badgeX, y - 4, draftWidth, 6, 1, 1, "F");
-        doc.setTextColor("#92400e");
-        doc.text("DRAFT", badgeX + 4, y);
-        badgeX += draftWidth + 4;
-      } else {
-        // Show sharing badges for published reports
-        if (report.share_internal) {
-          doc.setFillColor("#ede9fe"); // violet-100
-          doc.setFontSize(8);
-          doc.setFont(fontFamily, "bold");
-          const internalWidth = doc.getTextWidth("INTERNAL") + 8;
-          doc.roundedRect(badgeX, y - 4, internalWidth, 6, 1, 1, "F");
-          doc.setTextColor(violet);
-          doc.text("INTERNAL", badgeX + 4, y);
-          badgeX += internalWidth + 4;
-        }
-
-        if (report.share_with_client) {
-          doc.setFillColor("#e0f2fe"); // sky-100
-          doc.setFontSize(8);
-          doc.setFont(fontFamily, "bold");
-          const clientWidth = doc.getTextWidth("CLIENT") + 8;
-          doc.roundedRect(badgeX, y - 4, clientWidth, 6, 1, 1, "F");
-          doc.setTextColor(sky);
-          doc.text("CLIENT", badgeX + 4, y);
-          badgeX += clientWidth + 4;
-        }
-
-        // If published but no sharing options
-        if (!report.share_internal && !report.share_with_client) {
-          doc.setFillColor("#dcfce7");
-          doc.setFontSize(8);
-          doc.setFont(fontFamily, "bold");
-          const pubWidth = doc.getTextWidth("PUBLISHED") + 8;
-          doc.roundedRect(badgeX, y - 4, pubWidth, 6, 1, 1, "F");
-          doc.setTextColor("#166534");
-          doc.text("PUBLISHED", badgeX + 4, y);
-        }
-      }
-
-      y += 10;
-
-      // Header divider
-      doc.setDrawColor(orange);
-      doc.setLineWidth(0.5);
-      doc.line(margin, y, pageWidth - margin, y);
-      y += 15;
+      // Draw page 1 header
+      drawPage1Header();
 
       // === SECTIONS ===
       const lines = report.lines || [];
-      const teal = "#14b8a6"; // Accent color for section indicators
 
       if (lines.length === 0) {
-        doc.setFontSize(11);
-        doc.setTextColor(lightGray);
+        doc.setFontSize(10);
+        doc.setTextColor(mediumGray);
         doc.setFont(fontFamily, "normal");
         doc.text("No content has been added to this report yet.", margin, y);
       } else {
         for (let i = 0; i < lines.length; i++) {
           const line = lines[i];
+          const sectionNum = i + 1;
 
-          // Check if we need a new page (estimate section height)
-          checkPageBreak(40);
+          // Estimate section height for page break check
+          const hasPhotos = line.photos && line.photos.length > 0;
+          const photoRows = hasPhotos ? Math.ceil((line.photos as string[]).length / 3) : 0;
+          const estimatedHeight = 20 + (photoRows * 32); // title + desc + photos
 
-          // Accent bar on the left of the title
-          doc.setFillColor(teal);
-          doc.rect(margin, y - 4, 2, 6, "F");
+          checkPageBreak(Math.min(estimatedHeight, 60)); // Check for at least partial section
 
-          // Section title (no "Section X" label - cleaner design)
-          doc.setFontSize(12);
-          doc.setTextColor(darkGray);
+          // Section title with underline
+          doc.setFontSize(10);
+          doc.setTextColor(black);
           doc.setFont(fontFamily, "bold");
-          doc.text(line.title, margin + 6, y);
-          y += 8;
+          const titleText = `${sectionNum}. ${line.title}`;
+          doc.text(titleText, margin, y);
+
+          // Black underline only under title text
+          const titleWidth = doc.getTextWidth(titleText);
+          doc.setDrawColor(black);
+          doc.setLineWidth(0.5);
+          doc.line(margin, y + 1, margin + titleWidth, y + 1);
+
+          y += 6;
 
           // Section description
           if (line.description) {
-            doc.setFontSize(10);
-            doc.setTextColor(mediumGray);
+            doc.setFontSize(8);
+            doc.setTextColor(darkGray);
             doc.setFont(fontFamily, "normal");
 
-            // Word wrap the description
-            const descLines = doc.splitTextToSize(line.description, contentWidth - 6);
+            const descLines = doc.splitTextToSize(line.description, contentWidth);
             for (const descLine of descLines) {
-              checkPageBreak(6);
-              doc.text(descLine, margin + 6, y);
-              y += 5;
+              checkPageBreak(5);
+              doc.text(descLine, margin, y);
+              y += 4;
             }
             y += 2;
           }
 
-          // Photos (if any)
-          if (line.photos && line.photos.length > 0) {
-            y += 3;
+          // Photos (3x2 grid)
+          if (hasPhotos) {
             const photos = line.photos as string[];
-            const maxPhotoWidth = 55; // Slightly larger photos
-            const maxPhotoHeight = 40;
-            const photoGap = 4;
+            const photoGap = 2;
+            const photosPerRow = 3;
+            const photoWidth = (contentWidth - (photosPerRow - 1) * photoGap) / photosPerRow;
+            const photoHeight = photoWidth * 0.75; // 4:3 aspect ratio
 
-            // Load all images first to get their dimensions
+            // Load all images
             const imageDataList: (ImageData | null)[] = await Promise.all(
               photos.map((url) => loadImageWithDimensions(url))
             );
 
-            let currentX = margin + 6;
-            let rowMaxHeight = 0;
-            const photoAreaWidth = contentWidth - 6;
-
             for (let j = 0; j < photos.length; j++) {
+              const col = j % photosPerRow;
+              const isNewRow = col === 0 && j > 0;
+
+              if (isNewRow) {
+                y += photoHeight + photoGap;
+              }
+
+              // Check page break for new row
+              if (col === 0) {
+                checkPageBreak(photoHeight + 5);
+              }
+
+              const photoX = margin + col * (photoWidth + photoGap);
               const imageData = imageDataList[j];
-
-              // Calculate dimensions that maintain aspect ratio
-              let photoWidth = maxPhotoWidth;
-              let photoHeight = maxPhotoHeight;
-
-              if (imageData) {
-                const dims = calculateFitDimensions(
-                  imageData.width,
-                  imageData.height,
-                  maxPhotoWidth,
-                  maxPhotoHeight
-                );
-                photoWidth = dims.width;
-                photoHeight = dims.height;
-              }
-
-              // Check if we need to wrap to next row
-              if (currentX + photoWidth > margin + 6 + photoAreaWidth) {
-                currentX = margin + 6;
-                y += rowMaxHeight + photoGap;
-                rowMaxHeight = 0;
-              }
-
-              // Check page break
-              if (y + photoHeight > pageHeight - 30) {
-                doc.addPage();
-                y = margin;
-                currentX = margin + 6;
-                rowMaxHeight = 0;
-              }
-
-              // Track max height in this row for proper row spacing
-              rowMaxHeight = Math.max(rowMaxHeight, photoHeight);
 
               try {
                 if (imageData) {
-                  // Add subtle border around image
-                  doc.setDrawColor("#e2e8f0");
+                  // Calculate fit dimensions maintaining aspect ratio
+                  const dims = calculateFitDimensions(
+                    imageData.width,
+                    imageData.height,
+                    photoWidth,
+                    photoHeight
+                  );
+
+                  // Center the image in its cell
+                  const offsetX = (photoWidth - dims.width) / 2;
+                  const offsetY = (photoHeight - dims.height) / 2;
+
+                  // Border around photo area
+                  doc.setDrawColor(borderGray);
                   doc.setLineWidth(0.2);
-                  doc.rect(currentX - 0.5, y - 0.5, photoWidth + 1, photoHeight + 1, "S");
-                  doc.addImage(imageData.base64, "JPEG", currentX, y, photoWidth, photoHeight);
+                  doc.rect(photoX, y, photoWidth, photoHeight, "S");
+
+                  // Add image
+                  doc.addImage(
+                    imageData.base64,
+                    "JPEG",
+                    photoX + offsetX,
+                    y + offsetY,
+                    dims.width,
+                    dims.height
+                  );
                 } else {
-                  // Draw placeholder
-                  doc.setFillColor("#f1f5f9");
-                  doc.rect(currentX, y, photoWidth, photoHeight, "F");
-                  doc.setFontSize(8);
+                  // Placeholder
+                  doc.setFillColor("#f0f0f0");
+                  doc.setDrawColor(borderGray);
+                  doc.setLineWidth(0.2);
+                  doc.rect(photoX, y, photoWidth, photoHeight, "FD");
+                  doc.setFontSize(7);
                   doc.setTextColor(lightGray);
-                  doc.text("Image", currentX + photoWidth / 2, y + photoHeight / 2, { align: "center" });
+                  doc.text("Photo", photoX + photoWidth / 2, y + photoHeight / 2, { align: "center" });
                 }
               } catch {
-                // Draw placeholder on error
-                doc.setFillColor("#f1f5f9");
-                doc.rect(currentX, y, photoWidth, photoHeight, "F");
+                // Error placeholder
+                doc.setFillColor("#f0f0f0");
+                doc.rect(photoX, y, photoWidth, photoHeight, "F");
               }
-
-              // Move X position for next image
-              currentX += photoWidth + photoGap;
             }
 
-            // Move Y after the last row of photos
-            y += rowMaxHeight + 8;
+            // Move Y after last row of photos
+            y += photoHeight + 8;
           } else {
             y += 4;
           }
 
-          // Section spacing (subtle, no divider line for cleaner look)
+          // Section spacing
           if (i < lines.length - 1) {
-            y += 6;
+            y += 4;
           }
         }
       }
 
-      // === FOOTER (on every page) ===
+      // === ADD BORDERS AND FOOTERS TO ALL PAGES ===
       const totalPages = doc.internal.pages.length - 1;
       for (let p = 1; p <= totalPages; p++) {
         doc.setPage(p);
-        doc.setFontSize(8);
-        doc.setTextColor(lightGray);
-        doc.setFont(fontFamily, "normal");
-
-        const footerY = pageHeight - 15;
-        doc.setDrawColor("#e2e8f0");
-        doc.setLineWidth(0.3);
-        doc.line(margin, footerY - 5, pageWidth - margin, footerY - 5);
-
-        doc.text(
-          `Generated on ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`,
-          margin,
-          footerY
-        );
-        doc.text(`Page ${p} of ${totalPages}`, pageWidth - margin, footerY, { align: "right" });
+        drawPageBorder();
+        drawFooter(p, totalPages);
       }
 
-      // Create filename and download
+      // === SAVE PDF ===
       const dateForFile = new Date(report.created_at).toISOString().split("T")[0];
       const fileName = `${projectCode}_${reportTypeLabel.replace(/\s+/g, "_")}_${dateForFile}.pdf`;
 
