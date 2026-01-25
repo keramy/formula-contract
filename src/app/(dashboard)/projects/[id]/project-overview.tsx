@@ -91,6 +91,38 @@ interface Activity {
   } | null;
 }
 
+// Human-readable action descriptions for activity feed
+const activityDescriptions: Record<string, string> = {
+  project_created: "created the project",
+  project_updated: "updated project details",
+  project_status_changed: "changed project status",
+  drawing_uploaded: "uploaded a drawing",
+  drawing_sent_to_client: "sent drawing to client",
+  drawing_approved: "approved a drawing",
+  drawing_rejected: "rejected a drawing",
+  drawing_pm_override: "overrode drawing status",
+  material_created: "added a material",
+  material_updated: "updated a material",
+  material_sent_to_client: "sent material to client",
+  material_approved: "approved a material",
+  material_rejected: "rejected a material",
+  item_created: "created a scope item",
+  item_updated: "updated a scope item",
+  item_deleted: "deleted a scope item",
+  item_status_changed: "changed item status",
+  user_assigned: "was assigned to project",
+  user_unassigned: "was removed from project",
+  report_created: "created a report",
+  report_published: "published a report",
+  snagging_created: "reported a snag",
+  snagging_updated: "updated a snag",
+  snagging_resolved: "resolved a snag",
+};
+
+const getActivityDescription = (action: string): string => {
+  return activityDescriptions[action] || action.replace(/_/g, " ");
+};
+
 interface ProjectOverviewProps {
   projectId: string;
   projectUrlId: string;
@@ -713,7 +745,8 @@ export function ProjectOverview({
             </div>
             <button
               onClick={() => {
-                const tab = document.querySelector(`[data-state][value="activity"]`) as HTMLElement;
+                // Find the activity tab trigger button and click it
+                const tab = document.querySelector('button[role="tab"][value="activity"]') as HTMLElement;
                 tab?.click();
               }}
               className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
@@ -728,9 +761,8 @@ export function ProjectOverview({
                   <ClockIcon className="size-3.5 text-muted-foreground mt-0.5 shrink-0" />
                   <div className="flex-1 min-w-0">
                     <span className="text-muted-foreground">
-                      {activity.user?.name || "System"}{" "}
-                      <span className="text-foreground">{activity.action}</span>{" "}
-                      {activity.entity_type}
+                      <span className="font-medium text-foreground">{activity.user?.name || "System"}</span>{" "}
+                      {getActivityDescription(activity.action)}
                     </span>
                   </div>
                 </div>

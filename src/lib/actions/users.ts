@@ -16,6 +16,7 @@ import { revalidatePath } from "next/cache";
 import { Resend } from "resend";
 import { checkUserCreationRateLimit } from "@/lib/rate-limit";
 import { sanitizeText } from "@/lib/sanitize";
+import { WelcomeEmail } from "@/emails/welcome-email";
 
 // ============================================================================
 // Types
@@ -78,77 +79,12 @@ async function sendWelcomeEmail(
       from: "Formula Contract <noreply@formulacontractpm.com>",
       to: email,
       subject: "Welcome to Formula Contract - Your Account Details",
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        </head>
-        <body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
-          <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
-            <!-- Header -->
-            <div style="background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 50%, #5b21b6 100%); padding: 40px 30px; text-align: center; border-radius: 16px 16px 0 0;">
-              <div style="display: inline-block; background: rgba(255,255,255,0.15); padding: 12px 24px; border-radius: 50px; margin-bottom: 16px;">
-                <span style="color: white; font-size: 14px; font-weight: 600; letter-spacing: 1px;">FORMULA CONTRACT</span>
-              </div>
-              <h1 style="margin: 0; color: white; font-size: 28px; font-weight: 700;">Welcome Aboard! 🎉</h1>
-              <p style="margin: 12px 0 0 0; color: rgba(255,255,255,0.85); font-size: 16px;">Your account has been created successfully</p>
-            </div>
-
-            <!-- Main Content -->
-            <div style="background-color: white; padding: 40px 30px; border-radius: 0 0 16px 16px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);">
-              <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 24px 0;">
-                Hi <strong>${name}</strong>,
-              </p>
-              <p style="color: #6b7280; font-size: 15px; line-height: 1.6; margin: 0 0 24px 0;">
-                Welcome to Formula Contract! Your account is ready and waiting for you. Use the credentials below to access the platform.
-              </p>
-
-              <!-- Credentials Box -->
-              <div style="background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%); border: 1px solid #ddd6fe; border-radius: 12px; padding: 24px; margin: 24px 0;">
-                <div style="margin-bottom: 16px;">
-                  <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Login URL</p>
-                  <a href="${siteUrl}/login" style="color: #7c3aed; font-size: 15px; font-weight: 600; text-decoration: none;">${siteUrl}/login</a>
-                </div>
-                <div style="margin-bottom: 16px;">
-                  <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Email Address</p>
-                  <p style="margin: 0; color: #111827; font-size: 15px; font-weight: 600;">${email}</p>
-                </div>
-                <div>
-                  <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Temporary Password</p>
-                  <code style="display: inline-block; background: white; color: #7c3aed; padding: 8px 16px; border-radius: 6px; font-size: 15px; font-weight: 600; border: 1px solid #ddd6fe;">${tempPassword}</code>
-                </div>
-              </div>
-
-              <!-- Security Notice -->
-              <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 24px 0;">
-                <p style="margin: 0; color: #92400e; font-size: 14px;">
-                  🔐 <strong>Security Tip:</strong> Please change your password after your first login.
-                </p>
-              </div>
-
-              <!-- CTA Button -->
-              <div style="text-align: center; margin-top: 32px;">
-                <a href="${siteUrl}/login"
-                   style="display: inline-block; background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); color: white; padding: 16px 40px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 14px rgba(124, 58, 237, 0.4);">
-                  Log In to Your Account →
-                </a>
-              </div>
-            </div>
-
-            <!-- Footer -->
-            <div style="text-align: center; padding: 32px 20px;">
-              <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px; font-weight: 600;">Formula Contract</p>
-              <p style="margin: 0 0 16px 0; color: #9ca3af; font-size: 13px;">Project Management for Furniture Manufacturing</p>
-              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
-                <a href="https://formulacontractpm.com" style="color: #7c3aed; text-decoration: none;">formulacontractpm.com</a>
-              </p>
-            </div>
-          </div>
-        </body>
-        </html>
-      `,
+      react: WelcomeEmail({
+        userName: name,
+        userEmail: email,
+        tempPassword,
+        loginUrl: `${siteUrl}/login`,
+      }),
     });
     return { success: true };
   } catch (error) {

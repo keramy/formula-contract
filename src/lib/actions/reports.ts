@@ -17,6 +17,7 @@ import { logActivity } from "@/lib/activity-log/actions";
 import { ACTIVITY_ACTIONS } from "@/lib/activity-log/constants";
 import { sanitizeText, sanitizeHTML } from "@/lib/sanitize";
 import { Resend } from "resend";
+import { ReportPublishedEmail } from "@/emails/report-published-email";
 
 // ============================================================================
 // Types
@@ -193,120 +194,71 @@ async function sendReportPublishedNotification(
   let sent = 0;
   let failed = 0;
 
-  // Create in-app notifications and send emails to each team member
-  for (const user of users) {
-    try {
-      // 1. Create in-app notification (bell icon) - use direct insert like assignment flow
-      await supabase.from("notifications").insert({
-        user_id: user.id,
-        type: "report_published",
-        title: `New ${reportType} report published`,
-        message: `${publisherName} published a new report for ${projectName}`,
-        project_id: projectId,
-        report_id: reportId,
-        link: `/projects/${projectId}?tab=reports`,
-      });
+  // 1. Create in-app notifications for all users (batch insert)
+  // Note: No 'link' column - UI constructs link from project_id + report_id
+  const notifications = users.map(user => ({
+    user_id: user.id,
+    type: "report_published",
+    title: `New ${reportType} report published`,
+    message: `${publisherName} published a new report for ${projectName}`,
+    project_id: projectId,
+    report_id: reportId,
+  }));
 
-      // 2. Send email notification (if Resend is configured)
-      const apiKey = process.env.RESEND_API_KEY;
-      console.log("[Report Notification] Checking email for:", user.email, "API key exists:", !!apiKey);
-
-      if (apiKey && user.email) {
-        console.log("[Report Notification] Sending email to:", user.email);
-        const resend = new Resend(apiKey);
-        await resend.emails.send({
-          from: "Formula Contract <noreply@formulacontractpm.com>",
-          to: user.email,
-          subject: `📊 New Report Published: ${projectName}`,
-          html: `
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <meta charset="utf-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            </head>
-            <body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
-              <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
-                <!-- Header -->
-                <div style="background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 50%, #5b21b6 100%); padding: 40px 30px; text-align: center; border-radius: 16px 16px 0 0;">
-                  <div style="display: inline-block; background: rgba(255,255,255,0.15); padding: 12px 24px; border-radius: 50px; margin-bottom: 16px;">
-                    <span style="color: white; font-size: 14px; font-weight: 600; letter-spacing: 1px;">FORMULA CONTRACT</span>
-                  </div>
-                  <h1 style="margin: 0; color: white; font-size: 28px; font-weight: 700;">📊 New Report Published</h1>
-                  <p style="margin: 12px 0 0 0; color: rgba(255,255,255,0.85); font-size: 16px;">A new report is ready for your review</p>
-                </div>
-
-                <!-- Main Content -->
-                <div style="background-color: white; padding: 40px 30px; border-radius: 0 0 16px 16px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);">
-                  <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 24px 0;">
-                    Hi <strong>${user.name}</strong>,
-                  </p>
-                  <p style="color: #6b7280; font-size: 15px; line-height: 1.6; margin: 0 0 24px 0;">
-                    A new <strong style="color: #7c3aed;">${reportType}</strong> report has been published for your project. Click below to view the details.
-                  </p>
-
-                  <!-- Report Details Box -->
-                  <div style="background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%); border: 1px solid #ddd6fe; border-radius: 12px; padding: 24px; margin: 24px 0;">
-                    <div style="display: flex; margin-bottom: 16px; border-bottom: 1px solid #ddd6fe; padding-bottom: 16px;">
-                      <div style="flex: 1;">
-                        <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Project</p>
-                        <p style="margin: 0; color: #111827; font-size: 16px; font-weight: 600;">${projectName}</p>
-                      </div>
-                      <div>
-                        <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Code</p>
-                        <code style="display: inline-block; background: white; color: #7c3aed; padding: 4px 12px; border-radius: 4px; font-size: 14px; font-weight: 600;">${projectCode}</code>
-                      </div>
-                    </div>
-                    <div style="display: flex;">
-                      <div style="flex: 1;">
-                        <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Report Type</p>
-                        <p style="margin: 0; color: #111827; font-size: 15px; font-weight: 500; text-transform: capitalize;">${reportType}</p>
-                      </div>
-                      <div style="flex: 1;">
-                        <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Published By</p>
-                        <p style="margin: 0; color: #111827; font-size: 15px; font-weight: 500;">${publisherName}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- CTA Button -->
-                  <div style="text-align: center; margin-top: 32px;">
-                    <a href="${siteUrl}/projects/${projectId}?tab=reports"
-                       style="display: inline-block; background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); color: white; padding: 16px 40px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 14px rgba(124, 58, 237, 0.4);">
-                      View Report →
-                    </a>
-                  </div>
-
-                  <!-- Info Notice -->
-                  <p style="color: #9ca3af; font-size: 13px; margin-top: 32px; margin-bottom: 0; text-align: center;">
-                    You're receiving this because you're a team member on this project.
-                  </p>
-                </div>
-
-                <!-- Footer -->
-                <div style="text-align: center; padding: 32px 20px;">
-                  <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 14px; font-weight: 600;">Formula Contract</p>
-                  <p style="margin: 0 0 16px 0; color: #9ca3af; font-size: 13px;">Project Management for Furniture Manufacturing</p>
-                  <p style="margin: 0; color: #9ca3af; font-size: 12px;">
-                    <a href="https://formulacontractpm.com" style="color: #7c3aed; text-decoration: none;">formulacontractpm.com</a>
-                  </p>
-                </div>
-              </div>
-            </body>
-            </html>
-          `,
-        });
-        console.log("[Report Notification] Email sent successfully to:", user.email);
-      }
-
-      sent++;
-    } catch (notifyError) {
-      console.error(`[Report Notification] FAILED for ${user.email}:`, notifyError);
-      failed++;
-    }
+  const { error: notifError } = await supabase.from("notifications").insert(notifications);
+  if (notifError) {
+    console.error("[Report Notification] Failed to create in-app notifications:", notifError.message);
+  } else {
+    console.log(`[Report Notification] Created ${notifications.length} in-app notifications`);
   }
 
-  console.log(`Report notifications: ${sent} sent, ${failed} failed`);
+  // 2. Send email notifications using Resend batch API (avoids rate limits)
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.log("[Report Notification] RESEND_API_KEY not configured, skipping emails");
+    return { sent: users.length, failed: 0 };
+  }
+
+  // Filter users with valid emails
+  const usersWithEmail = users.filter(u => u.email);
+  if (usersWithEmail.length === 0) {
+    console.log("[Report Notification] No users with email addresses");
+    return { sent: users.length, failed: 0 };
+  }
+
+  // Build batch email requests
+  const emailRequests = usersWithEmail.map(user => ({
+    from: "Formula Contract <noreply@formulacontractpm.com>",
+    to: user.email,
+    subject: `New Report Published: ${projectName}`,
+    react: ReportPublishedEmail({
+      userName: user.name,
+      projectName,
+      projectCode,
+      reportType,
+      publisherName,
+      reportUrl: `${siteUrl}/projects/${projectId}?tab=reports`,
+    }),
+  }));
+
+  try {
+    const resend = new Resend(apiKey);
+    // Batch send - single API call for up to 100 emails
+    const { data, error: batchError } = await resend.batch.send(emailRequests);
+
+    if (batchError) {
+      console.error("[Report Notification] Batch email failed:", batchError);
+      failed = usersWithEmail.length;
+    } else {
+      console.log(`[Report Notification] Batch sent ${data?.data?.length || usersWithEmail.length} emails`);
+      sent = usersWithEmail.length;
+    }
+  } catch (emailError) {
+    console.error("[Report Notification] Batch email error:", emailError);
+    failed = usersWithEmail.length;
+  }
+
+  console.log(`Report notifications: ${sent} emails sent, ${failed} failed`);
   return { sent, failed };
 }
 

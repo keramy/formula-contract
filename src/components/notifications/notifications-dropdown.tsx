@@ -118,10 +118,12 @@ export function NotificationsDropdown() {
       markAsReadMutation.mutate(notification.id);
     }
 
-    // Navigate to relevant page if there's a link
+    // Navigate to relevant page based on notification type
     if (notification.project_id) {
       if (notification.item_id) {
         router.push(`/projects/${notification.project_id}/scope/${notification.item_id}`);
+      } else if (notification.report_id || notification.type === "report_published") {
+        router.push(`/projects/${notification.project_id}?tab=reports`);
       } else {
         router.push(`/projects/${notification.project_id}`);
       }
