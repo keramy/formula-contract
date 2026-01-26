@@ -200,7 +200,7 @@ export async function generateReportPdfBase64(
     doc.line(margin, currentY, pageWidth - margin, currentY);
     currentY += 8;
 
-    // Date info
+    // Report code and date info
     doc.setFont("Roboto", "normal");
     doc.setFontSize(9);
     doc.setTextColor(...lightGray);
@@ -209,7 +209,17 @@ export async function generateReportPdfBase64(
       month: "long",
       year: "numeric",
     });
-    doc.text(`Report Date: ${createdDate}`, margin, currentY);
+    // Display report code if available
+    if (report.report_code) {
+      doc.setFont("Roboto", "medium");
+      doc.setTextColor(...tealColor);
+      doc.text(`Report: ${report.report_code}`, margin, currentY);
+      doc.setFont("Roboto", "normal");
+      doc.setTextColor(...lightGray);
+      doc.text(`  |  ${createdDate}`, margin + doc.getTextWidth(`Report: ${report.report_code}`), currentY);
+    } else {
+      doc.text(`Report Date: ${createdDate}`, margin, currentY);
+    }
     currentY += 15;
 
     // === REPORT LINES (SECTIONS) ===
@@ -409,6 +419,7 @@ export async function downloadReportPdf(options: GeneratePdfOptions): Promise<bo
     doc.line(margin, currentY, pageWidth - margin, currentY);
     currentY += 8;
 
+    // Report code and date info
     doc.setFont("Roboto", "normal");
     doc.setFontSize(9);
     doc.setTextColor(...lightGray);
@@ -417,7 +428,17 @@ export async function downloadReportPdf(options: GeneratePdfOptions): Promise<bo
       month: "long",
       year: "numeric",
     });
-    doc.text(`Report Date: ${createdDate}`, margin, currentY);
+    // Display report code if available
+    if (report.report_code) {
+      doc.setFont("Roboto", "medium");
+      doc.setTextColor(...tealColor);
+      doc.text(`Report: ${report.report_code}`, margin, currentY);
+      doc.setFont("Roboto", "normal");
+      doc.setTextColor(...lightGray);
+      doc.text(`  |  ${createdDate}`, margin + doc.getTextWidth(`Report: ${report.report_code}`), currentY);
+    } else {
+      doc.text(`Report Date: ${createdDate}`, margin, currentY);
+    }
     currentY += 15;
 
     // === SECTIONS ===

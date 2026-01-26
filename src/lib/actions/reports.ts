@@ -33,6 +33,7 @@ export interface Report {
   id: string;
   project_id: string;
   report_type: string;
+  report_code: string | null; // Human-readable code (RPT-YYYY-NNNN)
   is_published: boolean;
   published_at: string | null;
   share_with_client: boolean;
@@ -294,7 +295,7 @@ export async function getProjectReports(projectId: string): Promise<Report[]> {
   let query = supabase
     .from("reports")
     .select(`
-      id, project_id, report_type, is_published, published_at,
+      id, project_id, report_type, report_code, is_published, published_at,
       share_with_client, share_internal, created_by, updated_by, created_at, updated_at,
       creator:users!reports_created_by_fkey(name),
       updater:users!reports_updated_by_fkey(name),
@@ -335,6 +336,7 @@ export async function getProjectReports(projectId: string): Promise<Report[]> {
       id: report.id,
       project_id: report.project_id,
       report_type: report.report_type,
+      report_code: report.report_code,
       is_published: report.is_published,
       published_at: report.published_at,
       share_with_client: report.share_with_client,
@@ -367,7 +369,7 @@ export async function getReportDetail(reportId: string): Promise<Report | null> 
     supabase
       .from("reports")
       .select(`
-        id, project_id, report_type, is_published, published_at,
+        id, project_id, report_type, report_code, is_published, published_at,
         share_with_client, share_internal, created_by, updated_by, created_at, updated_at,
         creator:users!reports_created_by_fkey(name),
         updater:users!reports_updated_by_fkey(name)

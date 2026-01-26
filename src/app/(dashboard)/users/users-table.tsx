@@ -51,6 +51,7 @@ interface User {
   last_login_at: string | null;
   last_active_at: string | null;
   created_at: string;
+  employee_code: string | null; // Human-readable code (EMP-NNNN)
 }
 
 interface UsersTableProps {
@@ -207,7 +208,8 @@ export function UsersTable({ users }: UsersTableProps) {
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent border-b border-gray-100">
-              <TableHead className="py-4">User</TableHead>
+              <TableHead className="py-4 w-24">Code</TableHead>
+              <TableHead>User</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Role</TableHead>
               <TableHead>Status</TableHead>
@@ -218,7 +220,7 @@ export function UsersTable({ users }: UsersTableProps) {
           <TableBody>
             {users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                   No users found matching your filters.
                 </TableCell>
               </TableRow>
@@ -233,6 +235,11 @@ export function UsersTable({ users }: UsersTableProps) {
                     key={user.id}
                     className={`group hover:bg-gray-50/50 border-b border-gray-50 last:border-0 ${userStatus === "inactive" ? "opacity-60" : ""}`}
                   >
+                    <TableCell className="py-4">
+                      <span className="text-sm font-mono font-medium text-orange-600">
+                        {user.employee_code || "—"}
+                      </span>
+                    </TableCell>
                     <TableCell className="py-4">
                       <div className="flex items-center gap-3">
                         <GradientAvatar name={user.name} size="sm" colorIndex={(index + 4) % 8} />

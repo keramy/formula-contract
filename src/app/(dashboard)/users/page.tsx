@@ -12,6 +12,7 @@ interface User {
   last_login_at: string | null;
   last_active_at: string | null;
   created_at: string;
+  employee_code: string | null; // Human-readable code (EMP-NNNN)
 }
 
 export default async function UsersPage({
@@ -25,7 +26,7 @@ export default async function UsersPage({
   // Build query
   let query = supabase
     .from("users")
-    .select("id, email, name, phone, role, is_active, last_login_at, last_active_at, created_at")
+    .select("id, email, name, phone, role, is_active, last_login_at, last_active_at, created_at, employee_code")
     .order("name");
 
   if (params.search) {

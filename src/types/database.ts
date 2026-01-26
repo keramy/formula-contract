@@ -32,6 +32,7 @@ export interface Database {
           language: string;
           email_notifications: boolean;
           is_active: boolean;
+          employee_code: string | null; // Human-readable code (EMP-NNNN)
           last_login_at: string | null;
           last_active_at: string | null;
           created_at: string;
@@ -46,6 +47,7 @@ export interface Database {
           language?: string;
           email_notifications?: boolean;
           is_active?: boolean;
+          employee_code?: string | null;
           last_login_at?: string | null;
           last_active_at?: string | null;
           created_at?: string;
@@ -60,6 +62,7 @@ export interface Database {
           language?: string;
           email_notifications?: boolean;
           is_active?: boolean;
+          employee_code?: string | null;
           last_login_at?: string | null;
           last_active_at?: string | null;
           created_at?: string;
@@ -76,6 +79,7 @@ export interface Database {
           phone: string | null;
           address: string | null;
           notes: string | null;
+          client_code: string | null; // Human-readable code (CLT-NNNN)
           is_deleted: boolean;
           created_at: string;
           updated_at: string;
@@ -88,6 +92,7 @@ export interface Database {
           phone?: string | null;
           address?: string | null;
           notes?: string | null;
+          client_code?: string | null;
           is_deleted?: boolean;
           created_at?: string;
           updated_at?: string;
@@ -100,6 +105,7 @@ export interface Database {
           phone?: string | null;
           address?: string | null;
           notes?: string | null;
+          client_code?: string | null;
           is_deleted?: boolean;
           created_at?: string;
           updated_at?: string;
@@ -206,6 +212,7 @@ export interface Database {
           is_completed: boolean;
           completed_at: string | null;
           alert_days_before: number | null;
+          milestone_code: string | null; // Human-readable code (MS-NNNN)
           created_at: string;
           updated_at: string;
         };
@@ -218,6 +225,7 @@ export interface Database {
           is_completed?: boolean;
           completed_at?: string | null;
           alert_days_before?: number | null;
+          milestone_code?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -230,6 +238,7 @@ export interface Database {
           is_completed?: boolean;
           completed_at?: string | null;
           alert_days_before?: number | null;
+          milestone_code?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -558,6 +567,7 @@ export interface Database {
           id: string;
           project_id: string;
           report_type: string;
+          report_code: string | null; // Human-readable code (RPT-YYYY-NNNN)
           is_published: boolean;
           published_at: string | null;
           share_with_client: boolean;
@@ -570,6 +580,7 @@ export interface Database {
           id?: string;
           project_id: string;
           report_type: string;
+          report_code?: string | null;
           is_published?: boolean;
           published_at?: string | null;
           share_with_client?: boolean;
@@ -582,6 +593,7 @@ export interface Database {
           id?: string;
           project_id?: string;
           report_type?: string;
+          report_code?: string | null;
           is_published?: boolean;
           published_at?: string | null;
           share_with_client?: boolean;

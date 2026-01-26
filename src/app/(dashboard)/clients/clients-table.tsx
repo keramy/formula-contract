@@ -26,6 +26,7 @@ interface Client {
   contact_person: string | null;
   email: string | null;
   phone: string | null;
+  client_code: string | null; // Human-readable code (CLT-NNNN)
 }
 
 interface ClientsTableProps {
@@ -55,7 +56,8 @@ export function ClientsTable({ clients }: ClientsTableProps) {
       <Table>
         <TableHeader>
           <TableRow className="hover:bg-transparent border-b border-gray-100">
-            <TableHead className="py-4">Company</TableHead>
+            <TableHead className="py-4 w-24">Code</TableHead>
+            <TableHead>Company</TableHead>
             <TableHead>Contact Person</TableHead>
             <TableHead>Email</TableHead>
             <TableHead>Phone</TableHead>
@@ -68,6 +70,11 @@ export function ClientsTable({ clients }: ClientsTableProps) {
               key={client.id}
               className="group hover:bg-gray-50/50 border-b border-gray-50 last:border-0"
             >
+              <TableCell className="py-4">
+                <span className="text-sm font-mono font-medium text-cyan-700">
+                  {client.client_code || "—"}
+                </span>
+              </TableCell>
               <TableCell className="py-4">
                 <div className="flex items-center gap-3">
                   <GradientAvatar name={client.company_name} size="sm" colorIndex={(index + 2) % 8} />

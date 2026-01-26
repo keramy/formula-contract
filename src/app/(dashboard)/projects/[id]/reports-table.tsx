@@ -232,7 +232,7 @@ export function ReportsTable({
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="w-12 text-center">#</TableHead>
+                <TableHead className="w-32">Report Code</TableHead>
                 <SortHeader field="report_type" className="w-28">
                   Type
                 </SortHeader>
@@ -253,16 +253,13 @@ export function ReportsTable({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedReports.map((report, index) => {
-                // Number column: 1 = most recent when sorted by created_at desc
-                const displayNumber = index + 1;
-
+              {sortedReports.map((report) => {
                 return (
                   <TableRow key={report.id} className="group">
-                    {/* Number Column */}
-                    <TableCell className="py-2 text-center">
-                      <span className="text-sm font-medium text-muted-foreground">
-                        {displayNumber}
+                    {/* Report Code Column */}
+                    <TableCell className="py-2">
+                      <span className="text-sm font-mono font-medium text-teal-700">
+                        {report.report_code || "—"}
                       </span>
                     </TableCell>
 
