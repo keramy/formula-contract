@@ -18,6 +18,8 @@ export interface ActivityLog {
 
 // Actions that clients are allowed to see
 // These are "client-facing" activities - things sent to them or their own responses
+// NOTE: REPORT_PUBLISHED removed because clients should only see reports with share_with_client=true
+// and we can't filter activity by report.share_with_client flag easily
 const CLIENT_VISIBLE_ACTIONS = [
   ACTIVITY_ACTIONS.DRAWING_SENT_TO_CLIENT,
   ACTIVITY_ACTIONS.DRAWING_APPROVED,
@@ -25,7 +27,6 @@ const CLIENT_VISIBLE_ACTIONS = [
   ACTIVITY_ACTIONS.MATERIAL_SENT_TO_CLIENT,
   ACTIVITY_ACTIONS.MATERIAL_APPROVED,
   ACTIVITY_ACTIONS.MATERIAL_REJECTED,
-  ACTIVITY_ACTIONS.REPORT_PUBLISHED,
   ACTIVITY_ACTIONS.PROJECT_STATUS_CHANGED,
 ];
 
