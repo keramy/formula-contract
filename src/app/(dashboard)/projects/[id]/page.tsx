@@ -223,6 +223,7 @@ export default async function ProjectDetailPage({
     })(),
     // 2. Scope Items - ordered by created_at to preserve Excel import order
     // Include parent_id for hierarchical display (split items)
+    // NOTE: Cost columns are hidden from clients in ScopeItemsTable component via isClient prop
     (async () => {
       const start = performance.now();
       const result = await supabase
@@ -442,14 +443,17 @@ export default async function ProjectDetailPage({
               </Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="milestones">
-            Milestones
-            {milestones.length > 0 && (
-              <Badge variant="secondary" className="ml-2 text-xs">
-                {milestones.filter(m => !m.is_completed).length}/{milestones.length}
-              </Badge>
-            )}
-          </TabsTrigger>
+          {/* Milestones tab - hidden from clients */}
+          {!isClient && (
+            <TabsTrigger value="milestones">
+              Milestones
+              {milestones.length > 0 && (
+                <Badge variant="secondary" className="ml-2 text-xs">
+                  {milestones.filter(m => !m.is_completed).length}/{milestones.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+          )}
           <TabsTrigger value="reports">
             <FileTextIcon className="size-4 mr-1.5" />
             Reports
@@ -609,12 +613,15 @@ export default async function ProjectDetailPage({
         </TabsContent>
 
         {/* Milestones Tab */}
-        <TabsContent value="milestones">
-          <MilestonesOverview
-            projectId={projectId}
-            milestones={milestones}
-          />
-        </TabsContent>
+        {/* Milestones Tab - hidden from clients */}
+        {!isClient && (
+          <TabsContent value="milestones">
+            <MilestonesOverview
+              projectId={projectId}
+              milestones={milestones}
+            />
+          </TabsContent>
+        )}
 
         {/* Reports Tab */}
         <TabsContent value="reports">

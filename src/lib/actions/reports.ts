@@ -305,9 +305,11 @@ export async function getProjectReports(projectId: string): Promise<Report[]> {
     .eq("project_id", projectId)
     .order("created_at", { ascending: false });
 
-  // Clients only see published reports
+  // Clients only see published reports that are explicitly shared with them
   if (isClient) {
-    query = query.eq("is_published", true);
+    query = query
+      .eq("is_published", true)
+      .eq("share_with_client", true);
   }
 
   const { data, error } = await query;
