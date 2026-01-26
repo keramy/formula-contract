@@ -290,7 +290,7 @@ async function sendAssignmentEmail(
   try {
     const resend = new Resend(resendApiKey);
     await resend.emails.send({
-      from: "Formula Contract <notifications@updates.formulacontract.com>",
+      from: "Formula Contract <noreply@formulacontractpm.com>",
       to: email,
       subject: `You've been assigned to ${projectName}`,
       react: ProjectAssignmentEmail({

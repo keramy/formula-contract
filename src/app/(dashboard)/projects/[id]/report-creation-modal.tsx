@@ -58,7 +58,7 @@ import {
   ChevronUpIcon,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { publishReport, uploadReportPdf, getReportDetail } from "@/lib/actions/reports";
+import { publishReport, uploadReportPdf } from "@/lib/actions/reports";
 import { generateReportPdfBase64 } from "@/lib/pdf/generate-report-pdf";
 import { toast } from "sonner";
 
@@ -238,22 +238,44 @@ export function ReportCreationModal({
         try {
           toast.info("Generating PDF...");
 
-          // Fetch the full report with lines for PDF generation
-          const fullReport = await getReportDetail(newReport.id);
-          if (!fullReport) {
-            throw new Error("Failed to fetch created report");
-          }
+          // Build report object from local data (no need to re-fetch)
+          const reportForPdf = {
+            id: newReport.id,
+            project_id: projectId,
+            report_type: reportType,
+            is_published: false,
+            published_at: null,
+            share_with_client: shareWithClient,
+            share_internal: shareInternal,
+            created_by: null,
+            updated_by: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            creator: null,
+            updater: null,
+            lines: sections.map((section, index) => ({
+              id: section.id,
+              report_id: newReport.id,
+              line_order: index + 1,
+              title: section.title,
+              description: section.description || null,
+              photos: section.photos,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })),
+          };
 
           // Generate PDF
           const pdfResult = await generateReportPdfBase64({
-            report: fullReport,
+            report: reportForPdf,
             projectName,
             projectCode,
           });
 
           if (!pdfResult.success || !pdfResult.base64) {
-            console.error("PDF generation failed, publishing without PDF");
+            console.error("PDF generation failed:", pdfResult.error);
             await publishReport(newReport.id, notifyClients);
+            toast.success("Report published (PDF generation failed)");
           } else {
             toast.info("Uploading PDF...");
 
@@ -266,15 +288,15 @@ export function ReportCreationModal({
             );
 
             if (!uploadResult.success || !uploadResult.url) {
-              console.error("PDF upload failed, publishing without PDF");
+              console.error("PDF upload failed:", uploadResult.error);
               await publishReport(newReport.id, notifyClients);
+              toast.success("Report published (PDF upload failed)");
             } else {
               // Publish with PDF URL
               await publishReport(newReport.id, notifyClients, uploadResult.url);
+              toast.success("Report published successfully!");
             }
           }
-
-          toast.success("Report published successfully!");
         } catch (pdfError) {
           console.error("Error with PDF generation/upload:", pdfError);
           // Still publish, just without PDF
