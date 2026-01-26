@@ -607,7 +607,9 @@ export async function uploadReportPdf(
   if (!user) return { success: false, error: "Not authenticated" };
 
   // Convert base64 to blob
-  const base64Data = pdfBase64.replace(/^data:application\/pdf;base64,/, "");
+  // jsPDF datauristring format: "data:application/pdf;filename=xxx.pdf;base64,<data>"
+  // We need to strip everything before the actual base64 data
+  const base64Data = pdfBase64.replace(/^data:application\/pdf;[^,]*,/, "");
   const binaryString = atob(base64Data);
   const bytes = new Uint8Array(binaryString.length);
   for (let i = 0; i < binaryString.length; i++) {
