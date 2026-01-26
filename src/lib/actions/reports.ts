@@ -199,11 +199,12 @@ async function sendReportPublishedNotification(
 
   // 1. Create in-app notifications for all users (batch insert)
   // Note: No 'link' column - UI constructs link from project_id + report_id
+  // Title includes WHO did the action for better context
   const notifications = users.map(user => ({
     user_id: user.id,
     type: "report_published",
-    title: `New ${reportType} report published`,
-    message: `${publisherName} published a new report for ${projectName}`,
+    title: `${publisherName} shared a ${reportType} report`,
+    message: `New ${reportType} report published for ${projectName}`,
     project_id: projectId,
     report_id: reportId,
   }));
