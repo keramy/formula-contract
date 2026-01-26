@@ -736,42 +736,44 @@ export function ProjectOverview({
           </GlassCard>
         )}
 
-        {/* Recent Activity */}
-        <GlassCard className="p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <GradientIcon icon={<ActivityIcon className="size-4" />} size="sm" color="sky" />
-              <span className="text-sm font-medium">Recent Activity</span>
+        {/* Recent Activity - hidden from clients */}
+        {!isClient && (
+          <GlassCard className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <GradientIcon icon={<ActivityIcon className="size-4" />} size="sm" color="sky" />
+                <span className="text-sm font-medium">Recent Activity</span>
+              </div>
+              <button
+                onClick={() => {
+                  // Find the activity tab trigger button and click it
+                  const tab = document.querySelector('button[role="tab"][value="activity"]') as HTMLElement;
+                  tab?.click();
+                }}
+                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+              >
+                View All <ArrowRightIcon className="size-3" />
+              </button>
             </div>
-            <button
-              onClick={() => {
-                // Find the activity tab trigger button and click it
-                const tab = document.querySelector('button[role="tab"][value="activity"]') as HTMLElement;
-                tab?.click();
-              }}
-              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
-            >
-              View All <ArrowRightIcon className="size-3" />
-            </button>
-          </div>
-          {recentActivities.length > 0 ? (
-            <div className="space-y-2">
-              {recentActivities.slice(0, 4).map((activity) => (
-                <div key={activity.id} className="flex items-start gap-2 text-sm">
-                  <ClockIcon className="size-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <span className="text-muted-foreground">
-                      <span className="font-medium text-foreground">{activity.user?.name || "System"}</span>{" "}
-                      {getActivityDescription(activity.action)}
-                    </span>
+            {recentActivities.length > 0 ? (
+              <div className="space-y-2">
+                {recentActivities.slice(0, 4).map((activity) => (
+                  <div key={activity.id} className="flex items-start gap-2 text-sm">
+                    <ClockIcon className="size-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-muted-foreground">
+                        <span className="font-medium text-foreground">{activity.user?.name || "System"}</span>{" "}
+                        {getActivityDescription(activity.action)}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground italic">No recent activity</p>
-          )}
-        </GlassCard>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">No recent activity</p>
+            )}
+          </GlassCard>
+        )}
       </div>
 
       {/* Description */}
