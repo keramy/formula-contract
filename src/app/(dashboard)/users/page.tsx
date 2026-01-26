@@ -10,6 +10,7 @@ interface User {
   role: string;
   is_active: boolean;
   last_login_at: string | null;
+  last_active_at: string | null;
   created_at: string;
 }
 
@@ -24,7 +25,7 @@ export default async function UsersPage({
   // Build query
   let query = supabase
     .from("users")
-    .select("id, email, name, phone, role, is_active, last_login_at, created_at")
+    .select("id, email, name, phone, role, is_active, last_login_at, last_active_at, created_at")
     .order("name");
 
   if (params.search) {

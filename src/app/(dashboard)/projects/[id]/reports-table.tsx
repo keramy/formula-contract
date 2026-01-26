@@ -24,10 +24,13 @@ import { GlassCard, StatusBadge } from "@/components/ui/ui-helpers";
 import { ReportPDFExport } from "@/components/reports/report-pdf-export";
 import {
   deleteReport,
+  uploadReportPdf,
   publishReport,
   unpublishReport,
   type Report,
 } from "@/lib/actions/reports";
+import { generateReportPdfBase64 } from "@/lib/pdf/generate-report-pdf";
+import { toast } from "sonner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -139,11 +142,53 @@ export function ReportsTable({
 
   const handlePublishToggle = async (report: Report) => {
     setIsLoading(true);
+
     if (report.is_published) {
+      // Unpublishing - just toggle status
       await unpublishReport(report.id);
     } else {
-      await publishReport(report.id);
+      // Publishing - generate PDF, upload to storage, then publish
+      try {
+        toast.info("Generating PDF...");
+
+        // Generate PDF
+        const pdfResult = await generateReportPdfBase64({
+          report,
+          projectName,
+          projectCode,
+        });
+
+        if (!pdfResult.success || !pdfResult.base64) {
+          toast.error("Failed to generate PDF");
+          setIsLoading(false);
+          return;
+        }
+
+        toast.info("Uploading PDF...");
+
+        // Upload to Supabase Storage
+        const uploadResult = await uploadReportPdf(
+          report.id,
+          pdfResult.base64,
+          projectCode,
+          report.report_type
+        );
+
+        if (!uploadResult.success || !uploadResult.url) {
+          toast.error("Failed to upload PDF");
+          setIsLoading(false);
+          return;
+        }
+
+        // Publish with PDF URL
+        await publishReport(report.id, false, uploadResult.url);
+        toast.success("Report published successfully!");
+      } catch (error) {
+        console.error("Error publishing report:", error);
+        toast.error("Failed to publish report");
+      }
     }
+
     setIsLoading(false);
     router.refresh();
   };

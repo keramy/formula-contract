@@ -49,6 +49,7 @@ interface User {
   role: string;
   is_active: boolean;
   last_login_at: string | null;
+  last_active_at: string | null;
   created_at: string;
 }
 
@@ -210,7 +211,7 @@ export function UsersTable({ users }: UsersTableProps) {
               <TableHead>Email</TableHead>
               <TableHead>Role</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Last Login</TableHead>
+              <TableHead>Last Active</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -250,7 +251,9 @@ export function UsersTable({ users }: UsersTableProps) {
                       </StatusBadge>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
-                      {user.last_login_at
+                      {user.last_active_at
+                        ? format(new Date(user.last_active_at), "MMM d, yyyy 'at' h:mm a")
+                        : user.last_login_at
                         ? format(new Date(user.last_login_at), "MMM d, yyyy 'at' h:mm a")
                         : "Never"}
                     </TableCell>

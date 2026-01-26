@@ -72,6 +72,7 @@ export {
   createReport,
   updateReport,
   deleteReport,
+  uploadReportPdf,
   publishReport,
   unpublishReport,
   addReportLine,

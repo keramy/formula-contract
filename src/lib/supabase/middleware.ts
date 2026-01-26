@@ -127,6 +127,35 @@ export async function updateSession(request: NextRequest) {
   // - User role is updated (updateUser)
   // - User is activated/deactivated (toggleUserActive)
   // ============================================================================
+
+  // ============================================================================
+  // ACTIVITY TRACKING: Update last_active_at (throttled to every 5 minutes)
+  // Uses a cookie to track last update time to avoid DB spam
+  // ============================================================================
+  if (user && !isAuthPage && !isPublicPage) {
+    const ACTIVITY_UPDATE_INTERVAL = 5 * 60 * 1000; // 5 minutes in ms
+    const lastActivityUpdate = request.cookies.get("last_activity_update")?.value;
+    const now = Date.now();
+
+    // Only update if cookie doesn't exist or is older than 5 minutes
+    if (!lastActivityUpdate || (now - parseInt(lastActivityUpdate, 10)) > ACTIVITY_UPDATE_INTERVAL) {
+      // Update last_active_at in background (don't await to avoid blocking)
+      supabase
+        .from("users")
+        .update({ last_active_at: new Date().toISOString() })
+        .eq("id", user.id)
+        .then(() => {}, (err) => console.error("Failed to update last_active_at:", err));
+
+      // Set cookie to track last update (expires in 1 day)
+      supabaseResponse.cookies.set("last_activity_update", now.toString(), {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 60 * 60 * 24, // 1 day
+      });
+    }
+  }
+
   if (user && !isAuthPage && !isPublicPage) {
     const metadata = user.user_metadata || {};
 

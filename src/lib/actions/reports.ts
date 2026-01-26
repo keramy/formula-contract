@@ -128,6 +128,7 @@ export async function debugReportNotificationRecipients(projectId: string, publi
 /**
  * Send notifications (in-app + email) to all project team members when a report is published
  * @param includeClients - Whether to send notifications to client users (default: false)
+ * @param pdfUrl - Optional direct link to the PDF file in storage
  */
 async function sendReportPublishedNotification(
   projectId: string,
@@ -137,7 +138,8 @@ async function sendReportPublishedNotification(
   reportType: string,
   publisherName: string,
   publisherId: string,
-  includeClients: boolean = false
+  includeClients: boolean = false,
+  pdfUrl?: string
 ): Promise<{ sent: number; failed: number }> {
   const supabase = await createClient();
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
@@ -227,6 +229,9 @@ async function sendReportPublishedNotification(
   }
 
   // Build batch email requests
+  // Use PDF URL if available, otherwise link to project reports page
+  const reportUrl = pdfUrl || `${siteUrl}/projects/${projectId}?tab=reports`;
+
   const emailRequests = usersWithEmail.map(user => ({
     from: "Formula Contract <noreply@formulacontractpm.com>",
     to: user.email,
@@ -237,7 +242,7 @@ async function sendReportPublishedNotification(
       projectCode,
       reportType,
       publisherName,
-      reportUrl: `${siteUrl}/projects/${projectId}?tab=reports`,
+      reportUrl,
     }),
   }));
 
@@ -584,10 +589,68 @@ export async function deleteReport(reportId: string): Promise<ActionResult> {
 // ============================================================================
 
 /**
+ * Upload a PDF file to Supabase Storage
+ * @param reportId - The report ID (used for file naming)
+ * @param pdfBlob - The PDF blob to upload
+ * @param projectCode - Project code for file naming
+ * @param reportType - Report type for file naming
+ */
+export async function uploadReportPdf(
+  reportId: string,
+  pdfBase64: string,
+  projectCode: string,
+  reportType: string
+): Promise<{ success: boolean; url?: string; error?: string }> {
+  const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "Not authenticated" };
+
+  // Convert base64 to blob
+  const base64Data = pdfBase64.replace(/^data:application\/pdf;base64,/, "");
+  const binaryString = atob(base64Data);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  const pdfBlob = new Blob([bytes], { type: "application/pdf" });
+
+  // Generate filename: {projectCode}_{reportType}_{date}_{reportId}.pdf
+  const dateStr = new Date().toISOString().split("T")[0].replace(/-/g, "");
+  const fileName = `${projectCode}_${reportType}_${dateStr}_${reportId.slice(0, 8)}.pdf`;
+  const filePath = `pdfs/${fileName}`;
+
+  // Upload to Supabase Storage
+  const { error: uploadError } = await supabase.storage
+    .from("reports")
+    .upload(filePath, pdfBlob, {
+      contentType: "application/pdf",
+      upsert: true, // Overwrite if exists
+    });
+
+  if (uploadError) {
+    console.error("Error uploading PDF:", uploadError.message);
+    return { success: false, error: uploadError.message };
+  }
+
+  // Get public URL
+  const { data: { publicUrl } } = supabase.storage
+    .from("reports")
+    .getPublicUrl(filePath);
+
+  return { success: true, url: publicUrl };
+}
+
+/**
  * Publish a report and notify all project team members via email
  * @param includeClients - Whether to send notifications to client users (default: false)
+ * @param pdfUrl - Optional URL of the generated PDF stored in Supabase Storage
  */
-export async function publishReport(reportId: string, includeClients: boolean = false): Promise<ActionResult> {
+export async function publishReport(
+  reportId: string,
+  includeClients: boolean = false,
+  pdfUrl?: string
+): Promise<ActionResult> {
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -620,6 +683,7 @@ export async function publishReport(reportId: string, includeClients: boolean = 
     .update({
       is_published: true,
       published_at: new Date().toISOString(),
+      ...(pdfUrl && { pdf_url: pdfUrl }),
     })
     .eq("id", reportId);
 
@@ -649,7 +713,8 @@ export async function publishReport(reportId: string, includeClients: boolean = 
           report.report_type,
           publisherName,
           user.id,
-          includeClients
+          includeClients,
+          pdfUrl // Pass PDF URL for direct download link in email
         );
       } catch (err) {
         // Log but don't fail the publish operation

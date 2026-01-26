@@ -58,7 +58,9 @@ import {
   ChevronUpIcon,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { publishReport } from "@/lib/actions/reports";
+import { publishReport, uploadReportPdf, getReportDetail } from "@/lib/actions/reports";
+import { generateReportPdfBase64 } from "@/lib/pdf/generate-report-pdf";
+import { toast } from "sonner";
 
 // Shared report components
 import {
@@ -71,12 +73,16 @@ import { DeleteSectionDialog } from "@/components/reports/delete-section-dialog"
 
 interface ReportCreationModalProps {
   projectId: string;
+  projectName: string;
+  projectCode: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
 export function ReportCreationModal({
   projectId,
+  projectName,
+  projectCode,
   open,
   onOpenChange,
 }: ReportCreationModalProps) {
@@ -227,10 +233,54 @@ export function ReportCreationModal({
 
       if (linesError) throw linesError;
 
-      // If publishing, call publishReport to log activity and send notifications
-      // Pass notifyClients to determine if clients should receive email notifications
+      // If publishing, generate PDF, upload to storage, then publish
       if (publish) {
-        await publishReport(newReport.id, notifyClients);
+        try {
+          toast.info("Generating PDF...");
+
+          // Fetch the full report with lines for PDF generation
+          const fullReport = await getReportDetail(newReport.id);
+          if (!fullReport) {
+            throw new Error("Failed to fetch created report");
+          }
+
+          // Generate PDF
+          const pdfResult = await generateReportPdfBase64({
+            report: fullReport,
+            projectName,
+            projectCode,
+          });
+
+          if (!pdfResult.success || !pdfResult.base64) {
+            console.error("PDF generation failed, publishing without PDF");
+            await publishReport(newReport.id, notifyClients);
+          } else {
+            toast.info("Uploading PDF...");
+
+            // Upload to storage
+            const uploadResult = await uploadReportPdf(
+              newReport.id,
+              pdfResult.base64,
+              projectCode,
+              reportType
+            );
+
+            if (!uploadResult.success || !uploadResult.url) {
+              console.error("PDF upload failed, publishing without PDF");
+              await publishReport(newReport.id, notifyClients);
+            } else {
+              // Publish with PDF URL
+              await publishReport(newReport.id, notifyClients, uploadResult.url);
+            }
+          }
+
+          toast.success("Report published successfully!");
+        } catch (pdfError) {
+          console.error("Error with PDF generation/upload:", pdfError);
+          // Still publish, just without PDF
+          await publishReport(newReport.id, notifyClients);
+          toast.success("Report published (PDF generation failed)");
+        }
       }
 
       // Close modal and refresh

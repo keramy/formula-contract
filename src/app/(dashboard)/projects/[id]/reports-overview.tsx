@@ -130,6 +130,8 @@ export function ReportsOverview({
       {/* Creation Modal - Full editing experience for new reports */}
       <ReportCreationModal
         projectId={projectId}
+        projectName={projectName}
+        projectCode={projectCode}
         open={creationModalOpen}
         onOpenChange={setCreationModalOpen}
       />
