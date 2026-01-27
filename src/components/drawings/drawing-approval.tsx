@@ -33,7 +33,7 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   AlertTriangleIcon,
-  BanIcon,
+  FileX2Icon,
 } from "lucide-react";
 import type { DrawingUpdate, DrawingInsert, ScopeItemUpdate, DrawingStatus } from "@/types/database";
 
@@ -45,6 +45,8 @@ interface DrawingApprovalProps {
   userRole?: string; // Pass user role to determine available actions
   projectId?: string; // For activity logging
   itemCode?: string; // For activity logging
+  /** Callback when the scope item status changes (e.g., after marking not required) */
+  onStatusChange?: (newStatus: string) => void;
 }
 
 export function DrawingApproval({
@@ -55,6 +57,7 @@ export function DrawingApproval({
   userRole = "pm",
   projectId,
   itemCode,
+  onStatusChange,
 }: DrawingApprovalProps) {
   const isClient = userRole === "client";
   const canSendToClient = ["admin", "pm"].includes(userRole);
@@ -118,6 +121,7 @@ export function DrawingApproval({
       }
 
       setIsSendDialogOpen(false);
+      onStatusChange?.("awaiting_approval");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to send to client");
@@ -186,6 +190,7 @@ export function DrawingApproval({
 
       setIsApprovalDialogOpen(false);
       setClientComments("");
+      onStatusChange?.(newItemStatus);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to record approval");
@@ -250,6 +255,7 @@ export function DrawingApproval({
 
       setIsOverrideDialogOpen(false);
       setOverrideReason("");
+      onStatusChange?.("approved");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to override");
@@ -331,6 +337,7 @@ export function DrawingApproval({
 
       setIsNotRequiredDialogOpen(false);
       setNotRequiredReason("");
+      onStatusChange?.("approved");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to mark as not required");
@@ -544,8 +551,8 @@ export function DrawingApproval({
         <AlertDialog open={isNotRequiredDialogOpen} onOpenChange={setIsNotRequiredDialogOpen}>
           <AlertDialogTrigger asChild>
             <Button size="sm" variant="outline">
-              <BanIcon className="size-4" />
-              No Drawing Required
+              <FileX2Icon className="size-4" />
+              No Drawing Needed
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>

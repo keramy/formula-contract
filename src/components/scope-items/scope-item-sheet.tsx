@@ -785,6 +785,12 @@ export function ScopeItemSheet({
                               userRole={userRole}
                               projectId={projectId}
                               itemCode={formData.item_code}
+                              onStatusChange={(newStatus) => {
+                                // Sync local form state with DB change to prevent overwriting on save
+                                setFormData((prev) => ({ ...prev, status: newStatus }));
+                                // Refetch to get updated drawing data
+                                fetchItemData(itemId);
+                              }}
                             />
                           </div>
                         )}
