@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { getNextProjectCode } from "@/lib/actions/projects";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -65,6 +66,7 @@ export function ProjectWizard({ clients, users }: ProjectWizardProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isLoadingCode, setIsLoadingCode] = useState(true);
 
   // Form data
   const [formData, setFormData] = useState({
@@ -76,6 +78,21 @@ export function ProjectWizard({ clients, users }: ProjectWizardProps) {
     installation_date: "",
     contract_value_manual: "",
   });
+
+  // Auto-fetch next project code on mount
+  useEffect(() => {
+    async function fetchNextCode() {
+      try {
+        const nextCode = await getNextProjectCode();
+        setFormData(prev => ({ ...prev, project_code: nextCode }));
+      } catch (err) {
+        console.error("Failed to fetch next project code:", err);
+      } finally {
+        setIsLoadingCode(false);
+      }
+    }
+    fetchNextCode();
+  }, []);
 
   // Client selection
   const [clientMode, setClientMode] = useState<"existing" | "new">("existing");
@@ -219,14 +236,22 @@ export function ProjectWizard({ clients, users }: ProjectWizardProps) {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="project_code">Project Code *</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="project_code">Project Code *</Label>
+                    <span className="text-xs text-muted-foreground">Auto-generated</span>
+                  </div>
                   <Input
                     id="project_code"
-                    placeholder="e.g., PRJ-2024-001"
+                    placeholder={isLoadingCode ? "Loading..." : "e.g., 2605"}
                     value={formData.project_code}
                     onChange={(e) => handleChange("project_code", e.target.value)}
                     required
+                    disabled={isLoadingCode}
+                    className="font-mono"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Sequential number assigned automatically. You can modify if needed.
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="name">Project Name *</Label>
