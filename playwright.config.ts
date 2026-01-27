@@ -7,12 +7,16 @@ import path from "path";
  * Test Structure:
  * 1. setup - Authenticates once and saves session
  * 2. chromium - Runs authenticated tests using saved session
- * 3. lighthouse - Runs performance audits (separate project)
+ * 3. accessibility - Runs accessibility audits with axe-core
+ * 4. security - Runs security tests
+ * 5. lighthouse - Runs performance audits (separate project)
  *
  * Usage:
- * - npm run test:e2e        - Run all E2E tests
- * - npm run test:e2e:ui     - Run with Playwright UI
- * - npm run lighthouse      - Run only Lighthouse audits
+ * - npm run test:e2e           - Run all E2E tests
+ * - npm run test:e2e:ui        - Run with Playwright UI
+ * - npm run test:accessibility - Run only accessibility tests
+ * - npm run test:security      - Run only security tests
+ * - npm run lighthouse         - Run only Lighthouse audits
  */
 
 const authFile = path.join(__dirname, ".auth/user.json");
@@ -26,6 +30,8 @@ export default defineConfig({
   reporter: [
     ["html", { outputFolder: "playwright-report" }],
     ["list"],
+    // JSON reporter for CI integration
+    ...(process.env.CI ? [["json", { outputFile: "test-results.json" }] as const] : []),
   ],
   use: {
     baseURL: "http://localhost:3000",
@@ -39,7 +45,7 @@ export default defineConfig({
       name: "setup",
       testMatch: /.*\.setup\.ts/,
     },
-    // Main test project - uses authenticated state
+    // Main functional tests - uses authenticated state
     {
       name: "chromium",
       use: {
@@ -47,9 +53,40 @@ export default defineConfig({
         storageState: authFile,
       },
       dependencies: ["setup"],
-      testIgnore: /.*\.setup\.ts|.*lighthouse.*\.ts/,
+      testMatch: /^(?!.*lighthouse).*\.spec\.ts$/,
+      testIgnore: /.*\.setup\.ts/,
     },
-    // Lighthouse audits - separate project (no auth dependency for public pages)
+    // Accessibility tests - uses authenticated state
+    {
+      name: "accessibility",
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: authFile,
+      },
+      dependencies: ["setup"],
+      testMatch: /accessibility\.spec\.ts/,
+    },
+    // Security tests - some tests need auth, some don't
+    {
+      name: "security",
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: authFile,
+      },
+      dependencies: ["setup"],
+      testMatch: /security\.spec\.ts/,
+    },
+    // Performance audit tests
+    {
+      name: "performance",
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: authFile,
+      },
+      dependencies: ["setup"],
+      testMatch: /performance-audit\.spec\.ts/,
+    },
+    // Lighthouse audits - separate project (uses its own browser instance)
     {
       name: "lighthouse",
       testMatch: /.*lighthouse.*\.ts/,

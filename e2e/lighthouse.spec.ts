@@ -50,10 +50,10 @@ test.describe("Lighthouse Performance Audits", () => {
 
     console.log("\n📊 Login Page Lighthouse Results:");
     console.log("==================================");
-    console.log(`Performance: ${result.lhr.categories.performance.score * 100}`);
-    console.log(`Accessibility: ${result.lhr.categories.accessibility.score * 100}`);
-    console.log(`Best Practices: ${result.lhr.categories["best-practices"].score * 100}`);
-    console.log(`SEO: ${result.lhr.categories.seo.score * 100}`);
+    console.log(`Performance: ${(result.lhr.categories.performance?.score ?? 0) * 100}`);
+    console.log(`Accessibility: ${(result.lhr.categories.accessibility?.score ?? 0) * 100}`);
+    console.log(`Best Practices: ${(result.lhr.categories["best-practices"]?.score ?? 0) * 100}`);
+    console.log(`SEO: ${(result.lhr.categories.seo?.score ?? 0) * 100}`);
 
     // Log Core Web Vitals
     const audits = result.lhr.audits;
@@ -99,10 +99,10 @@ test.describe("Lighthouse Performance Audits", () => {
 
     console.log("\n📊 Dashboard/Login Redirect Lighthouse Results:");
     console.log("================================================");
-    console.log(`Performance: ${result.lhr.categories.performance.score * 100}`);
-    console.log(`Accessibility: ${result.lhr.categories.accessibility.score * 100}`);
-    console.log(`Best Practices: ${result.lhr.categories["best-practices"].score * 100}`);
-    console.log(`SEO: ${result.lhr.categories.seo.score * 100}`);
+    console.log(`Performance: ${(result.lhr.categories.performance?.score ?? 0) * 100}`);
+    console.log(`Accessibility: ${(result.lhr.categories.accessibility?.score ?? 0) * 100}`);
+    console.log(`Best Practices: ${(result.lhr.categories["best-practices"]?.score ?? 0) * 100}`);
+    console.log(`SEO: ${(result.lhr.categories.seo?.score ?? 0) * 100}`);
 
     await browser.close();
   });

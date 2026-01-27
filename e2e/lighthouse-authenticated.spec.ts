@@ -73,10 +73,10 @@ test.describe("Lighthouse - Authenticated Pages", () => {
 
     console.log("\n📊 Dashboard (Authenticated) Lighthouse Results:");
     console.log("=================================================");
-    console.log(`Performance: ${result.lhr.categories.performance.score * 100}`);
-    console.log(`Accessibility: ${result.lhr.categories.accessibility.score * 100}`);
-    console.log(`Best Practices: ${result.lhr.categories["best-practices"].score * 100}`);
-    console.log(`SEO: ${result.lhr.categories.seo.score * 100}`);
+    console.log(`Performance: ${(result.lhr.categories.performance?.score ?? 0) * 100}`);
+    console.log(`Accessibility: ${(result.lhr.categories.accessibility?.score ?? 0) * 100}`);
+    console.log(`Best Practices: ${(result.lhr.categories["best-practices"]?.score ?? 0) * 100}`);
+    console.log(`SEO: ${(result.lhr.categories.seo?.score ?? 0) * 100}`);
 
     // Core Web Vitals
     const audits = result.lhr.audits;
@@ -129,10 +129,10 @@ test.describe("Lighthouse - Authenticated Pages", () => {
 
     console.log("\n📊 Projects List Lighthouse Results:");
     console.log("=====================================");
-    console.log(`Performance: ${result.lhr.categories.performance.score * 100}`);
-    console.log(`Accessibility: ${result.lhr.categories.accessibility.score * 100}`);
-    console.log(`Best Practices: ${result.lhr.categories["best-practices"].score * 100}`);
-    console.log(`SEO: ${result.lhr.categories.seo.score * 100}`);
+    console.log(`Performance: ${(result.lhr.categories.performance?.score ?? 0) * 100}`);
+    console.log(`Accessibility: ${(result.lhr.categories.accessibility?.score ?? 0) * 100}`);
+    console.log(`Best Practices: ${(result.lhr.categories["best-practices"]?.score ?? 0) * 100}`);
+    console.log(`SEO: ${(result.lhr.categories.seo?.score ?? 0) * 100}`);
 
     const audits = result.lhr.audits;
     console.log("\n⚡ Core Web Vitals:");
@@ -196,10 +196,10 @@ test.describe("Lighthouse - Authenticated Pages", () => {
 
     console.log("\n📊 Project Detail Page Lighthouse Results:");
     console.log("==========================================");
-    console.log(`Performance: ${result.lhr.categories.performance.score * 100}`);
-    console.log(`Accessibility: ${result.lhr.categories.accessibility.score * 100}`);
-    console.log(`Best Practices: ${result.lhr.categories["best-practices"].score * 100}`);
-    console.log(`SEO: ${result.lhr.categories.seo.score * 100}`);
+    console.log(`Performance: ${(result.lhr.categories.performance?.score ?? 0) * 100}`);
+    console.log(`Accessibility: ${(result.lhr.categories.accessibility?.score ?? 0) * 100}`);
+    console.log(`Best Practices: ${(result.lhr.categories["best-practices"]?.score ?? 0) * 100}`);
+    console.log(`SEO: ${(result.lhr.categories.seo?.score ?? 0) * 100}`);
 
     const audits = result.lhr.audits;
     console.log("\n⚡ Core Web Vitals:");
