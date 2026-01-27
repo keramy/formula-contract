@@ -10,8 +10,8 @@ import {
   UsersIcon,
   FileTextIcon,
   SettingsIcon,
-  SparklesIcon,
 } from "lucide-react";
+import { getVersionDisplay } from "@/lib/version";
 
 import {
   Sidebar,
@@ -237,6 +237,12 @@ export function AppSidebar({ user }: AppSidebarProps) {
             <UserMenu user={user} />
           </SidebarMenuItem>
         </SidebarMenu>
+        {/* Version display - subtle, bottom of sidebar */}
+        <div className="px-3 pb-2 group-data-[collapsible=icon]:hidden">
+          <span className="text-[10px] text-muted-foreground/50 font-mono">
+            {getVersionDisplay()}
+          </span>
+        </div>
       </SidebarFooter>
 
       {/* Rail for collapse/expand on hover at edge */}

@@ -40,6 +40,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { ScopeItemImageUpload } from "@/components/scope-items/scope-item-image-upload";
 import { InstallationStatusEditor } from "@/components/scope-items/installation-status-editor";
+import { ProductionProgressEditor } from "@/components/scope-items/production-progress-editor";
 import type { ItemPath, ItemStatus } from "@/types/database";
 
 interface ScopeItemSheetProps {
@@ -730,19 +731,18 @@ export function ScopeItemSheet({
                       Current Status
                     </p>
 
-                    {/* Production Progress */}
+                    {/* Production Progress - Editable */}
                     {formData.item_path === "production" && (
-                      <div className="p-3 rounded-lg bg-violet-50 border border-violet-100 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 text-violet-700">
-                            <FactoryIcon className="size-4" />
-                            <span className="text-sm font-medium">Production Progress</span>
-                          </div>
-                          <span className="text-sm font-bold text-violet-700">
-                            {productionProgress}%
-                          </span>
+                      <div className="p-3 rounded-lg bg-violet-50 border border-violet-100">
+                        <div className="flex items-center gap-2 mb-2 text-violet-700">
+                          <FactoryIcon className="size-4" />
+                          <span className="text-sm font-medium">Production Progress</span>
                         </div>
-                        <Progress value={productionProgress} className="h-2" />
+                        <ProductionProgressEditor
+                          scopeItemId={itemId!}
+                          initialValue={productionProgress}
+                          readOnly={isViewOnly}
+                        />
                       </div>
                     )}
 

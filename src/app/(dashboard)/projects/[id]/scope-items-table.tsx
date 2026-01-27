@@ -76,6 +76,11 @@ import {
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { GlassCard, EmptyState, StatusBadge } from "@/components/ui/ui-helpers";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import dynamic from "next/dynamic";
 
 // ============================================================================
@@ -211,17 +216,19 @@ interface ColumnConfig {
   defaultVisible: boolean;
 }
 
+// Default columns: Code, Name, Path, Status, Qty, Sale Total, Progress
+// Users can expand via "Columns" toggle for full detail
 const COLUMNS: ColumnConfig[] = [
-  { id: "row", label: "#", defaultVisible: true },
+  { id: "row", label: "#", defaultVisible: false },
   { id: "code", label: "Code", defaultVisible: true },
   { id: "name", label: "Name", defaultVisible: true },
   { id: "path", label: "Path", defaultVisible: true },
   { id: "status", label: "Status", defaultVisible: true },
   { id: "quantity", label: "Qty", defaultVisible: true },
-  // Initial cost (budgeted)
+  // Initial cost (budgeted) - hidden by default
   { id: "initial_unit_cost", label: "Init Unit", defaultVisible: false },
-  { id: "initial_total_cost", label: "Init Total", defaultVisible: true },
-  // Actual cost
+  { id: "initial_total_cost", label: "Init Total", defaultVisible: false },
+  // Actual cost - hidden by default
   { id: "actual_unit_cost", label: "Act Unit", defaultVisible: false },
   { id: "actual_total_cost", label: "Act Total", defaultVisible: false },
   // Sales (what client pays)
@@ -456,12 +463,16 @@ const ScopeItemRow = memo(function ScopeItemRow({
       )}
       {isColumnVisible("progress") && (
         <TableCell>
-          <div className="flex items-center gap-2">
-            <Progress value={item.production_percentage} className="h-2 flex-1" />
-            <span className="text-xs text-muted-foreground w-7">
-              {item.production_percentage}%
-            </span>
-          </div>
+          {item.production_percentage === 0 ? (
+            <span className="text-xs text-muted-foreground italic">Not started</span>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Progress value={item.production_percentage} className="h-2 flex-1" />
+              <span className="text-xs text-muted-foreground w-7">
+                {item.production_percentage}%
+              </span>
+            </div>
+          )}
         </TableCell>
       )}
       {isColumnVisible("installed") && (
@@ -1202,8 +1213,11 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
         </div>
       )}
 
-      {/* Table */}
-      <GlassCard className="py-0">
+      {/* Table with mobile scroll hint */}
+      <GlassCard className="py-0 relative">
+        {/* Mobile scroll hint - gradient shadow on right edge */}
+        <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white/80 to-transparent pointer-events-none z-10 md:hidden" />
+        <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent border-b border-gray-100">
@@ -1224,12 +1238,54 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
               {isColumnVisible("path") && <TableHead>Path</TableHead>}
               {isColumnVisible("status") && <TableHead>Status</TableHead>}
               {isColumnVisible("quantity") && <TableHead className="text-right">Qty</TableHead>}
-              {isColumnVisible("initial_unit_cost") && <TableHead className="text-right text-blue-600" title="Initial Unit Cost (budgeted, per item)">Init Unit</TableHead>}
-              {isColumnVisible("initial_total_cost") && <TableHead className="text-right text-blue-600" title="Initial Total Cost (budgeted, locked)">Init Total</TableHead>}
-              {isColumnVisible("actual_unit_cost") && <TableHead className="text-right text-amber-600" title="Actual Unit Cost (real cost per item)">Act Unit</TableHead>}
-              {isColumnVisible("actual_total_cost") && <TableHead className="text-right text-amber-600" title="Actual Total Cost (real cost)">Act Total</TableHead>}
-              {isColumnVisible("unit_sales_price") && <TableHead className="text-right text-green-600" title="Unit Sales Price (per item)">Sale Unit</TableHead>}
-              {isColumnVisible("total_sales_price") && <TableHead className="text-right text-green-600" title="Total Sales Price (unit × qty)">Sale Total</TableHead>}
+              {isColumnVisible("initial_unit_cost") && (
+                <TableHead className="text-right text-blue-600">
+                  <Tooltip>
+                    <TooltipTrigger className="cursor-help underline decoration-dotted underline-offset-2">Init Unit</TooltipTrigger>
+                    <TooltipContent>Initial/Budget Unit Cost</TooltipContent>
+                  </Tooltip>
+                </TableHead>
+              )}
+              {isColumnVisible("initial_total_cost") && (
+                <TableHead className="text-right text-blue-600">
+                  <Tooltip>
+                    <TooltipTrigger className="cursor-help underline decoration-dotted underline-offset-2">Init Total</TooltipTrigger>
+                    <TooltipContent>Initial/Budget Total Cost (locked)</TooltipContent>
+                  </Tooltip>
+                </TableHead>
+              )}
+              {isColumnVisible("actual_unit_cost") && (
+                <TableHead className="text-right text-amber-600">
+                  <Tooltip>
+                    <TooltipTrigger className="cursor-help underline decoration-dotted underline-offset-2">Act Unit</TooltipTrigger>
+                    <TooltipContent>Actual Unit Cost (real cost per item)</TooltipContent>
+                  </Tooltip>
+                </TableHead>
+              )}
+              {isColumnVisible("actual_total_cost") && (
+                <TableHead className="text-right text-amber-600">
+                  <Tooltip>
+                    <TooltipTrigger className="cursor-help underline decoration-dotted underline-offset-2">Act Total</TooltipTrigger>
+                    <TooltipContent>Actual Total Cost (real cost)</TooltipContent>
+                  </Tooltip>
+                </TableHead>
+              )}
+              {isColumnVisible("unit_sales_price") && (
+                <TableHead className="text-right text-green-600">
+                  <Tooltip>
+                    <TooltipTrigger className="cursor-help underline decoration-dotted underline-offset-2">Sale Unit</TooltipTrigger>
+                    <TooltipContent>Selling Price per Unit</TooltipContent>
+                  </Tooltip>
+                </TableHead>
+              )}
+              {isColumnVisible("total_sales_price") && (
+                <TableHead className="text-right text-green-600">
+                  <Tooltip>
+                    <TooltipTrigger className="cursor-help underline decoration-dotted underline-offset-2">Sale Total</TooltipTrigger>
+                    <TooltipContent>Total Selling Price (unit × qty)</TooltipContent>
+                  </Tooltip>
+                </TableHead>
+              )}
               {isColumnVisible("progress") && <TableHead className="w-[100px]">Progress</TableHead>}
               {isColumnVisible("installed") && <TableHead className="text-center">Installed</TableHead>}
               <TableHead className="w-[50px]"></TableHead>
@@ -1253,6 +1309,7 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
             ))}
           </TableBody>
         </Table>
+        </div>
       </GlassCard>
 
       {/* Unit Price Dialog */}

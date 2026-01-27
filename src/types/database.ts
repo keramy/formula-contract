@@ -11,7 +11,7 @@ export type Json =
 
 // Enum Types
 export type UserRole = "admin" | "pm" | "production" | "procurement" | "management" | "client";
-export type ProjectStatus = "tender" | "active" | "on_hold" | "completed" | "cancelled";
+export type ProjectStatus = "tender" | "active" | "on_hold" | "completed" | "cancelled" | "not_awarded";
 export type ItemPath = "production" | "procurement";
 export type ItemStatus = "pending" | "in_design" | "awaiting_approval" | "approved" | "in_production" | "complete" | "on_hold" | "cancelled";
 export type ProcurementStatus = "pm_approval" | "not_ordered" | "ordered" | "received";

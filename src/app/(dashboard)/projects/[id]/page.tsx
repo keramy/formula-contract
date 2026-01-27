@@ -1,12 +1,8 @@
 import { notFound } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
 import { createClient, getUserRoleFromJWT } from "@/lib/supabase/server";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  ActivityIcon,
-  FileTextIcon,
-} from "lucide-react";
+import { TabsContent } from "@/components/ui/tabs";
+import { ProjectTabs } from "./project-tabs";
 import { ScopeItemsTable } from "./scope-items-table";
 import { DrawingsOverview } from "./drawings-overview";
 import { MaterialsOverview } from "./materials-overview";
@@ -421,61 +417,16 @@ export default async function ProjectDetailPage({
         showEditButton={false}
       />
 
-      {/* Tabs */}
-      <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="bg-white/80 backdrop-blur border shadow-sm p-1 h-auto flex-wrap">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="scope">
-            Scope Items
-            {scopeItems.length > 0 && (
-              <Badge variant="secondary" className="ml-2 text-xs">
-                {scopeItems.length}
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="drawings">Drawings</TabsTrigger>
-          <TabsTrigger value="materials">Materials</TabsTrigger>
-          <TabsTrigger value="snagging">
-            Snagging
-            {openSnaggingCount > 0 && (
-              <Badge variant="destructive" className="ml-2 text-xs">
-                {openSnaggingCount}
-              </Badge>
-            )}
-          </TabsTrigger>
-          {/* Milestones tab - hidden from clients */}
-          {!isClient && (
-            <TabsTrigger value="milestones">
-              Milestones
-              {milestones.length > 0 && (
-                <Badge variant="secondary" className="ml-2 text-xs">
-                  {milestones.filter(m => !m.is_completed).length}/{milestones.length}
-                </Badge>
-              )}
-            </TabsTrigger>
-          )}
-          <TabsTrigger value="reports">
-            <FileTextIcon className="size-4 mr-1.5" />
-            Reports
-            {reports.length > 0 && (
-              <Badge variant="secondary" className="ml-2 text-xs">
-                {reports.length}
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="team">
-            Team
-            {assignments.length > 0 && (
-              <Badge variant="secondary" className="ml-2 text-xs">
-                {assignments.length}
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="activity">
-            <ActivityIcon className="size-4 mr-1.5" />
-            Activity
-          </TabsTrigger>
-        </TabsList>
+      {/* Tabs - responsive with "More" dropdown on mobile */}
+      <ProjectTabs
+        scopeItemsCount={scopeItems.length}
+        openSnaggingCount={openSnaggingCount}
+        milestonesCount={milestones.length}
+        incompleteMilestonesCount={milestones.filter(m => !m.is_completed).length}
+        reportsCount={reports.length}
+        assignmentsCount={assignments.length}
+        isClient={isClient}
+      >
 
         {/* Overview Tab */}
         <TabsContent value="overview">
@@ -647,7 +598,7 @@ export default async function ProjectDetailPage({
         <TabsContent value="activity">
           <ActivityFeed projectId={projectId} limit={50} maxHeight="600px" />
         </TabsContent>
-      </Tabs>
+      </ProjectTabs>
     </div>
   );
 }

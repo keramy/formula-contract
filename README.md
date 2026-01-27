@@ -1,5 +1,9 @@
 # Formula Contract
 
+![Version](https://img.shields.io/badge/version-1.0.0-violet)
+![Next.js](https://img.shields.io/badge/Next.js-15-black)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
+
 A modern Project Management System for furniture manufacturing operations. Built with Next.js, Supabase, and shadcn/ui.
 
 ## Overview
@@ -107,11 +111,17 @@ src/
 ## Scripts
 
 ```bash
-npm run dev       # Development server
-npm run build     # Production build
-npm run start     # Start production
-npm run lint      # Run ESLint
-npm run test      # Run tests
+# Development
+npm run dev           # Development server
+npm run build         # Production build
+npm run start         # Start production
+npm run lint          # Run ESLint
+npm run test          # Run tests
+
+# Versioning (creates git tag and pushes)
+npm run version:patch # 1.0.0 → 1.0.1 (bug fixes)
+npm run version:minor # 1.0.0 → 1.1.0 (new features)
+npm run version:major # 1.0.0 → 2.0.0 (breaking changes)
 ```
 
 ## Deployment

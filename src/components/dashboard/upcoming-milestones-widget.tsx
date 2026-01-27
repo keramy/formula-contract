@@ -77,7 +77,7 @@ export function UpcomingMilestonesWidget({ milestones }: UpcomingMilestonesWidge
           <EmptyState
             icon={<CalendarIcon className="size-6" />}
             title="No upcoming milestones"
-            description="Milestones will appear here"
+            description="Deadlines will appear here when added to projects"
           />
         ) : (
           <ScrollArea className="h-[200px]">

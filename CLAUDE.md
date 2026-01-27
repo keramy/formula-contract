@@ -1,6 +1,7 @@
 # Formula Contract - Project Intelligence
 
-> **Last Updated:** January 20, 2026
+> **Last Updated:** January 27, 2026
+> **Version:** 1.0.0
 > **Supabase Project:** `lsuiaqrpkhejeavsrsqc` (contract-eu, eu-central-1)
 
 ---
@@ -20,6 +21,8 @@
 ### Core Flow
 ```
 Tender → Active → Scope Items → Drawings/Materials Approval → Production/Procurement → Installation → Complete
+         ↓
+    Not Awarded (if tender lost to competitor)
 ```
 
 ---
@@ -81,7 +84,7 @@ formula-contract/
 │   └── types/                    # TypeScript type definitions
 │
 ├── supabase/
-│   └── migrations/               # Database migrations (001-012)
+│   └── migrations/               # Database migrations (001-026)
 │
 └── docs/                         # Documentation
     ├── DATABASE.md               # Schema documentation
@@ -124,7 +127,7 @@ formula-contract/
 
 ```typescript
 UserRole: "admin" | "pm" | "production" | "procurement" | "management" | "client"
-ProjectStatus: "tender" | "active" | "on_hold" | "completed" | "cancelled"
+ProjectStatus: "tender" | "active" | "on_hold" | "completed" | "cancelled" | "not_awarded"
 ItemPath: "production" | "procurement"
 ItemStatus: "pending" | "in_design" | "awaiting_approval" | "approved" | "in_production" | "complete" | "on_hold" | "cancelled"
 DrawingStatus: "not_uploaded" | "uploaded" | "sent_to_client" | "approved" | "rejected" | "approved_with_comments"
@@ -132,6 +135,8 @@ MaterialStatus: "pending" | "sent_to_client" | "approved" | "rejected"
 ProcurementStatus: "pm_approval" | "not_ordered" | "ordered" | "received"
 Currency: "TRY" | "USD" | "EUR"
 ```
+
+**Note:** `not_awarded` status is used when a tender is lost to a competitor (distinct from `cancelled` which is an internal decision).
 
 ---
 
@@ -399,6 +404,21 @@ Before any feature is complete:
 
 ---
 
+## Versioning
+
+The app uses semantic versioning with CI/CD integration:
+
+```bash
+# Bump version (updates package.json, creates git tag, pushes)
+npm run version:patch   # 1.0.0 → 1.0.1 (bug fixes)
+npm run version:minor   # 1.0.0 → 1.1.0 (new features)
+npm run version:major   # 1.0.0 → 2.0.0 (breaking changes)
+```
+
+Version is displayed in the sidebar footer and injected at build time via `next.config.ts`.
+
+---
+
 ## Current Status (Jan 2026)
 
 ### Completed
@@ -410,14 +430,14 @@ Before any feature is complete:
 - Reports (create, lines, publish, share)
 - Notifications system
 - Activity logging
-- Dashboard with stats
+- Dashboard redesign (compact layout, This Week widget, Projects Status Chart)
+- Version system with CI/CD integration
+- "Not Awarded" project status for lost tenders
 
 ### In Progress
-- UX improvements (see docs/ROADMAP.md)
-- Cost tracking refinements
+- Financial module (see FINANCIAL-MODULE-PLAN.md)
 
 ### Planned
 - Mobile optimization
 - Command menu (Cmd+K)
-- Role-specific dashboards
-- Autosave/draft system
+- PDF Executive Summary generation

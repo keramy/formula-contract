@@ -194,6 +194,7 @@ export function ProjectForm({ clients, initialData }: ProjectFormProps) {
                   <SelectItem value="on_hold">On Hold</SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
+                  <SelectItem value="not_awarded">Not Awarded</SelectItem>
                 </SelectContent>
               </Select>
             </div>

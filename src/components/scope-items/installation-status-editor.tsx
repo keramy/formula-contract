@@ -158,13 +158,13 @@ export function InstallationStatusEditor({
           <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
             <PopoverTrigger asChild>
               <Button
-                variant="outline"
+                variant={date ? "outline" : "ghost"}
                 size="sm"
-                className="text-xs"
+                className={date ? "text-xs" : "text-xs text-violet-600 hover:text-violet-700 hover:bg-violet-50"}
                 disabled={isSaving}
               >
                 <CalendarIcon className="size-3 mr-1" />
-                {date ? format(date, "MMM d, yyyy") : "Set date"}
+                {date ? format(date, "MMM d, yyyy") : "Set date →"}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="end">

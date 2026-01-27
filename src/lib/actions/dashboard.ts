@@ -788,6 +788,123 @@ export async function getFinancialOverview(): Promise<FinancialOverview> {
   };
 }
 
+// ============================================================================
+// THIS WEEK SUMMARY - Quick overview of weekly activity
+// ============================================================================
+export interface ThisWeekSummary {
+  itemsCompletedThisWeek: number;
+  reportsPublishedThisWeek: number;
+  upcomingMilestones: number; // Next 7 days
+  milestonesOverdue: number;
+}
+
+export async function getThisWeekSummary(): Promise<ThisWeekSummary> {
+  const supabase = await createClient();
+
+  // Calculate date ranges
+  const now = new Date();
+  const startOfWeek = new Date(now);
+  startOfWeek.setDate(now.getDate() - now.getDay()); // Sunday
+  startOfWeek.setHours(0, 0, 0, 0);
+
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(startOfWeek.getDate() + 7);
+
+  const sevenDaysFromNow = new Date(now);
+  sevenDaysFromNow.setDate(now.getDate() + 7);
+
+  const startOfWeekISO = startOfWeek.toISOString();
+  const nowISO = now.toISOString();
+  const sevenDaysISO = sevenDaysFromNow.toISOString();
+
+  // Parallel fetch for all stats
+  const [
+    { count: itemsCompletedThisWeek },
+    { count: reportsPublishedThisWeek },
+    { count: upcomingMilestones },
+    { count: milestonesOverdue },
+  ] = await Promise.all([
+    // Items marked complete this week (status changed to 'complete')
+    // We check updated_at since we don't have a completed_at field on scope_items
+    supabase
+      .from("scope_items")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "complete")
+      .eq("is_deleted", false)
+      .gte("updated_at", startOfWeekISO),
+
+    // Reports published this week
+    supabase
+      .from("reports")
+      .select("*", { count: "exact", head: true })
+      .eq("is_published", true)
+      .gte("published_at", startOfWeekISO),
+
+    // Milestones due in next 7 days (not completed)
+    supabase
+      .from("milestones")
+      .select("*", { count: "exact", head: true })
+      .eq("is_completed", false)
+      .gte("due_date", nowISO)
+      .lte("due_date", sevenDaysISO),
+
+    // Overdue milestones
+    supabase
+      .from("milestones")
+      .select("*", { count: "exact", head: true })
+      .eq("is_completed", false)
+      .lt("due_date", nowISO),
+  ]);
+
+  return {
+    itemsCompletedThisWeek: itemsCompletedThisWeek || 0,
+    reportsPublishedThisWeek: reportsPublishedThisWeek || 0,
+    upcomingMilestones: upcomingMilestones || 0,
+    milestonesOverdue: milestonesOverdue || 0,
+  };
+}
+
+// ============================================================================
+// PROJECTS BY STATUS - For chart visualization
+// ============================================================================
+export interface ProjectsByStatus {
+  tender: number;
+  active: number;
+  on_hold: number;
+  completed: number;
+  cancelled: number;
+  not_awarded: number;
+  total: number;
+}
+
+export async function getProjectsByStatus(): Promise<ProjectsByStatus> {
+  const supabase = await createClient();
+
+  const { data: projects } = await supabase
+    .from("projects")
+    .select("status")
+    .eq("is_deleted", false);
+
+  const counts = {
+    tender: 0,
+    active: 0,
+    on_hold: 0,
+    completed: 0,
+    cancelled: 0,
+    not_awarded: 0,
+    total: 0,
+  };
+
+  for (const project of projects || []) {
+    counts.total++;
+    if (project.status in counts) {
+      counts[project.status as keyof Omit<ProjectsByStatus, 'total'>]++;
+    }
+  }
+
+  return counts;
+}
+
 export async function getDashboardMilestones(): Promise<DashboardMilestone[]> {
   const supabase = await createClient();
 

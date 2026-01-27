@@ -6,13 +6,13 @@ import { ActivityFeed } from "@/components/activity-log/activity-feed";
 import Link from "next/link";
 import {
   FolderKanbanIcon,
-  UsersIcon,
-  BuildingIcon,
   ArrowRightIcon,
+  CalendarIcon,
+  AlertTriangleIcon,
 } from "lucide-react";
 import { DashboardHeader } from "./dashboard-header";
 import { getCachedDashboardStats, getCachedRecentProjects } from "@/lib/cache";
-import { getMyTasks, getAtRiskProjects, getPendingApprovals, getClientProjectProgress, getMyDashboardStats, getDashboardMilestones, getProductionQueue, getProcurementQueue, getFinancialOverview } from "@/lib/actions/dashboard";
+import { getMyTasks, getAtRiskProjects, getPendingApprovals, getClientProjectProgress, getMyDashboardStats, getDashboardMilestones, getProductionQueue, getProcurementQueue, getFinancialOverview, getThisWeekSummary, getProjectsByStatus } from "@/lib/actions/dashboard";
 import { MyTasksWidget } from "@/components/dashboard/my-tasks-widget";
 import { AtRiskProjects } from "@/components/dashboard/at-risk-projects";
 import { PendingApprovalsWidget } from "@/components/dashboard/pending-approvals-widget";
@@ -21,14 +21,18 @@ import { UpcomingMilestonesWidget } from "@/components/dashboard/upcoming-milest
 import { ProductionQueueWidget } from "@/components/dashboard/production-queue-widget";
 import { ProcurementQueueWidget } from "@/components/dashboard/procurement-queue-widget";
 import { FinancialOverviewWidget } from "@/components/dashboard/financial-overview-widget";
+import { ThisWeekWidget } from "@/components/dashboard/this-week-widget";
+import { ProjectsStatusChart } from "@/components/dashboard/projects-status-chart";
+import { ScrollIndicator } from "@/components/dashboard/scroll-indicator";
 
-// Status configuration for compact pills
+// Status configuration for display
 const statusConfig: Record<string, { variant: "info" | "success" | "warning" | "default" | "danger"; label: string }> = {
   tender: { variant: "info", label: "Tender" },
   active: { variant: "success", label: "Active" },
   on_hold: { variant: "warning", label: "On Hold" },
   completed: { variant: "default", label: "Completed" },
   cancelled: { variant: "danger", label: "Cancelled" },
+  not_awarded: { variant: "danger", label: "Not Awarded" },
 };
 
 export default async function DashboardPage() {
@@ -99,6 +103,8 @@ export default async function DashboardPage() {
     productionQueueData,
     procurementQueueData,
     financialData,
+    thisWeekData,
+    projectsStatusData,
   ] = await Promise.all([
     // My Tasks - PM and Admin only (not production/procurement)
     (userRole === "pm" || canSeeAllProjects)
@@ -120,6 +126,14 @@ export default async function DashboardPage() {
     isProcurement ? getProcurementQueue() : Promise.resolve({ needsMaterials: [], pendingApproval: [], totalNeedsMaterials: 0, totalPendingApproval: 0 }),
     // Financial Overview - Admin/Management only
     canSeeAllProjects ? getFinancialOverview() : Promise.resolve({ totalContractValue: 0, byStatus: { tender: 0, active: 0, completed: 0 }, currency: "TRY", projectCount: 0 }),
+    // This Week Summary - Admin/Management/PM (not production/procurement/client)
+    (canSeeAllProjects || userRole === "pm")
+      ? getThisWeekSummary()
+      : Promise.resolve({ itemsCompletedThisWeek: 0, reportsPublishedThisWeek: 0, upcomingMilestones: 0, milestonesOverdue: 0 }),
+    // Projects by Status Chart - Admin/Management only
+    canSeeAllProjects
+      ? getProjectsByStatus()
+      : Promise.resolve({ tender: 0, active: 0, on_hold: 0, completed: 0, cancelled: 0, not_awarded: 0, total: 0 }),
   ]);
 
   console.log(`📊 [PROFILE] Dashboard Total: ${(performance.now() - pageStart).toFixed(0)}ms\n`);
@@ -149,113 +163,38 @@ export default async function DashboardPage() {
   // ============================================================================
   // PM/ADMIN DASHBOARD - Compact mission control view
   // ============================================================================
+
+  // Process milestones for compact display
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const overdueMilestones = milestonesData.filter(m => {
+    const dueDate = new Date(m.due_date);
+    return dueDate < today && !m.is_completed;
+  });
+  const upcomingMilestonesList = milestonesData.filter(m => {
+    const dueDate = new Date(m.due_date);
+    return dueDate >= today && !m.is_completed;
+  }).slice(0, 4);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50/50 via-white to-gray-50/50">
-      <div className="p-6 space-y-5">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50/50 via-white to-gray-50/50 relative">
+      <div className="p-6 space-y-5 pb-16">
         <DashboardHeader userName={userName} />
 
-        {/* Stats Overview - Clean horizontal layout */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          {/* Total Projects */}
-          <Link
-            href="/projects"
-            className="group p-4 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 text-white hover:shadow-lg hover:scale-[1.02] transition-all"
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <FolderKanbanIcon className="size-4 opacity-80" />
-              <span className="text-xs font-medium opacity-90">
-                {canSeeAllProjects ? "All Projects" : "My Projects"}
-              </span>
-            </div>
-            <p className="text-2xl font-bold">{projectCounts.total}</p>
-          </Link>
-
-          {/* Status Cards */}
-          <Link
-            href="/projects?status=active"
-            className="group p-4 rounded-xl bg-white border border-gray-100 hover:border-emerald-200 hover:shadow-md transition-all"
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <div className="size-2 rounded-full bg-emerald-500" />
-              <span className="text-xs text-muted-foreground">Active</span>
-            </div>
-            <p className="text-xl font-bold text-gray-900">{projectCounts.active}</p>
-          </Link>
-
-          <Link
-            href="/projects?status=tender"
-            className="group p-4 rounded-xl bg-white border border-gray-100 hover:border-sky-200 hover:shadow-md transition-all"
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <div className="size-2 rounded-full bg-sky-500" />
-              <span className="text-xs text-muted-foreground">Tender</span>
-            </div>
-            <p className="text-xl font-bold text-gray-900">{projectCounts.tender}</p>
-          </Link>
-
-          <Link
-            href="/projects?status=on_hold"
-            className="group p-4 rounded-xl bg-white border border-gray-100 hover:border-amber-200 hover:shadow-md transition-all"
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <div className="size-2 rounded-full bg-amber-500" />
-              <span className="text-xs text-muted-foreground">On Hold</span>
-            </div>
-            <p className="text-xl font-bold text-gray-900">{projectCounts.on_hold}</p>
-          </Link>
-
-          <Link
-            href="/projects?status=completed"
-            className="group p-4 rounded-xl bg-white border border-gray-100 hover:border-gray-300 hover:shadow-md transition-all"
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <div className="size-2 rounded-full bg-gray-400" />
-              <span className="text-xs text-muted-foreground">Completed</span>
-            </div>
-            <p className="text-xl font-bold text-gray-900">{projectCounts.completed}</p>
-          </Link>
-
-          {/* Admin: Clients & Team OR Cancelled for others */}
-          {canSeeAllProjects ? (
-            <div className="p-4 rounded-xl bg-white border border-gray-100 flex flex-col justify-center">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <BuildingIcon className="size-3.5 text-teal-600" />
-                  <span className="text-xs text-muted-foreground">Clients</span>
-                </div>
-                <span className="text-sm font-bold">{clientCount}</span>
-              </div>
-              <div className="flex items-center justify-between mt-2">
-                <div className="flex items-center gap-2">
-                  <UsersIcon className="size-3.5 text-orange-600" />
-                  <span className="text-xs text-muted-foreground">Team</span>
-                </div>
-                <span className="text-sm font-bold">{userCount}</span>
-              </div>
-            </div>
-          ) : (
-            <Link
-              href="/projects?status=cancelled"
-              className="group p-4 rounded-xl bg-white border border-gray-100 hover:border-rose-200 hover:shadow-md transition-all"
-            >
-              <div className="flex items-center gap-2 mb-1">
-                <div className="size-2 rounded-full bg-rose-500" />
-                <span className="text-xs text-muted-foreground">Cancelled</span>
-              </div>
-              <p className="text-xl font-bold text-gray-900">{projectCounts.cancelled}</p>
-            </Link>
-          )}
-        </div>
+        {/* This Week Summary & Charts - At the TOP for visibility */}
+        {(canSeeAllProjects || userRole === "pm") && (
+          <div className="grid gap-5 lg:grid-cols-2">
+            <ThisWeekWidget summary={thisWeekData} />
+            {canSeeAllProjects && <ProjectsStatusChart data={projectsStatusData} />}
+          </div>
+        )}
 
         {/* Role-Specific Widgets */}
         {isProduction ? (
-          // PRODUCTION ROLE - Show production queue
           <ProductionQueueWidget queue={productionQueueData} />
         ) : isProcurement ? (
-          // PROCUREMENT ROLE - Show procurement queue
           <ProcurementQueueWidget queue={procurementQueueData} />
         ) : (
-          // PM/ADMIN/MANAGEMENT - Show tasks, at-risk, milestones
           <div className="grid gap-5 lg:grid-cols-3">
             <MyTasksWidget tasks={tasksData} />
             <AtRiskProjects projects={atRiskData} />
@@ -267,14 +206,8 @@ export default async function DashboardPage() {
           </div>
         )}
 
-        {/* Milestones for Admin/Management (shown separately) */}
-        {canSeeAllProjects && (
-          <UpcomingMilestonesWidget milestones={milestonesData} />
-        )}
-
         {/* Recent Projects & Activity Feed */}
         <div className="grid gap-5 lg:grid-cols-2">
-          {/* Recent Projects */}
           <GlassCard>
             <CardHeader className="pb-2 pt-4 px-4">
               <div className="flex items-center justify-between">
@@ -319,20 +252,83 @@ export default async function DashboardPage() {
                   );
                 })
               ) : (
-                <div className="py-6 text-center text-muted-foreground">
-                  <FolderKanbanIcon className="size-6 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">
-                    {canSeeAllProjects ? "No projects yet" : "No projects assigned yet"}
+                <div className="py-6 text-center">
+                  <FolderKanbanIcon className="size-6 mx-auto mb-2 text-muted-foreground/50" />
+                  <p className="text-sm font-medium text-muted-foreground">
+                    {canSeeAllProjects ? "No projects yet" : "No projects assigned"}
+                  </p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">
+                    {canSeeAllProjects
+                      ? "Create your first project to get started"
+                      : "Projects will appear here when assigned to you"}
                   </p>
                 </div>
               )}
             </CardContent>
           </GlassCard>
 
-          {/* Activity Feed */}
           <ActivityFeed limit={8} maxHeight="320px" />
         </div>
+
+        {/* Compact Milestones - Horizontal layout for admin/management */}
+        {canSeeAllProjects && milestonesData.length > 0 && (
+          <div className="rounded-xl border border-gray-200 bg-white/80 backdrop-blur p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <CalendarIcon className="size-4 text-amber-600" />
+                <span className="text-sm font-semibold">Upcoming Milestones</span>
+                {overdueMilestones.length > 0 && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs font-medium">
+                    <AlertTriangleIcon className="size-3" />
+                    {overdueMilestones.length} overdue
+                  </span>
+                )}
+              </div>
+              <Link href="/projects" className="text-xs text-violet-600 hover:text-violet-700 font-medium">
+                View all →
+              </Link>
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
+              {[...overdueMilestones.slice(0, 2), ...upcomingMilestonesList].slice(0, 5).map((milestone) => {
+                const dueDate = new Date(milestone.due_date);
+                const isOverdue = dueDate < today && !milestone.is_completed;
+                const isDueSoon = !isOverdue && dueDate <= new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+                const projectUrl = milestone.project?.slug || milestone.project_id;
+
+                return (
+                  <Link
+                    key={milestone.id}
+                    href={`/projects/${projectUrl}?tab=milestones`}
+                    className={`flex-shrink-0 w-48 p-3 rounded-lg border transition-colors ${
+                      isOverdue
+                        ? "bg-red-50 border-red-200 hover:bg-red-100"
+                        : isDueSoon
+                        ? "bg-amber-50 border-amber-200 hover:bg-amber-100"
+                        : "bg-gray-50 border-gray-200 hover:bg-gray-100"
+                    }`}
+                  >
+                    <p className="font-medium text-sm truncate">{milestone.name}</p>
+                    <p className="text-xs text-muted-foreground truncate mt-0.5">
+                      {milestone.project?.name}
+                    </p>
+                    <p className={`text-xs mt-1 font-medium ${
+                      isOverdue ? "text-red-600" : isDueSoon ? "text-amber-600" : "text-gray-500"
+                    }`}>
+                      {dueDate.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                    </p>
+                  </Link>
+                );
+              })}
+              {milestonesData.length === 0 && (
+                <p className="text-sm text-muted-foreground py-2">No upcoming milestones</p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Smart Scroll Indicator - Hides when at bottom */}
+      <ScrollIndicator />
     </div>
   );
 }

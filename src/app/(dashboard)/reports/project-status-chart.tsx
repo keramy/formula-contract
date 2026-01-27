@@ -15,6 +15,7 @@ interface ProjectStatusChartProps {
     on_hold: number;
     completed: number;
     cancelled: number;
+    not_awarded?: number;
   };
 }
 
@@ -42,6 +43,10 @@ const chartConfig = {
     label: "Cancelled",
     color: "hsl(0, 84%, 60%)",
   },
+  not_awarded: {
+    label: "Not Awarded",
+    color: "hsl(330, 81%, 60%)", // Pink
+  },
 } satisfies ChartConfig;
 
 export function ProjectStatusChart({ data }: ProjectStatusChartProps) {
@@ -51,6 +56,7 @@ export function ProjectStatusChart({ data }: ProjectStatusChartProps) {
     { status: "On Hold", count: data.on_hold, fill: "hsl(45, 93%, 47%)" },
     { status: "Completed", count: data.completed, fill: "hsl(215, 14%, 34%)" },
     { status: "Cancelled", count: data.cancelled, fill: "hsl(0, 84%, 60%)" },
+    { status: "Not Awarded", count: data.not_awarded || 0, fill: "hsl(330, 81%, 60%)" },
   ].filter(item => item.count > 0);
 
   if (chartData.length === 0) {
