@@ -25,6 +25,7 @@ export const ACTIVITY_ACTIONS = {
   DRAWING_APPROVED: "drawing_approved",
   DRAWING_REJECTED: "drawing_rejected",
   DRAWING_PM_OVERRIDE: "drawing_pm_override",
+  DRAWING_MARKED_NOT_REQUIRED: "drawing_marked_not_required",
 
   // Material actions
   MATERIAL_CREATED: "material_created",

@@ -22,6 +22,7 @@ const statusConfig: Record<string, { variant: "info" | "success" | "warning" | "
   on_hold: { variant: "warning", label: "On Hold" },
   completed: { variant: "default", label: "Completed" },
   cancelled: { variant: "danger", label: "Cancelled" },
+  not_awarded: { variant: "danger", label: "Not Awarded" },
 };
 
 export function ClientProjectProgressWidget({ projects }: ClientProjectProgressProps) {

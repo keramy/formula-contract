@@ -148,6 +148,7 @@ interface ScopeItemsTableProps {
   materials: Material[];
   currency?: string;
   isClient?: boolean; // Hide sensitive cost data from clients
+  userRole?: string; // User role for permission checks
 }
 
 const currencySymbols: Record<string, string> = {
@@ -647,7 +648,7 @@ function organizeHierarchically(items: ScopeItem[]): HierarchicalScopeItem[] {
   return result;
 }
 
-export function ScopeItemsTable({ projectId, items, materials, currency = "TRY", isClient = false }: ScopeItemsTableProps) {
+export function ScopeItemsTable({ projectId, items, materials, currency = "TRY", isClient = false, userRole = "pm" }: ScopeItemsTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -990,6 +991,7 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
             open={sheetOpen}
             onOpenChange={setSheetOpen}
             itemId={null}
+            userRole={userRole as "admin" | "pm" | "production" | "procurement" | "management" | "client"}
           />
         )}
       </>
@@ -1588,6 +1590,7 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
           open={sheetOpen}
           onOpenChange={setSheetOpen}
           itemId={selectedItemId}
+          userRole={userRole as "admin" | "pm" | "production" | "procurement" | "management" | "client"}
         />
       )}
     </div>

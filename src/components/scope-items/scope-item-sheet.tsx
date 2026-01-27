@@ -41,7 +41,8 @@ import { createClient } from "@/lib/supabase/client";
 import { ScopeItemImageUpload } from "@/components/scope-items/scope-item-image-upload";
 import { InstallationStatusEditor } from "@/components/scope-items/installation-status-editor";
 import { ProductionProgressEditor } from "@/components/scope-items/production-progress-editor";
-import type { ItemPath, ItemStatus } from "@/types/database";
+import { DrawingApproval } from "@/components/drawings";
+import type { ItemPath, ItemStatus, UserRole } from "@/types/database";
 
 interface ScopeItemSheetProps {
   projectId: string;
@@ -53,6 +54,8 @@ interface ScopeItemSheetProps {
   onSuccess?: () => void;
   /** When true, shows view-only mode with no pricing info (for clients) */
   isClient?: boolean;
+  /** User role for permission checks (e.g., showing drawing actions) */
+  userRole?: UserRole;
 }
 
 interface ScopeItemData {
@@ -126,6 +129,7 @@ const drawingStatusConfig: Record<string, { variant: "info" | "success" | "warni
   approved: { variant: "success", label: "Approved" },
   rejected: { variant: "danger", label: "Rejected" },
   approved_with_comments: { variant: "success", label: "Approved w/ Comments" },
+  not_required: { variant: "default", label: "Not Required" },
 };
 
 export function ScopeItemSheet({
@@ -136,6 +140,7 @@ export function ScopeItemSheet({
   itemId,
   onSuccess,
   isClient = false,
+  userRole = "pm",
 }: ScopeItemSheetProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -768,6 +773,20 @@ export function ScopeItemSheet({
                           </div>
                         ) : (
                           <p className="text-sm text-muted-foreground">No drawing uploaded</p>
+                        )}
+                        {/* Drawing Actions - for PM/Admin */}
+                        {itemId && (
+                          <div className="mt-2">
+                            <DrawingApproval
+                              drawingId={drawing?.id || null}
+                              drawingStatus={drawing?.status || "not_uploaded"}
+                              currentRevision={drawing?.current_revision || null}
+                              scopeItemId={itemId}
+                              userRole={userRole}
+                              projectId={projectId}
+                              itemCode={formData.item_code}
+                            />
+                          </div>
                         )}
                       </div>
                     )}

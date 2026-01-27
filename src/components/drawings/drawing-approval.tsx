@@ -33,11 +33,12 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   AlertTriangleIcon,
+  BanIcon,
 } from "lucide-react";
-import type { DrawingUpdate, ScopeItemUpdate, DrawingStatus } from "@/types/database";
+import type { DrawingUpdate, DrawingInsert, ScopeItemUpdate, DrawingStatus } from "@/types/database";
 
 interface DrawingApprovalProps {
-  drawingId: string;
+  drawingId: string | null; // Can be null if no drawing record exists yet
   drawingStatus: string;
   currentRevision: string | null;
   scopeItemId: string;
@@ -74,7 +75,13 @@ export function DrawingApproval({
   const [isOverrideDialogOpen, setIsOverrideDialogOpen] = useState(false);
   const [overrideReason, setOverrideReason] = useState("");
 
+  // Not Required dialog
+  const [isNotRequiredDialogOpen, setIsNotRequiredDialogOpen] = useState(false);
+  const [notRequiredReason, setNotRequiredReason] = useState("");
+
   const handleSendToClient = async () => {
+    if (!drawingId) return; // Safety check - should never happen for this action
+
     setIsLoading(true);
     setError(null);
 
@@ -120,6 +127,8 @@ export function DrawingApproval({
   };
 
   const handleApproval = async () => {
+    if (!drawingId) return; // Safety check - should never happen for this action
+
     setIsLoading(true);
     setError(null);
 
@@ -186,6 +195,8 @@ export function DrawingApproval({
   };
 
   const handlePMOverride = async () => {
+    if (!drawingId) return; // Safety check - should never happen for this action
+
     if (!overrideReason.trim()) {
       setError("Please provide a reason for the override");
       return;
@@ -247,12 +258,97 @@ export function DrawingApproval({
     }
   };
 
-  // Show different actions based on current status and user role
-  const showSendToClient = drawingStatus === "uploaded" && canSendToClient;
-  const showApprovalOptions = drawingStatus === "sent_to_client";
-  const showOverride = (drawingStatus === "sent_to_client" || drawingStatus === "rejected") && canOverride;
+  const handleMarkNotRequired = async () => {
+    if (!notRequiredReason.trim()) {
+      setError("Please provide a reason why drawing is not required");
+      return;
+    }
 
-  if (!currentRevision) {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const supabase = createClient();
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      let finalDrawingId = drawingId;
+
+      if (!drawingId) {
+        // No drawing record exists yet - create one with not_required status
+        const drawingInsert: DrawingInsert = {
+          item_id: scopeItemId,
+          status: "not_required",
+          not_required_reason: notRequiredReason,
+          not_required_at: new Date().toISOString(),
+          not_required_by: user.id,
+        };
+        const { data: newDrawing, error: insertError } = await supabase
+          .from("drawings")
+          .insert(drawingInsert)
+          .select("id")
+          .single();
+
+        if (insertError) throw insertError;
+        finalDrawingId = (newDrawing as { id: string }).id;
+      } else {
+        // Update existing drawing record
+        const drawingUpdate: DrawingUpdate = {
+          status: "not_required",
+          not_required_reason: notRequiredReason,
+          not_required_at: new Date().toISOString(),
+          not_required_by: user.id,
+        };
+        const { error: updateError } = await supabase
+          .from("drawings")
+          .update(drawingUpdate)
+          .eq("id", drawingId);
+
+        if (updateError) throw updateError;
+      }
+
+      // Update scope item status to approved (can proceed to production)
+      const scopeItemUpdate: ScopeItemUpdate = { status: "approved" };
+      await supabase
+        .from("scope_items")
+        .update(scopeItemUpdate)
+        .eq("id", scopeItemId);
+
+      // Log activity
+      if (projectId && finalDrawingId) {
+        await logActivity({
+          action: ACTIVITY_ACTIONS.DRAWING_MARKED_NOT_REQUIRED,
+          entityType: "drawing",
+          entityId: finalDrawingId,
+          projectId,
+          details: {
+            item_code: itemCode,
+            reason: notRequiredReason,
+          },
+        });
+      }
+
+      setIsNotRequiredDialogOpen(false);
+      setNotRequiredReason("");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to mark as not required");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Show different actions based on current status and user role
+  // Actions that require an existing drawing record need drawingId check
+  const showSendToClient = drawingId && drawingStatus === "uploaded" && canSendToClient;
+  const showApprovalOptions = drawingId && drawingStatus === "sent_to_client";
+  const showOverride = drawingId && (drawingStatus === "sent_to_client" || drawingStatus === "rejected") && canOverride;
+  // Not Required can work without existing drawing (will create one)
+  const showNotRequired = drawingStatus === "not_uploaded" && canOverride;
+
+  // For "not required" action, we don't need a revision
+  if (!currentRevision && !showNotRequired) {
     return null;
   }
 
@@ -436,6 +532,53 @@ export function DrawingApproval({
                   </>
                 ) : (
                   "Approve with Override"
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
+      {/* Mark as Not Required */}
+      {showNotRequired && (
+        <AlertDialog open={isNotRequiredDialogOpen} onOpenChange={setIsNotRequiredDialogOpen}>
+          <AlertDialogTrigger asChild>
+            <Button size="sm" variant="outline">
+              <BanIcon className="size-4" />
+              No Drawing Required
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Mark Drawing as Not Required</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will skip the drawing approval process and allow the item to proceed to production.
+                This action is logged and requires justification.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="space-y-2 py-4">
+              <Label htmlFor="not-required-reason">Reason *</Label>
+              <Textarea
+                id="not-required-reason"
+                placeholder="Explain why this item doesn't require a drawing (e.g., standard item, client provided specs, etc.)..."
+                value={notRequiredReason}
+                onChange={(e) => setNotRequiredReason(e.target.value)}
+                rows={3}
+              />
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleMarkNotRequired}
+                disabled={isLoading || !notRequiredReason.trim()}
+              >
+                {isLoading ? (
+                  <>
+                    <Spinner className="size-4" />
+                    Processing...
+                  </>
+                ) : (
+                  "Mark as Not Required"
                 )}
               </AlertDialogAction>
             </AlertDialogFooter>

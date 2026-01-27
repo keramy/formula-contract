@@ -15,7 +15,7 @@ export type ProjectStatus = "tender" | "active" | "on_hold" | "completed" | "can
 export type ItemPath = "production" | "procurement";
 export type ItemStatus = "pending" | "in_design" | "awaiting_approval" | "approved" | "in_production" | "complete" | "on_hold" | "cancelled";
 export type ProcurementStatus = "pm_approval" | "not_ordered" | "ordered" | "received";
-export type DrawingStatus = "not_uploaded" | "uploaded" | "sent_to_client" | "approved" | "rejected" | "approved_with_comments";
+export type DrawingStatus = "not_uploaded" | "uploaded" | "sent_to_client" | "approved" | "rejected" | "approved_with_comments" | "not_required";
 export type MaterialStatus = "pending" | "sent_to_client" | "approved" | "rejected";
 export type Currency = "TRY" | "USD" | "EUR";
 
@@ -360,6 +360,9 @@ export interface Database {
           pm_override_reason: string | null;
           pm_override_at: string | null;
           pm_override_by: string | null;
+          not_required_reason: string | null;
+          not_required_at: string | null;
+          not_required_by: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -376,6 +379,9 @@ export interface Database {
           pm_override_reason?: string | null;
           pm_override_at?: string | null;
           pm_override_by?: string | null;
+          not_required_reason?: string | null;
+          not_required_at?: string | null;
+          not_required_by?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -392,6 +398,9 @@ export interface Database {
           pm_override_reason?: string | null;
           pm_override_at?: string | null;
           pm_override_by?: string | null;
+          not_required_reason?: string | null;
+          not_required_at?: string | null;
+          not_required_by?: string | null;
           created_at?: string;
           updated_at?: string;
         };

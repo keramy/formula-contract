@@ -62,6 +62,7 @@ const statusOptions = [
   { value: "on_hold", label: "On Hold" },
   { value: "completed", label: "Completed" },
   { value: "cancelled", label: "Cancelled" },
+  { value: "not_awarded", label: "Not Awarded" },
 ];
 
 export function ProjectsListClient({ projects, clients = [], canCreateProject = false }: ProjectsListClientProps) {

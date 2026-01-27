@@ -54,6 +54,7 @@ const statusConfig: Record<string, { variant: StatusVariant; label: string }> = 
   approved: { variant: "success", label: "Approved" },
   approved_with_comments: { variant: "success", label: "Approved w/ Comments" },
   rejected: { variant: "danger", label: "Rejected" },
+  not_required: { variant: "default", label: "Not Required" },
 };
 
 export function DrawingsOverview({ projectId, productionItems, drawings, projectCurrency = "TRY", isClient = false }: DrawingsOverviewProps) {
@@ -93,7 +94,7 @@ export function DrawingsOverview({ projectId, productionItems, drawings, project
       (i) => i.drawing?.status === "rejected"
     ).length,
     approved: itemsWithDrawings.filter(
-      (i) => i.drawing?.status === "approved" || i.drawing?.status === "approved_with_comments"
+      (i) => i.drawing?.status === "approved" || i.drawing?.status === "approved_with_comments" || i.drawing?.status === "not_required"
     ).length,
   };
 

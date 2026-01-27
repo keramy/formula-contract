@@ -516,6 +516,7 @@ export default async function ProjectDetailPage({
             }))}
             currency={project.currency}
             isClient={isClient}
+            userRole={userRole}
           />
         </TabsContent>
 

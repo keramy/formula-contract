@@ -15,6 +15,7 @@ const statusConfig: Record<string, { variant: StatusVariant; label: string }> = 
   on_hold: { variant: "warning", label: "On Hold" },
   completed: { variant: "default", label: "Completed" },
   cancelled: { variant: "danger", label: "Cancelled" },
+  not_awarded: { variant: "danger", label: "Not Awarded" },
 };
 
 interface ProjectDetailHeaderProps {

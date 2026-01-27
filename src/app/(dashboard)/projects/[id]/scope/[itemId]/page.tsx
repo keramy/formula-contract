@@ -131,6 +131,7 @@ const drawingStatusConfig: Record<string, { variant: StatusVariant; label: strin
   approved: { variant: "success", label: "Approved" },
   rejected: { variant: "danger", label: "Rejected" },
   approved_with_comments: { variant: "success", label: "Approved with Comments" },
+  not_required: { variant: "default", label: "Not Required" },
 };
 
 const currencySymbols: Record<string, string> = {
@@ -546,12 +547,12 @@ export default async function ScopeItemDetailPage({
               </CardDescription>
             </CardHeader>
             <CardContent className="px-4 pb-4 pt-0 space-y-3">
-              {/* Approval Actions */}
-              {drawing && canApproveDrawings && (
+              {/* Approval Actions - show when drawing exists OR when PM/Admin can mark as not required */}
+              {canApproveDrawings && (
                 <DrawingApproval
-                  drawingId={drawing.id}
-                  drawingStatus={drawing.status}
-                  currentRevision={drawing.current_revision}
+                  drawingId={drawing?.id || null}
+                  drawingStatus={drawing?.status || "not_uploaded"}
+                  currentRevision={drawing?.current_revision || null}
                   scopeItemId={itemId}
                   userRole={userRole}
                   projectId={projectId}
