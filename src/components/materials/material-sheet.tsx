@@ -20,7 +20,22 @@ import {
 } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { GradientIcon } from "@/components/ui/ui-helpers";
-import { PlusIcon, XIcon, PackageIcon, SaveIcon, ImageIcon } from "lucide-react";
+import { PlusIcon, XIcon, PackageIcon, SaveIcon, ImageIcon, ChevronsUpDownIcon, CheckIcon, SearchIcon } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Badge } from "@/components/ui/badge";
 import { createMaterial, updateMaterial } from "@/lib/actions/materials";
 import { toast } from "sonner";
 
@@ -66,6 +81,8 @@ export function MaterialSheet({
     new Set(editMaterial?.assignedItemIds || [])
   );
   const [uploadingImages, setUploadingImages] = useState(false);
+  const [scopeItemsOpen, setScopeItemsOpen] = useState(false);
+  const [scopeItemsSearch, setScopeItemsSearch] = useState("");
 
   const isEditing = !!editMaterial;
 
@@ -324,34 +341,162 @@ export function MaterialSheet({
               </div>
             </div>
 
-            {/* Assign to Items */}
+            {/* Assign to Items - Modal Multi-Select */}
             {scopeItems.length > 0 && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <Label className="text-sm font-medium">Assign to Scope Items</Label>
-                  <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">
-                    {selectedItemIds.size} selected
-                  </span>
-                </div>
-                <div className="border rounded-lg divide-y max-h-[200px] overflow-y-auto">
-                  {scopeItems.map((item) => (
-                    <label
-                      key={item.id}
-                      className="flex items-center gap-3 p-3 hover:bg-muted/50 cursor-pointer transition-colors"
+                  {selectedItemIds.size > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedItemIds(new Set())}
+                      className="text-xs text-muted-foreground hover:text-destructive transition-colors"
                     >
-                      <Checkbox
-                        checked={selectedItemIds.has(item.id)}
-                        onCheckedChange={() => toggleItem(item.id)}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <span className="font-mono text-xs text-muted-foreground">
-                          {item.item_code}
-                        </span>
-                        <p className="text-sm truncate">{item.name}</p>
-                      </div>
-                    </label>
-                  ))}
+                      Clear all
+                    </button>
+                  )}
                 </div>
+
+                {/* Trigger Button */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setScopeItemsOpen(true)}
+                  className="w-full justify-between h-auto min-h-10 py-2"
+                >
+                  <span className={selectedItemIds.size === 0 ? "text-muted-foreground" : ""}>
+                    {selectedItemIds.size === 0
+                      ? "Click to select items..."
+                      : `${selectedItemIds.size} item${selectedItemIds.size > 1 ? "s" : ""} selected`}
+                  </span>
+                  <ChevronsUpDownIcon className="ml-2 size-4 shrink-0 opacity-50" />
+                </Button>
+
+                {/* Selection Modal */}
+                <Dialog
+                  open={scopeItemsOpen}
+                  onOpenChange={(open) => {
+                    setScopeItemsOpen(open);
+                    if (!open) setScopeItemsSearch("");
+                  }}
+                >
+                  <DialogContent className="sm:max-w-lg max-h-[80vh] flex flex-col p-0">
+                    <DialogHeader className="px-4 pt-4 pb-2">
+                      <DialogTitle className="flex items-center gap-2">
+                        <PackageIcon className="size-5 text-amber-500" />
+                        Select Scope Items
+                      </DialogTitle>
+                    </DialogHeader>
+
+                    <Command shouldFilter={false} className="flex-1 overflow-hidden">
+                      {/* Search Input */}
+                      <div className="flex items-center gap-2 border-y px-4 h-12 bg-muted/30">
+                        <SearchIcon className="size-4 shrink-0 opacity-50" />
+                        <input
+                          value={scopeItemsSearch}
+                          onChange={(e) => setScopeItemsSearch(e.target.value)}
+                          placeholder="Search by code or name..."
+                          className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                          autoFocus
+                        />
+                        {scopeItemsSearch && (
+                          <button
+                            type="button"
+                            onClick={() => setScopeItemsSearch("")}
+                            className="p-1 rounded hover:bg-muted"
+                          >
+                            <XIcon className="size-4 text-muted-foreground" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Items List */}
+                      <CommandList className="flex-1 max-h-[400px] overflow-y-auto p-2">
+                        <CommandEmpty className="py-6 text-center text-sm text-muted-foreground">
+                          No items found.
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {scopeItems
+                            .filter((item) => {
+                              if (!scopeItemsSearch) return true;
+                              const search = scopeItemsSearch.toLowerCase();
+                              return (
+                                item.item_code.toLowerCase().includes(search) ||
+                                item.name.toLowerCase().includes(search)
+                              );
+                            })
+                            .map((item) => {
+                              const isSelected = selectedItemIds.has(item.id);
+                              return (
+                                <CommandItem
+                                  key={item.id}
+                                  value={`${item.item_code} ${item.name}`}
+                                  onSelect={() => toggleItem(item.id)}
+                                  className="cursor-pointer py-3 px-3 rounded-lg mb-1"
+                                >
+                                  <div className={`mr-3 flex size-5 items-center justify-center rounded border-2 transition-colors ${isSelected ? "bg-primary border-primary" : "border-muted-foreground/30"}`}>
+                                    {isSelected && <CheckIcon className="size-3.5 text-primary-foreground" />}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-mono text-xs px-1.5 py-0.5 bg-muted rounded text-muted-foreground">
+                                        {item.item_code}
+                                      </span>
+                                      {isSelected && (
+                                        <Badge variant="secondary" className="text-xs px-1.5 py-0 bg-primary/10 text-primary">
+                                          Selected
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <p className="text-sm mt-1">{item.name}</p>
+                                  </div>
+                                </CommandItem>
+                              );
+                            })}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+
+                    <DialogFooter className="px-4 py-3 border-t bg-muted/30">
+                      <div className="flex items-center justify-between w-full">
+                        <span className="text-sm text-muted-foreground">
+                          {selectedItemIds.size} item{selectedItemIds.size !== 1 ? "s" : ""} selected
+                        </span>
+                        <Button onClick={() => setScopeItemsOpen(false)}>
+                          Done
+                        </Button>
+                      </div>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                {/* Selected Items as Badges */}
+                {selectedItemIds.size > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {Array.from(selectedItemIds).map((id) => {
+                      const item = scopeItems.find((i) => i.id === id);
+                      if (!item) return null;
+                      return (
+                        <Badge
+                          key={id}
+                          variant="secondary"
+                          className="pl-2 pr-1 py-1 gap-1 text-xs"
+                        >
+                          <span className="font-mono text-muted-foreground">{item.item_code}</span>
+                          <span className="mx-1">-</span>
+                          <span className="max-w-[120px] truncate">{item.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => toggleItem(id)}
+                            className="ml-1 rounded-full hover:bg-muted-foreground/20 p-0.5"
+                          >
+                            <XIcon className="size-3" />
+                          </button>
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </div>
