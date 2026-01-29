@@ -165,20 +165,36 @@ export function ProjectOverview({
   // CALCULATIONS
   // ============================================================================
 
-  // Scope progress
+  // Scope progress calculation
+  // Production items: 90% from production_percentage + 10% from installation
+  // Procurement items: 100% when installed, 0% otherwise
   const productionItems = scopeItems.filter((i) => i.item_path === "production");
   const procurementItems = scopeItems.filter((i) => i.item_path === "procurement");
 
+  // Calculate individual item progress and averages
+  const productionItemProgresses = productionItems.map((i) => {
+    const productionPart = i.production_percentage * 0.9;
+    const installationPart = i.is_installed ? 10 : 0;
+    return Math.round(productionPart + installationPart);
+  });
+
+  const procurementItemProgresses = procurementItems.map((i): number =>
+    i.is_installed ? 100 : 0
+  );
+
+  // Progress for display bars
   const productionProgress = productionItems.length > 0
-    ? Math.round(productionItems.reduce((sum, i) => sum + i.production_percentage, 0) / productionItems.length)
+    ? Math.round(productionItemProgresses.reduce((sum, p) => sum + p, 0) / productionItems.length)
     : 0;
 
   const procurementProgress = procurementItems.length > 0
-    ? Math.round((procurementItems.filter((i) => i.is_installed).length / procurementItems.length) * 100)
+    ? Math.round(procurementItemProgresses.reduce((sum, p) => sum + p, 0) / procurementItems.length)
     : 0;
 
-  const overallProgress = scopeItems.length > 0
-    ? Math.round((productionProgress * productionItems.length + procurementProgress * procurementItems.length) / scopeItems.length)
+  // Overall progress = average of all item progress values
+  const allItemProgresses = [...productionItemProgresses, ...procurementItemProgresses];
+  const overallProgress = allItemProgresses.length > 0
+    ? Math.round(allItemProgresses.reduce((sum, p) => sum + p, 0) / allItemProgresses.length)
     : 0;
 
   // Drawing stats

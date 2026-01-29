@@ -35,11 +35,13 @@ import {
   ShoppingCartIcon,
   FileIcon,
   PackageIcon,
+  TruckIcon,
   CheckCircleIcon,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ScopeItemImageUpload } from "@/components/scope-items/scope-item-image-upload";
 import { InstallationStatusEditor } from "@/components/scope-items/installation-status-editor";
+import { ShippedStatusEditor } from "@/components/scope-items/shipped-status-editor";
 import { ProductionProgressEditor } from "@/components/scope-items/production-progress-editor";
 import { DrawingApproval } from "@/components/drawings";
 import type { ItemPath, ItemStatus, UserRole } from "@/types/database";
@@ -79,6 +81,8 @@ interface ScopeItemData {
   notes: string | null;
   images: string[] | null;
   production_percentage: number;
+  is_shipped: boolean;
+  shipped_at: string | null;
   is_installed: boolean;
   installed_at: string | null;
 }
@@ -173,6 +177,8 @@ export function ScopeItemSheet({
 
   // Read-only data (only for editing existing items)
   const [productionProgress, setProductionProgress] = useState(0);
+  const [isShipped, setIsShipped] = useState(false);
+  const [shippedAt, setShippedAt] = useState<string | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
   const [installedAt, setInstalledAt] = useState<string | null>(null);
   const [drawing, setDrawing] = useState<Drawing | null>(null);
@@ -205,6 +211,8 @@ export function ScopeItemSheet({
     setImages([]);
     setErrors({});
     setProductionProgress(0);
+    setIsShipped(false);
+    setShippedAt(null);
     setIsInstalled(false);
     setInstalledAt(null);
     setDrawing(null);
@@ -224,7 +232,7 @@ export function ScopeItemSheet({
             id, item_code, name, description, unit, quantity,
             initial_unit_cost, initial_total_cost, actual_unit_cost, actual_total_cost,
             unit_sales_price, total_sales_price, item_path, status,
-            notes, images, production_percentage, is_installed, installed_at
+            notes, images, production_percentage, is_shipped, shipped_at, is_installed, installed_at
           `)
           .eq("id", id)
           .single(),
@@ -263,6 +271,8 @@ export function ScopeItemSheet({
         });
         setImages(item.images || []);
         setProductionProgress(item.production_percentage || 0);
+        setIsShipped(item.is_shipped || false);
+        setShippedAt(item.shipped_at || null);
         setIsInstalled(item.is_installed || false);
         setInstalledAt(item.installed_at || null);
       }
@@ -813,6 +823,20 @@ export function ScopeItemSheet({
                         </div>
                       </div>
                     )}
+
+                    {/* Shipped Status - Interactive toggle */}
+                    <div className="p-3 rounded-lg bg-blue-50 border border-blue-100">
+                      <div className="flex items-center gap-2 mb-2 text-blue-700">
+                        <TruckIcon className="size-4" />
+                        <span className="text-sm font-medium">Shipping Status</span>
+                      </div>
+                      <ShippedStatusEditor
+                        scopeItemId={itemId!}
+                        isShipped={isShipped}
+                        shippedAt={shippedAt}
+                        readOnly={isViewOnly}
+                      />
+                    </div>
 
                     {/* Installation Status - Interactive toggle */}
                     <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-100">

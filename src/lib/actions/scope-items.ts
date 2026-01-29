@@ -33,6 +33,7 @@ export type ScopeItemField =
   | "initial_unit_cost"
   | "actual_unit_cost"
   | "quantity"
+  | "is_shipped"
   | "is_installed"
   | "production_percentage";
 
@@ -56,6 +57,8 @@ export interface ScopeItem {
   unit_sales_price: number | null;
   total_sales_price: number | null;
   production_percentage: number;
+  is_shipped: boolean;
+  shipped_at: string | null;
   is_installed: boolean;
   installed_at: string | null;
   images: string[] | null;
@@ -215,6 +218,7 @@ export async function bulkUpdateScopeItems(
       "initial_unit_cost",
       "actual_unit_cost",
       "quantity",
+      "is_shipped",
       "is_installed",
       "production_percentage",
     ];
@@ -223,10 +227,23 @@ export async function bulkUpdateScopeItems(
       return { success: false, error: "Invalid field" };
     }
 
+    // Build update data with timestamps for shipped/installed
+    const updateData: Record<string, unknown> = { [field]: value };
+
+    // Handle shipped_at timestamp
+    if (field === "is_shipped") {
+      updateData.shipped_at = value ? new Date().toISOString() : null;
+    }
+
+    // Handle installed_at timestamp
+    if (field === "is_installed") {
+      updateData.installed_at = value ? new Date().toISOString() : null;
+    }
+
     // Perform the update
     const { error } = await supabase
       .from("scope_items")
-      .update({ [field]: value })
+      .update(updateData)
       .in("id", itemIds);
 
     if (error) {

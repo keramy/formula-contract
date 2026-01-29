@@ -65,6 +65,7 @@ import {
   XIcon,
   PackageIcon,
   CheckCircle2Icon,
+  TruckIcon,
   BanknoteIcon,
   BarChart3Icon,
   ListIcon,
@@ -79,6 +80,7 @@ import { GlassCard, EmptyState, StatusBadge } from "@/components/ui/ui-helpers";
 import {
   Tooltip,
   TooltipContent,
+  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import dynamic from "next/dynamic";
@@ -121,6 +123,7 @@ interface ScopeItem {
   unit_sales_price: number | null;
   total_sales_price: number | null;
   production_percentage: number;
+  is_shipped: boolean;
   is_installed: boolean;
   images: string[] | null;
   parent_id: string | null; // References parent item when created via split
@@ -382,12 +385,20 @@ const ScopeItemRow = memo(function ScopeItemRow({
       )}
       {isColumnVisible("name") && (
         <TableCell>
-          <button
-            onClick={() => onViewItem(item)}
-            className={`font-medium hover:underline text-left cursor-pointer ${item.isChild ? "text-muted-foreground hover:text-foreground" : ""}`}
-          >
-            {item.name}
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => onViewItem(item)}
+              className={`font-medium hover:underline text-left cursor-pointer ${item.isChild ? "text-muted-foreground hover:text-foreground" : ""}`}
+            >
+              {item.name}
+            </button>
+            {item.is_installed && (
+              <span className="inline-flex items-center gap-1 text-green-600 shrink-0">
+                <CheckCircle2Icon className="size-3.5" />
+                <span className="text-xs font-medium">Installed</span>
+              </span>
+            )}
+          </div>
         </TableCell>
       )}
       {isColumnVisible("path") && (
@@ -464,16 +475,111 @@ const ScopeItemRow = memo(function ScopeItemRow({
       )}
       {isColumnVisible("progress") && (
         <TableCell>
-          {item.production_percentage === 0 ? (
-            <span className="text-xs text-muted-foreground italic">Not started</span>
-          ) : (
-            <div className="flex items-center gap-2">
-              <Progress value={item.production_percentage} className="h-2 flex-1" />
-              <span className="text-xs text-muted-foreground w-7">
-                {item.production_percentage}%
-              </span>
-            </div>
-          )}
+          <TooltipProvider delayDuration={200}>
+            {(() => {
+              // Calculate combined progress matching project overview formula
+              // Production: 90% from production_percentage + 10% from installation
+              // Procurement: 100% when installed, 0% otherwise
+              const combinedProgress = item.item_path === "production"
+                ? Math.round((item.production_percentage * 0.9) + (item.is_installed ? 10 : 0))
+                : (item.is_installed ? 100 : 0);
+
+              // === PROCUREMENT ITEMS ===
+              if (item.item_path === "procurement") {
+                if (item.is_installed) {
+                  // Installed
+                  return (
+                    <div className="flex items-center gap-1.5">
+                      <Progress value={100} className="h-2 flex-1 max-w-[60px]" />
+                      <span className="text-xs text-muted-foreground w-8">100%</span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="cursor-help">
+                            <CheckCircle2Icon className="size-3.5 text-green-600 shrink-0" />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="text-xs">Installed</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  );
+                } else if (item.is_shipped) {
+                  // Shipped, awaiting installation
+                  return (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-1.5 text-blue-600 cursor-help">
+                          <TruckIcon className="size-3.5" />
+                          <span className="text-xs font-medium">Shipped</span>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="text-xs">At site, awaiting installation</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                } else {
+                  // Not shipped yet
+                  return (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-1.5 text-muted-foreground cursor-help">
+                          <PackageIcon className="size-3.5" />
+                          <span className="text-xs">Awaiting shipment</span>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="text-xs">Ready to ship to site</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                }
+              }
+
+              // === PRODUCTION ITEMS ===
+              // Not started
+              if (item.production_percentage === 0 && !item.is_shipped && !item.is_installed) {
+                return <span className="text-xs text-muted-foreground italic">Not started</span>;
+              }
+
+              // Determine the status icon based on workflow state
+              let StatusIcon: React.ReactNode;
+              let statusTooltip: string;
+
+              if (item.is_installed) {
+                StatusIcon = <CheckCircle2Icon className="size-3.5 text-green-600 shrink-0" />;
+                statusTooltip = "Installed";
+              } else if (item.is_shipped) {
+                StatusIcon = <TruckIcon className="size-3.5 text-blue-600 shrink-0" />;
+                statusTooltip = "Shipped to site";
+              } else if (item.production_percentage === 100) {
+                StatusIcon = <PackageIcon className="size-3.5 text-amber-600 shrink-0" />;
+                statusTooltip = "Ready to ship";
+              } else {
+                StatusIcon = <TruckIcon className="size-3.5 text-amber-500 shrink-0" />;
+                statusTooltip = "Awaiting installation (+10%)";
+              }
+
+              // Show progress bar with combined value
+              return (
+                <div className="flex items-center gap-1.5">
+                  <Progress value={combinedProgress} className="h-2 flex-1 max-w-[60px]" />
+                  <span className="text-xs text-muted-foreground w-8">
+                    {combinedProgress}%
+                  </span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="cursor-help">{StatusIcon}</span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs">{statusTooltip}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              );
+            })()}
+          </TooltipProvider>
         </TableCell>
       )}
       {isColumnVisible("installed") && (
@@ -772,8 +878,6 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
   } = dialogState;
 
   // Dialog open state helpers
-  const priceDialogOpen = activeDialog === "price";
-  const quantityDialogOpen = activeDialog === "quantity";
   const materialsDialogOpen = activeDialog === "materials";
   const splitDialogOpen = activeDialog === "split";
   const deleteDialogOpen = activeDialog === "delete";
@@ -835,22 +939,6 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
       }
     });
   }, [selectedIds, projectId, router]);
-
-  const handlePriceSubmit = useCallback(() => {
-    const price = parseFloat(inputValue);
-    if (!isNaN(price) && price >= 0) {
-      bulkUpdate("unit_sales_price", price);
-    }
-    dispatch({ type: "CLOSE_DIALOG" });
-  }, [inputValue, bulkUpdate]);
-
-  const handleQuantitySubmit = useCallback(() => {
-    const qty = parseInt(inputValue);
-    if (!isNaN(qty) && qty >= 1) {
-      bulkUpdate("quantity", qty);
-    }
-    dispatch({ type: "CLOSE_DIALOG" });
-  }, [inputValue, bulkUpdate]);
 
   const toggleMaterialSelection = useCallback((materialId: string) => {
     dispatch({ type: "TOGGLE_MATERIAL", materialId });
@@ -951,8 +1039,18 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
     const totalSalesPrice = items.reduce((sum, item) => sum + (item.total_sales_price || 0), 0);
     const totalActualCost = parentItems.reduce((sum, item) => sum + item.actualTotalCost, 0);
     const totalInitialCost = parentItems.reduce((sum, item) => sum + (item.initial_total_cost || 0), 0);
+    // Calculate average progress using combined formula (matching project overview)
+    // Production: 90% from production_percentage + 10% from installation
+    // Procurement: 100% when installed, 0% otherwise
     const avgProgress = items.length > 0
-      ? Math.round(items.reduce((sum, item) => sum + item.production_percentage, 0) / items.length)
+      ? Math.round(
+          items.reduce((sum, item) => {
+            const itemProgress = item.item_path === "production"
+              ? (item.production_percentage * 0.9) + (item.is_installed ? 10 : 0)
+              : (item.is_installed ? 100 : 0);
+            return sum + itemProgress;
+          }, 0) / items.length
+        )
       : 0;
     return { totalSalesPrice, totalActualCost, totalInitialCost, avgProgress };
   }, [items, hierarchicalItems]);
@@ -1116,14 +1214,17 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" disabled={isPending}>
-                  Bulk Actions
+                  Actions
                   <ChevronDownIcon className="size-4 ml-1" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuContent align="end" className="w-52">
                 {/* Status submenu */}
                 <DropdownMenuSub>
-                  <DropdownMenuSubTrigger>Change Status</DropdownMenuSubTrigger>
+                  <DropdownMenuSubTrigger>
+                    <BarChart3Icon className="size-4 mr-2 text-violet-500" />
+                    Update Status
+                  </DropdownMenuSubTrigger>
                   <DropdownMenuPortal>
                     <DropdownMenuSubContent>
                       {statusOptions.map((status) => (
@@ -1142,7 +1243,10 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
 
                 {/* Path submenu */}
                 <DropdownMenuSub>
-                  <DropdownMenuSubTrigger>Change Path</DropdownMenuSubTrigger>
+                  <DropdownMenuSubTrigger>
+                    <FactoryIcon className="size-4 mr-2 text-purple-500" />
+                    Change Path
+                  </DropdownMenuSubTrigger>
                   <DropdownMenuPortal>
                     <DropdownMenuSubContent>
                       <DropdownMenuItem onClick={() => bulkUpdate("item_path", "production")}>
@@ -1157,49 +1261,35 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
                   </DropdownMenuPortal>
                 </DropdownMenuSub>
 
-                {/* Unit submenu */}
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger>Change Unit</DropdownMenuSubTrigger>
-                  <DropdownMenuPortal>
-                    <DropdownMenuSubContent>
-                      {unitOptions.map((unit) => (
-                        <DropdownMenuItem
-                          key={unit.value}
-                          onClick={() => bulkUpdate("unit", unit.value)}
-                        >
-                          {unit.label}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuSubContent>
-                  </DropdownMenuPortal>
-                </DropdownMenuSub>
-
                 <DropdownMenuSeparator />
 
-                {/* Price and Quantity dialogs */}
-                <DropdownMenuItem onClick={() => dispatch({ type: "OPEN_PRICE_DIALOG" })}>
-                  Set Unit Price
+                {/* Shipping actions */}
+                <DropdownMenuItem onClick={() => bulkUpdate("is_shipped", true)}>
+                  <TruckIcon className="size-4 mr-2 text-blue-600" />
+                  Mark as Shipped
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => dispatch({ type: "OPEN_QUANTITY_DIALOG" })}>
-                  Set Quantity
+                <DropdownMenuItem onClick={() => bulkUpdate("is_shipped", false)}>
+                  <PackageIcon className="size-4 mr-2 text-muted-foreground" />
+                  Remove Shipped
                 </DropdownMenuItem>
 
                 <DropdownMenuSeparator />
 
+                {/* Installation actions */}
                 <DropdownMenuItem onClick={() => bulkUpdate("is_installed", true)}>
                   <CheckCircle2Icon className="size-4 mr-2 text-green-600" />
                   Mark as Installed
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => bulkUpdate("is_installed", false)}>
-                  <XIcon className="size-4 mr-2" />
-                  Mark as Not Installed
+                  <XIcon className="size-4 mr-2 text-muted-foreground" />
+                  Remove Installation
                 </DropdownMenuItem>
 
                 {materials.length > 0 && (
                   <>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => dispatch({ type: "OPEN_MATERIALS_DIALOG" })}>
-                      <PackageIcon className="size-4 mr-2" />
+                      <PackageIcon className="size-4 mr-2 text-amber-500" />
                       Assign Materials
                     </DropdownMenuItem>
                   </>
@@ -1313,72 +1403,6 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
         </Table>
         </div>
       </GlassCard>
-
-      {/* Unit Price Dialog */}
-      <Dialog open={priceDialogOpen} onOpenChange={(open) => !open && dispatch({ type: "CLOSE_DIALOG" })}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Set Unit Price</DialogTitle>
-            <DialogDescription>
-              Set the unit price for {selectedIds.size} selected item{selectedIds.size > 1 ? "s" : ""}.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2 py-4">
-            <Label htmlFor="price">Unit Price ({currency})</Label>
-            <Input
-              id="price"
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="0.00"
-              value={inputValue}
-              onChange={(e) => dispatch({ type: "SET_INPUT_VALUE", value: e.target.value })}
-              onKeyDown={(e) => e.key === "Enter" && handlePriceSubmit()}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => dispatch({ type: "CLOSE_DIALOG" })}>
-              Cancel
-            </Button>
-            <Button onClick={handlePriceSubmit} disabled={!inputValue}>
-              Apply
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Quantity Dialog */}
-      <Dialog open={quantityDialogOpen} onOpenChange={(open) => !open && dispatch({ type: "CLOSE_DIALOG" })}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Set Quantity</DialogTitle>
-            <DialogDescription>
-              Set the quantity for {selectedIds.size} selected item{selectedIds.size > 1 ? "s" : ""}.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2 py-4">
-            <Label htmlFor="quantity">Quantity</Label>
-            <Input
-              id="quantity"
-              type="number"
-              min="1"
-              step="1"
-              placeholder="1"
-              value={inputValue}
-              onChange={(e) => dispatch({ type: "SET_INPUT_VALUE", value: e.target.value })}
-              onKeyDown={(e) => e.key === "Enter" && handleQuantitySubmit()}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => dispatch({ type: "CLOSE_DIALOG" })}>
-              Cancel
-            </Button>
-            <Button onClick={handleQuantitySubmit} disabled={!inputValue}>
-              Apply
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Materials Assignment Dialog */}
       <Dialog open={materialsDialogOpen} onOpenChange={(open) => !open && dispatch({ type: "CLOSE_DIALOG" })}>

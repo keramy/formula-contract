@@ -54,9 +54,10 @@ export default async function ProjectsPage() {
       .eq("is_deleted", false)
       .order("created_at", { ascending: false }),
     // All scope items for progress calculation
+    // Fetch fields needed to match Project Overview calculation
     supabase
       .from("scope_items")
-      .select("project_id, status")
+      .select("project_id, item_path, production_percentage, is_installed")
       .eq("is_deleted", false),
     // All clients for filter dropdown
     supabase
@@ -130,16 +131,38 @@ export default async function ProjectsPage() {
     const projectIds = new Set(projects.map(p => p.id));
 
     // Group items by project and calculate progress
-    const progressMap = new Map<string, { total: number; completed: number }>();
+    // Progress formula:
+    // - Production items: (production_percentage * 90%) + (is_installed * 10%) = max 100%
+    // - Procurement items: is_installed = 100%, not installed = 0%
+    // - Overall: average of all item progress values
+    const progressMap = new Map<string, {
+      itemProgresses: number[];  // Individual item progress values (0-100)
+      total: number;
+    }>();
 
     for (const item of allScopeItems) {
       if (!projectIds.has(item.project_id)) continue; // Skip items from other projects
 
-      const existing = progressMap.get(item.project_id) || { total: 0, completed: 0 };
+      const existing = progressMap.get(item.project_id) || {
+        itemProgresses: [],
+        total: 0,
+      };
+
       existing.total++;
-      if (item.status === "complete") {
-        existing.completed++;
+
+      // Calculate individual item progress
+      let itemProgress = 0;
+      if (item.item_path === "production") {
+        // Production: 90% from production_percentage + 10% from installation
+        const productionPart = (item.production_percentage || 0) * 0.9;
+        const installationPart = item.is_installed ? 10 : 0;
+        itemProgress = Math.round(productionPart + installationPart);
+      } else if (item.item_path === "procurement") {
+        // Procurement: 100% when installed, 0% otherwise
+        itemProgress = item.is_installed ? 100 : 0;
       }
+
+      existing.itemProgresses.push(itemProgress);
       progressMap.set(item.project_id, existing);
     }
 
@@ -149,11 +172,19 @@ export default async function ProjectsPage() {
       const attentionCount = attentionMap.get(project.id) || 0;
 
       if (stats && stats.total > 0) {
+        // Overall progress = average of all item progress values
+        const overallProgress = Math.round(
+          stats.itemProgresses.reduce((sum, p) => sum + p, 0) / stats.total
+        );
+
+        // Count completed items (100% progress)
+        const completedItems = stats.itemProgresses.filter(p => p === 100).length;
+
         return {
           ...project,
-          progress: Math.round((stats.completed / stats.total) * 100),
+          progress: overallProgress,
           totalItems: stats.total,
-          completedItems: stats.completed,
+          completedItems,
           hasAttention: attentionCount > 0,
           attentionCount,
         };

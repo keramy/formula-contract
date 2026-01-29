@@ -271,6 +271,8 @@ export interface Database {
           production_percentage: number;
           drawing_receival_date: string | null;
           planned_completion_date: string | null;
+          is_shipped: boolean;
+          shipped_at: string | null;
           is_installed: boolean;
           installed_at: string | null;
           notes: string | null;
@@ -303,6 +305,8 @@ export interface Database {
           production_percentage?: number;
           drawing_receival_date?: string | null;
           planned_completion_date?: string | null;
+          is_shipped?: boolean;
+          shipped_at?: string | null;
           is_installed?: boolean;
           installed_at?: string | null;
           notes?: string | null;
@@ -335,6 +339,8 @@ export interface Database {
           production_percentage?: number;
           drawing_receival_date?: string | null;
           planned_completion_date?: string | null;
+          is_shipped?: boolean;
+          shipped_at?: string | null;
           is_installed?: boolean;
           installed_at?: string | null;
           notes?: string | null;
