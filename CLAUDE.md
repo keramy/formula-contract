@@ -1,7 +1,7 @@
 # Formula Contract - Project Intelligence
 
-> **Last Updated:** January 27, 2026
-> **Version:** 1.0.0
+> **Last Updated:** January 30, 2026
+> **Version:** 1.1.0
 > **Supabase Project:** `lsuiaqrpkhejeavsrsqc` (contract-eu, eu-central-1)
 
 ---
@@ -20,10 +20,20 @@
 
 ### Core Flow
 ```
-Tender → Active → Scope Items → Drawings/Materials Approval → Production/Procurement → Installation → Complete
+Tender → Active → Scope Items → Drawings/Materials Approval → Production/Procurement → Shipped → Installing → Installed → Complete
          ↓
     Not Awarded (if tender lost to competitor)
 ```
+
+### Scope Item Progress Tracking
+Each scope item tracks workflow progress through multiple states:
+- **Shipped** (`is_shipped`) - Item has left the factory
+- **Installation Started** (`is_installation_started`) - Installation work has begun on-site
+- **Installed** (`is_installed`) - Installation complete
+
+**Progress Calculation Formula:**
+- Production items: `(production_percentage × 0.9) + (installation_started ? 5 : 0) + (installed ? 5 : 0)`
+- Procurement items: `installed ? 100 : 0`
 
 ---
 
@@ -84,7 +94,7 @@ formula-contract/
 │   └── types/                    # TypeScript type definitions
 │
 ├── supabase/
-│   └── migrations/               # Database migrations (001-026)
+│   └── migrations/               # Database migrations (001-032)
 │
 └── docs/                         # Documentation
     ├── DATABASE.md               # Schema documentation
@@ -103,7 +113,7 @@ formula-contract/
 | `users` | Internal users | id, email, name, role, is_active |
 | `clients` | External client companies | id, company_name, contact_person |
 | `projects` | Main entity | id, project_code, name, client_id, status, currency |
-| `scope_items` | Line items (furniture pieces) | id, project_id, item_code, item_path, status, unit_cost, initial_total_cost |
+| `scope_items` | Line items (furniture pieces) | id, project_id, item_code, item_path, status, unit_cost, initial_total_cost, is_shipped, is_installation_started, is_installed |
 | `drawings` | Drawing approval per item | id, item_id, status, current_revision |
 | `drawing_revisions` | Revision history | id, drawing_id, revision (A, B, C...), file_url |
 | `materials` | Material samples | id, project_id, name, status, images |
@@ -147,13 +157,14 @@ Every `scope_item` has an `item_path` that determines its workflow:
 
 **Production Path:**
 ```
-PENDING → IN_DESIGN → AWAITING_APPROVAL → APPROVED → IN_PRODUCTION → COMPLETE
+PENDING → IN_DESIGN → AWAITING_APPROVAL → APPROVED → IN_PRODUCTION → SHIPPED → INSTALLING → INSTALLED
                             ↓
                         REJECTED (back to IN_DESIGN)
 ```
 - Requires drawing upload and client approval
 - Requires material selection and approval
 - Tracks production_percentage (0-100%)
+- Tracks delivery: is_shipped → is_installation_started → is_installed
 
 **Procurement Path:**
 ```
@@ -275,6 +286,23 @@ function MyForm() {
     </SheetFooter>
   </SheetContent>
 </Sheet>
+```
+
+### Currency Formatting Pattern
+```typescript
+// Always use manual symbols for consistent display (₺, $, €)
+// Intl.NumberFormat shows "TRY" instead of "₺" for en-US locale
+const currencySymbols: Record<string, string> = { TRY: "₺", USD: "$", EUR: "€" };
+
+function formatCurrency(value: number | null, currency: string): string {
+  if (value === null || value === undefined) return "-";
+  const symbol = currencySymbols[currency] || currency;
+  const formatted = new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+  return `${symbol}${formatted}`;  // ₺1,234.00
+}
 ```
 
 ---
@@ -433,6 +461,10 @@ Version is displayed in the sidebar footer and injected at build time via `next.
 - Dashboard redesign (compact layout, This Week widget, Projects Status Chart)
 - Version system with CI/CD integration
 - "Not Awarded" project status for lost tenders
+- Shipped status tracking with date
+- Installation started status tracking (between shipped and installed)
+- Project Overview redesign (unified compact card with progress ring + info bar)
+- Currency formatting fix (always shows ₺/$/€ symbols with 2 decimals)
 
 ### In Progress
 - Financial module (see FINANCIAL-MODULE-PLAN.md)
