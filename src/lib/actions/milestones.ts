@@ -23,10 +23,13 @@ export interface Milestone {
   name: string;
   description: string | null;
   due_date: string;
-  is_completed: boolean;
+  is_completed: boolean | null;
+  completed_at: string | null;
   alert_days_before: number | null;
   alert_sent_at: string | null;
-  created_at: string;
+  milestone_code: string | null;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
 export interface MilestoneInput {
@@ -288,7 +291,8 @@ export async function getUpcomingMilestones(options?: {
     .from("milestones")
     .select(`
       id, project_id, name, description, due_date,
-      is_completed, alert_days_before, alert_sent_at, created_at
+      is_completed, completed_at, alert_days_before, alert_sent_at,
+      milestone_code, created_at, updated_at
     `)
     .eq("is_completed", false)
     .gte("due_date", new Date().toISOString().split("T")[0])
@@ -330,7 +334,8 @@ export async function getOverdueMilestones(options?: {
     .from("milestones")
     .select(`
       id, project_id, name, description, due_date,
-      is_completed, alert_days_before, alert_sent_at, created_at
+      is_completed, completed_at, alert_days_before, alert_sent_at,
+      milestone_code, created_at, updated_at
     `)
     .eq("is_completed", false)
     .lt("due_date", today)

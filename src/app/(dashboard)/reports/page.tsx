@@ -69,9 +69,9 @@ export default async function ReportsPage() {
 
   const productionStats = {
     total: productionItems.length,
-    notStarted: productionItems.filter(i => i.production_percentage === 0).length,
-    inProgress: productionItems.filter(i => i.production_percentage > 0 && i.production_percentage < 100).length,
-    completed: productionItems.filter(i => i.production_percentage === 100).length,
+    notStarted: productionItems.filter(i => (i.production_percentage ?? 0) === 0).length,
+    inProgress: productionItems.filter(i => (i.production_percentage ?? 0) > 0 && (i.production_percentage ?? 0) < 100).length,
+    completed: productionItems.filter(i => (i.production_percentage ?? 0) === 100).length,
     avgProgress: avgProductionProgress,
   };
 

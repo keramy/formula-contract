@@ -38,8 +38,8 @@ export default async function ProfilePage() {
               email: profile.email,
               phone: profile.phone || "",
               role: profile.role,
-              createdAt: profile.created_at,
-              lastLoginAt: profile.last_login_at,
+              createdAt: profile.created_at || new Date().toISOString(),
+              lastLoginAt: profile.last_login_at || null,
             }}
           />
 

@@ -594,11 +594,12 @@ export async function getProductionQueue(): Promise<ProductionQueueSummary> {
     };
 
     // Categorize items
+    const progress = item.production_percentage ?? 0;
     if (item.status === "complete" && !item.is_installed) {
       pendingInstallation.push(queueItem);
-    } else if (item.status === "in_production" || (item.production_percentage > 0 && item.production_percentage < 100)) {
+    } else if (item.status === "in_production" || (progress > 0 && progress < 100)) {
       inProduction.push(queueItem);
-    } else if (item.status === "approved" && item.production_percentage === 0) {
+    } else if (item.status === "approved" && progress === 0) {
       readyForProduction.push(queueItem);
     }
   }

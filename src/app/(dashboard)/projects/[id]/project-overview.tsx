@@ -88,7 +88,7 @@ interface Activity {
   id: string;
   action: string;
   entity_type: string;
-  created_at: string;
+  created_at: string | null;
   user: {
     name: string;
   } | null;

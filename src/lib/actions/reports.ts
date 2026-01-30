@@ -1101,7 +1101,7 @@ export async function getReportActivity(
       ip_address,
       user_agent,
       created_at,
-      user:users(name, email)
+      user:users!report_activity_user_id_fkey(name, email)
     `)
     .eq("report_id", reportId)
     .order("created_at", { ascending: false })
@@ -1139,7 +1139,7 @@ export async function getReportActivitySummary(reportId: string): Promise<{
       action,
       user_id,
       created_at,
-      user:users(name)
+      user:users!report_activity_user_id_fkey(name)
     `)
     .eq("report_id", reportId)
     .order("created_at", { ascending: false });
@@ -1153,11 +1153,14 @@ export async function getReportActivitySummary(reportId: string): Promise<{
   const uniqueViewers = new Set(data.map((a) => a.user_id).filter(Boolean)).size;
   const lastView = data.find((a) => a.action === "viewed");
 
+  // Safely extract user name from the join result
+  const lastViewUser = lastView?.user as unknown as { name: string } | null;
+
   return {
     viewCount,
     downloadCount,
     uniqueViewers,
     lastViewed: lastView?.created_at || null,
-    lastViewedBy: (lastView?.user as { name: string } | null)?.name || null,
+    lastViewedBy: lastViewUser?.name || null,
   };
 }
