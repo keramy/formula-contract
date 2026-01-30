@@ -114,15 +114,21 @@ export async function GET(request: Request) {
       const daysUntilDue = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
       // Get team members for this project
-      const { data: teamMembers } = await supabase
+      // Use explicit FK reference since project_assignments has two FKs to users (user_id, assigned_by)
+      const { data: teamMembers, error: teamError } = await supabase
         .from("project_assignments")
         .select(
           `
           user_id,
-          user:users!inner(id, name, email, email_notifications)
+          user:users!project_assignments_user_id_fkey(id, name, email, email_notifications)
         `
         )
         .eq("project_id", milestone.project_id);
+
+      if (teamError) {
+        console.error("Error fetching team members:", teamError);
+        continue;
+      }
 
       if (!teamMembers || teamMembers.length === 0) continue;
 
@@ -141,7 +147,6 @@ export async function GET(request: Request) {
         type: daysUntilDue < 0 ? "milestone_overdue" : "milestone_due",
         title: alertTitle,
         message: `Project: ${milestone.project.name}`,
-        link: `/projects/${milestone.project_id}?tab=milestones`,
         project_id: milestone.project_id,
       }));
 
@@ -149,7 +154,9 @@ export async function GET(request: Request) {
         .from("notifications")
         .insert(notifications);
 
-      if (!notifError) {
+      if (notifError) {
+        console.error("Error creating notifications:", notifError);
+      } else {
         notificationsCreated += notifications.length;
       }
 
