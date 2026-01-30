@@ -273,6 +273,8 @@ export interface Database {
           planned_completion_date: string | null;
           is_shipped: boolean;
           shipped_at: string | null;
+          is_installation_started: boolean;
+          installation_started_at: string | null;
           is_installed: boolean;
           installed_at: string | null;
           notes: string | null;
@@ -307,6 +309,8 @@ export interface Database {
           planned_completion_date?: string | null;
           is_shipped?: boolean;
           shipped_at?: string | null;
+          is_installation_started?: boolean;
+          installation_started_at?: string | null;
           is_installed?: boolean;
           installed_at?: string | null;
           notes?: string | null;
@@ -341,6 +345,8 @@ export interface Database {
           planned_completion_date?: string | null;
           is_shipped?: boolean;
           shipped_at?: string | null;
+          is_installation_started?: boolean;
+          installation_started_at?: string | null;
           is_installed?: boolean;
           installed_at?: string | null;
           notes?: string | null;

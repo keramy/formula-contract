@@ -21,12 +21,20 @@ export function formatDate(date: Date | string, options?: Intl.DateTimeFormatOpt
   });
 }
 
-export function formatCurrency(amount: number, currency: "TRY" | "USD" | "EUR" = "TRY") {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency,
+const currencySymbols: Record<string, string> = {
+  TRY: "₺",
+  USD: "$",
+  EUR: "€",
+};
+
+export function formatCurrency(amount: number | null, currency: "TRY" | "USD" | "EUR" = "TRY"): string {
+  if (amount === null || amount === undefined) return "-";
+  const symbol = currencySymbols[currency] || currency;
+  const formatted = new Intl.NumberFormat("en-US", {
     minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(amount);
+  return `${symbol}${formatted}`;
 }
 
 export function getNextRevision(current: string | null): string {

@@ -74,6 +74,7 @@ import {
   EyeIcon,
   EyeOffIcon,
   PlusIcon,
+  WrenchIcon,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { GlassCard, EmptyState, StatusBadge } from "@/components/ui/ui-helpers";
@@ -124,6 +125,7 @@ interface ScopeItem {
   total_sales_price: number | null;
   production_percentage: number;
   is_shipped: boolean;
+  is_installation_started: boolean;
   is_installed: boolean;
   images: string[] | null;
   parent_id: string | null; // References parent item when created via split
@@ -478,10 +480,11 @@ const ScopeItemRow = memo(function ScopeItemRow({
           <TooltipProvider delayDuration={200}>
             {(() => {
               // Calculate combined progress matching project overview formula
-              // Production: 90% from production_percentage + 10% from installation
+              // Production: 90% from production_percentage + 5% for installation_started + 5% for installed
               // Procurement: 100% when installed, 0% otherwise
+              const installationProgress = item.is_installed ? 10 : (item.is_installation_started ? 5 : 0);
               const combinedProgress = item.item_path === "production"
-                ? Math.round((item.production_percentage * 0.9) + (item.is_installed ? 10 : 0))
+                ? Math.round((item.production_percentage * 0.9) + installationProgress)
                 : (item.is_installed ? 100 : 0);
 
               // === PROCUREMENT ITEMS ===
@@ -503,6 +506,21 @@ const ScopeItemRow = memo(function ScopeItemRow({
                         </TooltipContent>
                       </Tooltip>
                     </div>
+                  );
+                } else if (item.is_installation_started) {
+                  // Installation in progress
+                  return (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-1.5 text-violet-600 cursor-help">
+                          <WrenchIcon className="size-3.5" />
+                          <span className="text-xs font-medium">Installing</span>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="text-xs">Installation in progress</p>
+                      </TooltipContent>
+                    </Tooltip>
                   );
                 } else if (item.is_shipped) {
                   // Shipped, awaiting installation
@@ -539,7 +557,7 @@ const ScopeItemRow = memo(function ScopeItemRow({
 
               // === PRODUCTION ITEMS ===
               // Not started
-              if (item.production_percentage === 0 && !item.is_shipped && !item.is_installed) {
+              if (item.production_percentage === 0 && !item.is_shipped && !item.is_installation_started && !item.is_installed) {
                 return <span className="text-xs text-muted-foreground italic">Not started</span>;
               }
 
@@ -550,6 +568,9 @@ const ScopeItemRow = memo(function ScopeItemRow({
               if (item.is_installed) {
                 StatusIcon = <CheckCircle2Icon className="size-3.5 text-green-600 shrink-0" />;
                 statusTooltip = "Installed";
+              } else if (item.is_installation_started) {
+                StatusIcon = <WrenchIcon className="size-3.5 text-violet-600 shrink-0" />;
+                statusTooltip = "Installation in progress (+5%)";
               } else if (item.is_shipped) {
                 StatusIcon = <TruckIcon className="size-3.5 text-blue-600 shrink-0" />;
                 statusTooltip = "Shipped to site";
@@ -557,8 +578,8 @@ const ScopeItemRow = memo(function ScopeItemRow({
                 StatusIcon = <PackageIcon className="size-3.5 text-amber-600 shrink-0" />;
                 statusTooltip = "Ready to ship";
               } else {
-                StatusIcon = <TruckIcon className="size-3.5 text-amber-500 shrink-0" />;
-                statusTooltip = "Awaiting installation (+10%)";
+                StatusIcon = <FactoryIcon className="size-3.5 text-amber-500 shrink-0" />;
+                statusTooltip = "In production";
               }
 
               // Show progress bar with combined value
@@ -1040,13 +1061,14 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
     const totalActualCost = parentItems.reduce((sum, item) => sum + item.actualTotalCost, 0);
     const totalInitialCost = parentItems.reduce((sum, item) => sum + (item.initial_total_cost || 0), 0);
     // Calculate average progress using combined formula (matching project overview)
-    // Production: 90% from production_percentage + 10% from installation
+    // Production: 90% from production_percentage + 5% for installation_started + 5% for installed
     // Procurement: 100% when installed, 0% otherwise
     const avgProgress = items.length > 0
       ? Math.round(
           items.reduce((sum, item) => {
+            const installationProgress = item.is_installed ? 10 : (item.is_installation_started ? 5 : 0);
             const itemProgress = item.item_path === "production"
-              ? (item.production_percentage * 0.9) + (item.is_installed ? 10 : 0)
+              ? (item.production_percentage * 0.9) + installationProgress
               : (item.is_installed ? 100 : 0);
             return sum + itemProgress;
           }, 0) / items.length
@@ -1275,7 +1297,19 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
 
                 <DropdownMenuSeparator />
 
-                {/* Installation actions */}
+                {/* Installation started actions */}
+                <DropdownMenuItem onClick={() => bulkUpdate("is_installation_started", true)}>
+                  <WrenchIcon className="size-4 mr-2 text-violet-600" />
+                  Mark Installation Started
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => bulkUpdate("is_installation_started", false)}>
+                  <WrenchIcon className="size-4 mr-2 text-muted-foreground" />
+                  Remove Installation Started
+                </DropdownMenuItem>
+
+                <DropdownMenuSeparator />
+
+                {/* Installation completed actions */}
                 <DropdownMenuItem onClick={() => bulkUpdate("is_installed", true)}>
                   <CheckCircle2Icon className="size-4 mr-2 text-green-600" />
                   Mark as Installed

@@ -11,13 +11,15 @@ interface FinancialOverviewWidgetProps {
   financial: FinancialOverview;
 }
 
+const currencySymbols: Record<string, string> = { TRY: "₺", USD: "$", EUR: "€" };
+
 function formatCurrency(value: number, currency: string): string {
-  return new Intl.NumberFormat("tr-TR", {
-    style: "currency",
-    currency: currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+  const symbol = currencySymbols[currency] || currency;
+  const formatted = new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(value);
+  return `${symbol}${formatted}`;
 }
 
 export function FinancialOverviewWidget({ financial }: FinancialOverviewWidgetProps) {

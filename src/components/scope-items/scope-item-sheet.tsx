@@ -36,11 +36,13 @@ import {
   FileIcon,
   PackageIcon,
   TruckIcon,
+  WrenchIcon,
   CheckCircleIcon,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ScopeItemImageUpload } from "@/components/scope-items/scope-item-image-upload";
 import { InstallationStatusEditor } from "@/components/scope-items/installation-status-editor";
+import { InstallationStartedEditor } from "@/components/scope-items/installation-started-editor";
 import { ShippedStatusEditor } from "@/components/scope-items/shipped-status-editor";
 import { ProductionProgressEditor } from "@/components/scope-items/production-progress-editor";
 import { DrawingApproval } from "@/components/drawings";
@@ -83,6 +85,8 @@ interface ScopeItemData {
   production_percentage: number;
   is_shipped: boolean;
   shipped_at: string | null;
+  is_installation_started: boolean;
+  installation_started_at: string | null;
   is_installed: boolean;
   installed_at: string | null;
 }
@@ -179,6 +183,8 @@ export function ScopeItemSheet({
   const [productionProgress, setProductionProgress] = useState(0);
   const [isShipped, setIsShipped] = useState(false);
   const [shippedAt, setShippedAt] = useState<string | null>(null);
+  const [isInstallationStarted, setIsInstallationStarted] = useState(false);
+  const [installationStartedAt, setInstallationStartedAt] = useState<string | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
   const [installedAt, setInstalledAt] = useState<string | null>(null);
   const [drawing, setDrawing] = useState<Drawing | null>(null);
@@ -213,6 +219,8 @@ export function ScopeItemSheet({
     setProductionProgress(0);
     setIsShipped(false);
     setShippedAt(null);
+    setIsInstallationStarted(false);
+    setInstallationStartedAt(null);
     setIsInstalled(false);
     setInstalledAt(null);
     setDrawing(null);
@@ -232,7 +240,8 @@ export function ScopeItemSheet({
             id, item_code, name, description, unit, quantity,
             initial_unit_cost, initial_total_cost, actual_unit_cost, actual_total_cost,
             unit_sales_price, total_sales_price, item_path, status,
-            notes, images, production_percentage, is_shipped, shipped_at, is_installed, installed_at
+            notes, images, production_percentage, is_shipped, shipped_at,
+            is_installation_started, installation_started_at, is_installed, installed_at
           `)
           .eq("id", id)
           .single(),
@@ -273,6 +282,8 @@ export function ScopeItemSheet({
         setProductionProgress(item.production_percentage || 0);
         setIsShipped(item.is_shipped || false);
         setShippedAt(item.shipped_at || null);
+        setIsInstallationStarted(item.is_installation_started || false);
+        setInstallationStartedAt(item.installation_started_at || null);
         setIsInstalled(item.is_installed || false);
         setInstalledAt(item.installed_at || null);
       }
@@ -838,11 +849,25 @@ export function ScopeItemSheet({
                       />
                     </div>
 
-                    {/* Installation Status - Interactive toggle */}
+                    {/* Installation Started - Interactive toggle */}
+                    <div className="p-3 rounded-lg bg-violet-50 border border-violet-100">
+                      <div className="flex items-center gap-2 mb-2 text-violet-700">
+                        <WrenchIcon className="size-4" />
+                        <span className="text-sm font-medium">Installation Progress</span>
+                      </div>
+                      <InstallationStartedEditor
+                        scopeItemId={itemId!}
+                        isInstallationStarted={isInstallationStarted}
+                        installationStartedAt={installationStartedAt}
+                        readOnly={isViewOnly}
+                      />
+                    </div>
+
+                    {/* Installation Completed - Interactive toggle */}
                     <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-100">
                       <div className="flex items-center gap-2 mb-2 text-emerald-700">
                         <CheckCircleIcon className="size-4" />
-                        <span className="text-sm font-medium">Installation Status</span>
+                        <span className="text-sm font-medium">Installation Complete</span>
                       </div>
                       <InstallationStatusEditor
                         scopeItemId={itemId!}

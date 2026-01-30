@@ -28,6 +28,8 @@ import {
   ActivityIcon,
   ArrowRightIcon,
   ClockIcon,
+  FactoryIcon,
+  WrenchIcon,
 } from "lucide-react";
 
 interface ProjectClient {
@@ -42,6 +44,7 @@ interface ScopeItem {
   name: string;
   item_path: "production" | "procurement";
   production_percentage: number;
+  is_installation_started: boolean;
   is_installed: boolean;
   total_sales_price: number | null;
 }
@@ -166,7 +169,7 @@ export function ProjectOverview({
   // ============================================================================
 
   // Scope progress calculation
-  // Production items: 90% from production_percentage + 10% from installation
+  // Production items: 90% from production_percentage + 5% for installation_started + 5% for installed
   // Procurement items: 100% when installed, 0% otherwise
   const productionItems = scopeItems.filter((i) => i.item_path === "production");
   const procurementItems = scopeItems.filter((i) => i.item_path === "procurement");
@@ -174,7 +177,8 @@ export function ProjectOverview({
   // Calculate individual item progress and averages
   const productionItemProgresses = productionItems.map((i) => {
     const productionPart = i.production_percentage * 0.9;
-    const installationPart = i.is_installed ? 10 : 0;
+    // Installation started = +5%, installed = +10% total (5% more after started)
+    const installationPart = i.is_installed ? 10 : (i.is_installation_started ? 5 : 0);
     return Math.round(productionPart + installationPart);
   });
 
@@ -200,9 +204,14 @@ export function ProjectOverview({
   // Drawing stats
   const productionItemIds = new Set(productionItems.map((i) => i.id));
   const drawingsForProduction = drawings.filter((d) => productionItemIds.has(d.item_id));
-  const approvedDrawings = drawingsForProduction.filter((d) => d.status === "approved" || d.status === "approved_with_comments").length;
+  const approvedDrawings = drawingsForProduction.filter((d) => d.status === "approved" || d.status === "approved_with_comments" || d.status === "not_required").length;
   const rejectedDrawings = drawingsForProduction.filter((d) => d.status === "rejected").length;
   const totalDrawingsNeeded = productionItems.length;
+
+  // Installation stats
+  const installingItems = scopeItems.filter((i) => i.is_installation_started && !i.is_installed).length;
+  const installedItems = scopeItems.filter((i) => i.is_installed).length;
+  const totalItems = scopeItems.length;
 
   // Material stats
   const approvedMaterials = materials.filter((m) => m.status === "approved").length;
@@ -309,13 +318,15 @@ export function ProjectOverview({
     });
   }
 
+  const currencySymbols: Record<string, string> = { TRY: "₺", USD: "$", EUR: "€" };
   const formatCurrency = (value: number | null, currency: string) => {
-    if (!value) return "-";
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: currency,
-      maximumFractionDigits: 0,
+    if (value === null || value === undefined) return "-";
+    const symbol = currencySymbols[currency] || currency;
+    const formatted = new Intl.NumberFormat("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(value);
+    return `${symbol}${formatted}`;
   };
 
   // Progress ring SVG calculation
@@ -350,15 +361,14 @@ export function ProjectOverview({
         />
       )}
 
-      {/* Top Section: Progress Ring + Project Info */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Progress Ring Card */}
-        <GlassCard className="lg:col-span-1 p-6">
-          <div className="flex flex-col items-center">
+      {/* Main Dashboard Card - Progress + Info + Stats */}
+      <GlassCard className="p-6">
+        <div className="grid gap-6 lg:grid-cols-3 lg:divide-x">
+          {/* Left: Progress Ring + Status Bars */}
+          <div className="flex flex-col items-center pb-6 lg:pb-0 lg:pr-6 border-b lg:border-b-0">
             {/* SVG Progress Ring */}
-            <div className="relative size-36">
+            <div className="relative size-32">
               <svg className="size-full -rotate-90" viewBox="0 0 120 120">
-                {/* Background circle */}
                 <circle
                   cx="60"
                   cy="60"
@@ -368,7 +378,6 @@ export function ProjectOverview({
                   strokeWidth="8"
                   className="text-muted/20"
                 />
-                {/* Progress circle */}
                 <circle
                   cx="60"
                   cy="60"
@@ -388,107 +397,141 @@ export function ProjectOverview({
                   </linearGradient>
                 </defs>
               </svg>
-              {/* Center text */}
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-3xl font-bold">{overallProgress}%</span>
-                <span className="text-xs text-muted-foreground">Complete</span>
+                <span className="text-2xl font-bold">{overallProgress}%</span>
+                <span className="text-[10px] text-muted-foreground">Complete</span>
               </div>
             </div>
 
-            {/* Sub-progress bars */}
+            {/* Project Status Bars */}
             <div className="w-full mt-4 space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">Production</span>
-                <span className="font-medium">{productionProgress}%</span>
+              {/* Drawings */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <PenToolIcon className="size-3" />
+                    Drawings
+                  </span>
+                  <span className="font-medium">{approvedDrawings}/{totalDrawingsNeeded}</span>
+                </div>
+                <Progress
+                  value={totalDrawingsNeeded > 0 ? (approvedDrawings / totalDrawingsNeeded) * 100 : 0}
+                  className="h-1.5 [&>div]:bg-teal-500"
+                />
               </div>
-              <Progress value={productionProgress} className="h-1.5 [&>div]:bg-violet-500" />
 
-              <div className="flex items-center justify-between text-xs mt-2">
-                <span className="text-muted-foreground">Procurement</span>
-                <span className="font-medium">{procurementProgress}%</span>
+              {/* Materials */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <PackageIcon className="size-3" />
+                    Materials
+                  </span>
+                  <span className="font-medium">{approvedMaterials}/{totalMaterials}</span>
+                </div>
+                <Progress
+                  value={totalMaterials > 0 ? (approvedMaterials / totalMaterials) * 100 : 0}
+                  className="h-1.5 [&>div]:bg-amber-500"
+                />
               </div>
-              <Progress value={procurementProgress} className="h-1.5 [&>div]:bg-cyan-500" />
+
+              {/* Production */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <FactoryIcon className="size-3" />
+                    Production
+                  </span>
+                  <span className="font-medium">{productionProgress}%</span>
+                </div>
+                <Progress value={productionProgress} className="h-1.5 [&>div]:bg-violet-500" />
+              </div>
+
+              {/* Installation */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <WrenchIcon className="size-3" />
+                    Installation
+                  </span>
+                  <span className="font-medium">
+                    {installingItems > 0 && (
+                      <span className="text-violet-600">{installingItems} in progress · </span>
+                    )}
+                    {installedItems}/{totalItems}
+                  </span>
+                </div>
+                <Progress
+                  value={totalItems > 0 ? (installedItems / totalItems) * 100 : 0}
+                  className="h-1.5 [&>div]:bg-emerald-500"
+                />
+              </div>
             </div>
           </div>
-        </GlassCard>
 
-        {/* Project Info Cards */}
-        <div className="lg:col-span-2 grid gap-4 sm:grid-cols-2">
-          {/* Client */}
-          <GlassCard>
-            <CardHeader className="flex flex-row items-center gap-3 pb-2">
-              <GradientIcon icon={<BuildingIcon className="size-4" />} size="sm" color="teal" />
-              <CardTitle className="text-sm font-medium">Client</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {project.client ? (
-                <div>
-                  <p className="font-semibold">{project.client.company_name}</p>
-                  {project.client.contact_person && (
-                    <p className="text-sm text-muted-foreground">{project.client.contact_person}</p>
-                  )}
+          {/* Right: Info Bar (top) + Quick Stats (bottom) */}
+          <div className="lg:col-span-2 flex flex-col lg:pl-6 pt-6 lg:pt-0">
+            {/* Info Bar - Aligned to Top */}
+            <div className="flex flex-wrap gap-x-6 gap-y-3 pb-4 mb-4 border-b">
+              {/* Client */}
+              <div className="min-w-[100px]">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                  <BuildingIcon className="size-3" />
+                  Client
                 </div>
-              ) : (
-                <p className="text-muted-foreground italic">No client assigned</p>
-              )}
-            </CardContent>
-          </GlassCard>
-
-          {/* Installation Date */}
-          <GlassCard>
-            <CardHeader className="flex flex-row items-center gap-3 pb-2">
-              <GradientIcon icon={<CalendarIcon className="size-4" />} size="sm" color="coral" />
-              <CardTitle className="text-sm font-medium">Installation Date</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="font-semibold">
-                {project.installation_date
-                  ? format(new Date(project.installation_date), "MMM d, yyyy")
-                  : "Not set"}
-              </p>
-              {project.installation_date && (
-                <p className="text-sm text-muted-foreground">
-                  {differenceInDays(new Date(project.installation_date), new Date()) > 0
-                    ? `${differenceInDays(new Date(project.installation_date), new Date())} days away`
-                    : isPast(new Date(project.installation_date))
-                    ? "Passed"
-                    : "Today"}
+                <p className="font-medium text-sm truncate">
+                  {project.client?.company_name || <span className="text-muted-foreground italic">Not set</span>}
                 </p>
-              )}
-            </CardContent>
-          </GlassCard>
+              </div>
 
-          {/* Contract Value - Hidden from clients */}
-          {!isClient && (
-            <GlassCard>
-              <CardHeader className="flex flex-row items-center gap-3 pb-2">
-                <GradientIcon icon={<BanknoteIcon className="size-4" />} size="sm" color="emerald" />
-                <CardTitle className="text-sm font-medium">Contract Value</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="font-semibold">
-                  {formatCurrency(project.contract_value_manual, project.currency)}
+              {/* Installation Date */}
+              <div className="min-w-[100px] pl-6 border-l">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                  <CalendarIcon className="size-3" />
+                  Installation
+                </div>
+                <p className="font-medium text-sm">
+                  {project.installation_date
+                    ? format(new Date(project.installation_date), "MMM d, yyyy")
+                    : <span className="text-muted-foreground italic">Not set</span>}
                 </p>
-              </CardContent>
-            </GlassCard>
-          )}
+                {project.installation_date && (
+                  <p className="text-xs text-muted-foreground">
+                    {differenceInDays(new Date(project.installation_date), new Date()) > 0
+                      ? `${differenceInDays(new Date(project.installation_date), new Date())} days`
+                      : isPast(new Date(project.installation_date))
+                      ? "Passed"
+                      : "Today"}
+                  </p>
+                )}
+              </div>
 
-          {/* Team Preview */}
-          <GlassCard>
-            <CardHeader className="flex flex-row items-center gap-3 pb-2">
-              <GradientIcon icon={<UsersIcon className="size-4" />} size="sm" color="violet" />
-              <CardTitle className="text-sm font-medium">Team</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {assignments.length > 0 ? (
-                <div className="flex items-center gap-2">
-                  {/* Avatar stack with tooltips */}
+              {/* Contract Value - Hidden from clients */}
+              {!isClient && (
+                <div className="min-w-[100px] pl-6 border-l">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                    <BanknoteIcon className="size-3" />
+                    Contract
+                  </div>
+                  <p className="font-medium text-sm">
+                    {formatCurrency(project.contract_value_manual, project.currency)}
+                  </p>
+                </div>
+              )}
+
+              {/* Team */}
+              <div className="min-w-[80px] pl-6 border-l">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                  <UsersIcon className="size-3" />
+                  Team
+                </div>
+                {assignments.length > 0 ? (
                   <TooltipProvider delayDuration={100}>
-                    <div className="flex -space-x-2">
+                    <div className="flex -space-x-1.5">
                       {assignments.slice(0, 4).map((a) => (
                         <Tooltip key={a.id}>
                           <TooltipTrigger asChild>
-                            <div className="size-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-500 ring-2 ring-white flex items-center justify-center text-white text-xs font-medium cursor-default hover:z-10 hover:scale-110 transition-transform">
+                            <div className="size-6 rounded-full bg-gradient-to-br from-violet-500 to-purple-500 ring-1 ring-white flex items-center justify-center text-white text-[10px] font-medium cursor-default hover:z-10 hover:scale-110 transition-transform">
                               {a.user.name.charAt(0).toUpperCase()}
                             </div>
                           </TooltipTrigger>
@@ -500,7 +543,7 @@ export function ProjectOverview({
                       {assignments.length > 4 && (
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <div className="size-8 rounded-full bg-muted ring-2 ring-white flex items-center justify-center text-xs font-medium cursor-default hover:z-10 hover:scale-110 transition-transform">
+                            <div className="size-6 rounded-full bg-muted ring-1 ring-white flex items-center justify-center text-[10px] font-medium cursor-default">
                               +{assignments.length - 4}
                             </div>
                           </TooltipTrigger>
@@ -511,17 +554,67 @@ export function ProjectOverview({
                       )}
                     </div>
                   </TooltipProvider>
-                  <span className="text-sm text-muted-foreground">
-                    {assignments.length} member{assignments.length !== 1 ? "s" : ""}
-                  </span>
-                </div>
-              ) : (
-                <p className="text-muted-foreground italic">No team assigned</p>
-              )}
-            </CardContent>
-          </GlassCard>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">None</p>
+                )}
+              </div>
+            </div>
+
+            {/* Milestones + Snagging Stats */}
+            <div className="flex flex-wrap gap-3">
+              {/* Milestones */}
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => {
+                        const tab = document.querySelector('[data-state][value="milestones"]') as HTMLElement;
+                        tab?.click();
+                      }}
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border bg-background/50 hover:bg-accent/50 transition-colors"
+                    >
+                      <FlagIcon className="size-4 text-violet-600" />
+                      <span className="text-sm">
+                        <span className="font-semibold">{completedMilestones}/{totalMilestones}</span>
+                        <span className="text-muted-foreground ml-1">milestones</span>
+                      </span>
+                      {overdueMilestones > 0 && (
+                        <span className="text-xs text-rose-600 font-medium">({overdueMilestones} overdue)</span>
+                      )}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Click to view Milestones tab</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              {/* Snagging */}
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => {
+                        const tab = document.querySelector('[data-state][value="snagging"]') as HTMLElement;
+                        tab?.click();
+                      }}
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border bg-background/50 hover:bg-accent/50 transition-colors"
+                    >
+                      <BugIcon className="size-4 text-rose-600" />
+                      <span className="text-sm">
+                        <span className="font-semibold">{snaggingItems.length - openIssues}/{snaggingItems.length}</span>
+                        <span className="text-muted-foreground ml-1">issues</span>
+                      </span>
+                      {openIssues > 0 && (
+                        <span className="text-xs text-amber-600 font-medium">({openIssues} open)</span>
+                      )}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Click to view Snagging tab</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          </div>
         </div>
-      </div>
+      </GlassCard>
 
       {/* Attention Required Section - Compact with Tooltips */}
       {attentionItems.length > 0 && (
@@ -577,95 +670,6 @@ export function ProjectOverview({
           <span className="text-sm text-emerald-600">No items requiring attention</span>
         </div>
       )}
-
-      {/* Quick Stats Row */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Drawings */}
-        <GlassCard className="p-4">
-          <div className="flex items-center gap-3 mb-3">
-            <GradientIcon icon={<PenToolIcon className="size-4" />} size="sm" color="teal" />
-            <span className="text-sm font-medium">Drawings</span>
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Approved</span>
-              <span className="font-medium">{approvedDrawings}/{totalDrawingsNeeded}</span>
-            </div>
-            <Progress
-              value={totalDrawingsNeeded > 0 ? (approvedDrawings / totalDrawingsNeeded) * 100 : 0}
-              className="h-2 [&>div]:bg-gradient-to-r [&>div]:from-teal-500 [&>div]:to-emerald-500"
-            />
-            {rejectedDrawings > 0 && (
-              <p className="text-xs text-rose-600">{rejectedDrawings} rejected</p>
-            )}
-          </div>
-        </GlassCard>
-
-        {/* Materials */}
-        <GlassCard className="p-4">
-          <div className="flex items-center gap-3 mb-3">
-            <GradientIcon icon={<PackageIcon className="size-4" />} size="sm" color="amber" />
-            <span className="text-sm font-medium">Materials</span>
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Approved</span>
-              <span className="font-medium">{approvedMaterials}/{totalMaterials}</span>
-            </div>
-            <Progress
-              value={totalMaterials > 0 ? (approvedMaterials / totalMaterials) * 100 : 0}
-              className="h-2 [&>div]:bg-gradient-to-r [&>div]:from-amber-500 [&>div]:to-orange-500"
-            />
-            {pendingMaterials > 0 && (
-              <p className="text-xs text-amber-600">{pendingMaterials} pending</p>
-            )}
-          </div>
-        </GlassCard>
-
-        {/* Milestones */}
-        <GlassCard className="p-4">
-          <div className="flex items-center gap-3 mb-3">
-            <GradientIcon icon={<FlagIcon className="size-4" />} size="sm" color="violet" />
-            <span className="text-sm font-medium">Milestones</span>
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Completed</span>
-              <span className="font-medium">{completedMilestones}/{totalMilestones}</span>
-            </div>
-            <Progress
-              value={totalMilestones > 0 ? (completedMilestones / totalMilestones) * 100 : 0}
-              className="h-2 [&>div]:bg-gradient-to-r [&>div]:from-violet-500 [&>div]:to-purple-500"
-            />
-            {overdueMilestones > 0 && (
-              <p className="text-xs text-rose-600">{overdueMilestones} overdue</p>
-            )}
-          </div>
-        </GlassCard>
-
-        {/* Snagging */}
-        <GlassCard className="p-4">
-          <div className="flex items-center gap-3 mb-3">
-            <GradientIcon icon={<BugIcon className="size-4" />} size="sm" color="rose" />
-            <span className="text-sm font-medium">Snagging</span>
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Resolved</span>
-              <span className="font-medium">
-                {snaggingItems.length - openIssues}/{snaggingItems.length}
-              </span>
-            </div>
-            <Progress
-              value={snaggingItems.length > 0 ? ((snaggingItems.length - openIssues) / snaggingItems.length) * 100 : 100}
-              className="h-2 [&>div]:bg-gradient-to-r [&>div]:from-rose-500 [&>div]:to-orange-500"
-            />
-            {openIssues > 0 && (
-              <p className="text-xs text-amber-600">{openIssues} open</p>
-            )}
-          </div>
-        </GlassCard>
-      </div>
 
       {/* Bottom Row: Next Milestone + Recent Activity */}
       <div className="grid gap-4 lg:grid-cols-2">

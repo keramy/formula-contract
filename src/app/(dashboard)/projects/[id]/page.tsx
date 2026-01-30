@@ -62,6 +62,7 @@ interface ScopeItem {
   total_sales_price: number | null;
   production_percentage: number;
   is_shipped: boolean;
+  is_installation_started: boolean;
   is_installed: boolean;
   notes: string | null;
   images: string[] | null;
@@ -225,7 +226,7 @@ export default async function ProjectDetailPage({
       const start = performance.now();
       const result = await supabase
         .from("scope_items")
-        .select("id, item_code, name, description, width, depth, height, item_path, status, quantity, unit, initial_unit_cost, initial_total_cost, actual_unit_cost, actual_total_cost, unit_sales_price, total_sales_price, production_percentage, is_shipped, is_installed, notes, images, created_at, parent_id")
+        .select("id, item_code, name, description, width, depth, height, item_path, status, quantity, unit, initial_unit_cost, initial_total_cost, actual_unit_cost, actual_total_cost, unit_sales_price, total_sales_price, production_percentage, is_shipped, is_installation_started, is_installed, notes, images, created_at, parent_id")
         .eq("project_id", projectId)
         .eq("is_deleted", false)
         .order("created_at", { ascending: true });
@@ -393,12 +394,15 @@ export default async function ProjectDetailPage({
   const recentActivities = activitiesResult.data || [];
   const canManageTeam = ["admin", "pm"].includes(userRole);
 
+  const currencySymbols: Record<string, string> = { TRY: "₺", USD: "$", EUR: "€" };
   const formatCurrency = (value: number | null, currency: string) => {
-    if (!value) return "-";
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: currency,
+    if (value === null || value === undefined) return "-";
+    const symbol = currencySymbols[currency] || currency;
+    const formatted = new Intl.NumberFormat("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(value);
+    return `${symbol}${formatted}`;
   };
 
   // Calculate totals
@@ -450,6 +454,7 @@ export default async function ProjectDetailPage({
               name: item.name,
               item_path: item.item_path,
               production_percentage: item.production_percentage,
+              is_installation_started: item.is_installation_started,
               is_installed: item.is_installed,
               total_sales_price: item.total_sales_price,
             }))}

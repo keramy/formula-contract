@@ -34,6 +34,7 @@ export type ScopeItemField =
   | "actual_unit_cost"
   | "quantity"
   | "is_shipped"
+  | "is_installation_started"
   | "is_installed"
   | "production_percentage";
 
@@ -59,6 +60,8 @@ export interface ScopeItem {
   production_percentage: number;
   is_shipped: boolean;
   shipped_at: string | null;
+  is_installation_started: boolean;
+  installation_started_at: string | null;
   is_installed: boolean;
   installed_at: string | null;
   images: string[] | null;
@@ -219,6 +222,7 @@ export async function bulkUpdateScopeItems(
       "actual_unit_cost",
       "quantity",
       "is_shipped",
+      "is_installation_started",
       "is_installed",
       "production_percentage",
     ];
@@ -233,6 +237,11 @@ export async function bulkUpdateScopeItems(
     // Handle shipped_at timestamp
     if (field === "is_shipped") {
       updateData.shipped_at = value ? new Date().toISOString() : null;
+    }
+
+    // Handle installation_started_at timestamp
+    if (field === "is_installation_started") {
+      updateData.installation_started_at = value ? new Date().toISOString() : null;
     }
 
     // Handle installed_at timestamp
@@ -370,6 +379,8 @@ export async function updateScopeItemField(
       "initial_unit_cost",
       "actual_unit_cost",
       "quantity",
+      "is_shipped",
+      "is_installation_started",
       "is_installed",
       "production_percentage",
     ];
@@ -378,9 +389,21 @@ export async function updateScopeItemField(
       return { success: false, error: "Invalid field" };
     }
 
+    // Build update data with timestamps for status fields
+    const updateData: Record<string, unknown> = { [field]: value };
+    if (field === "is_shipped") {
+      updateData.shipped_at = value ? new Date().toISOString() : null;
+    }
+    if (field === "is_installation_started") {
+      updateData.installation_started_at = value ? new Date().toISOString() : null;
+    }
+    if (field === "is_installed") {
+      updateData.installed_at = value ? new Date().toISOString() : null;
+    }
+
     const { error } = await supabase
       .from("scope_items")
-      .update({ [field]: value })
+      .update(updateData)
       .eq("id", itemId);
 
     if (error) {
