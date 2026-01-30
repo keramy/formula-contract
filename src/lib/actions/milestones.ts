@@ -25,6 +25,7 @@ export interface Milestone {
   due_date: string;
   is_completed: boolean;
   alert_days_before: number | null;
+  alert_sent_at: string | null;
   created_at: string;
 }
 

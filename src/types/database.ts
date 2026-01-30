@@ -212,6 +212,7 @@ export interface Database {
           is_completed: boolean;
           completed_at: string | null;
           alert_days_before: number | null;
+          alert_sent_at: string | null; // When last alert was sent
           milestone_code: string | null; // Human-readable code (MS-NNNN)
           created_at: string;
           updated_at: string;
@@ -225,6 +226,7 @@ export interface Database {
           is_completed?: boolean;
           completed_at?: string | null;
           alert_days_before?: number | null;
+          alert_sent_at?: string | null;
           milestone_code?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -238,6 +240,7 @@ export interface Database {
           is_completed?: boolean;
           completed_at?: string | null;
           alert_days_before?: number | null;
+          alert_sent_at?: string | null;
           milestone_code?: string | null;
           created_at?: string;
           updated_at?: string;
