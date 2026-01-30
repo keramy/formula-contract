@@ -3,7 +3,8 @@
 import { useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { createClient } from "@/lib/supabase/client";
+import { deleteMaterial } from "@/lib/actions/materials";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { GlassCard, GradientIcon, EmptyState } from "@/components/ui/ui-helpers";
@@ -122,26 +123,26 @@ export function MaterialsOverview({
     if (!deleteMaterialId) return;
 
     setIsLoading(true);
-    const supabase = createClient();
 
     try {
-      // Soft delete
-      const { error } = await supabase
-        .from("materials")
-        .update({ is_deleted: true })
-        .eq("id", deleteMaterialId);
+      const result = await deleteMaterial(deleteMaterialId, projectId);
 
-      if (error) throw error;
-
-      router.refresh();
+      if (result.success) {
+        toast.success("Material deleted");
+        router.refresh();
+      } else {
+        toast.error(result.error || "Failed to delete material");
+        console.error("Delete material error:", result.error);
+      }
     } catch (error) {
+      toast.error("Failed to delete material");
       console.error("Failed to delete material:", error);
     } finally {
       setIsLoading(false);
       setDeleteDialogOpen(false);
       setDeleteMaterialId(null);
     }
-  }, [deleteMaterialId, router]);
+  }, [deleteMaterialId, projectId, router]);
 
   const handleApprove = useCallback((materialId: string) => {
     const material = materials.find((m) => m.id === materialId);
@@ -309,11 +310,21 @@ export function MaterialsOverview({
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDeleteConfirm}
+              onClick={(e) => {
+                e.preventDefault();
+                handleDeleteConfirm();
+              }}
               disabled={isLoading}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete
+              {isLoading ? (
+                <>
+                  <Spinner className="size-4 mr-2" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

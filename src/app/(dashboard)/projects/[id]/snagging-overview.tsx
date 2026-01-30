@@ -16,6 +16,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { GlassCard, GradientIcon, StatusBadge, EmptyState } from "@/components/ui/ui-helpers";
+import { Spinner } from "@/components/ui/spinner";
 import {
   PlusIcon,
   ImageIcon,
@@ -377,11 +378,21 @@ export function SnaggingOverview({
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDeleteConfirm}
+              onClick={(e) => {
+                e.preventDefault();
+                handleDeleteConfirm();
+              }}
               disabled={isLoading}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete
+              {isLoading ? (
+                <>
+                  <Spinner className="size-4 mr-2" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -399,10 +410,20 @@ export function SnaggingOverview({
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleResolveConfirm}
+              onClick={(e) => {
+                e.preventDefault();
+                handleResolveConfirm();
+              }}
               disabled={isLoading}
             >
-              Mark as Resolved
+              {isLoading ? (
+                <>
+                  <Spinner className="size-4 mr-2" />
+                  Resolving...
+                </>
+              ) : (
+                "Mark as Resolved"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

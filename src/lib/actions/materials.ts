@@ -12,7 +12,7 @@
  */
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceRoleClient, getUserRoleFromJWT } from "@/lib/supabase/server";
 import { sanitizeText } from "@/lib/sanitize";
 import { logActivity } from "@/lib/activity-log/actions";
 
@@ -324,6 +324,7 @@ export async function updateMaterial(
 
 /**
  * Delete a material (soft delete)
+ * Uses service role client to bypass RLS policy issues with UPDATE WITH CHECK
  */
 export async function deleteMaterial(
   materialId: string,
@@ -338,15 +339,22 @@ export async function deleteMaterial(
       return { success: false, error: "Not authenticated" };
     }
 
-    // Get material info for logging
+    // Check authorization - only admin and pm can delete
+    const role = await getUserRoleFromJWT(user, supabase);
+    if (!["admin", "pm"].includes(role)) {
+      return { success: false, error: "Not authorized to delete materials" };
+    }
+
+    // Get material info for logging (using regular client)
     const { data: material } = await supabase
       .from("materials")
       .select("material_code, name")
       .eq("id", materialId)
       .single();
 
-    // Soft delete
-    const { error } = await supabase
+    // Use service role client for the update to bypass RLS
+    const serviceClient = createServiceRoleClient();
+    const { error } = await serviceClient
       .from("materials")
       .update({ is_deleted: true })
       .eq("id", materialId);

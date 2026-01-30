@@ -391,7 +391,10 @@ export function TeamOverview({ projectId, assignments, canManageTeam }: TeamOver
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleRemove}
+              onClick={(e) => {
+                e.preventDefault();
+                handleRemove();
+              }}
               disabled={isLoading}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >

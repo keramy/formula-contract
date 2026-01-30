@@ -529,7 +529,10 @@ export function DrawingApproval({
             <AlertDialogFooter>
               <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
               <AlertDialogAction
-                onClick={handlePMOverride}
+                onClick={(e) => {
+                  e.preventDefault();
+                  handlePMOverride();
+                }}
                 disabled={isLoading || !overrideReason.trim()}
               >
                 {isLoading ? (
@@ -576,7 +579,10 @@ export function DrawingApproval({
             <AlertDialogFooter>
               <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
               <AlertDialogAction
-                onClick={handleMarkNotRequired}
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleMarkNotRequired();
+                }}
                 disabled={isLoading || !notRequiredReason.trim()}
               >
                 {isLoading ? (
