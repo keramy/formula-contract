@@ -19,9 +19,11 @@ import {
   ArrowDownIcon,
   PencilIcon,
   TrashIcon,
+  EyeIcon,
 } from "lucide-react";
 import { GlassCard, StatusBadge } from "@/components/ui/ui-helpers";
 import { ReportPDFExport } from "@/components/reports/report-pdf-export";
+import { ReportActivityModal } from "@/components/reports/report-activity-modal";
 import {
   deleteReport,
   uploadReportPdf,
@@ -84,8 +86,10 @@ export function ReportsTable({
   const [isLoading, setIsLoading] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteReportId, setDeleteReportId] = useState<string | null>(null);
+  const [activityModalReport, setActivityModalReport] = useState<Report | null>(null);
 
   const isClient = userRole === "client";
+  const isAdmin = userRole === "admin";
   const canManageReports = ["admin", "pm"].includes(userRole);
 
   // Sort reports
@@ -339,6 +343,17 @@ export function ReportsTable({
                           variant="ghost"
                           size="icon"
                         />
+                        {isAdmin && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="size-8 hover:bg-violet-50 hover:text-violet-600"
+                            onClick={() => setActivityModalReport(report)}
+                            title="View activity"
+                          >
+                            <EyeIcon className="size-4" />
+                          </Button>
+                        )}
                         {canManageReports && (
                           <>
                             <Button
@@ -401,6 +416,16 @@ export function ReportsTable({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Activity Modal (Admin Only) */}
+      {activityModalReport && (
+        <ReportActivityModal
+          reportId={activityModalReport.id}
+          reportName={`${REPORT_TYPE_LABELS[activityModalReport.report_type] || activityModalReport.report_type} Report`}
+          open={!!activityModalReport}
+          onOpenChange={(open) => !open && setActivityModalReport(null)}
+        />
+      )}
     </>
   );
 }

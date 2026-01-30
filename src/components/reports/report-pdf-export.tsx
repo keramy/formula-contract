@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { DownloadIcon } from "lucide-react";
 import type { Report } from "@/lib/actions/reports";
+import { logReportActivity } from "@/lib/actions/reports";
 
 interface ReportPDFExportProps {
   report: Report;
@@ -460,6 +461,9 @@ export function ReportPDFExport({
       const fileName = `${projectCode}_${reportTypeLabel.replace(/\s+/g, "_")}_${dateForFile}.pdf`;
 
       doc.save(fileName);
+
+      // Log download activity (fire and forget)
+      logReportActivity(report.id, "downloaded").catch(console.error);
     } catch (error) {
       console.error("Error generating PDF:", error);
     } finally {

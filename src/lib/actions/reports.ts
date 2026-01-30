@@ -1032,3 +1032,132 @@ export async function updateReportShares(
 
   return { success: true };
 }
+
+// ============================================================================
+// Report Activity Tracking (Admin Only)
+// ============================================================================
+
+export interface ReportActivity {
+  id: string;
+  report_id: string;
+  user_id: string | null;
+  action: "viewed" | "downloaded";
+  ip_address: string | null;
+  user_agent: string | null;
+  created_at: string;
+  user?: { name: string; email: string } | null;
+}
+
+/**
+ * Log when a user views or downloads a report
+ */
+export async function logReportActivity(
+  reportId: string,
+  action: "viewed" | "downloaded",
+  metadata?: { ip_address?: string; user_agent?: string }
+): Promise<ActionResult> {
+  const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return { success: false, error: "Not authenticated" };
+  }
+
+  const { error } = await supabase.from("report_activity").insert({
+    report_id: reportId,
+    user_id: user.id,
+    action,
+    ip_address: metadata?.ip_address || null,
+    user_agent: metadata?.user_agent || null,
+  });
+
+  if (error) {
+    console.error("Error logging report activity:", error.message);
+    return { success: false, error: error.message };
+  }
+
+  return { success: true };
+}
+
+/**
+ * Get activity log for a report (Admin only - enforced by RLS)
+ */
+export async function getReportActivity(
+  reportId: string,
+  limit = 50
+): Promise<ReportActivity[]> {
+  const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from("report_activity")
+    .select(`
+      id,
+      report_id,
+      user_id,
+      action,
+      ip_address,
+      user_agent,
+      created_at,
+      user:users(name, email)
+    `)
+    .eq("report_id", reportId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    // RLS will return empty if not admin, not an error
+    console.error("Error fetching report activity:", error.message);
+    return [];
+  }
+
+  return (data || []) as unknown as ReportActivity[];
+}
+
+/**
+ * Get activity summary for a report (Admin only)
+ * Returns view count, download count, unique viewers, last viewed
+ */
+export async function getReportActivitySummary(reportId: string): Promise<{
+  viewCount: number;
+  downloadCount: number;
+  uniqueViewers: number;
+  lastViewed: string | null;
+  lastViewedBy: string | null;
+} | null> {
+  const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  // Get all activity for this report
+  const { data, error } = await supabase
+    .from("report_activity")
+    .select(`
+      action,
+      user_id,
+      created_at,
+      user:users(name)
+    `)
+    .eq("report_id", reportId)
+    .order("created_at", { ascending: false });
+
+  if (error || !data) {
+    return null;
+  }
+
+  const viewCount = data.filter((a) => a.action === "viewed").length;
+  const downloadCount = data.filter((a) => a.action === "downloaded").length;
+  const uniqueViewers = new Set(data.map((a) => a.user_id).filter(Boolean)).size;
+  const lastView = data.find((a) => a.action === "viewed");
+
+  return {
+    viewCount,
+    downloadCount,
+    uniqueViewers,
+    lastViewed: lastView?.created_at || null,
+    lastViewedBy: (lastView?.user as { name: string } | null)?.name || null,
+  };
+}

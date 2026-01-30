@@ -57,7 +57,7 @@ import {
   ChevronUpIcon,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { type Report, type ReportLine } from "@/lib/actions/reports";
+import { type Report, type ReportLine, logReportActivity } from "@/lib/actions/reports";
 
 // Shared report components
 import {
@@ -137,6 +137,9 @@ export function ReportEditModal({
       setError(null);
       setSectionFormOpen(false);
       setEditingSection(null);
+
+      // Log view activity (fire and forget)
+      logReportActivity(report.id, "viewed").catch(console.error);
     }
   }, [open, report]);
 

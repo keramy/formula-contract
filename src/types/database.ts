@@ -682,6 +682,36 @@ export interface Database {
         };
         Relationships: [];
       };
+      report_activity: {
+        Row: {
+          id: string;
+          report_id: string;
+          user_id: string | null;
+          action: "viewed" | "downloaded";
+          ip_address: string | null;
+          user_agent: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          report_id: string;
+          user_id?: string | null;
+          action: "viewed" | "downloaded";
+          ip_address?: string | null;
+          user_agent?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          report_id?: string;
+          user_id?: string | null;
+          action?: "viewed" | "downloaded";
+          ip_address?: string | null;
+          user_agent?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       notifications: {
         Row: {
           id: string;
