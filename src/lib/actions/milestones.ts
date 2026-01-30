@@ -288,7 +288,7 @@ export async function getUpcomingMilestones(options?: {
     .from("milestones")
     .select(`
       id, project_id, name, description, due_date,
-      is_completed, alert_days_before, created_at
+      is_completed, alert_days_before, alert_sent_at, created_at
     `)
     .eq("is_completed", false)
     .gte("due_date", new Date().toISOString().split("T")[0])
@@ -330,7 +330,7 @@ export async function getOverdueMilestones(options?: {
     .from("milestones")
     .select(`
       id, project_id, name, description, due_date,
-      is_completed, alert_days_before, created_at
+      is_completed, alert_days_before, alert_sent_at, created_at
     `)
     .eq("is_completed", false)
     .lt("due_date", today)
