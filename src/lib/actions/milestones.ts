@@ -6,12 +6,15 @@
  * Handles milestone CRUD operations with:
  * - Activity logging
  * - In-app notifications for team members
+ * - Email notifications via Resend batch API
  */
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { logActivity } from "@/lib/activity-log/actions";
 import { ACTIVITY_ACTIONS } from "@/lib/activity-log/constants";
+import { Resend } from "resend";
+import { MilestoneAlertEmail } from "@/emails/milestone-alert-email";
 
 // ============================================================================
 // Types
@@ -78,6 +81,13 @@ export async function createMilestone(
     return { success: false, error: error.message };
   }
 
+  // Get user name for notification
+  const { data: userData } = await supabase
+    .from("users")
+    .select("name")
+    .eq("id", user.id)
+    .single();
+
   // Log activity
   await logActivity({
     action: ACTIVITY_ACTIONS.MILESTONE_CREATED,
@@ -90,12 +100,18 @@ export async function createMilestone(
     },
   });
 
-  // Create notifications for team members
+  // Create notifications for team members (in-app + email)
   await notifyTeamAboutMilestone(
     input.project_id,
     user.id,
     `New milestone "${input.name}" added`,
-    milestone.id
+    milestone.id,
+    {
+      name: input.name,
+      dueDate: input.due_date,
+      isCompleted: false,
+      actionByName: userData?.name || "A team member",
+    }
   );
 
   revalidatePath(`/projects/${input.project_id}`);
@@ -176,16 +192,23 @@ export async function completeMilestone(
     return { success: false, error: "Not authenticated" };
   }
 
-  // Get milestone details
+  // Get milestone details (including due_date for email)
   const { data: milestone } = await supabase
     .from("milestones")
-    .select("project_id, name")
+    .select("project_id, name, due_date")
     .eq("id", milestoneId)
     .single();
 
   if (!milestone) {
     return { success: false, error: "Milestone not found" };
   }
+
+  // Get user name for notification
+  const { data: userData } = await supabase
+    .from("users")
+    .select("name")
+    .eq("id", user.id)
+    .single();
 
   // Update completion status with timestamp
   const { error } = await supabase
@@ -216,7 +239,13 @@ export async function completeMilestone(
         milestone.project_id,
         user.id,
         `Milestone "${milestone.name}" completed! 🎉`,
-        milestoneId
+        milestoneId,
+        {
+          name: milestone.name,
+          dueDate: milestone.due_date,
+          isCompleted: true,
+          actionByName: userData?.name || "A team member",
+        }
       ),
     ]).catch(err => console.error("Background task error:", err));
   }
@@ -356,16 +385,23 @@ export async function getOverdueMilestones(options?: {
 }
 
 // ============================================================================
-// Helper: Notify team about milestone
+// Helper: Notify team about milestone (in-app + email via batch API)
 // ============================================================================
 
 async function notifyTeamAboutMilestone(
   projectId: string,
   excludeUserId: string,
   message: string,
-  milestoneId: string
+  milestoneId: string,
+  milestoneDetails?: {
+    name: string;
+    dueDate: string;
+    isCompleted?: boolean;
+    actionByName: string;
+  }
 ) {
   const supabase = await createClient();
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
   // Get project details
   const { data: project } = await supabase
@@ -385,19 +421,78 @@ async function notifyTeamAboutMilestone(
 
   if (!assignments || assignments.length === 0) return;
 
-  // Create notifications for each team member
-  const notifications = assignments.map((a) => ({
-    user_id: a.user_id,
+  const userIds = assignments.map((a) => a.user_id);
+
+  // Get user details for email (active users, exclude clients)
+  const { data: users } = await supabase
+    .from("users")
+    .select("id, name, email, role")
+    .in("id", userIds)
+    .eq("is_active", true)
+    .neq("role", "client");
+
+  if (!users || users.length === 0) return;
+
+  // 1. Create in-app notifications (batch insert)
+  const notifications = users.map((u) => ({
+    user_id: u.id,
     type: "milestone_due",
     title: message,
     message: `Project: ${project.name}`,
-    link: `/projects/${projectId}?tab=milestones`,
     project_id: projectId,
   }));
 
-  const { error } = await supabase.from("notifications").insert(notifications);
+  const { error: notifError } = await supabase.from("notifications").insert(notifications);
+  if (notifError) {
+    console.error("[Milestone Notification] Failed to create in-app notifications:", notifError.message);
+  }
 
-  if (error) {
-    console.error("Error creating milestone notifications:", error);
+  // 2. Send email notifications using Resend batch API
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey || !milestoneDetails) {
+    return;
+  }
+
+  const usersWithEmail = users.filter((u) => u.email);
+  if (usersWithEmail.length === 0) return;
+
+  const projectUrl = `${siteUrl}/projects/${projectId}?tab=milestones`;
+  const daysUntilDue = milestoneDetails.isCompleted
+    ? 0
+    : Math.ceil((new Date(milestoneDetails.dueDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+
+  // Build batch email requests
+  const emailRequests = usersWithEmail.map((user) => ({
+    from: "Formula Contract <noreply@formulacontractpm.com>",
+    to: user.email,
+    subject: milestoneDetails.isCompleted
+      ? `Milestone Completed: ${milestoneDetails.name}`
+      : `New Milestone: ${milestoneDetails.name}`,
+    react: MilestoneAlertEmail({
+      userName: user.name,
+      milestoneName: milestoneDetails.name,
+      projectName: project.name,
+      projectCode: project.project_code,
+      dueDate: new Date(milestoneDetails.dueDate).toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      }),
+      daysUntilDue,
+      projectUrl,
+    }),
+  }));
+
+  try {
+    const resend = new Resend(apiKey);
+    const { error: batchError } = await resend.batch.send(emailRequests);
+
+    if (batchError) {
+      console.error("[Milestone Notification] Batch email failed:", batchError);
+    } else {
+      console.log(`[Milestone Notification] Batch sent ${usersWithEmail.length} emails`);
+    }
+  } catch (emailError) {
+    console.error("[Milestone Notification] Batch email error:", emailError);
   }
 }

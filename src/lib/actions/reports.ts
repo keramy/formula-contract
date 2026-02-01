@@ -1101,15 +1101,13 @@ export async function getReportActivity(
       ip_address,
       user_agent,
       created_at,
-      user:users!report_activity_user_id_fkey(name, email)
+      user:users(name, email)
     `)
     .eq("report_id", reportId)
     .order("created_at", { ascending: false })
     .limit(limit);
 
   if (error) {
-    // RLS will return empty if not admin, not an error
-    console.error("Error fetching report activity:", error.message);
     return [];
   }
 
@@ -1139,7 +1137,7 @@ export async function getReportActivitySummary(reportId: string): Promise<{
       action,
       user_id,
       created_at,
-      user:users!report_activity_user_id_fkey(name)
+      user:users(name)
     `)
     .eq("report_id", reportId)
     .order("created_at", { ascending: false });
