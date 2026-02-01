@@ -70,7 +70,7 @@ ReportPublishedEmail.PreviewProps = {
   userName: "John Doe",
   projectName: "Hilton Hotel Renovation",
   projectCode: "PRJ-2024-001",
-  reportType: "progress",
+  reportType: "daily",
   publisherName: "Jane Smith",
   reportUrl: "https://formulacontractpm.com/projects/abc123?tab=reports",
 } satisfies ReportPublishedEmailProps;

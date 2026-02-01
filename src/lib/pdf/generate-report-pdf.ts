@@ -9,11 +9,11 @@
 import type { Report } from "@/lib/actions/reports";
 
 const REPORT_TYPE_LABELS: Record<string, string> = {
-  progress: "Progress Report",
+  daily: "Daily Report",
   weekly: "Weekly Report",
-  monthly: "Monthly Report",
-  milestone: "Milestone Report",
-  final: "Final Report",
+  site: "Site Report",
+  installation: "Installation Report",
+  snagging: "Snagging Report",
 };
 
 // Image data with dimensions for proper aspect ratio

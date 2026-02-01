@@ -11,7 +11,7 @@
  * Original: ~875 lines -> Refactored: ~350 lines
  */
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   DndContext,
@@ -42,20 +42,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   PlusIcon,
   ImageIcon,
   FileTextIcon,
   SaveIcon,
   SendIcon,
-  ChevronDownIcon,
-  ChevronUpIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  CheckIcon,
+  GlobeIcon,
+  BellIcon,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { publishReport, uploadReportPdf } from "@/lib/actions/reports";
@@ -89,9 +85,8 @@ export function ReportCreationModal({
   const router = useRouter();
 
   // Report metadata state
-  const [reportType, setReportType] = useState("progress");
+  const [reportType, setReportType] = useState("daily");
   const [shareWithClient, setShareWithClient] = useState(false);
-  const [shareInternal, setShareInternal] = useState(true);
 
   // Sections state (local until save)
   const [sections, setSections] = useState<LocalSection[]>([]);
@@ -107,8 +102,8 @@ export function ReportCreationModal({
   // Delete confirmation state
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  // Expanded state for settings
-  const [settingsExpanded, setSettingsExpanded] = useState(true);
+  // Wizard step state (0 = Content, 1 = Share & Publish)
+  const [currentStep, setCurrentStep] = useState(0);
 
   // Notification settings - whether to include clients in email notifications
   const [notifyClients, setNotifyClients] = useState(false);
@@ -121,17 +116,23 @@ export function ReportCreationModal({
     })
   );
 
+  // Wizard steps configuration
+  const WIZARD_STEPS = [
+    { number: 1, title: "Content" },
+    { number: 2, title: "Share & Publish" },
+  ];
+
   // Reset all state when modal opens/closes
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen && !isSaving) {
-      setReportType("progress");
+      setReportType("daily");
       setShareWithClient(false);
-      setShareInternal(true);
       setNotifyClients(false);
       setSections([]);
       setError(null);
       setSectionFormOpen(false);
       setEditingSection(null);
+      setCurrentStep(0);
     }
     onOpenChange(newOpen);
   };
@@ -202,6 +203,7 @@ export function ReportCreationModal({
       if (!user) throw new Error("Not authenticated");
 
       // Create the report (always as draft first)
+      // share_internal is always true - team members always see their reports
       const { data: newReport, error: reportError } = await supabase
         .from("reports")
         .insert({
@@ -211,7 +213,7 @@ export function ReportCreationModal({
           is_published: false,
           published_at: null,
           share_with_client: shareWithClient,
-          share_internal: shareInternal,
+          share_internal: true,
         })
         .select("id")
         .single();
@@ -248,7 +250,7 @@ export function ReportCreationModal({
             is_published: false,
             published_at: null,
             share_with_client: shareWithClient,
-            share_internal: shareInternal,
+            share_internal: true,
             created_by: null,
             updated_by: null,
             created_at: new Date().toISOString(),
@@ -321,216 +323,331 @@ export function ReportCreationModal({
   return (
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileTextIcon className="size-5 text-orange-500" />
               Create New Report
             </DialogTitle>
             <DialogDescription>
-              Build your report by adding sections with descriptions and photos.
-              Save as draft or publish when ready.
+              {currentStep === 0
+                ? "Build your report by adding sections with descriptions and photos."
+                : "Configure sharing options and publish your report."}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto space-y-4 py-2 pr-2 -mr-2">
+          {/* Step Indicator */}
+          <div className="flex items-center justify-center gap-4 py-4 border-b">
+            {WIZARD_STEPS.map((step, index) => (
+              <div key={step.number} className="flex items-center gap-2">
+                <div
+                  className={`flex items-center justify-center size-8 rounded-full border-2 transition-colors ${
+                    index < currentStep
+                      ? "bg-orange-500 border-orange-500 text-white"
+                      : index === currentStep
+                        ? "border-orange-500 text-orange-500"
+                        : "border-gray-300 text-gray-400"
+                  }`}
+                >
+                  {index < currentStep ? (
+                    <CheckIcon className="size-4" />
+                  ) : (
+                    <span className="text-sm font-medium">{step.number}</span>
+                  )}
+                </div>
+                <span
+                  className={`text-sm font-medium ${
+                    index <= currentStep ? "text-foreground" : "text-muted-foreground"
+                  }`}
+                >
+                  {step.title}
+                </span>
+                {index < WIZARD_STEPS.length - 1 && (
+                  <div
+                    className={`w-12 h-0.5 mx-2 ${
+                      index < currentStep ? "bg-orange-500" : "bg-gray-200"
+                    }`}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="flex-1 overflow-y-auto space-y-4 py-4 pr-2 -mr-2">
             {error && (
               <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-sm">
                 {error}
               </div>
             )}
 
-            {/* Report Settings - Collapsible */}
-            <div className="border rounded-lg">
-              <button
-                type="button"
-                className="w-full flex items-center justify-between p-3 hover:bg-muted/50 transition-colors"
-                onClick={() => setSettingsExpanded(!settingsExpanded)}
-              >
-                <span className="font-medium text-sm">Report Settings</span>
-                {settingsExpanded ? (
-                  <ChevronUpIcon className="size-4 text-muted-foreground" />
-                ) : (
-                  <ChevronDownIcon className="size-4 text-muted-foreground" />
-                )}
-              </button>
-
-              {settingsExpanded && (
-                <div className="p-3 pt-0 space-y-4 border-t">
-                  {/* Report Type */}
-                  <div className="space-y-2">
-                    <Label htmlFor="report-type">Report Type</Label>
-                    <Select value={reportType} onValueChange={setReportType}>
-                      <SelectTrigger id="report-type">
-                        <SelectValue placeholder="Select report type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {REPORT_TYPES.map((type) => (
-                          <SelectItem key={type.value} value={type.value}>
-                            {type.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Visibility Settings */}
-                  <div className="space-y-3">
-                    <Label className="text-xs text-muted-foreground uppercase tracking-wide">Visibility</Label>
-                    <div className="flex flex-wrap gap-4">
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          id="share-internal"
-                          checked={shareInternal}
-                          onCheckedChange={setShareInternal}
-                        />
-                        <Label
-                          htmlFor="share-internal"
-                          className="text-sm font-normal cursor-pointer"
-                        >
-                          Share internally
-                        </Label>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          id="share-client"
-                          checked={shareWithClient}
-                          onCheckedChange={setShareWithClient}
-                        />
-                        <Label
-                          htmlFor="share-client"
-                          className="text-sm font-normal cursor-pointer"
-                        >
-                          Share with client
-                        </Label>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Email Notification Settings */}
-                  <div className="space-y-3">
-                    <Label className="text-xs text-muted-foreground uppercase tracking-wide">Email Notifications (on publish)</Label>
-                    <p className="text-xs text-muted-foreground">
-                      All team members will be notified by email when you publish this report.
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        id="notify-clients"
-                        checked={notifyClients}
-                        onCheckedChange={setNotifyClients}
-                      />
-                      <Label
-                        htmlFor="notify-clients"
-                        className="text-sm font-normal cursor-pointer"
+            {/* Step 1: Content */}
+            {currentStep === 0 && (
+              <div className="space-y-6">
+                {/* Report Type Selector - Prominent */}
+                <div className="space-y-3">
+                  <Label htmlFor="report-type" className="text-base font-medium">
+                    Report Type
+                  </Label>
+                  <div className="grid grid-cols-5 gap-2">
+                    {REPORT_TYPES.map((type) => (
+                      <button
+                        key={type.value}
+                        type="button"
+                        onClick={() => setReportType(type.value)}
+                        className={`p-3 rounded-lg border-2 text-center transition-all ${
+                          reportType === type.value
+                            ? "border-orange-500 bg-orange-50 text-orange-700"
+                            : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                        }`}
                       >
-                        Also notify clients
-                      </Label>
-                    </div>
+                        <span className="text-sm font-medium">{type.label.replace(" Report", "")}</span>
+                      </button>
+                    ))}
                   </div>
                 </div>
-              )}
-            </div>
 
-            {/* Report Sections */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-medium text-sm">Report Sections</h3>
-                  <p className="text-xs text-muted-foreground">
-                    {sections.length}{" "}
-                    {sections.length === 1 ? "section" : "sections"}
-                  </p>
-                </div>
-                <Button size="sm" variant="outline" onClick={handleAddSection}>
-                  <PlusIcon className="size-4" />
-                  Add Section
-                </Button>
-              </div>
-
-              {sections.length === 0 ? (
-                <Card className="p-6 border-dashed">
-                  <div className="flex flex-col items-center justify-center text-center">
-                    <ImageIcon className="size-8 text-muted-foreground/50 mb-2" />
-                    <p className="text-sm text-muted-foreground mb-3">
-                      No sections yet. Add your first section to get started.
-                    </p>
-                    <Button size="sm" onClick={handleAddSection}>
+                {/* Report Sections */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-medium text-base">Report Sections</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {sections.length}{" "}
+                        {sections.length === 1 ? "section" : "sections"} •{" "}
+                        {sections.reduce((acc, s) => acc + s.photos.length, 0)} photos
+                      </p>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={handleAddSection}>
                       <PlusIcon className="size-4" />
-                      Add First Section
+                      Add Section
                     </Button>
                   </div>
-                </Card>
-              ) : (
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={handleDragEnd}
-                >
-                  <SortableContext
-                    items={sections.map((s) => s.id)}
-                    strategy={verticalListSortingStrategy}
+
+                  {sections.length === 0 ? (
+                    <Card className="p-8 border-dashed">
+                      <div className="flex flex-col items-center justify-center text-center">
+                        <ImageIcon className="size-10 text-muted-foreground/50 mb-3" />
+                        <p className="text-muted-foreground mb-4">
+                          No sections yet. Add your first section to get started.
+                        </p>
+                        <Button onClick={handleAddSection}>
+                          <PlusIcon className="size-4" />
+                          Add First Section
+                        </Button>
+                      </div>
+                    </Card>
+                  ) : (
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <SortableContext
+                        items={sections.map((s) => s.id)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        <div className="space-y-2">
+                          {sections.map((section) => (
+                            <SortableSection
+                              key={section.id}
+                              section={section}
+                              onEdit={handleEditSection}
+                              onDelete={handleDeleteSection}
+                              disabled={isSaving}
+                              accentColor="orange"
+                            />
+                          ))}
+                        </div>
+                      </SortableContext>
+                    </DndContext>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Step 2: Share & Publish */}
+            {currentStep === 1 && (
+              <div className="space-y-6">
+                {/* Client Visibility */}
+                <div className="space-y-3">
+                  <Label className="text-base font-medium">Client Access</Label>
+                  <button
+                    type="button"
+                    onClick={() => setShareWithClient(!shareWithClient)}
+                    className={`w-full p-4 rounded-lg border-2 text-left transition-all ${
+                      shareWithClient
+                        ? "border-sky-500 bg-sky-50"
+                        : "border-gray-200 hover:border-gray-300"
+                    }`}
                   >
-                    <div className="space-y-2">
-                      {sections.map((section) => (
-                        <SortableSection
-                          key={section.id}
-                          section={section}
-                          onEdit={handleEditSection}
-                          onDelete={handleDeleteSection}
-                          disabled={isSaving}
-                          accentColor="orange"
+                    <div className="flex items-start gap-4">
+                      <div
+                        className={`p-3 rounded-lg ${
+                          shareWithClient ? "bg-sky-100" : "bg-gray-100"
+                        }`}
+                      >
+                        <GlobeIcon
+                          className={`size-6 ${
+                            shareWithClient ? "text-sky-600" : "text-gray-500"
+                          }`}
                         />
-                      ))}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-lg">Share with Client</span>
+                          <Switch
+                            checked={shareWithClient}
+                            onCheckedChange={setShareWithClient}
+                            className="pointer-events-none"
+                          />
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          When enabled, client contacts assigned to this project will be able to view this report.
+                        </p>
+                      </div>
                     </div>
-                  </SortableContext>
-                </DndContext>
-              )}
-            </div>
+                  </button>
+                </div>
+
+                {/* Email Notifications */}
+                <div className="space-y-3">
+                  <Label className="text-base font-medium">Email Notifications</Label>
+                  <button
+                    type="button"
+                    onClick={() => setNotifyClients(!notifyClients)}
+                    className={`w-full p-4 rounded-lg border-2 text-left transition-all ${
+                      notifyClients
+                        ? "border-orange-500 bg-orange-50"
+                        : "border-gray-200 hover:border-gray-300"
+                    }`}
+                  >
+                    <div className="flex items-start gap-4">
+                      <div
+                        className={`p-3 rounded-lg ${
+                          notifyClients ? "bg-orange-100" : "bg-gray-100"
+                        }`}
+                      >
+                        <BellIcon
+                          className={`size-6 ${
+                            notifyClients ? "text-orange-600" : "text-gray-500"
+                          }`}
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-lg">Notify Clients</span>
+                          <Switch
+                            checked={notifyClients}
+                            onCheckedChange={setNotifyClients}
+                            className="pointer-events-none"
+                          />
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Send email notification to client contacts when published.
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+
+                {/* Summary Card */}
+                <div className="space-y-3">
+                  <Label className="text-base font-medium">Summary</Label>
+                  <Card className="p-4 bg-gray-50">
+                    <div className="grid grid-cols-3 gap-4 text-center">
+                      <div>
+                        <p className="text-2xl font-semibold text-orange-600">
+                          {REPORT_TYPES.find((t) => t.value === reportType)?.label.replace(" Report", "")}
+                        </p>
+                        <p className="text-sm text-muted-foreground">Report Type</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-semibold text-orange-600">
+                          {sections.length}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {sections.length === 1 ? "Section" : "Sections"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-semibold text-orange-600">
+                          {sections.reduce((acc, s) => acc + s.photos.length, 0)}
+                        </p>
+                        <p className="text-sm text-muted-foreground">Photos</p>
+                      </div>
+                    </div>
+                  </Card>
+                </div>
+              </div>
+            )}
           </div>
 
           <DialogFooter className="flex-shrink-0 gap-2 sm:gap-2 border-t pt-4">
-            <Button
-              variant="outline"
-              onClick={() => handleOpenChange(false)}
-              disabled={isSaving}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => handleSaveReport(false)}
-              disabled={isSaving || sections.length === 0}
-            >
-              {isSaving ? (
-                <>
-                  <Spinner className="size-4" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <SaveIcon className="size-4" />
-                  Save as Draft
-                </>
-              )}
-            </Button>
-            <Button
-              onClick={() => handleSaveReport(true)}
-              disabled={isSaving || sections.length === 0}
-              className="bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600"
-            >
-              {isSaving ? (
-                <>
-                  <Spinner className="size-4" />
-                  Publishing...
-                </>
-              ) : (
-                <>
-                  <SendIcon className="size-4" />
-                  Publish
-                </>
-              )}
-            </Button>
+            {currentStep === 0 ? (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => handleOpenChange(false)}
+                  disabled={isSaving}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => setCurrentStep(1)}
+                  disabled={sections.length === 0}
+                  className="bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600"
+                >
+                  Next: Share & Publish
+                  <ChevronRightIcon className="size-4" />
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="ghost"
+                  onClick={() => setCurrentStep(0)}
+                  disabled={isSaving}
+                >
+                  <ChevronLeftIcon className="size-4" />
+                  Back
+                </Button>
+                <div className="flex-1" />
+                <Button
+                  variant="secondary"
+                  onClick={() => handleSaveReport(false)}
+                  disabled={isSaving}
+                >
+                  {isSaving ? (
+                    <>
+                      <Spinner className="size-4" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <SaveIcon className="size-4" />
+                      Save as Draft
+                    </>
+                  )}
+                </Button>
+                <Button
+                  onClick={() => handleSaveReport(true)}
+                  disabled={isSaving}
+                  className="bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600"
+                >
+                  {isSaving ? (
+                    <>
+                      <Spinner className="size-4" />
+                      Publishing...
+                    </>
+                  ) : (
+                    <>
+                      <SendIcon className="size-4" />
+                      Publish
+                    </>
+                  )}
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

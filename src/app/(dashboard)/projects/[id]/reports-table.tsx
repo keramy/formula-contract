@@ -54,19 +54,19 @@ interface ReportsTableProps {
 }
 
 const REPORT_TYPE_LABELS: Record<string, string> = {
-  progress: "Progress",
+  daily: "Daily",
   weekly: "Weekly",
-  monthly: "Monthly",
-  milestone: "Milestone",
-  final: "Final",
+  site: "Site",
+  installation: "Installation",
+  snagging: "Snagging",
 };
 
 const REPORT_TYPE_COLORS: Record<string, string> = {
-  progress: "bg-blue-100 text-blue-700",
+  daily: "bg-blue-100 text-blue-700",
   weekly: "bg-teal-100 text-teal-700",
-  monthly: "bg-violet-100 text-violet-700",
-  milestone: "bg-amber-100 text-amber-700",
-  final: "bg-emerald-100 text-emerald-700",
+  site: "bg-violet-100 text-violet-700",
+  installation: "bg-amber-100 text-amber-700",
+  snagging: "bg-rose-100 text-rose-700",
 };
 
 type SortField = "report_type" | "is_published" | "created_at" | "updated_at" | "creator";

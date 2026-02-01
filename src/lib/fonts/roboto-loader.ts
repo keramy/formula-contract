@@ -2,7 +2,8 @@
  * Roboto Font Loader for jsPDF
  *
  * Loads Roboto font with Turkish character support for PDF generation.
- * Fonts are fetched from Google Fonts CDN and cached in memory.
+ * Uses complete font files from Google Fonts GitHub repository that include
+ * Latin Extended characters (Turkish: ş, ğ, ı, ö, ü, ç, İ, Ş, Ğ, etc.)
  */
 
 import { jsPDF } from "jspdf";
@@ -11,10 +12,13 @@ import { jsPDF } from "jspdf";
 let fontsLoaded = false;
 let robotoRegular: string | null = null;
 let robotoBold: string | null = null;
+let robotoMedium: string | null = null;
 
-// Google Fonts CDN URLs for Roboto (Latin Extended - includes Turkish)
-const ROBOTO_REGULAR_URL = "https://fonts.gstatic.com/s/roboto/v30/KFOmCnqEu92Fr1Mu4mxP.ttf";
-const ROBOTO_BOLD_URL = "https://fonts.gstatic.com/s/roboto/v30/KFOlCnqEu92Fr1MmWUlfBBc9.ttf";
+// Complete Roboto font files via jsDelivr CDN (includes all character sets)
+// These are full TTF files, not subsetted versions - includes Turkish characters
+const ROBOTO_REGULAR_URL = "https://cdn.jsdelivr.net/gh/google/fonts@main/apache/roboto/Roboto-Regular.ttf";
+const ROBOTO_MEDIUM_URL = "https://cdn.jsdelivr.net/gh/google/fonts@main/apache/roboto/Roboto-Medium.ttf";
+const ROBOTO_BOLD_URL = "https://cdn.jsdelivr.net/gh/google/fonts@main/apache/roboto/Roboto-Bold.ttf";
 
 /**
  * Convert ArrayBuffer to Base64 string
@@ -48,8 +52,9 @@ export async function loadRobotoFonts(doc: jsPDF): Promise<void> {
   // Load fonts if not already cached
   if (!fontsLoaded) {
     try {
-      [robotoRegular, robotoBold] = await Promise.all([
+      [robotoRegular, robotoMedium, robotoBold] = await Promise.all([
         fetchFontAsBase64(ROBOTO_REGULAR_URL),
+        fetchFontAsBase64(ROBOTO_MEDIUM_URL),
         fetchFontAsBase64(ROBOTO_BOLD_URL),
       ]);
       fontsLoaded = true;
@@ -61,10 +66,12 @@ export async function loadRobotoFonts(doc: jsPDF): Promise<void> {
   }
 
   // Register fonts with jsPDF
-  if (robotoRegular && robotoBold) {
+  if (robotoRegular && robotoMedium && robotoBold) {
     doc.addFileToVFS("Roboto-Regular.ttf", robotoRegular);
+    doc.addFileToVFS("Roboto-Medium.ttf", robotoMedium);
     doc.addFileToVFS("Roboto-Bold.ttf", robotoBold);
     doc.addFont("Roboto-Regular.ttf", "Roboto", "normal");
+    doc.addFont("Roboto-Medium.ttf", "Roboto", "medium");
     doc.addFont("Roboto-Bold.ttf", "Roboto", "bold");
   }
 }

@@ -98,7 +98,6 @@ export function ReportEditModal({
   // Report metadata state
   const [reportType, setReportType] = useState(report.report_type);
   const [shareWithClient, setShareWithClient] = useState(report.share_with_client);
-  const [shareInternal, setShareInternal] = useState(report.share_internal);
 
   // Sections state (local until save)
   const [sections, setSections] = useState<LocalSection[]>([]);
@@ -131,7 +130,6 @@ export function ReportEditModal({
     if (open) {
       setReportType(report.report_type);
       setShareWithClient(report.share_with_client);
-      setShareInternal(report.share_internal);
       setSections(linesToSections(report.lines || []));
       setDeletedSectionIds([]);
       setError(null);
@@ -226,12 +224,12 @@ export function ReportEditModal({
       if (!user) throw new Error("Not authenticated");
 
       // 1. Update report metadata
+      // share_internal stays as-is (always true for team visibility)
       const { error: reportError } = await supabase
         .from("reports")
         .update({
           report_type: reportType,
           share_with_client: shareWithClient,
-          share_internal: shareInternal,
           updated_by: user.id,
           updated_at: new Date().toISOString(),
         })
@@ -349,22 +347,9 @@ export function ReportEditModal({
                     </Select>
                   </div>
 
-                  {/* Visibility Settings */}
-                  <div className="flex flex-wrap gap-4">
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        id="share-internal"
-                        checked={shareInternal}
-                        onCheckedChange={setShareInternal}
-                      />
-                      <Label
-                        htmlFor="share-internal"
-                        className="text-sm font-normal cursor-pointer"
-                      >
-                        Share internally
-                      </Label>
-                    </div>
-
+                  {/* Client Visibility */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wide">Client Access</Label>
                     <div className="flex items-center gap-2">
                       <Switch
                         id="share-client"

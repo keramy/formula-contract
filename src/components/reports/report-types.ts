@@ -10,21 +10,21 @@
 // ============================================================================
 
 export const REPORT_TYPES = [
-  { value: "progress", label: "Progress Report" },
+  { value: "daily", label: "Daily Report" },
   { value: "weekly", label: "Weekly Report" },
-  { value: "monthly", label: "Monthly Report" },
-  { value: "milestone", label: "Milestone Report" },
-  { value: "final", label: "Final Report" },
+  { value: "site", label: "Site Report" },
+  { value: "installation", label: "Installation Report" },
+  { value: "snagging", label: "Snagging Report" },
 ] as const;
 
 export type ReportTypeValue = (typeof REPORT_TYPES)[number]["value"];
 
 export const REPORT_TYPE_LABELS: Record<ReportTypeValue, string> = {
-  progress: "Progress Report",
+  daily: "Daily Report",
   weekly: "Weekly Report",
-  monthly: "Monthly Report",
-  milestone: "Milestone Report",
-  final: "Final Report",
+  site: "Site Report",
+  installation: "Installation Report",
+  snagging: "Snagging Report",
 };
 
 // ============================================================================

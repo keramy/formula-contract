@@ -195,7 +195,7 @@ export function SectionFormDialog({
         if (!newOpen) setError(null);
       }}
     >
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>
             {editingSection ? "Edit Section" : "Add Section"}
@@ -234,44 +234,49 @@ export function SectionFormDialog({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Add details, notes, or observations..."
-              rows={4}
+              rows={5}
             />
           </div>
 
           {/* Photos */}
           <div className="space-y-2">
-            <Label>Photos</Label>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex items-center justify-between">
+              <Label>Photos</Label>
+              <span className="text-xs text-muted-foreground">
+                {photos.length} {photos.length === 1 ? "photo" : "photos"}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-3">
               {photos.map((url, idx) => (
                 <div
                   key={idx}
-                  className="relative w-20 h-14 rounded-md overflow-hidden bg-slate-100 group"
+                  className="relative w-28 h-20 rounded-lg overflow-hidden bg-slate-100 group border"
                 >
                   <Image
                     src={url}
                     alt={`Photo ${idx + 1}`}
                     fill
-                    className="object-contain"
+                    className="object-cover"
                   />
                   <button
                     type="button"
                     onClick={() => handleRemovePhoto(idx)}
-                    className="absolute top-0.5 right-0.5 size-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute top-1 right-1 size-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
                   >
-                    <XIcon className="size-3" />
+                    <XIcon className="size-3.5" />
                   </button>
                 </div>
               ))}
 
               {/* Upload Button */}
-              <label className="size-16 rounded-md border-2 border-dashed border-muted-foreground/25 hover:border-muted-foreground/50 flex flex-col items-center justify-center cursor-pointer transition-colors">
+              <label className="w-28 h-20 rounded-lg border-2 border-dashed border-muted-foreground/25 hover:border-muted-foreground/50 hover:bg-muted/50 flex flex-col items-center justify-center cursor-pointer transition-colors">
                 {isUploading ? (
                   <Spinner className="size-5" />
                 ) : (
                   <>
-                    <ImageIcon className="size-4 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground mt-0.5">
-                      Add
+                    <ImageIcon className="size-5 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground mt-1">
+                      Add Photos
                     </span>
                   </>
                 )}
