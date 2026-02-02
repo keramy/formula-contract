@@ -102,7 +102,7 @@ export function ReportCreationModal({
   // Delete confirmation state
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  // Wizard step state (0 = Content, 1 = Share & Publish)
+  // Wizard step state (0 = Report Type, 1 = Sections, 2 = Share & Publish)
   const [currentStep, setCurrentStep] = useState(0);
 
   // Notification settings - whether to include clients in email notifications
@@ -118,8 +118,9 @@ export function ReportCreationModal({
 
   // Wizard steps configuration
   const WIZARD_STEPS = [
-    { number: 1, title: "Content" },
-    { number: 2, title: "Share & Publish" },
+    { number: 1, title: "Report Type" },
+    { number: 2, title: "Sections" },
+    { number: 3, title: "Share" },
   ];
 
   // Reset all state when modal opens/closes
@@ -276,8 +277,17 @@ export function ReportCreationModal({
             projectCode,
           });
 
+          // DEBUG: Log PDF generation result
+          console.log("[Report Publish] PDF generation result:", {
+            success: pdfResult.success,
+            hasBase64: !!pdfResult.base64,
+            base64Length: pdfResult.base64?.length || 0,
+            error: pdfResult.error || "none"
+          });
+
           if (!pdfResult.success || !pdfResult.base64) {
-            console.error("PDF generation failed:", pdfResult.error);
+            console.error("[Report Publish] PDF generation failed:", pdfResult.error);
+            console.log("[Report Publish] Publishing WITHOUT PDF URL");
             await publishReport(newReport.id, notifyClients);
             toast.success("Report published (PDF generation failed)");
           } else {
@@ -291,12 +301,21 @@ export function ReportCreationModal({
               reportType
             );
 
+            // DEBUG: Log PDF upload result
+            console.log("[Report Publish] PDF upload result:", {
+              success: uploadResult.success,
+              url: uploadResult.url || "NONE",
+              error: uploadResult.error || "none"
+            });
+
             if (!uploadResult.success || !uploadResult.url) {
-              console.error("PDF upload failed:", uploadResult.error);
+              console.error("[Report Publish] PDF upload failed:", uploadResult.error);
+              console.log("[Report Publish] Publishing WITHOUT PDF URL");
               await publishReport(newReport.id, notifyClients);
               toast.success("Report published (PDF upload failed)");
             } else {
               // Publish with PDF URL
+              console.log("[Report Publish] Calling publishReport with pdfUrl:", uploadResult.url);
               await publishReport(newReport.id, notifyClients, uploadResult.url);
               toast.success("Report published successfully!");
             }
@@ -331,17 +350,19 @@ export function ReportCreationModal({
             </DialogTitle>
             <DialogDescription>
               {currentStep === 0
-                ? "Build your report by adding sections with descriptions and photos."
-                : "Configure sharing options and publish your report."}
+                ? "Select the type of report you want to create."
+                : currentStep === 1
+                  ? "Build your report by adding sections with descriptions and photos."
+                  : "Configure sharing options and publish your report."}
             </DialogDescription>
           </DialogHeader>
 
           {/* Step Indicator */}
-          <div className="flex items-center justify-center gap-4 py-4 border-b">
+          <div className="flex items-center justify-center gap-2 sm:gap-4 py-4 border-b">
             {WIZARD_STEPS.map((step, index) => (
-              <div key={step.number} className="flex items-center gap-2">
+              <div key={step.number} className="flex items-center gap-1.5 sm:gap-2">
                 <div
-                  className={`flex items-center justify-center size-8 rounded-full border-2 transition-colors ${
+                  className={`flex items-center justify-center size-7 sm:size-8 rounded-full border-2 transition-colors ${
                     index < currentStep
                       ? "bg-orange-500 border-orange-500 text-white"
                       : index === currentStep
@@ -350,13 +371,13 @@ export function ReportCreationModal({
                   }`}
                 >
                   {index < currentStep ? (
-                    <CheckIcon className="size-4" />
+                    <CheckIcon className="size-3.5 sm:size-4" />
                   ) : (
-                    <span className="text-sm font-medium">{step.number}</span>
+                    <span className="text-xs sm:text-sm font-medium">{step.number}</span>
                   )}
                 </div>
                 <span
-                  className={`text-sm font-medium ${
+                  className={`hidden sm:inline text-sm font-medium ${
                     index <= currentStep ? "text-foreground" : "text-muted-foreground"
                   }`}
                 >
@@ -364,13 +385,17 @@ export function ReportCreationModal({
                 </span>
                 {index < WIZARD_STEPS.length - 1 && (
                   <div
-                    className={`w-12 h-0.5 mx-2 ${
+                    className={`w-6 sm:w-12 h-0.5 mx-1 sm:mx-2 ${
                       index < currentStep ? "bg-orange-500" : "bg-gray-200"
                     }`}
                   />
                 )}
               </div>
             ))}
+          </div>
+          {/* Mobile step label - shown below indicator on small screens */}
+          <div className="sm:hidden text-center text-sm font-medium text-muted-foreground -mt-2 pb-2 border-b">
+            Step {currentStep + 1}: {WIZARD_STEPS[currentStep].title}
           </div>
 
           <div className="flex-1 overflow-y-auto space-y-4 py-4 pr-2 -mr-2">
@@ -380,15 +405,14 @@ export function ReportCreationModal({
               </div>
             )}
 
-            {/* Step 1: Content */}
+            {/* Step 1: Report Type */}
             {currentStep === 0 && (
               <div className="space-y-6">
-                {/* Report Type Selector - Prominent */}
                 <div className="space-y-3">
-                  <Label htmlFor="report-type" className="text-base font-medium">
-                    Report Type
+                  <Label className="text-base font-medium">
+                    Select Report Type
                   </Label>
-                  <div className="grid grid-cols-5 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
                     {REPORT_TYPES.map((type) => (
                       <button
                         key={type.value}
@@ -405,8 +429,12 @@ export function ReportCreationModal({
                     ))}
                   </div>
                 </div>
+              </div>
+            )}
 
-                {/* Report Sections */}
+            {/* Step 2: Sections */}
+            {currentStep === 1 && (
+              <div className="space-y-6">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
@@ -465,8 +493,8 @@ export function ReportCreationModal({
               </div>
             )}
 
-            {/* Step 2: Share & Publish */}
-            {currentStep === 1 && (
+            {/* Step 3: Share & Publish */}
+            {currentStep === 2 && (
               <div className="space-y-6">
                 {/* Client Visibility */}
                 <div className="space-y-3">
@@ -584,6 +612,7 @@ export function ReportCreationModal({
 
           <DialogFooter className="flex-shrink-0 gap-2 sm:gap-2 border-t pt-4">
             {currentStep === 0 ? (
+              // Step 1: Report Type
               <>
                 <Button
                   variant="outline"
@@ -594,18 +623,39 @@ export function ReportCreationModal({
                 </Button>
                 <Button
                   onClick={() => setCurrentStep(1)}
-                  disabled={sections.length === 0}
                   className="bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600"
                 >
-                  Next: Share & Publish
+                  Next: Add Sections
                   <ChevronRightIcon className="size-4" />
                 </Button>
               </>
-            ) : (
+            ) : currentStep === 1 ? (
+              // Step 2: Sections
               <>
                 <Button
                   variant="ghost"
                   onClick={() => setCurrentStep(0)}
+                  disabled={isSaving}
+                >
+                  <ChevronLeftIcon className="size-4" />
+                  Back
+                </Button>
+                <div className="flex-1" />
+                <Button
+                  onClick={() => setCurrentStep(2)}
+                  disabled={sections.length === 0}
+                  className="bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600"
+                >
+                  Next: Share Options
+                  <ChevronRightIcon className="size-4" />
+                </Button>
+              </>
+            ) : (
+              // Step 3: Share & Publish
+              <>
+                <Button
+                  variant="ghost"
+                  onClick={() => setCurrentStep(1)}
                   disabled={isSaving}
                 >
                   <ChevronLeftIcon className="size-4" />

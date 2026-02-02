@@ -145,6 +145,10 @@ async function sendReportPublishedNotification(
   const supabase = await createClient();
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
+  // DEBUG: Log PDF URL received and environment
+  console.log("[Report Notification] NEXT_PUBLIC_SITE_URL env:", process.env.NEXT_PUBLIC_SITE_URL || "NOT SET - using localhost:3000");
+  console.log("[Report Notification] Starting notification for report:", reportId);
+  console.log("[Report Notification] PDF URL received:", pdfUrl || "NONE - will use fallback");
   console.log("[Report Notification] Starting for project:", projectId, "publisher:", publisherId, "includeClients:", includeClients);
 
   // Get all user IDs assigned to this project
@@ -233,6 +237,10 @@ async function sendReportPublishedNotification(
   // Build batch email requests
   // Use PDF URL if available, otherwise link to project reports page
   const reportUrl = pdfUrl || `${siteUrl}/projects/${projectId}?tab=reports`;
+
+  // DEBUG: Log final URL being used in email
+  console.log("[Report Notification] Final reportUrl for email:", reportUrl);
+  console.log("[Report Notification] Using PDF direct link:", !!pdfUrl);
 
   const emailRequests = usersWithEmail.map(user => ({
     from: "Formula Contract <noreply@formulacontractpm.com>",
@@ -658,6 +666,9 @@ export async function publishReport(
   includeClients: boolean = false,
   pdfUrl?: string
 ): Promise<ActionResult> {
+  // DEBUG: Log what was received by publishReport
+  console.log("[publishReport] Called with:", { reportId, includeClients, pdfUrl: pdfUrl || "NONE" });
+
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -712,6 +723,9 @@ export async function publishReport(
     // Send in-app + email notifications to all project team members
     if (project) {
       try {
+        // DEBUG: Log before calling notification function
+        console.log("[publishReport] Passing pdfUrl to notification:", pdfUrl || "NONE");
+
         await sendReportPublishedNotification(
           report.project_id,
           reportId,
