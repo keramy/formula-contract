@@ -37,12 +37,16 @@ const nextConfig: NextConfig = {
   },
 
   // ============================================================================
-  // PERFORMANCE: Optimize barrel imports for large icon/component libraries
-  // Before: import { Icon } from "lucide-react" loads ALL 1000+ icons
-  // After:  Automatically transforms to direct imports, loading only used icons
-  // Impact: ~15-20% smaller bundle size for pages with many icons
+  // PERFORMANCE & SERVER CONFIG
   // ============================================================================
   experimental: {
+    // Increase body size limit for Server Actions (PDF uploads with photos)
+    serverActions: {
+      bodySizeLimit: "10mb",
+    },
+    // Optimize barrel imports for large icon/component libraries
+    // Before: import { Icon } from "lucide-react" loads ALL 1000+ icons
+    // After:  Automatically transforms to direct imports, loading only used icons
     optimizePackageImports: [
       "lucide-react",
       "date-fns",

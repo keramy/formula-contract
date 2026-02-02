@@ -18,6 +18,7 @@ import { ACTIVITY_ACTIONS } from "@/lib/activity-log/constants";
 import { sanitizeText, sanitizeHTML } from "@/lib/sanitize";
 import { Resend } from "resend";
 import { ReportPublishedEmail } from "@/emails/report-published-email";
+import type { ReportTypeValue } from "@/components/reports/report-types";
 
 // ============================================================================
 // Types
@@ -32,7 +33,7 @@ export interface SharedUser {
 export interface Report {
   id: string;
   project_id: string;
-  report_type: string;
+  report_type: ReportTypeValue;
   report_code: string | null; // Human-readable code (RPT-YYYY-NNNN)
   is_published: boolean;
   published_at: string | null;

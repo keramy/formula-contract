@@ -12,7 +12,7 @@
 export const REPORT_TYPES = [
   { value: "daily", label: "Daily Report" },
   { value: "weekly", label: "Weekly Report" },
-  { value: "site", label: "Site Report" },
+  { value: "progress", label: "Progress Report" },
   { value: "installation", label: "Installation Report" },
   { value: "snagging", label: "Snagging Report" },
 ] as const;
@@ -22,9 +22,18 @@ export type ReportTypeValue = (typeof REPORT_TYPES)[number]["value"];
 export const REPORT_TYPE_LABELS: Record<ReportTypeValue, string> = {
   daily: "Daily Report",
   weekly: "Weekly Report",
-  site: "Site Report",
+  progress: "Progress Report",
   installation: "Installation Report",
   snagging: "Snagging Report",
+};
+
+// Short labels for compact UI displays (tables, badges)
+export const REPORT_TYPE_SHORT_LABELS: Record<ReportTypeValue, string> = {
+  daily: "Daily",
+  weekly: "Weekly",
+  progress: "Progress",
+  installation: "Installation",
+  snagging: "Snagging",
 };
 
 // ============================================================================

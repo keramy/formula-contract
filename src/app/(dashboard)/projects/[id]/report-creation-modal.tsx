@@ -62,6 +62,7 @@ import { toast } from "sonner";
 import {
   REPORT_TYPES,
   type LocalSection,
+  type ReportTypeValue,
 } from "@/components/reports";
 import { SortableSection } from "@/components/reports/sortable-section";
 import { SectionFormDialog } from "@/components/reports/section-form-dialog";
@@ -85,7 +86,7 @@ export function ReportCreationModal({
   const router = useRouter();
 
   // Report metadata state
-  const [reportType, setReportType] = useState("daily");
+  const [reportType, setReportType] = useState<ReportTypeValue>("daily");
   const [shareWithClient, setShareWithClient] = useState(false);
 
   // Sections state (local until save)
@@ -499,10 +500,12 @@ export function ReportCreationModal({
                 {/* Client Visibility */}
                 <div className="space-y-3">
                   <Label className="text-base font-medium">Client Access</Label>
-                  <button
-                    type="button"
+                  <div
+                    role="button"
+                    tabIndex={0}
                     onClick={() => setShareWithClient(!shareWithClient)}
-                    className={`w-full p-4 rounded-lg border-2 text-left transition-all ${
+                    onKeyDown={(e) => e.key === "Enter" && setShareWithClient(!shareWithClient)}
+                    className={`w-full p-4 rounded-lg border-2 text-left transition-all cursor-pointer ${
                       shareWithClient
                         ? "border-sky-500 bg-sky-50"
                         : "border-gray-200 hover:border-gray-300"
@@ -534,16 +537,18 @@ export function ReportCreationModal({
                         </p>
                       </div>
                     </div>
-                  </button>
+                  </div>
                 </div>
 
                 {/* Email Notifications */}
                 <div className="space-y-3">
                   <Label className="text-base font-medium">Email Notifications</Label>
-                  <button
-                    type="button"
+                  <div
+                    role="button"
+                    tabIndex={0}
                     onClick={() => setNotifyClients(!notifyClients)}
-                    className={`w-full p-4 rounded-lg border-2 text-left transition-all ${
+                    onKeyDown={(e) => e.key === "Enter" && setNotifyClients(!notifyClients)}
+                    className={`w-full p-4 rounded-lg border-2 text-left transition-all cursor-pointer ${
                       notifyClients
                         ? "border-orange-500 bg-orange-50"
                         : "border-gray-200 hover:border-gray-300"
@@ -575,7 +580,7 @@ export function ReportCreationModal({
                         </p>
                       </div>
                     </div>
-                  </button>
+                  </div>
                 </div>
 
                 {/* Summary Card */}

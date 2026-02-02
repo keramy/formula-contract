@@ -63,6 +63,7 @@ import { type Report, type ReportLine, logReportActivity } from "@/lib/actions/r
 import {
   REPORT_TYPES,
   type LocalSection,
+  type ReportTypeValue,
 } from "@/components/reports";
 import { SortableSection } from "@/components/reports/sortable-section";
 import { SectionFormDialog } from "@/components/reports/section-form-dialog";
@@ -333,7 +334,7 @@ export function ReportEditModal({
                   {/* Report Type */}
                   <div className="space-y-2">
                     <Label htmlFor="report-type">Report Type</Label>
-                    <Select value={reportType} onValueChange={setReportType}>
+                    <Select value={reportType} onValueChange={(v) => setReportType(v as ReportTypeValue)}>
                       <SelectTrigger id="report-type">
                         <SelectValue placeholder="Select report type" />
                       </SelectTrigger>

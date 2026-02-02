@@ -24,6 +24,7 @@ import {
 import { GlassCard, StatusBadge } from "@/components/ui/ui-helpers";
 import { ReportPDFExport } from "@/components/reports/report-pdf-export";
 import { ReportActivityModal } from "@/components/reports/report-activity-modal";
+import { REPORT_TYPE_LABELS, REPORT_TYPE_SHORT_LABELS } from "@/components/reports/report-types";
 import {
   deleteReport,
   uploadReportPdf,
@@ -53,18 +54,10 @@ interface ReportsTableProps {
   onEditReport: (report: Report) => void;
 }
 
-const REPORT_TYPE_LABELS: Record<string, string> = {
-  daily: "Daily",
-  weekly: "Weekly",
-  site: "Site",
-  installation: "Installation",
-  snagging: "Snagging",
-};
-
 const REPORT_TYPE_COLORS: Record<string, string> = {
   daily: "bg-blue-100 text-blue-700",
   weekly: "bg-teal-100 text-teal-700",
-  site: "bg-violet-100 text-violet-700",
+  progress: "bg-violet-100 text-violet-700",
   installation: "bg-amber-100 text-amber-700",
   snagging: "bg-rose-100 text-rose-700",
 };
@@ -292,7 +285,7 @@ export function ReportsTable({
                           REPORT_TYPE_COLORS[report.report_type] || "bg-gray-100 text-gray-700"
                         }`}
                       >
-                        {REPORT_TYPE_LABELS[report.report_type] || report.report_type}
+                        {REPORT_TYPE_SHORT_LABELS[report.report_type]}
                       </span>
                     </TableCell>
 
@@ -439,7 +432,7 @@ export function ReportsTable({
       {activityModalReport && (
         <ReportActivityModal
           reportId={activityModalReport.id}
-          reportName={`${REPORT_TYPE_LABELS[activityModalReport.report_type] || activityModalReport.report_type} Report`}
+          reportName={`${REPORT_TYPE_LABELS[activityModalReport.report_type]} Report`}
           open={!!activityModalReport}
           onOpenChange={(open) => !open && setActivityModalReport(null)}
         />
