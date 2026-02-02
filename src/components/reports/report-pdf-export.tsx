@@ -122,9 +122,8 @@ export function ReportPDFExport({
         format: "a4",
       });
 
-      // Load Roboto fonts for Turkish character support
-      await loadRobotoFonts(doc);
-      const fontFamily = "Roboto";
+      // Load Roboto fonts for Turkish character support (returns font family to use)
+      const fontFamily = await loadRobotoFonts(doc);
 
       const pageWidth = doc.internal.pageSize.getWidth(); // 210mm
       const pageHeight = doc.internal.pageSize.getHeight(); // 297mm

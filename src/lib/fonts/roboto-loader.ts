@@ -4,21 +4,27 @@
  * Loads Roboto font with Turkish character support for PDF generation.
  * Uses complete font files from Google Fonts GitHub repository that include
  * Latin Extended characters (Turkish: ş, ğ, ı, ö, ü, ç, İ, Ş, Ğ, etc.)
+ *
+ * Falls back to Helvetica if font loading fails.
  */
 
 import { jsPDF } from "jspdf";
 
 // Cache for loaded fonts
-let fontsLoaded = false;
+let fontLoadAttempted = false;
+let fontLoadSuccess = false;
 let robotoRegular: string | null = null;
 let robotoBold: string | null = null;
 let robotoMedium: string | null = null;
 
-// Complete Roboto font files via jsDelivr CDN (includes all character sets)
-// These are full TTF files, not subsetted versions - includes Turkish characters
-const ROBOTO_REGULAR_URL = "https://cdn.jsdelivr.net/gh/google/fonts@main/apache/roboto/Roboto-Regular.ttf";
-const ROBOTO_MEDIUM_URL = "https://cdn.jsdelivr.net/gh/google/fonts@main/apache/roboto/Roboto-Medium.ttf";
-const ROBOTO_BOLD_URL = "https://cdn.jsdelivr.net/gh/google/fonts@main/apache/roboto/Roboto-Bold.ttf";
+// Roboto font files from Google Fonts CDN with latin-ext charset (includes Turkish: ş, ğ, ı, ö, ü, ç)
+// Source: https://gwfh.mranftl.com/fonts/roboto?subsets=latin-ext
+const ROBOTO_REGULAR_URL = "https://fonts.gstatic.com/s/roboto/v50/KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWubEbVmaiA8.ttf";
+const ROBOTO_MEDIUM_URL = "https://fonts.gstatic.com/s/roboto/v50/KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWub2bVmaiA8.ttf";
+const ROBOTO_BOLD_URL = "https://fonts.gstatic.com/s/roboto/v50/KFOMCnqEu92Fr1ME7kSn66aGLdTylUAMQXC89YmC2DPNWuYjalmaiA8.ttf";
+
+// Font family to use (Roboto if loaded, Helvetica as fallback)
+export let activeFontFamily = "helvetica";
 
 /**
  * Convert ArrayBuffer to Base64 string
@@ -47,26 +53,31 @@ async function fetchFontAsBase64(url: string): Promise<string> {
 /**
  * Load Roboto fonts and register them with jsPDF
  * Call this before generating any PDF that needs Turkish characters
+ * Returns the font family to use ("Roboto" if loaded, "helvetica" as fallback)
  */
-export async function loadRobotoFonts(doc: jsPDF): Promise<void> {
-  // Load fonts if not already cached
-  if (!fontsLoaded) {
+export async function loadRobotoFonts(doc: jsPDF): Promise<string> {
+  // Only attempt to load fonts once
+  if (!fontLoadAttempted) {
+    fontLoadAttempted = true;
     try {
+      console.log("[Font Loader] Fetching Roboto fonts from jsDelivr...");
       [robotoRegular, robotoMedium, robotoBold] = await Promise.all([
         fetchFontAsBase64(ROBOTO_REGULAR_URL),
         fetchFontAsBase64(ROBOTO_MEDIUM_URL),
         fetchFontAsBase64(ROBOTO_BOLD_URL),
       ]);
-      fontsLoaded = true;
+      fontLoadSuccess = true;
+      activeFontFamily = "Roboto";
+      console.log("[Font Loader] Roboto fonts loaded successfully");
     } catch (error) {
-      console.error("Failed to load Roboto fonts:", error);
-      // Fall back to Helvetica if fonts fail to load
-      return;
+      console.error("[Font Loader] Failed to load Roboto fonts, using Helvetica fallback:", error);
+      fontLoadSuccess = false;
+      activeFontFamily = "helvetica";
     }
   }
 
-  // Register fonts with jsPDF
-  if (robotoRegular && robotoMedium && robotoBold) {
+  // Register fonts with jsPDF if successfully loaded
+  if (fontLoadSuccess && robotoRegular && robotoMedium && robotoBold) {
     doc.addFileToVFS("Roboto-Regular.ttf", robotoRegular);
     doc.addFileToVFS("Roboto-Medium.ttf", robotoMedium);
     doc.addFileToVFS("Roboto-Bold.ttf", robotoBold);
@@ -74,11 +85,20 @@ export async function loadRobotoFonts(doc: jsPDF): Promise<void> {
     doc.addFont("Roboto-Medium.ttf", "Roboto", "medium");
     doc.addFont("Roboto-Bold.ttf", "Roboto", "bold");
   }
+
+  return activeFontFamily;
 }
 
 /**
- * Check if Roboto fonts are available
+ * Check if Roboto fonts were loaded successfully
  */
 export function areFontsLoaded(): boolean {
-  return fontsLoaded;
+  return fontLoadSuccess;
+}
+
+/**
+ * Get the active font family (Roboto if loaded, helvetica as fallback)
+ */
+export function getActiveFontFamily(): string {
+  return activeFontFamily;
 }

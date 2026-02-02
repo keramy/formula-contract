@@ -114,8 +114,8 @@ export async function generateReportPdfBase64(
       format: "a4",
     });
 
-    // Load Roboto fonts
-    await loadRobotoFonts(doc);
+    // Load Roboto fonts (returns font family to use - Roboto or helvetica fallback)
+    const fontFamily = await loadRobotoFonts(doc);
 
     // Page dimensions
     const pageWidth = 210;
@@ -149,7 +149,7 @@ export async function generateReportPdfBase64(
 
     // Helper: Draw footer
     const drawFooter = (pageNum: number, totalPages: number) => {
-      doc.setFont("Roboto", "normal");
+      doc.setFont(fontFamily, "normal");
       doc.setFontSize(8);
       doc.setTextColor(...lightGray);
       doc.text(
@@ -164,7 +164,7 @@ export async function generateReportPdfBase64(
     // Logo placeholder (teal gradient box)
     doc.setFillColor(...tealColor);
     doc.roundedRect(margin, currentY, 35, 12, 2, 2, "F");
-    doc.setFont("Roboto", "bold");
+    doc.setFont(fontFamily, "bold");
     doc.setFontSize(10);
     doc.setTextColor(255, 255, 255);
     doc.text("FC", margin + 17.5, currentY + 7.5, { align: "center" });
@@ -173,7 +173,7 @@ export async function generateReportPdfBase64(
     const reportTypeLabel = REPORT_TYPE_LABELS[report.report_type] || report.report_type;
     doc.setFillColor(240, 253, 250); // teal-50
     doc.roundedRect(pageWidth - margin - 40, currentY, 40, 12, 2, 2, "F");
-    doc.setFont("Roboto", "medium");
+    doc.setFont(fontFamily, "medium");
     doc.setFontSize(9);
     doc.setTextColor(...tealColor);
     doc.text(reportTypeLabel, pageWidth - margin - 20, currentY + 7.5, { align: "center" });
@@ -181,14 +181,14 @@ export async function generateReportPdfBase64(
     currentY += 20;
 
     // Project name
-    doc.setFont("Roboto", "bold");
+    doc.setFont(fontFamily, "bold");
     doc.setFontSize(20);
     doc.setTextColor(...darkGray);
     doc.text(projectName, margin, currentY);
     currentY += 8;
 
     // Project code
-    doc.setFont("Roboto", "normal");
+    doc.setFont(fontFamily, "normal");
     doc.setFontSize(10);
     doc.setTextColor(...lightGray);
     doc.text(projectCode, margin, currentY);
@@ -201,7 +201,7 @@ export async function generateReportPdfBase64(
     currentY += 8;
 
     // Report code and date info
-    doc.setFont("Roboto", "normal");
+    doc.setFont(fontFamily, "normal");
     doc.setFontSize(9);
     doc.setTextColor(...lightGray);
     const createdDate = new Date(report.created_at).toLocaleDateString("en-GB", {
@@ -211,10 +211,10 @@ export async function generateReportPdfBase64(
     });
     // Display report code if available
     if (report.report_code) {
-      doc.setFont("Roboto", "medium");
+      doc.setFont(fontFamily, "medium");
       doc.setTextColor(...tealColor);
       doc.text(`Report: ${report.report_code}`, margin, currentY);
-      doc.setFont("Roboto", "normal");
+      doc.setFont(fontFamily, "normal");
       doc.setTextColor(...lightGray);
       doc.text(`  |  ${createdDate}`, margin + doc.getTextWidth(`Report: ${report.report_code}`), currentY);
     } else {
@@ -229,7 +229,7 @@ export async function generateReportPdfBase64(
 
       // Section header
       checkNewPage(25);
-      doc.setFont("Roboto", "bold");
+      doc.setFont(fontFamily, "bold");
       doc.setFontSize(13);
       doc.setTextColor(...darkGray);
       doc.text(line.title, margin, currentY);
@@ -243,7 +243,7 @@ export async function generateReportPdfBase64(
 
       // Description
       if (line.description) {
-        doc.setFont("Roboto", "normal");
+        doc.setFont(fontFamily, "normal");
         doc.setFontSize(10);
         doc.setTextColor(...lightGray);
         const descLines = doc.splitTextToSize(line.description, contentWidth);
@@ -341,8 +341,8 @@ export async function downloadReportPdf(options: GeneratePdfOptions): Promise<bo
       format: "a4",
     });
 
-    // Load Roboto fonts
-    await loadRobotoFonts(doc);
+    // Load Roboto fonts (returns font family to use - Roboto or helvetica fallback)
+    const fontFamily = await loadRobotoFonts(doc);
 
     // Page dimensions
     const pageWidth = 210;
@@ -373,7 +373,7 @@ export async function downloadReportPdf(options: GeneratePdfOptions): Promise<bo
     };
 
     const drawFooter = (pageNum: number, totalPages: number) => {
-      doc.setFont("Roboto", "normal");
+      doc.setFont(fontFamily, "normal");
       doc.setFontSize(8);
       doc.setTextColor(...lightGray);
       doc.text(
@@ -387,7 +387,7 @@ export async function downloadReportPdf(options: GeneratePdfOptions): Promise<bo
     // === HEADER ===
     doc.setFillColor(...tealColor);
     doc.roundedRect(margin, currentY, 35, 12, 2, 2, "F");
-    doc.setFont("Roboto", "bold");
+    doc.setFont(fontFamily, "bold");
     doc.setFontSize(10);
     doc.setTextColor(255, 255, 255);
     doc.text("FC", margin + 17.5, currentY + 7.5, { align: "center" });
@@ -395,20 +395,20 @@ export async function downloadReportPdf(options: GeneratePdfOptions): Promise<bo
     const reportTypeLabel = REPORT_TYPE_LABELS[report.report_type] || report.report_type;
     doc.setFillColor(240, 253, 250);
     doc.roundedRect(pageWidth - margin - 40, currentY, 40, 12, 2, 2, "F");
-    doc.setFont("Roboto", "medium");
+    doc.setFont(fontFamily, "medium");
     doc.setFontSize(9);
     doc.setTextColor(...tealColor);
     doc.text(reportTypeLabel, pageWidth - margin - 20, currentY + 7.5, { align: "center" });
 
     currentY += 20;
 
-    doc.setFont("Roboto", "bold");
+    doc.setFont(fontFamily, "bold");
     doc.setFontSize(20);
     doc.setTextColor(...darkGray);
     doc.text(projectName, margin, currentY);
     currentY += 8;
 
-    doc.setFont("Roboto", "normal");
+    doc.setFont(fontFamily, "normal");
     doc.setFontSize(10);
     doc.setTextColor(...lightGray);
     doc.text(projectCode, margin, currentY);
@@ -420,7 +420,7 @@ export async function downloadReportPdf(options: GeneratePdfOptions): Promise<bo
     currentY += 8;
 
     // Report code and date info
-    doc.setFont("Roboto", "normal");
+    doc.setFont(fontFamily, "normal");
     doc.setFontSize(9);
     doc.setTextColor(...lightGray);
     const createdDate = new Date(report.created_at).toLocaleDateString("en-GB", {
@@ -430,10 +430,10 @@ export async function downloadReportPdf(options: GeneratePdfOptions): Promise<bo
     });
     // Display report code if available
     if (report.report_code) {
-      doc.setFont("Roboto", "medium");
+      doc.setFont(fontFamily, "medium");
       doc.setTextColor(...tealColor);
       doc.text(`Report: ${report.report_code}`, margin, currentY);
-      doc.setFont("Roboto", "normal");
+      doc.setFont(fontFamily, "normal");
       doc.setTextColor(...lightGray);
       doc.text(`  |  ${createdDate}`, margin + doc.getTextWidth(`Report: ${report.report_code}`), currentY);
     } else {
@@ -445,7 +445,7 @@ export async function downloadReportPdf(options: GeneratePdfOptions): Promise<bo
     const lines = report.lines || [];
     for (const line of lines) {
       checkNewPage(25);
-      doc.setFont("Roboto", "bold");
+      doc.setFont(fontFamily, "bold");
       doc.setFontSize(13);
       doc.setTextColor(...darkGray);
       doc.text(line.title, margin, currentY);
@@ -457,7 +457,7 @@ export async function downloadReportPdf(options: GeneratePdfOptions): Promise<bo
       currentY += 8;
 
       if (line.description) {
-        doc.setFont("Roboto", "normal");
+        doc.setFont(fontFamily, "normal");
         doc.setFontSize(10);
         doc.setTextColor(...lightGray);
         const descLines = doc.splitTextToSize(line.description, contentWidth);
