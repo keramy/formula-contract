@@ -4,6 +4,7 @@ import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { CommandMenu } from "@/components/layout/command-menu";
 import { AppHeader, PageHeaderProvider } from "@/components/layout/app-header";
+import { ErrorBoundary } from "@/components/error-boundary";
 
 interface UserProfile {
   id: string;
@@ -46,9 +47,11 @@ export default async function DashboardLayout({
         <SidebarInset className="flex flex-col overflow-hidden">
           {/* Unified top header with toggle, page info, search, notifications */}
           <AppHeader />
-          {/* Page content */}
+          {/* Page content - wrapped in ErrorBoundary for graceful error handling */}
           <div className="flex-1 overflow-auto">
-            {children}
+            <ErrorBoundary>
+              {children}
+            </ErrorBoundary>
           </div>
         </SidebarInset>
         {/* Global Command Menu - Cmd+K to open */}

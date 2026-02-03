@@ -1,9 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { format } from "date-fns";
-import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -16,9 +14,10 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { TruckIcon, CalendarIcon, PackageIcon } from "lucide-react";
-import type { ScopeItemUpdate } from "@/types/database";
+import { useUpdateShippedStatus } from "@/lib/react-query/scope-items";
 
 interface ShippedStatusEditorProps {
+  projectId: string;
   scopeItemId: string;
   isShipped: boolean;
   shippedAt: string | null;
@@ -26,79 +25,53 @@ interface ShippedStatusEditorProps {
 }
 
 export function ShippedStatusEditor({
+  projectId,
   scopeItemId,
   isShipped,
   shippedAt,
   readOnly = false,
 }: ShippedStatusEditorProps) {
-  const router = useRouter();
   const [shipped, setShipped] = useState(isShipped);
   const [date, setDate] = useState<Date | undefined>(
     shippedAt ? new Date(shippedAt) : undefined
   );
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
+  const updateMutation = useUpdateShippedStatus(projectId);
+
   const handleToggle = async (checked: boolean) => {
-    setIsSaving(true);
-    setError(null);
+    // Optimistically update local state
+    setShipped(checked);
+    setDate(checked ? new Date() : undefined);
 
-    try {
-      const supabase = createClient();
-
-      const updateData: ScopeItemUpdate = {
-        is_shipped: checked,
-        shipped_at: checked ? new Date().toISOString() : null,
-      };
-
-      const { error: updateError } = await supabase
-        .from("scope_items")
-        .update(updateData)
-        .eq("id", scopeItemId);
-
-      if (updateError) throw updateError;
-
-      setShipped(checked);
-      setDate(checked ? new Date() : undefined);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update status");
-      // Revert on error
-      setShipped(!checked);
-    } finally {
-      setIsSaving(false);
-    }
+    updateMutation.mutate(
+      { itemId: scopeItemId, isShipped: checked },
+      {
+        onError: () => {
+          // Revert on error
+          setShipped(!checked);
+          setDate(!checked ? (shippedAt ? new Date(shippedAt) : undefined) : undefined);
+        },
+      }
+    );
   };
 
   const handleDateChange = async (newDate: Date | undefined) => {
     if (!newDate || !shipped) return;
 
-    setIsSaving(true);
-    setError(null);
+    // Optimistically update local state
+    setDate(newDate);
+    setShowDatePicker(false);
 
-    try {
-      const supabase = createClient();
-
-      const updateData: ScopeItemUpdate = {
-        shipped_at: newDate.toISOString(),
-      };
-
-      const { error: updateError } = await supabase
-        .from("scope_items")
-        .update(updateData)
-        .eq("id", scopeItemId);
-
-      if (updateError) throw updateError;
-
-      setDate(newDate);
-      setShowDatePicker(false);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update date");
-    } finally {
-      setIsSaving(false);
-    }
+    updateMutation.mutate(
+      { itemId: scopeItemId, isShipped: true, shippedAt: newDate.toISOString() },
+      {
+        onError: () => {
+          // Revert on error
+          setDate(shippedAt ? new Date(shippedAt) : undefined);
+        },
+      }
+    );
   };
 
   if (readOnly) {
@@ -126,8 +99,8 @@ export function ShippedStatusEditor({
 
   return (
     <div className="space-y-3">
-      {error && (
-        <p className="text-xs text-destructive">{error}</p>
+      {updateMutation.error && (
+        <p className="text-xs text-destructive">{updateMutation.error.message}</p>
       )}
 
       <div className="flex items-center justify-between">
@@ -136,13 +109,13 @@ export function ShippedStatusEditor({
             id="shipped-status"
             checked={shipped}
             onCheckedChange={handleToggle}
-            disabled={isSaving}
+            disabled={updateMutation.isPending}
           />
           <Label
             htmlFor="shipped-status"
             className="flex items-center gap-2 cursor-pointer"
           >
-            {isSaving ? (
+            {updateMutation.isPending ? (
               <Spinner className="size-4" />
             ) : shipped ? (
               <TruckIcon className="size-4 text-blue-600" />
@@ -160,7 +133,7 @@ export function ShippedStatusEditor({
                 variant={date ? "outline" : "ghost"}
                 size="sm"
                 className={date ? "text-xs" : "text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"}
-                disabled={isSaving}
+                disabled={updateMutation.isPending}
               >
                 <CalendarIcon className="size-3 mr-1" />
                 {date ? format(date, "MMM d, yyyy") : "Set date →"}

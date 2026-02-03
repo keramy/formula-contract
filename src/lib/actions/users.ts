@@ -14,6 +14,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { Resend } from "resend";
+import { randomBytes } from "crypto";
 import { checkUserCreationRateLimit } from "@/lib/rate-limit";
 import { sanitizeText } from "@/lib/sanitize";
 import { WelcomeEmail } from "@/emails/welcome-email";
@@ -247,8 +248,8 @@ export async function inviteUser(data: {
     }
 
     // Create user with a temporary password
-    // Generate a random temporary password
-    const tempPassword = `Temp${Math.random().toString(36).slice(-8)}!${Date.now().toString(36)}`;
+    // Generate a cryptographically secure random temporary password
+    const tempPassword = `Temp${randomBytes(6).toString("base64url")}!${randomBytes(4).toString("hex")}`;
 
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email: data.email.toLowerCase(),

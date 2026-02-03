@@ -1,9 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { format } from "date-fns";
-import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -16,9 +14,10 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { WrenchIcon, CalendarIcon, ClockIcon } from "lucide-react";
-import type { ScopeItemUpdate } from "@/types/database";
+import { useUpdateInstallationStartedStatus } from "@/lib/react-query/scope-items";
 
 interface InstallationStartedEditorProps {
+  projectId: string;
   scopeItemId: string;
   isInstallationStarted: boolean;
   installationStartedAt: string | null;
@@ -26,79 +25,53 @@ interface InstallationStartedEditorProps {
 }
 
 export function InstallationStartedEditor({
+  projectId,
   scopeItemId,
   isInstallationStarted,
   installationStartedAt,
   readOnly = false,
 }: InstallationStartedEditorProps) {
-  const router = useRouter();
   const [started, setStarted] = useState(isInstallationStarted);
   const [date, setDate] = useState<Date | undefined>(
     installationStartedAt ? new Date(installationStartedAt) : undefined
   );
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
+  const updateMutation = useUpdateInstallationStartedStatus(projectId);
+
   const handleToggle = async (checked: boolean) => {
-    setIsSaving(true);
-    setError(null);
+    // Optimistically update local state
+    setStarted(checked);
+    setDate(checked ? new Date() : undefined);
 
-    try {
-      const supabase = createClient();
-
-      const updateData: ScopeItemUpdate = {
-        is_installation_started: checked,
-        installation_started_at: checked ? new Date().toISOString() : null,
-      };
-
-      const { error: updateError } = await supabase
-        .from("scope_items")
-        .update(updateData)
-        .eq("id", scopeItemId);
-
-      if (updateError) throw updateError;
-
-      setStarted(checked);
-      setDate(checked ? new Date() : undefined);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update status");
-      // Revert on error
-      setStarted(!checked);
-    } finally {
-      setIsSaving(false);
-    }
+    updateMutation.mutate(
+      { itemId: scopeItemId, isStarted: checked },
+      {
+        onError: () => {
+          // Revert on error
+          setStarted(!checked);
+          setDate(!checked ? (installationStartedAt ? new Date(installationStartedAt) : undefined) : undefined);
+        },
+      }
+    );
   };
 
   const handleDateChange = async (newDate: Date | undefined) => {
     if (!newDate || !started) return;
 
-    setIsSaving(true);
-    setError(null);
+    // Optimistically update local state
+    setDate(newDate);
+    setShowDatePicker(false);
 
-    try {
-      const supabase = createClient();
-
-      const updateData: ScopeItemUpdate = {
-        installation_started_at: newDate.toISOString(),
-      };
-
-      const { error: updateError } = await supabase
-        .from("scope_items")
-        .update(updateData)
-        .eq("id", scopeItemId);
-
-      if (updateError) throw updateError;
-
-      setDate(newDate);
-      setShowDatePicker(false);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update date");
-    } finally {
-      setIsSaving(false);
-    }
+    updateMutation.mutate(
+      { itemId: scopeItemId, isStarted: true, startedAt: newDate.toISOString() },
+      {
+        onError: () => {
+          // Revert on error
+          setDate(installationStartedAt ? new Date(installationStartedAt) : undefined);
+        },
+      }
+    );
   };
 
   if (readOnly) {
@@ -126,8 +99,8 @@ export function InstallationStartedEditor({
 
   return (
     <div className="space-y-3">
-      {error && (
-        <p className="text-xs text-destructive">{error}</p>
+      {updateMutation.error && (
+        <p className="text-xs text-destructive">{updateMutation.error.message}</p>
       )}
 
       <div className="flex items-center justify-between">
@@ -136,13 +109,13 @@ export function InstallationStartedEditor({
             id="installation-started-status"
             checked={started}
             onCheckedChange={handleToggle}
-            disabled={isSaving}
+            disabled={updateMutation.isPending}
           />
           <Label
             htmlFor="installation-started-status"
             className="flex items-center gap-2 cursor-pointer"
           >
-            {isSaving ? (
+            {updateMutation.isPending ? (
               <Spinner className="size-4" />
             ) : started ? (
               <WrenchIcon className="size-4 text-violet-600" />
@@ -160,7 +133,7 @@ export function InstallationStartedEditor({
                 variant={date ? "outline" : "ghost"}
                 size="sm"
                 className={date ? "text-xs" : "text-xs text-violet-600 hover:text-violet-700 hover:bg-violet-50"}
-                disabled={isSaving}
+                disabled={updateMutation.isPending}
               >
                 <CalendarIcon className="size-3 mr-1" />
                 {date ? format(date, "MMM d, yyyy") : "Set date →"}

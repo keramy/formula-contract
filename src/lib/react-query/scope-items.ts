@@ -9,6 +9,8 @@ import {
   bulkAssignMaterials,
   updateScopeItemField,
   updateProductionPercentage,
+  updateShippedStatus,
+  updateInstallationStartedStatus,
   updateInstallationStatus,
   deleteScopeItem,
   type ScopeItem,
@@ -286,6 +288,126 @@ export function useUpdateProductionPercentage(projectId: string) {
     },
     onSuccess: (_, { percentage }) => {
       toast.success(`Progress updated to ${percentage}%`);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: scopeItemKeys.list(projectId) });
+    },
+  });
+}
+
+/**
+ * Hook for updating shipped status
+ * Includes optimistic updates for instant UI feedback
+ */
+export function useUpdateShippedStatus(projectId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      itemId,
+      isShipped,
+      shippedAt,
+    }: {
+      itemId: string;
+      isShipped: boolean;
+      shippedAt?: string;
+    }) => {
+      const result = await updateShippedStatus(projectId, itemId, isShipped, shippedAt);
+      if (!result.success) {
+        throw new Error(result.error || "Failed to update shipped status");
+      }
+    },
+    onMutate: async ({ itemId, isShipped, shippedAt }) => {
+      await queryClient.cancelQueries({ queryKey: scopeItemKeys.list(projectId) });
+
+      const previousItems = queryClient.getQueryData(scopeItemKeys.list(projectId));
+
+      queryClient.setQueryData(
+        scopeItemKeys.list(projectId),
+        (old: ScopeItem[] | undefined) => {
+          if (!old) return old;
+          return old.map((item) =>
+            item.id === itemId
+              ? {
+                  ...item,
+                  is_shipped: isShipped,
+                  shipped_at: isShipped ? (shippedAt || new Date().toISOString()) : null,
+                }
+              : item
+          );
+        }
+      );
+
+      return { previousItems };
+    },
+    onError: (error: Error, _, context) => {
+      if (context?.previousItems) {
+        queryClient.setQueryData(scopeItemKeys.list(projectId), context.previousItems);
+      }
+      toast.error(error.message);
+    },
+    onSuccess: (_, { isShipped }) => {
+      toast.success(isShipped ? "Marked as shipped" : "Marked as not shipped");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: scopeItemKeys.list(projectId) });
+    },
+  });
+}
+
+/**
+ * Hook for updating installation started status
+ * Includes optimistic updates for instant UI feedback
+ */
+export function useUpdateInstallationStartedStatus(projectId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      itemId,
+      isStarted,
+      startedAt,
+    }: {
+      itemId: string;
+      isStarted: boolean;
+      startedAt?: string;
+    }) => {
+      const result = await updateInstallationStartedStatus(projectId, itemId, isStarted, startedAt);
+      if (!result.success) {
+        throw new Error(result.error || "Failed to update installation started status");
+      }
+    },
+    onMutate: async ({ itemId, isStarted, startedAt }) => {
+      await queryClient.cancelQueries({ queryKey: scopeItemKeys.list(projectId) });
+
+      const previousItems = queryClient.getQueryData(scopeItemKeys.list(projectId));
+
+      queryClient.setQueryData(
+        scopeItemKeys.list(projectId),
+        (old: ScopeItem[] | undefined) => {
+          if (!old) return old;
+          return old.map((item) =>
+            item.id === itemId
+              ? {
+                  ...item,
+                  is_installation_started: isStarted,
+                  installation_started_at: isStarted ? (startedAt || new Date().toISOString()) : null,
+                }
+              : item
+          );
+        }
+      );
+
+      return { previousItems };
+    },
+    onError: (error: Error, _, context) => {
+      if (context?.previousItems) {
+        queryClient.setQueryData(scopeItemKeys.list(projectId), context.previousItems);
+      }
+      toast.error(error.message);
+    },
+    onSuccess: (_, { isStarted }) => {
+      toast.success(isStarted ? "Installation started" : "Installation not started");
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: scopeItemKeys.list(projectId) });

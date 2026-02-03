@@ -6,6 +6,20 @@
 
 ---
 
+## Quick Start
+
+```bash
+npm install          # Install dependencies
+npm run dev          # Start dev server (port 3000)
+npm run email:dev    # Preview emails (port 3001)
+npm run test         # Run unit tests
+npm run test:e2e     # Run E2E tests (Playwright)
+npm run lint         # Lint code
+npm run build        # Production build
+```
+
+---
+
 ## What is This App?
 
 **Formula Contract** is a Project Management System for Formula International's furniture manufacturing business. It tracks the entire project lifecycle from tender to installation, managing scope items, drawings, materials, and progress reports.
@@ -94,10 +108,23 @@ formula-contract/
 │   │   └── notifications/        # Notification utilities
 │   │
 │   ├── hooks/                    # Custom React hooks
+│   │   ├── use-autosave.ts       # Autosave form data to drafts
+│   │   ├── use-debounce.ts       # Debounce values
+│   │   ├── use-file-upload.ts    # File upload with validation
+│   │   ├── use-media-query.ts    # Responsive breakpoints
+│   │   ├── use-mobile.ts         # Mobile detection
+│   │   └── use-toast.ts          # Toast notifications
+│   │
+│   ├── emails/                   # Email templates (react-email)
+│   │   ├── welcome-email.tsx     # New user welcome
+│   │   ├── project-assignment-email.tsx  # Assigned to project
+│   │   ├── milestone-alert-email.tsx     # Milestone approaching/overdue
+│   │   └── report-published-email.tsx    # Report shared with client
+│   │
 │   └── types/                    # TypeScript type definitions
 │
 ├── supabase/
-│   └── migrations/               # Database migrations (001-032)
+│   └── migrations/               # Database migrations (001-035)
 │
 └── docs/                         # Documentation
     ├── DATABASE.md               # Schema documentation
@@ -495,9 +522,28 @@ Extracted to `src/lib/pdf/image-helpers.ts`:
 - `calculateFitDimensions()` - Calculates aspect-ratio-preserving fit dimensions
 - `ImageData` type - Standardized image data interface
 
+### Code Review Fixes (Feb 2026)
+
+| Issue | File | Fix |
+|-------|------|-----|
+| **RLS Performance Bug** | `supabase/migrations/012_add_drafts_table.sql` | Fixed in migration 035 - changed `auth.uid()` to `(SELECT auth.uid())` for InitPlan optimization |
+| **Non-existent column** | `src/lib/actions/scope-items.ts:745` | Changed `unit_cost: null` to `initial_unit_cost: null` in `splitScopeItem()` |
+| **Debug console.logs** | `src/lib/actions/reports.ts` | Removed 15+ debug `console.log` statements from notification functions |
+| **Weak password generation** | `src/lib/actions/users.ts:251` | Replaced `Math.random()` with `crypto.randomBytes()` for secure temp passwords |
+| **Missing Error Boundary** | `src/app/(dashboard)/layout.tsx` | Added ErrorBoundary component to catch rendering errors gracefully |
+| **Missing ARIA labels** | `scope-items-table.tsx:618` | Added `aria-label` to icon-only buttons for screen reader accessibility |
+
+**Key Takeaways:**
+- Always use `(SELECT auth.uid())` pattern when creating new RLS policies
+- Database schema uses `initial_unit_cost` and `actual_unit_cost`, NOT `unit_cost`
+- Remove debug logs before production - keep only error logs (`console.error`)
+- Use `crypto.randomBytes()` for any security-sensitive random generation, never `Math.random()`
+- Wrap page content with `<ErrorBoundary>` to prevent white-screen crashes
+- Add `aria-label` to all icon-only buttons for accessibility (WCAG 2.1 compliance)
+
 ---
 
-## Current Status (Jan 2026)
+## Current Status (Feb 2026)
 
 ### Completed
 - Auth (login, logout, password reset)
@@ -517,6 +563,11 @@ Extracted to `src/lib/pdf/image-helpers.ts`:
 - Currency formatting fix (always shows ₺/$/€ symbols with 2 decimals)
 - PDF report improvements (borderless photos, dynamic sizing to fill available space)
 - PDF code refactor (unified generator, extracted image helpers)
+- Milestone email notifications (create/complete alerts)
+- Report activity tracking (admin-only view/download stats)
+- Report creation wizard (2-step: Content → Share & Publish)
+- Report types update (daily, site, installation, snagging)
+- Code review & cleanup (RLS fix, schema bug fix, debug logs removed)
 
 ### In Progress
 - Financial module (see FINANCIAL-MODULE-PLAN.md)
@@ -525,3 +576,76 @@ Extracted to `src/lib/pdf/image-helpers.ts`:
 - Mobile optimization
 - Command menu (Cmd+K)
 - PDF Executive Summary generation
+
+---
+
+## Design System (Quick Reference)
+
+### Colors
+
+| Token | Value | Usage |
+|-------|-------|-------|
+| Primary | `#2563eb` (blue-600) | Main actions, links, active states |
+| Primary Hover | `#1d4ed8` (blue-700) | Button hover |
+| Background | `#ffffff` | Page background |
+| Foreground | `#1f2937` (gray-800) | Primary text |
+| Muted | `#f9fafb` (gray-50) | Subtle backgrounds |
+| Muted Foreground | `#6b7280` (gray-500) | Secondary text |
+| Border | `#e5e7eb` (gray-200) | All borders |
+
+### Status Colors
+
+| Status | Background | Text | Border |
+|--------|------------|------|--------|
+| Tender | `#fef3c7` | `#92400e` | `#f59e0b` |
+| Active | `#dbeafe` | `#1e40af` | `#2563eb` |
+| On Hold | `#f3f4f6` | `#4b5563` | `#9ca3af` |
+| Completed | `#d1fae5` | `#065f46` | `#10b981` |
+| Cancelled | `#fee2e2` | `#991b1b` | `#ef4444` |
+
+### Semantic Colors
+
+- **Success:** `#10b981` (emerald-500)
+- **Warning:** `#f59e0b` (amber-500)
+- **Destructive:** `#ef4444` (red-500)
+
+### Item Path Colors
+
+| Path | Background | Text | Border |
+|------|------------|------|--------|
+| Production | `#dbeafe` | `#1e40af` | `#2563eb` |
+| Procurement | `#f3e8ff` | `#6b21a8` | `#9333ea` |
+
+### Typography
+
+- **Font:** Inter (Google Fonts)
+- **Headings:** font-semibold to font-bold
+- **Body:** font-normal
+
+### Spacing (Notion-style: generous whitespace)
+
+| Component | Padding | Gap |
+|-----------|---------|-----|
+| Page container | `px-6 py-6` | - |
+| Card | `p-6` | - |
+| Button | `px-4 py-2` | `gap-2` |
+| Form fields | - | `gap-6` (vertical) |
+
+### Border Radius
+
+| Component | Radius |
+|-----------|--------|
+| Button | `rounded-md` (6px) |
+| Input | `rounded-md` (6px) |
+| Card | `rounded-lg` (8px) |
+| Modal | `rounded-xl` (12px) |
+| Badge | `rounded-sm` (4px) |
+
+### Shadows (Notion-style: subtle)
+
+| Component | Shadow |
+|-----------|--------|
+| Card | `shadow-sm` (or none with border) |
+| Card Hover | `shadow` |
+| Dropdown | `shadow-md` |
+| Modal | `shadow-lg` |

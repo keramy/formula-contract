@@ -146,12 +146,6 @@ async function sendReportPublishedNotification(
   const supabase = await createClient();
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
-  // DEBUG: Log PDF URL received and environment
-  console.log("[Report Notification] NEXT_PUBLIC_SITE_URL env:", process.env.NEXT_PUBLIC_SITE_URL || "NOT SET - using localhost:3000");
-  console.log("[Report Notification] Starting notification for report:", reportId);
-  console.log("[Report Notification] PDF URL received:", pdfUrl || "NONE - will use fallback");
-  console.log("[Report Notification] Starting for project:", projectId, "publisher:", publisherId, "includeClients:", includeClients);
-
   // Get all user IDs assigned to this project
   const { data: assignments, error: assignmentsError } = await supabase
     .from("project_assignments")
@@ -163,13 +157,10 @@ async function sendReportPublishedNotification(
     return { sent: 0, failed: 0 };
   }
 
-  console.log("[Report Notification] Found assignments:", assignments.length);
-
   // Get user details for assigned users (excluding publisher)
   const userIds = assignments.map(a => a.user_id).filter(id => id !== publisherId);
 
   if (userIds.length === 0) {
-    console.log("[Report Notification] No OTHER users to notify (you are the only one assigned)");
     return { sent: 0, failed: 0 };
   }
 
@@ -193,11 +184,8 @@ async function sendReportPublishedNotification(
   }
 
   if (users.length === 0) {
-    console.log("[Report Notification] No eligible users found to notify");
     return { sent: 0, failed: 0 };
   }
-
-  console.log("[Report Notification] Will send to:", users.length, "users:", users.map(u => `${u.name} (${u.role})`));
 
   let sent = 0;
   let failed = 0;
@@ -217,31 +205,23 @@ async function sendReportPublishedNotification(
   const { error: notifError } = await supabase.from("notifications").insert(notifications);
   if (notifError) {
     console.error("[Report Notification] Failed to create in-app notifications:", notifError.message);
-  } else {
-    console.log(`[Report Notification] Created ${notifications.length} in-app notifications`);
   }
 
   // 2. Send email notifications using Resend batch API (avoids rate limits)
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
-    console.log("[Report Notification] RESEND_API_KEY not configured, skipping emails");
     return { sent: users.length, failed: 0 };
   }
 
   // Filter users with valid emails
   const usersWithEmail = users.filter(u => u.email);
   if (usersWithEmail.length === 0) {
-    console.log("[Report Notification] No users with email addresses");
     return { sent: users.length, failed: 0 };
   }
 
   // Build batch email requests
   // Use PDF URL if available, otherwise link to project reports page
   const reportUrl = pdfUrl || `${siteUrl}/projects/${projectId}?tab=reports`;
-
-  // DEBUG: Log final URL being used in email
-  console.log("[Report Notification] Final reportUrl for email:", reportUrl);
-  console.log("[Report Notification] Using PDF direct link:", !!pdfUrl);
 
   const emailRequests = usersWithEmail.map(user => ({
     from: "Formula Contract <noreply@formulacontractpm.com>",
@@ -266,7 +246,6 @@ async function sendReportPublishedNotification(
       console.error("[Report Notification] Batch email failed:", batchError);
       failed = usersWithEmail.length;
     } else {
-      console.log(`[Report Notification] Batch sent ${data?.data?.length || usersWithEmail.length} emails`);
       sent = usersWithEmail.length;
     }
   } catch (emailError) {
@@ -274,7 +253,6 @@ async function sendReportPublishedNotification(
     failed = usersWithEmail.length;
   }
 
-  console.log(`Report notifications: ${sent} emails sent, ${failed} failed`);
   return { sent, failed };
 }
 
@@ -667,9 +645,6 @@ export async function publishReport(
   includeClients: boolean = false,
   pdfUrl?: string
 ): Promise<ActionResult> {
-  // DEBUG: Log what was received by publishReport
-  console.log("[publishReport] Called with:", { reportId, includeClients, pdfUrl: pdfUrl || "NONE" });
-
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -724,9 +699,6 @@ export async function publishReport(
     // Send in-app + email notifications to all project team members
     if (project) {
       try {
-        // DEBUG: Log before calling notification function
-        console.log("[publishReport] Passing pdfUrl to notification:", pdfUrl || "NONE");
-
         await sendReportPublishedNotification(
           report.project_id,
           reportId,

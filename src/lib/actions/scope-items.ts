@@ -446,6 +446,118 @@ export async function updateProductionPercentage(
 }
 
 /**
+ * Update shipped status for a scope item
+ */
+export async function updateShippedStatus(
+  projectId: string,
+  itemId: string,
+  isShipped: boolean,
+  shippedAt?: string
+): Promise<ActionResult> {
+  try {
+    const supabase = await createClient();
+
+    // Check authentication
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, error: "Not authenticated" };
+    }
+
+    const updateData: Record<string, unknown> = {
+      is_shipped: isShipped,
+    };
+
+    // Handle shipped_at timestamp
+    if (isShipped) {
+      updateData.shipped_at = shippedAt || new Date().toISOString();
+    } else {
+      updateData.shipped_at = null;
+    }
+
+    const { error } = await supabase
+      .from("scope_items")
+      .update(updateData)
+      .eq("id", itemId);
+
+    if (error) {
+      console.error("Update shipped status failed:", error);
+      return { success: false, error: error.message };
+    }
+
+    // Log activity
+    await logActivity({
+      projectId: projectId,
+      action: isShipped ? "scope_item_shipped" : "scope_item_unshipped",
+      entityType: "scope_item",
+      entityId: itemId,
+    });
+
+    revalidatePath(`/projects/${projectId}`);
+
+    return { success: true };
+  } catch (error) {
+    console.error("updateShippedStatus error:", error);
+    return { success: false, error: "Failed to update shipped status" };
+  }
+}
+
+/**
+ * Update installation started status for a scope item
+ */
+export async function updateInstallationStartedStatus(
+  projectId: string,
+  itemId: string,
+  isStarted: boolean,
+  startedAt?: string
+): Promise<ActionResult> {
+  try {
+    const supabase = await createClient();
+
+    // Check authentication
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, error: "Not authenticated" };
+    }
+
+    const updateData: Record<string, unknown> = {
+      is_installation_started: isStarted,
+    };
+
+    // Handle installation_started_at timestamp
+    if (isStarted) {
+      updateData.installation_started_at = startedAt || new Date().toISOString();
+    } else {
+      updateData.installation_started_at = null;
+    }
+
+    const { error } = await supabase
+      .from("scope_items")
+      .update(updateData)
+      .eq("id", itemId);
+
+    if (error) {
+      console.error("Update installation started status failed:", error);
+      return { success: false, error: error.message };
+    }
+
+    // Log activity
+    await logActivity({
+      projectId: projectId,
+      action: isStarted ? "scope_item_installation_started" : "scope_item_installation_not_started",
+      entityType: "scope_item",
+      entityId: itemId,
+    });
+
+    revalidatePath(`/projects/${projectId}`);
+
+    return { success: true };
+  } catch (error) {
+    console.error("updateInstallationStartedStatus error:", error);
+    return { success: false, error: "Failed to update installation started status" };
+  }
+}
+
+/**
  * Mark a scope item as installed/not installed
  */
 export async function updateInstallationStatus(
@@ -742,7 +854,7 @@ export async function splitScopeItem(
         unit: originalItem.unit,
         quantity: newQuantity,
         // Cost tracking: child starts with no cost (user will set), inherit sales price
-        unit_cost: null,
+        initial_unit_cost: null,
         initial_total_cost: null,
         unit_sales_price: originalItem.unit_sales_price,
         item_path: targetPath,

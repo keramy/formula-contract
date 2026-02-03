@@ -403,6 +403,7 @@ export default async function ScopeItemDetailPage({
               <span className="text-sm font-medium">Production Progress</span>
             </div>
             <ProductionProgressEditor
+              projectId={projectId}
               scopeItemId={scopeItem.id}
               initialValue={scopeItem.production_percentage}
             />
@@ -464,6 +465,7 @@ export default async function ScopeItemDetailPage({
               <span className="text-sm font-medium">Installation Status</span>
             </div>
             <InstallationStatusEditor
+              projectId={projectId}
               scopeItemId={scopeItem.id}
               isInstalled={scopeItem.is_installed}
               installedAt={scopeItem.installed_at}

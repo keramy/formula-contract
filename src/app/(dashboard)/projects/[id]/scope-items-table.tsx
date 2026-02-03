@@ -615,7 +615,7 @@ const ScopeItemRow = memo(function ScopeItemRow({
       <TableCell>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon-sm">
+            <Button variant="ghost" size="icon-sm" aria-label="Open item actions menu">
               <MoreHorizontalIcon className="size-4" />
             </Button>
           </DropdownMenuTrigger>

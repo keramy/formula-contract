@@ -1,61 +1,46 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Spinner } from "@/components/ui/spinner";
 import { CheckIcon, PencilIcon } from "lucide-react";
-import type { ScopeItemUpdate } from "@/types/database";
+import { useUpdateProductionPercentage } from "@/lib/react-query/scope-items";
 
 interface ProductionProgressEditorProps {
+  projectId: string;
   scopeItemId: string;
   initialValue: number;
   readOnly?: boolean;
 }
 
 export function ProductionProgressEditor({
+  projectId,
   scopeItemId,
   initialValue,
   readOnly = false,
 }: ProductionProgressEditorProps) {
-  const router = useRouter();
   const [value, setValue] = useState(initialValue);
   const [isEditing, setIsEditing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+
+  const updateMutation = useUpdateProductionPercentage(projectId);
 
   const handleSave = async () => {
-    setIsSaving(true);
-    setError(null);
-
-    try {
-      const supabase = createClient();
-
-      const updateData: ScopeItemUpdate = { production_percentage: value };
-      const { error: updateError } = await supabase
-        .from("scope_items")
-        .update(updateData)
-        .eq("id", scopeItemId);
-
-      if (updateError) throw updateError;
-
-      setIsEditing(false);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update progress");
-    } finally {
-      setIsSaving(false);
-    }
+    updateMutation.mutate(
+      { itemId: scopeItemId, percentage: value },
+      {
+        onSuccess: () => {
+          setIsEditing(false);
+        },
+      }
+    );
   };
 
   const handleCancel = () => {
     setValue(initialValue);
     setIsEditing(false);
-    setError(null);
   };
 
   // Read-only mode: just show progress bar, no edit button
@@ -101,8 +86,8 @@ export function ProductionProgressEditor({
 
   return (
     <div className="space-y-3">
-      {error && (
-        <p className="text-xs text-destructive">{error}</p>
+      {updateMutation.error && (
+        <p className="text-xs text-destructive">{updateMutation.error.message}</p>
       )}
 
       {/* Slider with labels */}
@@ -147,8 +132,8 @@ export function ProductionProgressEditor({
         </div>
 
         <div className="flex gap-2 flex-1 justify-end">
-          <Button size="sm" onClick={handleSave} disabled={isSaving}>
-            {isSaving ? (
+          <Button size="sm" onClick={handleSave} disabled={updateMutation.isPending}>
+            {updateMutation.isPending ? (
               <Spinner className="size-4" />
             ) : (
               <CheckIcon className="size-4" />
@@ -159,7 +144,7 @@ export function ProductionProgressEditor({
             size="sm"
             variant="outline"
             onClick={handleCancel}
-            disabled={isSaving}
+            disabled={updateMutation.isPending}
           >
             Cancel
           </Button>

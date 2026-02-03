@@ -765,6 +765,7 @@ export function ScopeItemSheet({
                           <span className="text-sm font-medium">Production Progress</span>
                         </div>
                         <ProductionProgressEditor
+                          projectId={projectId}
                           scopeItemId={itemId!}
                           initialValue={productionProgress}
                           readOnly={isViewOnly}
@@ -842,6 +843,7 @@ export function ScopeItemSheet({
                         <span className="text-sm font-medium">Shipping Status</span>
                       </div>
                       <ShippedStatusEditor
+                        projectId={projectId}
                         scopeItemId={itemId!}
                         isShipped={isShipped}
                         shippedAt={shippedAt}
@@ -856,6 +858,7 @@ export function ScopeItemSheet({
                         <span className="text-sm font-medium">Installation Progress</span>
                       </div>
                       <InstallationStartedEditor
+                        projectId={projectId}
                         scopeItemId={itemId!}
                         isInstallationStarted={isInstallationStarted}
                         installationStartedAt={installationStartedAt}
@@ -870,6 +873,7 @@ export function ScopeItemSheet({
                         <span className="text-sm font-medium">Installation Complete</span>
                       </div>
                       <InstallationStatusEditor
+                        projectId={projectId}
                         scopeItemId={itemId!}
                         isInstalled={isInstalled}
                         installedAt={installedAt}
