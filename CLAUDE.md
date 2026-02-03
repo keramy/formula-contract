@@ -1,6 +1,6 @@
 # Formula Contract - Project Intelligence
 
-> **Last Updated:** January 30, 2026
+> **Last Updated:** February 3, 2026
 > **Version:** 1.1.0
 > **Supabase Project:** `lsuiaqrpkhejeavsrsqc` (contract-eu, eu-central-1)
 
@@ -87,6 +87,9 @@ formula-contract/
 │   │   ├── actions/              # Server actions (mutations)
 │   │   ├── supabase/             # Supabase client (server/client)
 │   │   ├── react-query/          # React Query hooks
+│   │   ├── pdf/                  # PDF generation (reports)
+│   │   │   ├── generate-report-pdf.ts  # Main PDF generator
+│   │   │   └── image-helpers.ts        # Image loading/sizing utils
 │   │   ├── activity-log/         # Activity logging utilities
 │   │   └── notifications/        # Notification utilities
 │   │
@@ -447,6 +450,53 @@ Version is displayed in the sidebar footer and injected at build time via `next.
 
 ---
 
+## Lessons Learned / Mistakes to Avoid
+
+### PDF Generation (`src/lib/pdf/generate-report-pdf.ts`)
+
+| Issue | Wrong Approach | Correct Approach |
+|-------|---------------|------------------|
+| **Photo borders** | Drew gray rectangle borders around every photo with `doc.rect(..., "S")` | Photos look cleaner without borders - remove border drawing code |
+| **Fixed photo sizing** | Used hardcoded `photoHeight = photoWidth * 0.75` regardless of page space | Calculate dynamic size based on `availableHeight` and cap at 1.5x default |
+| **Duplicated code** | Had separate implementations for `generateReportPdfBase64` and `downloadReportPdf` | Extract shared `generatePdfDocument()` function, reuse in both |
+| **Placeholder borders** | Used `"FD"` (fill + draw) for placeholder rectangles | Use `"F"` (fill only) for borderless placeholders |
+
+**Dynamic Photo Sizing Algorithm:**
+```typescript
+// Calculate available space and optimal photo height
+const defaultPhotoHeight = photoWidth * 0.75; // 4:3 baseline
+const photoRows = Math.ceil(photos.length / photosPerRow);
+const availableHeight = maxContentY - y - 8; // Leave margin
+const maxHeightPerRow = (availableHeight - (photoRows - 1) * photoGap) / photoRows;
+
+// Expand if space allows, but cap at 1.5x to avoid absurdly large photos
+const photoHeight = Math.min(
+  Math.max(defaultPhotoHeight, maxHeightPerRow),
+  defaultPhotoHeight * 1.5
+);
+```
+
+### jsPDF Drawing Modes
+- `"S"` = Stroke only (draws border)
+- `"F"` = Fill only (no border)
+- `"FD"` = Fill + Draw (fill with border)
+
+**Rule:** When you don't want borders, always use `"F"` not `"FD"`.
+
+### Code Extraction Pattern
+When two functions share 90%+ similar code:
+1. Extract the common logic into an internal function
+2. Have both public functions call the internal one
+3. Return intermediate results (like `{ doc, fileName }`) for flexibility
+
+### Image Helper Functions
+Extracted to `src/lib/pdf/image-helpers.ts`:
+- `loadImageWithDimensions()` - Converts URL to base64 with dimension info
+- `calculateFitDimensions()` - Calculates aspect-ratio-preserving fit dimensions
+- `ImageData` type - Standardized image data interface
+
+---
+
 ## Current Status (Jan 2026)
 
 ### Completed
@@ -465,6 +515,8 @@ Version is displayed in the sidebar footer and injected at build time via `next.
 - Installation started status tracking (between shipped and installed)
 - Project Overview redesign (unified compact card with progress ring + info bar)
 - Currency formatting fix (always shows ₺/$/€ symbols with 2 decimals)
+- PDF report improvements (borderless photos, dynamic sizing to fill available space)
+- PDF code refactor (unified generator, extracted image helpers)
 
 ### In Progress
 - Financial module (see FINANCIAL-MODULE-PLAN.md)
