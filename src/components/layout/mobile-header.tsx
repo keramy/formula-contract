@@ -24,12 +24,12 @@ export function MobileHeader({ className }: AppHeaderProps) {
     return (
       <header
         className={cn(
-          "sticky top-0 z-40 flex h-14 items-center justify-between border-b bg-white/95 backdrop-blur-sm px-4",
+          "sticky top-0 z-40 flex h-14 items-center justify-between border-b bg-card/95 backdrop-blur-sm px-4",
           className
         )}
       >
         {/* Left side: Sidebar toggle */}
-        <SidebarTrigger className="size-9 flex items-center justify-center hover:bg-gray-100 rounded-lg transition-colors">
+        <SidebarTrigger className="size-9 flex items-center justify-center hover:bg-primary/10 rounded-lg transition-colors">
           <PanelLeftIcon className="size-5" />
         </SidebarTrigger>
 
@@ -43,7 +43,7 @@ export function MobileHeader({ className }: AppHeaderProps) {
   return (
     <header
       className={cn(
-        "sticky top-0 z-40 flex h-14 items-center gap-3 border-b bg-white/95 backdrop-blur-sm px-4",
+        "sticky top-0 z-40 flex h-14 items-center gap-3 border-b bg-card/95 backdrop-blur-sm px-4",
         className
       )}
     >
@@ -52,9 +52,9 @@ export function MobileHeader({ className }: AppHeaderProps) {
         <MenuIcon className="size-5" />
       </SidebarTrigger>
 
-      {/* App Logo & Title */}
+      {/* App Logo & Title - Forest Whisper Teal */}
       <div className="flex items-center gap-2 flex-1">
-        <div className="flex items-center justify-center size-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 text-white font-bold text-xs shadow-md shadow-violet-500/25">
+        <div className="flex items-center justify-center size-8 rounded-lg bg-gradient-to-br from-primary-500 to-primary-700 text-white font-bold text-xs shadow-md shadow-primary-500/25">
           FC
         </div>
         <span className="font-semibold text-sm">Formula Contract</span>

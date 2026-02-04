@@ -41,7 +41,7 @@ export function ProjectDetailHeader({
   // Set the header content
   useEffect(() => {
     setContent({
-      icon: <GradientIcon icon={<FolderKanbanIcon className="size-4" />} color="violet" size="sm" />,
+      icon: <GradientIcon icon={<FolderKanbanIcon className="size-4" />} color="primary" size="sm" />,
       title: projectName,
       description: projectCode,
     });
@@ -64,7 +64,7 @@ export function ProjectDetailHeader({
         </StatusBadge>
       </div>
       {canEdit && showEditButton && (
-        <Button asChild size="sm" className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700">
+        <Button asChild size="sm">
           <Link href={`/projects/${projectId}/edit`}>
             <PencilIcon className="size-4" />
             Edit Project

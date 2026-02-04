@@ -42,7 +42,7 @@ export function ClientsTable({ clients }: ClientsTableProps) {
           title="No clients found"
           description="Get started by adding your first client to manage relationships."
           action={
-            <Button asChild className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700">
+            <Button asChild>
               <Link href="/clients/new">Add Client</Link>
             </Button>
           }
@@ -68,7 +68,7 @@ export function ClientsTable({ clients }: ClientsTableProps) {
           {clients.map((client, index) => (
             <TableRow
               key={client.id}
-              className="group hover:bg-gray-50/50 border-b border-gray-50 last:border-0"
+              className="group hover:bg-primary/5 border-b border-base-50 last:border-0"
             >
               <TableCell className="py-4">
                 <span className="text-sm font-mono font-medium text-cyan-700">

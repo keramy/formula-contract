@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { UsersTable } from "./users-table";
 import { UsersPageHeader } from "./users-page-header";
+import { TeamMembersCard } from "@/components/users/team-members-card";
 
 interface User {
   id: string;
@@ -43,13 +44,18 @@ export default async function UsersPage({
     console.error("Error fetching users:", error);
   }
 
+  const allUsers = (users || []) as User[];
+
   return (
-    <div className="p-6">
+    <div className="p-6 space-y-6">
       {/* Page Header */}
       <UsersPageHeader />
 
+      {/* Team Stats Overview */}
+      <TeamMembersCard users={allUsers} />
+
       {/* Users Table */}
-      <UsersTable users={(users || []) as User[]} />
+      <UsersTable users={allUsers} />
     </div>
   );
 }

@@ -90,8 +90,7 @@ export function ReportsOverview({
         {canManageReports && (
           <Button
             onClick={handleAddClick}
-            className="bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600"
-          >
+                      >
             <PlusIcon className="size-4" />
             New Report
           </Button>
@@ -108,8 +107,7 @@ export function ReportsOverview({
             canManageReports ? (
               <Button
                 onClick={handleAddClick}
-                className="bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600"
-              >
+                              >
                 <PlusIcon className="size-4" />
                 Create First Report
               </Button>

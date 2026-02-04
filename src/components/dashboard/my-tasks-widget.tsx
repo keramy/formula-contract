@@ -93,7 +93,7 @@ export function MyTasksWidget({ tasks }: MyTasksWidgetProps) {
                       <item.icon className="size-4" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium group-hover:text-violet-700 transition-colors">
+                      <p className="text-sm font-medium group-hover:text-primary transition-colors">
                         {item.label}
                       </p>
                       <p className="text-xs text-muted-foreground">{item.description}</p>

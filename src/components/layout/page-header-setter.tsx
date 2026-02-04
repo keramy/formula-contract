@@ -15,7 +15,7 @@ interface PageHeaderSetterProps {
  *
  * Example:
  * <PageHeaderSetter
- *   icon={<GradientIcon icon={<FolderIcon />} color="violet" />}
+ *   icon={<GradientIcon icon={<FolderIcon />} color="primary" />}
  *   title="Projects"
  *   description="Manage your projects"
  * />

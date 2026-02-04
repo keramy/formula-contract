@@ -628,8 +628,7 @@ export function ReportCreationModal({
                 </Button>
                 <Button
                   onClick={() => setCurrentStep(1)}
-                  className="bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600"
-                >
+                                  >
                   Next: Add Sections
                   <ChevronRightIcon className="size-4" />
                 </Button>
@@ -649,8 +648,7 @@ export function ReportCreationModal({
                 <Button
                   onClick={() => setCurrentStep(2)}
                   disabled={sections.length === 0}
-                  className="bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600"
-                >
+                                  >
                   Next: Share Options
                   <ChevronRightIcon className="size-4" />
                 </Button>
@@ -687,8 +685,7 @@ export function ReportCreationModal({
                 <Button
                   onClick={() => handleSaveReport(true)}
                   disabled={isSaving}
-                  className="bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600"
-                >
+                                  >
                   {isSaving ? (
                     <>
                       <Spinner className="size-4" />

@@ -124,7 +124,7 @@ export function InstallationStatusEditor({
               <Button
                 variant={date ? "outline" : "ghost"}
                 size="sm"
-                className={date ? "text-xs" : "text-xs text-violet-600 hover:text-violet-700 hover:bg-violet-50"}
+                className={date ? "text-xs" : "text-xs text-primary hover:text-primary-700 hover:bg-primary/10"}
                 disabled={updateMutation.isPending}
               >
                 <CalendarIcon className="size-3 mr-1" />

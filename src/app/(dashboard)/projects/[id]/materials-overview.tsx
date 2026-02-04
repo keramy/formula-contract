@@ -234,8 +234,7 @@ export function MaterialsOverview({
           {canManageMaterials && (
             <Button
               onClick={handleAddMaterial}
-              className="bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700"
-            >
+                          >
               <PlusIcon className="size-4" />
               Add Material
             </Button>
@@ -269,8 +268,7 @@ export function MaterialsOverview({
             action={canManageMaterials ? (
               <Button
                 onClick={handleAddMaterial}
-                className="bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700"
-              >
+                              >
                 <PlusIcon className="size-4" />
                 Add First Material
               </Button>

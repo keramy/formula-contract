@@ -101,7 +101,7 @@ export function UpcomingMilestonesWidget({ milestones }: UpcomingMilestonesWidge
                           status.variant === "warning" ? "text-amber-500" :
                           "text-gray-400"
                         }`} />
-                        <p className="font-medium text-sm truncate group-hover:text-violet-700 transition-colors">
+                        <p className="font-medium text-sm truncate group-hover:text-primary transition-colors">
                           {milestone.name}
                         </p>
                       </div>

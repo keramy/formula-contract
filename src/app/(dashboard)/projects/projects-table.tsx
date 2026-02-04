@@ -120,7 +120,7 @@ export function ProjectsTable({ projects, sortField, sortDirection, onSort, onEd
           title="No projects found"
           description="Get started by creating your first project to manage furniture manufacturing."
           action={
-            <Button asChild className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700">
+            <Button asChild>
               <Link href="/projects/new">Create Project</Link>
             </Button>
           }
@@ -211,7 +211,7 @@ export function ProjectsTable({ projects, sortField, sortDirection, onSort, onEd
             return (
               <TableRow
                 key={project.id}
-                className="group hover:bg-gray-50/50 border-b border-gray-50 last:border-0"
+                className="group hover:bg-primary/5 border-b border-base-50 last:border-0"
               >
                 {/* Row Number */}
                 <TableCell className="py-4 text-center text-muted-foreground text-sm font-mono">
@@ -222,7 +222,7 @@ export function ProjectsTable({ projects, sortField, sortDirection, onSort, onEd
                 <TableCell className="py-4">
                   <Link
                     href={`/projects/${project.slug || project.id}`}
-                    className="font-mono text-sm text-violet-600 hover:text-violet-700 hover:underline"
+                    className="font-mono text-sm text-primary hover:text-primary/80 hover:underline"
                   >
                     {project.project_code}
                   </Link>
@@ -234,7 +234,7 @@ export function ProjectsTable({ projects, sortField, sortDirection, onSort, onEd
                     href={`/projects/${project.slug || project.id}`}
                     className="flex items-center gap-2 group/link"
                   >
-                    <span className="font-medium group-hover/link:text-violet-600 group-hover/link:underline transition-colors">
+                    <span className="font-medium group-hover/link:text-primary group-hover/link:underline transition-colors">
                       {project.name}
                     </span>
                     {project.hasAttention && (

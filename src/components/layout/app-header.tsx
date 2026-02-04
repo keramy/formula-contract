@@ -61,12 +61,12 @@ export function AppHeader({ className }: AppHeaderProps) {
   return (
     <header
       className={cn(
-        "sticky top-0 z-40 flex h-14 items-center gap-4 border-b bg-white/95 backdrop-blur-sm px-4",
+        "sticky top-0 z-40 flex h-14 items-center gap-4 border-b bg-card/95 backdrop-blur-sm px-4",
         className
       )}
     >
       {/* Left: Sidebar Toggle */}
-      <SidebarTrigger className="size-9 flex items-center justify-center hover:bg-gray-100 rounded-lg transition-colors shrink-0">
+      <SidebarTrigger className="size-9 flex items-center justify-center hover:bg-primary/10 rounded-lg transition-colors shrink-0">
         {isMobile ? <MenuIcon className="size-5" /> : <PanelLeftIcon className="size-5" />}
       </SidebarTrigger>
 
@@ -96,7 +96,7 @@ export function AppHeader({ className }: AppHeaderProps) {
         <Button
           variant="outline"
           onClick={handleSearchClick}
-          className="w-full max-w-md h-9 px-3 justify-start text-muted-foreground font-normal bg-gray-50/50 border-gray-200 hover:bg-gray-100 hover:border-gray-300"
+          className="w-full max-w-md h-9 px-3 justify-start text-muted-foreground font-normal bg-base-50/50 border-base-200 hover:bg-primary/10 hover:border-primary/30"
         >
           <SearchIcon className="size-4 mr-2 shrink-0" />
           <span className="truncate">Search projects, clients...</span>

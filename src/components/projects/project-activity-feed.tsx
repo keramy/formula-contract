@@ -102,7 +102,7 @@ const actionColors: Record<string, string> = {
   material_updated: "bg-blue-100 text-blue-700",
 
   // Default (violet)
-  default: "bg-violet-100 text-violet-700",
+  default: "bg-primary-100 text-primary-700",
 };
 
 export function ProjectActivityFeed({
@@ -150,13 +150,13 @@ export function ProjectActivityFeed({
       <GlassCard>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base font-semibold">
-            <GradientIcon icon={<ActivityIcon className="size-4" />} color="violet" size="sm" />
+            <GradientIcon icon={<ActivityIcon className="size-4" />} color="primary" size="sm" />
             Project Activity
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-12">
-            <Spinner className="size-6 text-violet-500" />
+            <Spinner className="size-6 text-primary" />
           </div>
         </CardContent>
       </GlassCard>
@@ -168,7 +168,7 @@ export function ProjectActivityFeed({
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-base font-semibold">
-            <GradientIcon icon={<ActivityIcon className="size-4" />} color="violet" size="sm" />
+            <GradientIcon icon={<ActivityIcon className="size-4" />} color="primary" size="sm" />
             Project Activity
           </CardTitle>
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -197,7 +197,7 @@ export function ProjectActivityFeed({
                   size="sm"
                   className={cn(
                     "h-7 text-xs gap-1.5",
-                    isActive && "bg-violet-600 hover:bg-violet-700"
+                    isActive && "bg-primary hover:bg-primary-700"
                   )}
                   onClick={() => setActiveCategory(key)}
                 >

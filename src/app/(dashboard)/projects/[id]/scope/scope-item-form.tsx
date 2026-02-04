@@ -486,11 +486,7 @@ export function ScopeItemForm({ projectId, projectCurrency = "TRY", initialData 
 
           {/* Actions */}
           <div className="flex gap-3 pt-4">
-            <Button
-              type="submit"
-              disabled={isLoading}
-              className="bg-gradient-to-r from-sky-500 to-blue-500 hover:from-sky-600 hover:to-blue-600"
-            >
+            <Button type="submit" disabled={isLoading}>
               {isLoading ? (
                 <>
                   <Spinner className="size-4" />

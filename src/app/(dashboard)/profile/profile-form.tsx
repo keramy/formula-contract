@@ -182,11 +182,7 @@ export function ProfileForm({ userId, initialData }: ProfileFormProps) {
 
           {/* Submit */}
           <div className="pt-4">
-            <Button
-              type="submit"
-              disabled={isLoading || !hasChanges}
-              className="bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600"
-            >
+            <Button type="submit" disabled={isLoading || !hasChanges}>
               {isLoading ? (
                 <>
                   <Spinner className="size-4" />

@@ -88,7 +88,7 @@ export function PendingApprovalsWidget({ approvals }: PendingApprovalsWidgetProp
                       {formatDistanceToNow(new Date(approval.sentAt), { addSuffix: true })}
                     </span>
                   </div>
-                  <p className="text-sm font-medium truncate group-hover:text-violet-700 transition-colors">
+                  <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">
                     {approval.title}
                   </p>
                   <p className="text-xs text-muted-foreground">

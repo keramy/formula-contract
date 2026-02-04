@@ -100,7 +100,7 @@ export function ProductionProgressEditor({
             min={0}
             max={100}
             step={5}
-            className="flex-1 [&_[data-slot=slider-track]]:h-3 [&_[data-slot=slider-track]]:bg-gray-200 [&_[data-slot=slider-range]]:bg-gradient-to-r [&_[data-slot=slider-range]]:from-violet-500 [&_[data-slot=slider-range]]:to-purple-600 [&_[data-slot=slider-thumb]]:size-5 [&_[data-slot=slider-thumb]]:border-2 [&_[data-slot=slider-thumb]]:border-violet-500 [&_[data-slot=slider-thumb]]:shadow-md"
+            className="flex-1 [&_[data-slot=slider-track]]:h-3 [&_[data-slot=slider-track]]:bg-gray-200 [&_[data-slot=slider-range]]:bg-primary [&_[data-slot=slider-thumb]]:size-5 [&_[data-slot=slider-thumb]]:border-2 [&_[data-slot=slider-thumb]]:border-primary [&_[data-slot=slider-thumb]]:shadow-md"
           />
           <span className="text-xs text-muted-foreground w-8">100%</span>
         </div>
@@ -109,7 +109,7 @@ export function ProductionProgressEditor({
         <div className="flex justify-between px-7 -mt-1">
           {[0, 25, 50, 75, 100].map((tick) => (
             <div key={tick} className="flex flex-col items-center">
-              <div className={`w-0.5 h-1.5 ${value >= tick ? 'bg-violet-400' : 'bg-gray-300'}`} />
+              <div className={`w-0.5 h-1.5 ${value >= tick ? 'bg-primary' : 'bg-gray-300'}`} />
             </div>
           ))}
         </div>

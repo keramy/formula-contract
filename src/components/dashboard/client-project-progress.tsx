@@ -31,7 +31,7 @@ export function ClientProjectProgressWidget({ projects }: ClientProjectProgressP
       <GlassCard className="col-span-full">
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
-            <GradientIcon icon={<FolderKanbanIcon className="size-4" />} color="violet" size="sm" />
+            <GradientIcon icon={<FolderKanbanIcon className="size-4" />} color="primary" size="sm" />
             <CardTitle className="text-base font-semibold">My Projects</CardTitle>
           </div>
         </CardHeader>
@@ -53,7 +53,7 @@ export function ClientProjectProgressWidget({ projects }: ClientProjectProgressP
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <GradientIcon icon={<FolderKanbanIcon className="size-4" />} color="violet" size="sm" />
+            <GradientIcon icon={<FolderKanbanIcon className="size-4" />} color="primary" size="sm" />
             <CardTitle className="text-base font-semibold">My Projects</CardTitle>
             <Badge variant="secondary" className="ml-2">
               {projects.length}
@@ -71,17 +71,17 @@ export function ClientProjectProgressWidget({ projects }: ClientProjectProgressP
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {projects.map((project) => {
             const config = statusConfig[project.status] || { variant: "default" as const, label: project.status };
-            const progressColor = project.progress >= 75 ? "bg-green-500" : project.progress >= 50 ? "bg-blue-500" : "bg-violet-500";
+            const progressColor = project.progress >= 75 ? "bg-green-500" : project.progress >= 50 ? "bg-blue-500" : "bg-primary";
 
             return (
               <Link
                 key={project.id}
                 href={`/projects/${project.slug || project.id}`}
-                className="group block p-4 rounded-xl bg-gradient-to-br from-white to-gray-50/50 border border-gray-100 hover:shadow-lg hover:border-violet-200 transition-all"
+                className="group block p-4 rounded-xl bg-card border border-base-200 hover:border-primary-300 transition-colors"
               >
                 <div className="flex items-start justify-between mb-3">
                   <div>
-                    <p className="font-semibold text-sm group-hover:text-violet-700 transition-colors">
+                    <p className="font-semibold text-sm group-hover:text-primary transition-colors">
                       {project.name}
                     </p>
                     <p className="text-xs text-muted-foreground">{project.project_code}</p>

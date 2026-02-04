@@ -20,7 +20,7 @@ export function ProjectsPageHeader({ title, subtitle }: ProjectsPageHeaderProps)
 
   useEffect(() => {
     setContent({
-      icon: <GradientIcon icon={<FolderKanbanIcon className="size-4" />} color="violet" size="sm" />,
+      icon: <GradientIcon icon={<FolderKanbanIcon className="size-4" />} color="teal" size="sm" />,
       title,
       description: subtitle,
     });

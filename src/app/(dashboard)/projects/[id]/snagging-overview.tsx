@@ -184,10 +184,7 @@ export function SnaggingOverview({
             </p>
           </div>
         </div>
-        <Button
-          onClick={handleAdd}
-          className="bg-gradient-to-r from-rose-500 to-orange-500 hover:from-rose-600 hover:to-orange-600"
-        >
+        <Button onClick={handleAdd}>
           <PlusIcon className="size-4" />
           Report Issue
         </Button>
@@ -299,7 +296,6 @@ export function SnaggingOverview({
                         size="sm"
                         onClick={() => handleResolveClick(item)}
                         disabled={isLoading}
-                        className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white"
                       >
                         <CheckIcon className="size-3 mr-1" />
                         Resolve
@@ -346,10 +342,7 @@ export function SnaggingOverview({
           title="No issues reported"
           description="No snagging items reported yet. Report issues as they arise during production or installation."
           action={
-            <Button
-              onClick={handleAdd}
-              className="bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600"
-            >
+            <Button onClick={handleAdd}>
               <PlusIcon className="size-4" />
               Report First Issue
             </Button>

@@ -426,7 +426,7 @@ export function ProjectsListClient({ projects, clients = [], canCreateProject = 
 
           {/* New Project Button */}
           {canCreateProject && (
-            <Button asChild size="sm" className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700">
+            <Button asChild size="sm">
               <Link href="/projects/new">
                 <PlusIcon className="size-4" />
                 New Project

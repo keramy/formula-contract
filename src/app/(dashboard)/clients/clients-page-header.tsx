@@ -22,7 +22,7 @@ export function ClientsPageHeader() {
   // Render action button below header
   return (
     <div className="flex items-center justify-end mb-4">
-      <Button asChild size="sm" className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700">
+      <Button asChild size="sm">
         <Link href="/clients/new">
           <PlusIcon className="size-4" />
           New Client

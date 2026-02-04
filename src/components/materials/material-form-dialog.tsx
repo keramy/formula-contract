@@ -332,7 +332,6 @@ export function MaterialFormDialog({
           <Button
             onClick={handleSubmit}
             disabled={isPending || !materialCode.trim() || !name.trim()}
-            className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
           >
             {isPending && <Spinner className="size-4 mr-2" />}
             {isEditing ? "Save Changes" : "Add Material"}

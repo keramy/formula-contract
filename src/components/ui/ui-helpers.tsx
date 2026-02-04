@@ -18,15 +18,21 @@ const glassCardVariants = cva(
   {
     variants: {
       variant: {
-        default: "border-0 shadow-lg shadow-gray-200/50 bg-white/80 backdrop-blur",
-        solid: "border shadow-sm bg-card",
-        outline: "border-2 bg-transparent",
-        gradient: "border-0 bg-gradient-to-br from-white/90 to-white/70 backdrop-blur shadow-lg shadow-gray-200/50",
+        // Default: Clean border, no shadow (per design handbook)
+        default: "border border-base-200 bg-card",
+        // Elevated: For dropdowns, popovers that float above content
+        elevated: "border border-base-200 bg-card shadow-md",
+        // Subtle: Very light background for nested cards
+        subtle: "border border-base-100 bg-base-50/50",
+        // Outline: Stronger border, transparent background
+        outline: "border-2 border-base-200 bg-transparent",
       },
       hover: {
         none: "",
-        lift: "hover:shadow-xl hover:-translate-y-0.5",
-        glow: "hover:shadow-xl hover:shadow-primary/10",
+        // Subtle border color change on hover
+        subtle: "hover:border-base-300",
+        // Primary accent on hover (for clickable cards)
+        primary: "hover:border-primary/30 hover:bg-primary/[0.02]",
       },
     },
     defaultVariants: {
@@ -65,17 +71,17 @@ const gradientIconVariants = cva(
         xl: "p-4 size-16",
       },
       color: {
-        primary: "bg-gradient-to-br from-primary/10 to-violet-500/10 text-primary",
-        coral: "bg-gradient-to-br from-orange-500/10 to-rose-500/10 text-orange-600",
-        teal: "bg-gradient-to-br from-teal-500/10 to-cyan-500/10 text-teal-600",
-        amber: "bg-gradient-to-br from-amber-500/10 to-orange-500/10 text-amber-600",
-        violet: "bg-gradient-to-br from-violet-500/10 to-purple-500/10 text-violet-600",
-        rose: "bg-gradient-to-br from-rose-500/10 to-pink-500/10 text-rose-600",
-        emerald: "bg-gradient-to-br from-emerald-500/10 to-teal-500/10 text-emerald-600",
-        blue: "bg-gradient-to-br from-blue-500/10 to-indigo-500/10 text-blue-600",
-        gray: "bg-gradient-to-br from-gray-500/10 to-slate-500/10 text-gray-600",
-        sky: "bg-gradient-to-br from-sky-500/10 to-blue-500/10 text-sky-600",
-        slate: "bg-gradient-to-br from-slate-500/10 to-gray-500/10 text-slate-600",
+        primary: "bg-primary-100 text-primary-700",
+        coral: "bg-orange-100 text-orange-600",
+        teal: "bg-primary-100 text-primary-700",
+        amber: "bg-amber-100 text-amber-600",
+        violet: "bg-violet-100 text-violet-600",
+        rose: "bg-rose-100 text-rose-600",
+        emerald: "bg-emerald-100 text-emerald-600",
+        blue: "bg-blue-100 text-blue-600",
+        gray: "bg-base-100 text-base-600",
+        sky: "bg-sky-100 text-sky-600",
+        slate: "bg-secondary-100 text-secondary-600",
       },
     },
     defaultVariants: {

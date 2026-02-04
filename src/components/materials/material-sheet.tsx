@@ -214,7 +214,7 @@ export function MaterialSheet({
   return (
     <Sheet open={open} onOpenChange={handleClose}>
       <SheetContent className="w-full sm:max-w-lg flex flex-col p-0">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b bg-gradient-to-r from-amber-50 to-orange-50">
+        <SheetHeader className="px-6 pt-6 pb-4 border-b bg-base-50">
           <div className="flex items-center gap-3">
             <GradientIcon icon={<PackageIcon className="size-5" />} color="amber" size="sm" />
             <div>
@@ -515,7 +515,7 @@ export function MaterialSheet({
             <Button
               onClick={handleSubmit}
               disabled={isPending || !materialCode.trim() || !name.trim()}
-              className="flex-1 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
+              className="flex-1"
             >
               {isPending ? (
                 <Spinner className="size-4 mr-2" />

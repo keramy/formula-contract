@@ -72,7 +72,7 @@ export function ResponsiveDataView<T>({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="size-8 rounded-full border-2 border-violet-200 border-t-violet-500 animate-spin" />
+        <div className="size-8 rounded-full border-2 border-primary-200 border-t-primary animate-spin" />
       </div>
     );
   }
@@ -114,7 +114,7 @@ export function ViewToggle({ view, onViewChange, className }: ViewToggleProps) {
         className={cn(
           "px-3 py-1.5 text-xs font-medium transition-colors",
           view === "table"
-            ? "bg-violet-100 text-violet-700"
+            ? "bg-primary-100 text-primary-700"
             : "bg-white text-muted-foreground hover:bg-gray-50"
         )}
       >
@@ -138,7 +138,7 @@ export function ViewToggle({ view, onViewChange, className }: ViewToggleProps) {
         className={cn(
           "px-3 py-1.5 text-xs font-medium transition-colors border-l",
           view === "cards"
-            ? "bg-violet-100 text-violet-700"
+            ? "bg-primary-100 text-primary-700"
             : "bg-white text-muted-foreground hover:bg-gray-50"
         )}
       >

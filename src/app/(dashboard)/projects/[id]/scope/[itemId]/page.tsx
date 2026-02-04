@@ -326,17 +326,17 @@ export default async function ScopeItemDetailPage({
         {(parentItem || childItems.length > 0) && (
           <GlassCard className="p-4">
             <div className="flex items-center gap-2 mb-3">
-              <GradientIcon icon={<GitBranchIcon className="size-3.5" />} color="violet" size="sm" />
+              <GradientIcon icon={<GitBranchIcon className="size-3.5" />} color="primary" size="sm" />
               <span className="text-sm font-medium">Related Items</span>
             </div>
             <div className="space-y-3">
               {/* Show parent if this is a child item */}
               {parentItem && (
-                <div className="p-3 rounded-lg bg-violet-50 dark:bg-violet-950/20 border border-violet-200 dark:border-violet-800">
+                <div className="p-3 rounded-lg bg-primary-50 dark:bg-primary-950/20 border border-primary-200 dark:border-primary-800">
                   <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Parent Item</p>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-sm text-violet-700 dark:text-violet-300">{parentItem.item_code}</span>
+                      <span className="font-mono text-sm text-primary-700 dark:text-primary-300">{parentItem.item_code}</span>
                       <span className="text-sm font-medium">{parentItem.name}</span>
                       <div className="flex items-center gap-1">
                         {parentItem.item_path === "production" ? (
@@ -349,7 +349,7 @@ export default async function ScopeItemDetailPage({
                     </div>
                     <Link
                       href={`/projects/${projectUrlId}/scope/${parentItem.id}`}
-                      className="inline-flex items-center gap-1 text-xs text-violet-600 hover:text-violet-700 hover:underline"
+                      className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary-700 hover:underline"
                     >
                       View
                       <ExternalLinkIcon className="size-3" />
@@ -366,7 +366,7 @@ export default async function ScopeItemDetailPage({
                     {childItems.map((child) => (
                       <div key={child.id} className="flex items-center justify-between p-2 rounded bg-white/50 dark:bg-gray-900/20">
                         <div className="flex items-center gap-2">
-                          <span className="text-violet-400">⤷</span>
+                          <span className="text-primary-400">⤷</span>
                           <span className="font-mono text-sm text-blue-700 dark:text-blue-300">{child.item_code}</span>
                           <span className="text-sm">{child.name}</span>
                           <div className="flex items-center gap-1">
@@ -399,7 +399,7 @@ export default async function ScopeItemDetailPage({
           {/* Progress */}
           <GlassCard className="p-4">
             <div className="flex items-center gap-2 mb-3">
-              <GradientIcon icon={<FactoryIcon className="size-3.5" />} color="violet" size="sm" />
+              <GradientIcon icon={<FactoryIcon className="size-3.5" />} color="primary" size="sm" />
               <span className="text-sm font-medium">Production Progress</span>
             </div>
             <ProductionProgressEditor

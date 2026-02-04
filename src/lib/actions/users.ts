@@ -366,6 +366,51 @@ export async function updateUser(
 }
 
 /**
+ * Update just the user's role
+ * Simplified action for role-only updates from Team Members card
+ */
+export async function updateUserRole(
+  userId: string,
+  role: string
+): Promise<ActionResult> {
+  try {
+    // Validate role
+    const validRoles = ["admin", "pm", "production", "procurement", "management", "client"];
+    if (!validRoles.includes(role)) {
+      return { success: false, error: "Invalid role" };
+    }
+
+    const supabase = createAdminClient();
+
+    // Update users table
+    const { error } = await supabase
+      .from("users")
+      .update({ role })
+      .eq("id", userId);
+
+    if (error) {
+      console.error("Update user role error:", error);
+      return { success: false, error: error.message };
+    }
+
+    // Sync role to JWT metadata (allows middleware to skip DB query)
+    const syncResult = await syncUserAuthMetadata(userId, { role });
+    if (!syncResult.success) {
+      console.warn("Failed to sync user metadata, middleware will fall back to DB:", syncResult.error);
+    }
+
+    revalidatePath("/users");
+    return { success: true };
+  } catch (error) {
+    console.error("Update user role error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to update user role",
+    };
+  }
+}
+
+/**
  * Activate or deactivate a user
  * Also bans/unbans in Supabase Auth and syncs to JWT metadata
  */

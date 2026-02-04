@@ -245,11 +245,7 @@ export function ProjectForm({ clients, initialData }: ProjectFormProps) {
 
           {/* Actions */}
           <div className="flex gap-3 pt-4">
-            <Button
-              type="submit"
-              disabled={isLoading}
-              className="bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600"
-            >
+            <Button type="submit" disabled={isLoading}>
               {isLoading ? (
                 <>
                   <Spinner className="size-4" />

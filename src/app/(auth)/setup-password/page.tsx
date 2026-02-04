@@ -108,9 +108,9 @@ export default function SetupPasswordPage() {
           ) : (
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               {/* Welcome Message */}
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-violet-50 border border-violet-200">
-                <PartyPopperIcon className="size-5 text-violet-600 shrink-0" />
-                <p className="text-sm text-violet-700">
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-primary-50 border border-primary-200">
+                <PartyPopperIcon className="size-5 text-primary shrink-0" />
+                <p className="text-sm text-primary-700">
                   You&apos;ve been invited to join Formula Contract. Create a password to activate your account.
                 </p>
               </div>

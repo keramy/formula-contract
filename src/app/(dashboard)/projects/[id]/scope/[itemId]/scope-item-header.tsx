@@ -46,7 +46,7 @@ export function ScopeItemHeader({
       icon: (
         <GradientIcon
           icon={itemPath === "production" ? <FactoryIcon className="size-4" /> : <ShoppingCartIcon className="size-4" />}
-          color={itemPath === "production" ? "violet" : "sky"}
+          color={itemPath === "production" ? "primary" : "sky"}
           size="sm"
         />
       ),
@@ -72,11 +72,7 @@ export function ScopeItemHeader({
         </StatusBadge>
       </div>
       {canEdit && (
-        <Button
-          asChild
-          size="sm"
-          className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700"
-        >
+        <Button asChild size="sm">
           <Link href={`/projects/${projectId}/scope/${itemId}/edit`}>
             <PencilIcon className="size-4" />
             Edit Item

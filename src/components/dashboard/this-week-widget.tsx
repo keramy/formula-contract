@@ -25,7 +25,7 @@ export function ThisWeekWidget({ summary }: ThisWeekWidgetProps) {
     <GlassCard>
       <CardHeader className="pb-2 pt-4 px-4">
         <div className="flex items-center gap-2">
-          <GradientIcon icon={<CalendarDaysIcon className="size-4" />} color="violet" size="sm" />
+          <GradientIcon icon={<CalendarDaysIcon className="size-4" />} color="primary" size="sm" />
           <CardTitle className="text-sm font-semibold">This Week</CardTitle>
         </div>
       </CardHeader>
