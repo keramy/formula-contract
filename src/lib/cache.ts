@@ -66,6 +66,7 @@ export const getCachedDashboardStats = unstable_cache(
 
 /**
  * Get cached recent projects for dashboard
+ * Enhanced with progress calculation and client initials
  */
 export const getCachedRecentProjects = unstable_cache(
   async () => {
@@ -89,30 +90,78 @@ export const getCachedRecentProjects = unstable_cache(
       return [];
     }
 
-    // Get client names in a single query
+    const projectIds = projects.map(p => p.id);
+
+    // Get client names and scope items for progress in parallel
     const clientIds = projects
       .map(p => p.client_id)
       .filter((id): id is string => id !== null);
 
-    const clientMap = new Map<string, string>();
-    if (clientIds.length > 0) {
-      const { data: clients } = await supabase
-        .from("clients")
-        .select("id, company_name")
-        .in("id", clientIds);
+    const [clientsResult, scopeItemsResult] = await Promise.all([
+      clientIds.length > 0
+        ? supabase.from("clients").select("id, company_name").in("id", clientIds)
+        : Promise.resolve({ data: [] }),
+      supabase
+        .from("scope_items")
+        .select("project_id, item_path, production_percentage, is_installed, is_installation_started, is_shipped")
+        .in("project_id", projectIds)
+        .eq("is_deleted", false),
+    ]);
 
-      clients?.forEach(c => clientMap.set(c.id, c.company_name));
+    const clientMap = new Map<string, string>();
+    clientsResult.data?.forEach((c: { id: string; company_name: string }) =>
+      clientMap.set(c.id, c.company_name)
+    );
+
+    // Calculate progress per project using the formula from CLAUDE.md
+    // Production items: (production_percentage × 0.9) + (installation_started ? 5 : 0) + (installed ? 5 : 0)
+    // Procurement items: installed ? 100 : 0
+    const progressMap = new Map<string, { totalProgress: number; itemCount: number }>();
+
+    for (const item of scopeItemsResult.data || []) {
+      const current = progressMap.get(item.project_id) || { totalProgress: 0, itemCount: 0 };
+      let itemProgress = 0;
+
+      if (item.item_path === "production") {
+        const prodPct = item.production_percentage || 0;
+        itemProgress = (prodPct * 0.9) +
+          (item.is_installation_started ? 5 : 0) +
+          (item.is_installed ? 5 : 0);
+      } else {
+        // Procurement path
+        itemProgress = item.is_installed ? 100 : 0;
+      }
+
+      current.totalProgress += itemProgress;
+      current.itemCount += 1;
+      progressMap.set(item.project_id, current);
     }
 
-    // Merge client data
-    const projectsWithClients = projects.map(project => ({
-      id: project.id,
-      slug: project.slug,
-      project_code: project.project_code,
-      name: project.name,
-      status: project.status,
-      client: project.client_id ? { company_name: clientMap.get(project.client_id) || null } : null,
-    }));
+    // Merge client data and progress
+    const projectsWithClients = projects.map(project => {
+      const progressData = progressMap.get(project.id);
+      const progress = progressData && progressData.itemCount > 0
+        ? Math.round(progressData.totalProgress / progressData.itemCount)
+        : 0;
+
+      const clientName = project.client_id ? clientMap.get(project.client_id) || null : null;
+
+      return {
+        id: project.id,
+        slug: project.slug,
+        project_code: project.project_code,
+        name: project.name,
+        status: project.status,
+        progress,
+        itemCount: progressData?.itemCount || 0,
+        client: {
+          company_name: clientName,
+          initials: clientName
+            ? clientName.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2)
+            : null,
+        },
+      };
+    });
 
     console.log(`  📊 [CACHE] Recent projects fetched in ${(performance.now() - start).toFixed(0)}ms`);
 

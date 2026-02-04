@@ -255,7 +255,7 @@ export function DrawingUploadSheet({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto p-0">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b bg-gradient-to-r from-blue-50 to-cyan-50">
+        <SheetHeader className="px-6 pt-6 pb-4 border-b bg-base-50">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-blue-100">
               <FileImageIcon className="size-5 text-blue-600" />

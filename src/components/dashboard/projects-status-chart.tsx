@@ -81,7 +81,7 @@ export function ProjectsStatusChart({ data }: ProjectsStatusChartProps) {
                   if (active && payload && payload.length) {
                     const data = payload[0].payload;
                     return (
-                      <div className="bg-white border rounded-lg shadow-lg px-3 py-2">
+                      <div className="bg-white border border-base-200 rounded-lg shadow-sm px-3 py-2">
                         <p className="text-sm font-medium">{data.name}</p>
                         <p className="text-lg font-bold" style={{ color: data.color }}>
                           {data.value} project{data.value !== 1 ? "s" : ""}

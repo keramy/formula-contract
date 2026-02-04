@@ -153,7 +153,7 @@ export function UserFormDialog({ open, onOpenChange, editUser }: UserFormDialogP
           <div className="flex items-center gap-2">
             <GradientIcon
               icon={isEditing ? <UserIcon className="size-4" /> : <UserPlusIcon className="size-4" />}
-              color="violet"
+              color="primary"
               size="sm"
             />
             <DialogTitle>{isEditing ? "Edit User" : "Add User"}</DialogTitle>
@@ -218,7 +218,7 @@ export function UserFormDialog({ open, onOpenChange, editUser }: UserFormDialogP
                         setCopied(true);
                         setTimeout(() => setCopied(false), 2000);
                       }}
-                      className="hover:bg-violet-50 hover:border-violet-200"
+                      className="hover:bg-primary/10 hover:border-primary-200"
                     >
                       {copied ? (
                         <CheckIcon className="size-4 text-emerald-600" />
@@ -235,10 +235,7 @@ export function UserFormDialog({ open, onOpenChange, editUser }: UserFormDialogP
             )}
 
             <div className="flex justify-center pt-2">
-              <Button
-                onClick={handleClose}
-                className="bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600"
-              >
+              <Button onClick={handleClose}>
                 Done
               </Button>
             </div>
@@ -254,7 +251,7 @@ export function UserFormDialog({ open, onOpenChange, editUser }: UserFormDialogP
               )}
 
               {!isEditing && (
-                <div className="p-3 rounded-lg bg-violet-50 border border-violet-200 text-violet-700 text-sm flex items-center gap-2">
+                <div className="p-3 rounded-lg bg-primary-50 border border-primary-200 text-primary-700 text-sm flex items-center gap-2">
                   <InfoIcon className="size-4 shrink-0" />
                   A temporary password will be generated. Share it with the user to let them log in.
                 </div>
@@ -326,7 +323,6 @@ export function UserFormDialog({ open, onOpenChange, editUser }: UserFormDialogP
               <Button
                 onClick={handleSubmit}
                 disabled={isLoading || !email.trim() || !name.trim()}
-                className="bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600"
               >
                 {isLoading && <Spinner className="size-4 mr-2" />}
                 {isEditing ? "Save Changes" : "Create User"}

@@ -220,11 +220,7 @@ export function ChangePasswordForm() {
 
           {/* Submit */}
           <div className="pt-4">
-            <Button
-              type="submit"
-              disabled={isLoading || !canSubmit}
-              className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
-            >
+            <Button type="submit" disabled={isLoading || !canSubmit}>
               {isLoading ? (
                 <>
                   <Spinner className="size-4" />

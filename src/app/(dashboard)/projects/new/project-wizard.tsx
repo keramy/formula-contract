@@ -223,8 +223,8 @@ export function ProjectWizard({ clients, users }: ProjectWizardProps) {
           <WizardStep step={0}>
             <div className="space-y-6">
               <div className="flex items-center gap-2 mb-4">
-                <div className="p-2 rounded-md bg-violet-100">
-                  <FolderIcon className="size-5 text-violet-600" />
+                <div className="p-2 rounded-md bg-primary-100">
+                  <FolderIcon className="size-5 text-primary-700" />
                 </div>
                 <div>
                   <h3 className="font-semibold">Project Details</h3>

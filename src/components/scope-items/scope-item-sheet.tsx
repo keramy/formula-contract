@@ -432,9 +432,9 @@ export function ScopeItemSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-lg flex flex-col p-0 h-full">
         {/* Header */}
-        <SheetHeader className="px-6 pt-6 pb-4 border-b bg-gradient-to-r from-violet-50 to-purple-50 shrink-0">
+        <SheetHeader className="px-6 pt-6 pb-4 border-b bg-base-50 shrink-0">
           <div className="flex items-center gap-3">
-            <GradientIcon icon={<ClipboardListIcon className="size-5" />} color="violet" size="sm" />
+            <GradientIcon icon={<ClipboardListIcon className="size-5" />} color="primary" size="sm" />
             <div>
               <SheetTitle className="text-lg">
                 {isViewOnly ? "View Scope Item" : isEditing ? "Edit Scope Item" : "Add Scope Item"}
@@ -524,7 +524,7 @@ export function ScopeItemSheet({
                     <SelectContent>
                       <SelectItem value="production">
                         <div className="flex items-center gap-2">
-                          <FactoryIcon className="size-4 text-violet-500" />
+                          <FactoryIcon className="size-4 text-primary" />
                           Production
                         </div>
                       </SelectItem>
@@ -759,8 +759,8 @@ export function ScopeItemSheet({
 
                     {/* Production Progress - Editable */}
                     {formData.item_path === "production" && (
-                      <div className="p-3 rounded-lg bg-violet-50 border border-violet-100">
-                        <div className="flex items-center gap-2 mb-2 text-violet-700">
+                      <div className="p-3 rounded-lg bg-primary-50 border border-primary-100">
+                        <div className="flex items-center gap-2 mb-2 text-primary-700">
                           <FactoryIcon className="size-4" />
                           <span className="text-sm font-medium">Production Progress</span>
                         </div>
@@ -852,8 +852,8 @@ export function ScopeItemSheet({
                     </div>
 
                     {/* Installation Started - Interactive toggle */}
-                    <div className="p-3 rounded-lg bg-violet-50 border border-violet-100">
-                      <div className="flex items-center gap-2 mb-2 text-violet-700">
+                    <div className="p-3 rounded-lg bg-primary-50 border border-primary-100">
+                      <div className="flex items-center gap-2 mb-2 text-primary-700">
                         <WrenchIcon className="size-4" />
                         <span className="text-sm font-medium">Installation Progress</span>
                       </div>
@@ -910,7 +910,7 @@ export function ScopeItemSheet({
               <Button
                 onClick={handleSubmit}
                 disabled={isPending || isLoading || !formData.item_code.trim() || !formData.name.trim()}
-                className="flex-1 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700"
+                className="flex-1"
               >
                 {isPending ? (
                   <Spinner className="size-4 mr-2" />

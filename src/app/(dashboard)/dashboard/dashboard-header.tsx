@@ -18,7 +18,7 @@ export function DashboardHeader({ userName }: DashboardHeaderProps) {
 
   useEffect(() => {
     setContent({
-      icon: <GradientIcon icon={<LayoutDashboardIcon className="size-4" />} color="violet" size="sm" />,
+      icon: <GradientIcon icon={<LayoutDashboardIcon className="size-4" />} color="primary" size="sm" />,
       title: "Dashboard",
       description: `Welcome back, ${userName}`,
     });

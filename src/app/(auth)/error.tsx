@@ -23,7 +23,7 @@ export default function AuthError({
   }, [error]);
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-gradient-to-b from-violet-50 to-background">
+    <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-gradient-to-b from-primary-50 to-background">
       <Card className="w-full max-w-md border-red-200">
         <CardContent className="pt-6">
           <div className="text-center">

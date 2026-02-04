@@ -80,7 +80,7 @@ export function ReportActivityModal({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <ActivityIcon className="size-5 text-violet-500" />
+            <ActivityIcon className="size-5 text-primary" />
             Report Activity
           </DialogTitle>
           <p className="text-sm text-muted-foreground">{reportName}</p>

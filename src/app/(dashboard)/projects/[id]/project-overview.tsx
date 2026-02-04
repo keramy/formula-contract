@@ -342,10 +342,7 @@ export function ProjectOverview({
       {/* Edit Project Button */}
       {canEdit && (
         <div className="flex justify-end">
-          <Button
-            onClick={() => setEditSheetOpen(true)}
-            className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700"
-          >
+          <Button onClick={() => setEditSheetOpen(true)}>
             <PencilIcon className="size-4" />
             Edit Project
           </Button>
@@ -444,7 +441,7 @@ export function ProjectOverview({
                   </span>
                   <span className="font-medium">{productionProgress}%</span>
                 </div>
-                <Progress value={productionProgress} className="h-1.5 [&>div]:bg-violet-500" />
+                <Progress value={productionProgress} className="h-1.5 [&>div]:bg-primary" />
               </div>
 
               {/* Installation */}
@@ -456,7 +453,7 @@ export function ProjectOverview({
                   </span>
                   <span className="font-medium">
                     {installingItems > 0 && (
-                      <span className="text-violet-600">{installingItems} in progress · </span>
+                      <span className="text-primary">{installingItems} in progress · </span>
                     )}
                     {installedItems}/{totalItems}
                   </span>
@@ -531,7 +528,7 @@ export function ProjectOverview({
                       {assignments.slice(0, 4).map((a) => (
                         <Tooltip key={a.id}>
                           <TooltipTrigger asChild>
-                            <div className="size-6 rounded-full bg-gradient-to-br from-violet-500 to-purple-500 ring-1 ring-white flex items-center justify-center text-white text-[10px] font-medium cursor-default hover:z-10 hover:scale-110 transition-transform">
+                            <div className="size-6 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 ring-1 ring-white flex items-center justify-center text-white text-[10px] font-medium cursor-default hover:z-10 hover:scale-110 transition-transform">
                               {a.user.name.charAt(0).toUpperCase()}
                             </div>
                           </TooltipTrigger>
@@ -573,7 +570,7 @@ export function ProjectOverview({
                       }}
                       className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border bg-background/50 hover:bg-accent/50 transition-colors"
                     >
-                      <FlagIcon className="size-4 text-violet-600" />
+                      <FlagIcon className="size-4 text-primary" />
                       <span className="text-sm">
                         <span className="font-semibold">{completedMilestones}/{totalMilestones}</span>
                         <span className="text-muted-foreground ml-1">milestones</span>
@@ -618,7 +615,7 @@ export function ProjectOverview({
 
       {/* Attention Required Section - Compact with Tooltips */}
       {attentionItems.length > 0 && (
-        <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl border border-amber-200 bg-gradient-to-r from-amber-50/80 to-orange-50/80">
+        <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl border border-amber-200 bg-amber-50">
           <div className="flex items-center gap-2 shrink-0">
             <AlertTriangleIcon className="size-4 text-amber-600" />
             <span className="text-sm font-medium text-amber-800">Needs Attention</span>
@@ -664,7 +661,7 @@ export function ProjectOverview({
 
       {/* All Clear Message - Compact */}
       {attentionItems.length === 0 && scopeItems.length > 0 && (
-        <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50/80 to-teal-50/80">
+        <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-emerald-200 bg-emerald-50">
           <CheckCircleIcon className="size-4 text-emerald-600" />
           <span className="text-sm font-medium text-emerald-700">All Clear!</span>
           <span className="text-sm text-emerald-600">No items requiring attention</span>
@@ -682,14 +679,14 @@ export function ProjectOverview({
                   ? "bg-rose-100"
                   : daysUntilNext !== null && daysUntilNext <= 7
                   ? "bg-amber-100"
-                  : "bg-violet-100"
+                  : "bg-primary-100"
               }`}>
                 <FlagIcon className={`size-6 ${
                   daysUntilNext !== null && daysUntilNext < 0
                     ? "text-rose-600"
                     : daysUntilNext !== null && daysUntilNext <= 7
                     ? "text-amber-600"
-                    : "text-violet-600"
+                    : "text-primary"
                 }`} />
               </div>
               <div className="flex-1">
@@ -710,7 +707,7 @@ export function ProjectOverview({
                     ? "text-rose-600"
                     : daysUntilNext !== null && daysUntilNext <= 7
                     ? "text-amber-600"
-                    : "text-violet-600"
+                    : "text-primary"
                 }`}>
                   {daysUntilNext !== null && daysUntilNext < 0
                     ? Math.abs(daysUntilNext)

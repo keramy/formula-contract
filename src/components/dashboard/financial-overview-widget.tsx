@@ -46,7 +46,7 @@ export function FinancialOverviewWidget({ financial }: FinancialOverviewWidgetPr
         ) : (
           <div className="space-y-4">
             {/* Total Value */}
-            <div className="p-4 rounded-xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100">
+            <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-100">
               <div className="flex items-center gap-2 text-sm text-emerald-700 mb-1">
                 <TrendingUpIcon className="size-4" />
                 <span>Total Contract Value</span>

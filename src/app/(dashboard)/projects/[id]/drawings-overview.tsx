@@ -155,7 +155,6 @@ export function DrawingsOverview({ projectId, productionItems, drawings, project
             setPreselectedItemId(undefined);
             setUploadSheetOpen(true);
           }}
-          className="bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700"
         >
           <UploadIcon className="size-4" />
           Upload Drawing
@@ -188,7 +187,7 @@ export function DrawingsOverview({ projectId, productionItems, drawings, project
                   const status = item.drawing?.status || "not_uploaded";
                   const config = statusConfig[status] || { variant: "default" as StatusVariant, label: status };
                   return (
-                    <TableRow key={item.id} className="hover:bg-gray-50/50 transition-colors">
+                    <TableRow key={item.id} className="hover:bg-primary/5 transition-colors">
                       <TableCell className="text-center">
                         <span className="text-sm font-medium text-muted-foreground">
                           {index + 1}

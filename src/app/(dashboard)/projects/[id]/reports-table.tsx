@@ -57,7 +57,7 @@ interface ReportsTableProps {
 const REPORT_TYPE_COLORS: Record<string, string> = {
   daily: "bg-blue-100 text-blue-700",
   weekly: "bg-teal-100 text-teal-700",
-  progress: "bg-violet-100 text-violet-700",
+  site: "bg-primary-100 text-primary-700",
   installation: "bg-amber-100 text-amber-700",
   snagging: "bg-rose-100 text-rose-700",
 };
@@ -302,7 +302,7 @@ export function ReportsTable({
                     <TableCell className="py-2">
                       <div className="flex items-center gap-1">
                         {report.share_internal && (
-                          <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-violet-100 text-violet-700">
+                          <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-primary-100 text-primary-700">
                             Internal
                           </span>
                         )}
@@ -358,7 +358,7 @@ export function ReportsTable({
                           <Button
                             size="icon"
                             variant="ghost"
-                            className="size-8 hover:bg-violet-50 hover:text-violet-600"
+                            className="size-8 hover:bg-primary/10 hover:text-primary"
                             onClick={() => setActivityModalReport(report)}
                             title="View activity"
                           >

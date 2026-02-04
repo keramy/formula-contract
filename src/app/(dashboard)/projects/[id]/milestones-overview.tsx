@@ -31,9 +31,12 @@ import {
   CalendarIcon,
   CircleIcon,
   CircleDotIcon,
+  LayoutGridIcon,
+  ListIcon,
 } from "lucide-react";
 import { format, isPast, differenceInDays } from "date-fns";
 import { MilestoneFormDialog } from "./milestone-form-dialog";
+import { MilestoneCards } from "@/components/milestones/milestone-cards";
 
 interface Milestone {
   id: string;
@@ -51,6 +54,8 @@ interface MilestonesOverviewProps {
   milestones: Milestone[];
 }
 
+type ViewMode = "cards" | "timeline";
+
 export function MilestonesOverview({
   projectId,
   milestones,
@@ -61,6 +66,7 @@ export function MilestonesOverview({
   const [editItem, setEditItem] = useState<Milestone | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteItemId, setDeleteItemId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>("cards"); // Default to cards view
 
   // Stats
   const stats = {
@@ -173,12 +179,51 @@ export function MilestonesOverview({
     return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
   });
 
+  // If in cards view, render the MilestoneCards component
+  if (viewMode === "cards") {
+    return (
+      <div className="space-y-4">
+        {/* View Toggle */}
+        <div className="flex justify-end">
+          <div className="inline-flex items-center rounded-lg border border-base-200 bg-muted/50 p-1">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => setViewMode("cards")}
+              className="h-7 px-2.5"
+            >
+              <LayoutGridIcon className="size-4 mr-1.5" />
+              Cards
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setViewMode("timeline")}
+              className="h-7 px-2.5"
+            >
+              <ListIcon className="size-4 mr-1.5" />
+              Timeline
+            </Button>
+          </div>
+        </div>
+
+        {/* Card View Component */}
+        <MilestoneCards
+          projectId={projectId}
+          milestones={milestones}
+          showProjectBadge={false}
+        />
+      </div>
+    );
+  }
+
+  // Timeline View (original view)
   return (
     <div className="space-y-4">
-      {/* Header with inline stats */}
+      {/* View Toggle + Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <GradientIcon icon={<FlagIcon className="size-5" />} color="violet" size="default" />
+          <GradientIcon icon={<FlagIcon className="size-5" />} color="primary" size="default" />
           <div>
             <h3 className="text-lg font-medium">Milestones</h3>
             <p className="text-sm text-muted-foreground">
@@ -195,13 +240,33 @@ export function MilestonesOverview({
             </p>
           </div>
         </div>
-        <Button
-          onClick={handleAdd}
-          className="bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600"
-        >
-          <PlusIcon className="size-4" />
-          Add Milestone
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* View Toggle */}
+          <div className="inline-flex items-center rounded-lg border border-base-200 bg-muted/50 p-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setViewMode("cards")}
+              className="h-7 px-2.5"
+            >
+              <LayoutGridIcon className="size-4 mr-1.5" />
+              Cards
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => setViewMode("timeline")}
+              className="h-7 px-2.5"
+            >
+              <ListIcon className="size-4 mr-1.5" />
+              Timeline
+            </Button>
+          </div>
+          <Button onClick={handleAdd}>
+            <PlusIcon className="size-4" />
+            Add Milestone
+          </Button>
+        </div>
       </div>
 
       {/* Progress Bar */}
@@ -209,9 +274,9 @@ export function MilestonesOverview({
         <GlassCard className="p-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium">Overall Progress</span>
-            <span className="text-sm font-semibold text-violet-600">{progress}%</span>
+            <span className="text-sm font-semibold text-primary">{progress}%</span>
           </div>
-          <Progress value={progress} className="h-2.5 [&>div]:bg-gradient-to-r [&>div]:from-violet-500 [&>div]:to-purple-500" />
+          <Progress value={progress} className="h-2.5 [&>div]:bg-primary" />
         </GlassCard>
       )}
 
@@ -219,7 +284,7 @@ export function MilestonesOverview({
       {milestones.length > 0 ? (
         <div className="relative">
           {/* Timeline line */}
-          <div className="absolute left-[19px] top-6 bottom-6 w-0.5 bg-gradient-to-b from-violet-200 via-violet-300 to-violet-200" />
+          <div className="absolute left-[19px] top-6 bottom-6 w-0.5 bg-gradient-to-b from-base-200 via-base-300 to-base-200" />
 
           <div className="space-y-1">
             {sortedMilestones.map((milestone, index) => {
@@ -232,7 +297,7 @@ export function MilestonesOverview({
                 completed: "bg-emerald-500 ring-emerald-100",
                 overdue: "bg-rose-500 ring-rose-100 animate-pulse",
                 warning: "bg-amber-500 ring-amber-100",
-                upcoming: "bg-violet-500 ring-violet-100",
+                upcoming: "bg-primary ring-primary-100",
               };
 
               return (
@@ -278,7 +343,7 @@ export function MilestonesOverview({
                                 ? "bg-rose-100 text-rose-700"
                                 : status === "warning"
                                 ? "bg-amber-100 text-amber-700"
-                                : "bg-violet-100 text-violet-700"
+                                : "bg-primary-100 text-primary-700"
                             }`}>
                               {format(new Date(milestone.due_date), "MMM d, yyyy")}
                             </span>
@@ -324,7 +389,7 @@ export function MilestonesOverview({
                             variant="ghost"
                             onClick={() => handleEdit(milestone)}
                             disabled={isLoading}
-                            className="size-8 hover:bg-violet-50 hover:text-violet-600"
+                            className="size-8 hover:bg-primary/10 hover:text-primary"
                           >
                             <PencilIcon className="size-3.5" />
                           </Button>
@@ -352,10 +417,7 @@ export function MilestonesOverview({
           title="No milestones yet"
           description="No milestones set yet. Add milestones to track project timeline."
           action={
-            <Button
-              onClick={handleAdd}
-              className="bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600"
-            >
+            <Button onClick={handleAdd}>
               <PlusIcon className="size-4" />
               Add First Milestone
             </Button>

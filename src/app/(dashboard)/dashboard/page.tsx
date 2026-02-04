@@ -2,6 +2,7 @@ import { createClient, getUserProfileFromJWT } from "@/lib/supabase/server";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { GlassCard, GradientIcon, StatusBadge } from "@/components/ui/ui-helpers";
+import { Progress } from "@/components/ui/progress";
 import { ActivityFeed } from "@/components/activity-log/activity-feed";
 import Link from "next/link";
 import {
@@ -21,8 +22,7 @@ import { UpcomingMilestonesWidget } from "@/components/dashboard/upcoming-milest
 import { ProductionQueueWidget } from "@/components/dashboard/production-queue-widget";
 import { ProcurementQueueWidget } from "@/components/dashboard/procurement-queue-widget";
 import { FinancialOverviewWidget } from "@/components/dashboard/financial-overview-widget";
-import { ThisWeekWidget } from "@/components/dashboard/this-week-widget";
-import { ProjectsStatusChart } from "@/components/dashboard/projects-status-chart";
+import { DashboardOverviewCard } from "@/components/dashboard/dashboard-overview-card";
 import { ScrollIndicator } from "@/components/dashboard/scroll-indicator";
 
 // Status configuration for display
@@ -143,7 +143,7 @@ export default async function DashboardPage() {
   // ============================================================================
   if (isClient) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50/50 via-white to-gray-50/50">
+      <div className="min-h-screen bg-background">
         <div className="p-6 space-y-5">
           <DashboardHeader userName={userName} />
 
@@ -177,32 +177,41 @@ export default async function DashboardPage() {
   }).slice(0, 4);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50/50 via-white to-gray-50/50 relative">
+    <div className="min-h-screen bg-background relative">
       <div className="p-6 space-y-5 pb-16">
         <DashboardHeader userName={userName} />
 
-        {/* This Week Summary & Charts - At the TOP for visibility */}
-        {(canSeeAllProjects || userRole === "pm") && (
+        {/* Top Row: Overview + Financial (admin/management) or just Overview (PM) */}
+        {canSeeAllProjects ? (
           <div className="grid gap-5 lg:grid-cols-2">
-            <ThisWeekWidget summary={thisWeekData} />
-            {canSeeAllProjects && <ProjectsStatusChart data={projectsStatusData} />}
+            <DashboardOverviewCard
+              thisWeek={thisWeekData}
+              projectsStatus={projectsStatusData}
+            />
+            <FinancialOverviewWidget financial={financialData} />
           </div>
-        )}
+        ) : userRole === "pm" ? (
+          <DashboardOverviewCard
+            thisWeek={thisWeekData}
+            projectsStatus={{ tender: 0, active: 0, on_hold: 0, completed: 0, cancelled: 0, not_awarded: 0, total: 0 }}
+          />
+        ) : null}
 
         {/* Role-Specific Widgets */}
         {isProduction ? (
           <ProductionQueueWidget queue={productionQueueData} />
         ) : isProcurement ? (
           <ProcurementQueueWidget queue={procurementQueueData} />
+        ) : canSeeAllProjects ? (
+          <div className="grid gap-5 lg:grid-cols-2">
+            <MyTasksWidget tasks={tasksData} />
+            <AtRiskProjects projects={atRiskData} />
+          </div>
         ) : (
           <div className="grid gap-5 lg:grid-cols-3">
             <MyTasksWidget tasks={tasksData} />
             <AtRiskProjects projects={atRiskData} />
-            {canSeeAllProjects ? (
-              <FinancialOverviewWidget financial={financialData} />
-            ) : (
-              <UpcomingMilestonesWidget milestones={milestonesData} />
-            )}
+            <UpcomingMilestonesWidget milestones={milestonesData} />
           </div>
         )}
 
@@ -212,7 +221,7 @@ export default async function DashboardPage() {
             <CardHeader className="pb-2 pt-4 px-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <GradientIcon icon={<FolderKanbanIcon className="size-4" />} color="violet" size="sm" />
+                  <GradientIcon icon={<FolderKanbanIcon className="size-4" />} color="teal" size="sm" />
                   <CardTitle className="text-sm font-semibold">
                     {canSeeAllProjects ? "Recent Projects" : "My Recent Projects"}
                   </CardTitle>
@@ -229,24 +238,55 @@ export default async function DashboardPage() {
               {recentProjects && recentProjects.length > 0 ? (
                 recentProjects.map((project) => {
                   const config = statusConfig[project.status] || { variant: "default" as const, label: project.status };
+                  // Type assertion for enhanced project data with progress
+                  const enhancedProject = project as typeof project & {
+                    progress?: number;
+                    itemCount?: number;
+                  };
+                  const progress = enhancedProject.progress ?? 0;
+
                   return (
                     <Link
                       key={project.id}
                       href={`/projects/${project.slug || project.id}`}
-                      className="group block p-2.5 rounded-lg bg-gray-50/50 hover:bg-gray-100/70 transition-colors"
+                      className="group block p-3 rounded-lg bg-base-50/50 hover:bg-primary/5 border border-transparent hover:border-primary/20 transition-all"
                     >
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="flex flex-col gap-1">
+                        {/* Project Info */}
                         <div className="min-w-0 flex-1">
-                          <p className="font-medium text-sm truncate group-hover:text-violet-700 transition-colors">
-                            {project.name}
-                          </p>
-                          <p className="text-xs text-muted-foreground truncate">
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <p className="font-medium text-sm truncate group-hover:text-primary transition-colors">
+                              {project.name}
+                            </p>
+                            <StatusBadge variant={config.variant} className="shrink-0 text-xs">
+                              {config.label}
+                            </StatusBadge>
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate mb-2">
                             {project.project_code} • {project.client?.company_name || "No client"}
                           </p>
+
+                          {/* Progress Bar */}
+                          <div className="flex items-center gap-2">
+                            <Progress
+                              value={progress}
+                              className="h-1.5 flex-1 bg-base-200"
+                              indicatorColor={
+                                progress >= 100 ? "bg-emerald-500" :
+                                progress >= 75 ? "bg-primary" :
+                                progress >= 50 ? "bg-amber-500" :
+                                "bg-base-400"
+                              }
+                            />
+                            <span className={`text-xs font-medium tabular-nums ${
+                              progress >= 100 ? "text-emerald-600" :
+                              progress >= 75 ? "text-primary" :
+                              "text-muted-foreground"
+                            }`}>
+                              {progress}%
+                            </span>
+                          </div>
                         </div>
-                        <StatusBadge variant={config.variant} className="shrink-0 text-xs">
-                          {config.label}
-                        </StatusBadge>
                       </div>
                     </Link>
                   );
@@ -272,7 +312,7 @@ export default async function DashboardPage() {
 
         {/* Compact Milestones - Horizontal layout for admin/management */}
         {canSeeAllProjects && milestonesData.length > 0 && (
-          <div className="rounded-xl border border-gray-200 bg-white/80 backdrop-blur p-4">
+          <div className="rounded-xl border border-base-200 bg-card p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <CalendarIcon className="size-4 text-amber-600" />
@@ -284,7 +324,7 @@ export default async function DashboardPage() {
                   </span>
                 )}
               </div>
-              <Link href="/projects" className="text-xs text-violet-600 hover:text-violet-700 font-medium">
+              <Link href="/projects" className="text-xs text-primary hover:text-primary/80 font-medium">
                 View all →
               </Link>
             </div>
@@ -304,7 +344,7 @@ export default async function DashboardPage() {
                         ? "bg-red-50 border-red-200 hover:bg-red-100"
                         : isDueSoon
                         ? "bg-amber-50 border-amber-200 hover:bg-amber-100"
-                        : "bg-gray-50 border-gray-200 hover:bg-gray-100"
+                        : "bg-base-50 border-base-200 hover:bg-base-100"
                     }`}
                   >
                     <p className="font-medium text-sm truncate">{milestone.name}</p>

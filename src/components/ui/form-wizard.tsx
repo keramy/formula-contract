@@ -162,7 +162,7 @@ export function WizardStepIndicator({
                 >
                   <div
                     className={cn(
-                      "h-full bg-violet-600 transition-all duration-500",
+                      "h-full bg-primary transition-all duration-500",
                       isCompleted ? "w-full" : "w-0"
                     )}
                   />
@@ -178,9 +178,9 @@ export function WizardStepIndicator({
                   className={cn(
                     "flex size-8 items-center justify-center rounded-full text-sm font-medium transition-all duration-200",
                     isCompleted &&
-                      "bg-violet-600 text-white hover:bg-violet-700",
+                      "bg-primary text-white hover:bg-primary-800",
                     isCurrent &&
-                      "border-2 border-violet-600 bg-white text-violet-600",
+                      "border-2 border-primary bg-white text-primary",
                     !isCompleted &&
                       !isCurrent &&
                       "border-2 border-gray-300 bg-white text-gray-400",
@@ -211,7 +211,7 @@ export function WizardStepIndicator({
                   <span
                     className={cn(
                       "text-sm font-medium",
-                      isCurrent ? "text-violet-600" : "text-gray-500"
+                      isCurrent ? "text-primary" : "text-gray-500"
                     )}
                   >
                     {step.title}
@@ -301,7 +301,7 @@ export function WizardNavigation({
           disabled={!canProceed || isSubmitting}
           className={cn(
             "px-6 py-2 text-sm font-medium rounded-md transition-colors",
-            "bg-violet-600 text-white hover:bg-violet-700",
+            "bg-primary text-white hover:bg-primary-800",
             "disabled:opacity-50 disabled:cursor-not-allowed"
           )}
         >
@@ -314,7 +314,7 @@ export function WizardNavigation({
           disabled={!canProceed}
           className={cn(
             "px-6 py-2 text-sm font-medium rounded-md transition-colors",
-            "bg-violet-600 text-white hover:bg-violet-700",
+            "bg-primary text-white hover:bg-primary-800",
             "disabled:opacity-50 disabled:cursor-not-allowed"
           )}
         >

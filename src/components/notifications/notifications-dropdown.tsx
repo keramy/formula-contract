@@ -28,7 +28,7 @@ import {
   useMarkAllAsRead,
 } from "@/lib/react-query/notifications";
 
-type GradientColor = "coral" | "teal" | "violet" | "amber" | "rose" | "emerald" | "sky" | "slate";
+type GradientColor = "coral" | "teal" | "violet" | "amber" | "rose" | "emerald" | "sky" | "slate" | "primary";
 
 const typeConfig: Record<string, { icon: React.ReactNode; color: GradientColor }> = {
   drawing_approved: { icon: <CheckCircleIcon className="size-3.5" />, color: "emerald" },
@@ -37,7 +37,7 @@ const typeConfig: Record<string, { icon: React.ReactNode; color: GradientColor }
   drawing_sent: { icon: <ClockIcon className="size-3.5" />, color: "amber" },
   material_approved: { icon: <CheckCircleIcon className="size-3.5" />, color: "teal" },
   material_rejected: { icon: <AlertCircleIcon className="size-3.5" />, color: "rose" },
-  project_assigned: { icon: <FileIcon className="size-3.5" />, color: "violet" },
+  project_assigned: { icon: <FileIcon className="size-3.5" />, color: "primary" },
   milestone_due: { icon: <ClockIcon className="size-3.5" />, color: "coral" },
   report_published: { icon: <FileIcon className="size-3.5" />, color: "teal" },
   default: { icon: <BellIcon className="size-3.5" />, color: "slate" },
@@ -93,11 +93,11 @@ export function NotificationsDropdown() {
         <Button
           variant="ghost"
           size="icon"
-          className="relative hover:bg-violet-100/70 transition-colors"
+          className="relative hover:bg-primary/10 transition-colors"
         >
           <BellIcon className="size-5" />
           {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 size-5 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 text-white text-xs flex items-center justify-center font-bold shadow-lg shadow-violet-500/30">
+            <span className="absolute -top-1 -right-1 size-5 rounded-full bg-primary text-white text-xs flex items-center justify-center font-bold shadow-sm">
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           )}
@@ -108,16 +108,16 @@ export function NotificationsDropdown() {
         className="w-[360px] bg-white/95 backdrop-blur-lg border-0 shadow-xl shadow-gray-200/50 rounded-xl overflow-hidden"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-violet-50 to-purple-50 border-b border-violet-100/50">
+        <div className="flex items-center justify-between px-4 py-3 bg-base-50 border-b border-base-200">
           <div className="flex items-center gap-2">
-            <GradientIcon icon={<BellIcon className="size-4" />} color="violet" size="sm" />
+            <GradientIcon icon={<BellIcon className="size-4" />} color="primary" size="sm" />
             <h4 className="font-semibold text-sm">Notifications</h4>
           </div>
           {unreadCount > 0 && (
             <Button
               variant="ghost"
               size="sm"
-              className="h-auto py-1 px-2 text-xs hover:bg-violet-100 text-violet-700"
+              className="h-auto py-1 px-2 text-xs hover:bg-primary/10 text-primary"
               onClick={handleMarkAllAsRead}
             >
               <CheckIcon className="size-3 mr-1" />
@@ -129,7 +129,7 @@ export function NotificationsDropdown() {
         <ScrollArea className="h-[340px]">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground text-sm">
-              <div className="size-8 rounded-full border-2 border-violet-200 border-t-violet-500 animate-spin mb-3" />
+              <div className="size-8 rounded-full border-2 border-primary-200 border-t-primary animate-spin mb-3" />
               <span>Loading notifications...</span>
             </div>
           ) : notifications.length === 0 ? (
@@ -176,7 +176,7 @@ function NotificationItem({ notification, config, onClick }: NotificationItemPro
       onClick={onClick}
       className={cn(
         "w-full text-left px-4 py-3 hover:bg-gray-50/80 transition-all duration-200 border-b border-gray-100/50 last:border-0",
-        !notification.is_read && "bg-violet-50/50"
+        !notification.is_read && "bg-primary-50/50"
       )}
     >
       <div className="flex gap-3">
@@ -192,12 +192,12 @@ function NotificationItem({ notification, config, onClick }: NotificationItemPro
           )}>
             {notification.title}
             {projectName && (
-              <span className="text-violet-600 font-medium"> on {projectName}</span>
+              <span className="text-primary font-medium"> on {projectName}</span>
             )}
           </p>
           <div className="flex items-center gap-2 mt-1">
             {notification.project?.project_code && (
-              <span className="text-[11px] font-medium text-violet-500">
+              <span className="text-[11px] font-medium text-primary">
                 {notification.project.project_code}
               </span>
             )}
@@ -209,7 +209,7 @@ function NotificationItem({ notification, config, onClick }: NotificationItemPro
           </div>
         </div>
         {!notification.is_read && (
-          <div className="size-2 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 mt-1.5 shrink-0 shadow-sm shadow-violet-400/50" />
+          <div className="size-2 rounded-full bg-primary mt-1.5 shrink-0" />
         )}
       </div>
     </button>

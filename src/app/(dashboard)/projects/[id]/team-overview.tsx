@@ -206,7 +206,7 @@ export function TeamOverview({ projectId, assignments, canManageTeam }: TeamOver
         {canManageTeam && (
           <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600">
+              <Button>
                 <PlusIcon className="size-4" />
                 Add Member
               </Button>
@@ -287,8 +287,7 @@ export function TeamOverview({ projectId, assignments, canManageTeam }: TeamOver
                   <Button
                     onClick={handleAssign}
                     disabled={isLoading || selectedUserIds.size === 0}
-                    className="bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600"
-                  >
+                                      >
                     {isLoading ? (
                       <>
                         <Spinner className="size-4" />
@@ -322,8 +321,7 @@ export function TeamOverview({ projectId, assignments, canManageTeam }: TeamOver
             action={canManageTeam ? (
               <Button
                 onClick={() => setAddDialogOpen(true)}
-                className="bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600"
-              >
+                              >
                 <PlusIcon className="size-4" />
                 Add First Member
               </Button>
@@ -350,7 +348,7 @@ export function TeamOverview({ projectId, assignments, canManageTeam }: TeamOver
                   {roleAssignments.map((assignment) => (
                     <div
                       key={assignment.id}
-                      className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 transition-colors group"
+                      className="flex items-center justify-between p-2 rounded-lg hover:bg-primary/5 transition-colors group"
                     >
                       <div className="flex items-center gap-3">
                         <GradientAvatar name={assignment.user.name} size="sm" />

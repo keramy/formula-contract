@@ -161,10 +161,10 @@ export function ProjectEditSheet({ projectId, open, onOpenChange }: ProjectEditS
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto p-0">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b bg-gradient-to-r from-violet-50 to-purple-50">
+        <SheetHeader className="px-6 pt-6 pb-4 border-b bg-base-50">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-violet-100">
-              <PencilIcon className="size-5 text-violet-600" />
+            <div className="p-2 rounded-lg bg-primary-100">
+              <PencilIcon className="size-5 text-primary-700" />
             </div>
             <div>
               <SheetTitle className="text-lg">Edit Project</SheetTitle>
@@ -321,7 +321,7 @@ export function ProjectEditSheet({ projectId, open, onOpenChange }: ProjectEditS
               <Button
                 type="submit"
                 disabled={isLoading}
-                className="flex-1 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700"
+                className="flex-1"
               >
                 {isLoading ? (
                   <>

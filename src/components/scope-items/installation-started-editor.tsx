@@ -78,7 +78,7 @@ export function InstallationStartedEditor({
     return (
       <div className="flex items-center gap-2">
         {started ? (
-          <Badge variant="default" className="bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-400">
+          <Badge variant="default" className="bg-primary-100 text-primary-800 dark:bg-primary-900/30 dark:text-primary-400">
             <WrenchIcon className="size-3 mr-1" />
             Installing
           </Badge>
@@ -118,7 +118,7 @@ export function InstallationStartedEditor({
             {updateMutation.isPending ? (
               <Spinner className="size-4" />
             ) : started ? (
-              <WrenchIcon className="size-4 text-violet-600" />
+              <WrenchIcon className="size-4 text-primary" />
             ) : (
               <ClockIcon className="size-4 text-muted-foreground" />
             )}
@@ -132,7 +132,7 @@ export function InstallationStartedEditor({
               <Button
                 variant={date ? "outline" : "ghost"}
                 size="sm"
-                className={date ? "text-xs" : "text-xs text-violet-600 hover:text-violet-700 hover:bg-violet-50"}
+                className={date ? "text-xs" : "text-xs text-primary hover:text-primary-700 hover:bg-primary/10"}
                 disabled={updateMutation.isPending}
               >
                 <CalendarIcon className="size-3 mr-1" />

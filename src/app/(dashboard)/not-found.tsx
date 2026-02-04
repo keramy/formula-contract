@@ -11,11 +11,11 @@ import { FileQuestionIcon, HomeIcon, FolderIcon } from "lucide-react";
 export default function DashboardNotFound() {
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center p-4">
-      <Card className="w-full max-w-md border-violet-200 bg-violet-50/30">
+      <Card className="w-full max-w-md border-primary-200 bg-primary-50/30">
         <CardContent className="pt-6">
           <div className="text-center">
-            <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-violet-100">
-              <FileQuestionIcon className="size-7 text-violet-600" />
+            <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-primary-100">
+              <FileQuestionIcon className="size-7 text-primary" />
             </div>
 
             <h2 className="mb-2 text-xl font-semibold text-foreground">

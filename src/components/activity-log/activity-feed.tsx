@@ -46,7 +46,7 @@ const actionConfig: Record<string, { icon: React.ReactNode; gradientColor: Gradi
   },
   [ACTIVITY_ACTIONS.PROJECT_UPDATED]: {
     icon: <EditIcon className="size-3.5" />,
-    gradientColor: "violet",
+    gradientColor: "sky",
     verb: "updated",
     entityLabel: "project",
   },
@@ -81,7 +81,7 @@ const actionConfig: Record<string, { icon: React.ReactNode; gradientColor: Gradi
   },
   [ACTIVITY_ACTIONS.USER_ASSIGNED]: {
     icon: <UserIcon className="size-3.5" />,
-    gradientColor: "violet",
+    gradientColor: "sky",
     verb: "assigned",
     entityLabel: "to",
   },
@@ -171,7 +171,7 @@ const actionConfig: Record<string, { icon: React.ReactNode; gradientColor: Gradi
   // Report actions
   [ACTIVITY_ACTIONS.REPORT_CREATED]: {
     icon: <FileTextIcon className="size-3.5" />,
-    gradientColor: "violet",
+    gradientColor: "sky",
     verb: "created report",
   },
   [ACTIVITY_ACTIONS.REPORT_PUBLISHED]: {
@@ -207,7 +207,7 @@ const actionConfig: Record<string, { icon: React.ReactNode; gradientColor: Gradi
   // Milestone actions
   [ACTIVITY_ACTIONS.MILESTONE_CREATED]: {
     icon: <CalendarIcon className="size-3.5" />,
-    gradientColor: "violet",
+    gradientColor: "sky",
     verb: "created milestone",
   },
   [ACTIVITY_ACTIONS.MILESTONE_UPDATED]: {
@@ -345,14 +345,14 @@ export function ActivityFeed({
         {showTitle && (
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base font-semibold">
-              <GradientIcon icon={<ActivityIcon className="size-4" />} color="violet" size="sm" />
+              <GradientIcon icon={<ActivityIcon className="size-4" />} color="primary" size="sm" />
               Activity Log
             </CardTitle>
           </CardHeader>
         )}
         <CardContent>
           <div className="flex items-center justify-center py-12">
-            <Spinner className="size-6 text-violet-500" />
+            <Spinner className="size-6 text-primary" />
           </div>
         </CardContent>
       </GlassCard>
@@ -364,7 +364,7 @@ export function ActivityFeed({
       {showTitle && (
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base font-semibold">
-            <GradientIcon icon={<ActivityIcon className="size-4" />} color="violet" size="sm" />
+            <GradientIcon icon={<ActivityIcon className="size-4" />} color="primary" size="sm" />
             Activity Log
           </CardTitle>
         </CardHeader>
@@ -380,7 +380,7 @@ export function ActivityFeed({
           <ScrollArea style={{ maxHeight }}>
             <div className="relative">
               {/* Timeline connector line */}
-              <div className="absolute left-[15px] top-2 bottom-2 w-px bg-gradient-to-b from-violet-200 via-gray-200 to-transparent" />
+              <div className="absolute left-[15px] top-2 bottom-2 w-px bg-gradient-to-b from-primary-200 via-gray-200 to-transparent" />
 
               <div className="space-y-4">
                 {activities.map((activity, index) => {

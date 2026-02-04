@@ -371,7 +371,7 @@ const ScopeItemRow = memo(function ScopeItemRow({
         <TableCell className="text-center text-muted-foreground font-mono text-sm">
           {item.isChild ? (
             <span className="flex items-center justify-center gap-0.5">
-              <span className="text-violet-500">⤷</span>
+              <span className="text-base-400">⤷</span>
               <span className="text-xs">{item.displayRowNumber}</span>
             </span>
           ) : (
@@ -381,7 +381,7 @@ const ScopeItemRow = memo(function ScopeItemRow({
       )}
       {isColumnVisible("code") && (
         <TableCell className={`font-mono text-sm ${item.isChild ? "pl-2" : ""}`}>
-          {item.isChild && <span className="text-violet-400 mr-1">└</span>}
+          {item.isChild && <span className="text-base-400 mr-1">└</span>}
           {item.item_code}
         </TableCell>
       )}
@@ -512,7 +512,7 @@ const ScopeItemRow = memo(function ScopeItemRow({
                   return (
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <div className="flex items-center gap-1.5 text-violet-600 cursor-help">
+                        <div className="flex items-center gap-1.5 text-primary cursor-help">
                           <WrenchIcon className="size-3.5" />
                           <span className="text-xs font-medium">Installing</span>
                         </div>
@@ -569,7 +569,7 @@ const ScopeItemRow = memo(function ScopeItemRow({
                 StatusIcon = <CheckCircle2Icon className="size-3.5 text-green-600 shrink-0" />;
                 statusTooltip = "Installed";
               } else if (item.is_installation_started) {
-                StatusIcon = <WrenchIcon className="size-3.5 text-violet-600 shrink-0" />;
+                StatusIcon = <WrenchIcon className="size-3.5 text-primary shrink-0" />;
                 statusTooltip = "Installation in progress (+5%)";
               } else if (item.is_shipped) {
                 StatusIcon = <TruckIcon className="size-3.5 text-blue-600 shrink-0" />;
@@ -1094,7 +1094,6 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
             action={
               <Button
                 onClick={openAddSheet}
-                className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700"
               >
                 <PlusIcon className="size-4 mr-2" />
                 Add Scope Item
@@ -1124,22 +1123,22 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
   return (
     <div className="space-y-3">
       {/* Summary Bar */}
-      <div className="flex flex-wrap items-center gap-4 p-3 bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-950/20 dark:to-purple-950/20 border border-violet-100 dark:border-violet-900/30 rounded-lg">
+      <div className="flex flex-wrap items-center gap-4 p-3 bg-base-50 dark:bg-base-900/20 border border-base-200 dark:border-base-800 rounded-lg">
         <div className="flex items-center gap-2">
-          <ListIcon className="size-4 text-violet-600" />
+          <ListIcon className="size-4 text-primary" />
           <span className="text-sm font-medium">Items:</span>
-          <span className="text-sm font-bold text-violet-700">{items.length}</span>
+          <span className="text-sm font-bold text-primary">{items.length}</span>
         </div>
         {/* Hide cost/sales info from clients */}
         {!isClient && (
           <>
-            <div className="h-4 w-px bg-violet-200 dark:bg-violet-800" />
+            <div className="h-4 w-px bg-base-200 dark:bg-base-700" />
             <div className="flex items-center gap-2" title="Total Sales Price (what client pays)">
               <BanknoteIcon className="size-4 text-emerald-600" />
               <span className="text-sm font-medium">Sales:</span>
               <span className="text-sm font-bold text-emerald-700">{formatCurrency(totalSalesPrice)}</span>
             </div>
-            <div className="h-4 w-px bg-violet-200 dark:bg-violet-800" />
+            <div className="h-4 w-px bg-base-200 dark:bg-base-700" />
             <div className="flex items-center gap-2" title="Total Actual Cost (what we pay)">
               <BanknoteIcon className="size-4 text-orange-600" />
               <span className="text-sm font-medium">Actual Cost:</span>
@@ -1147,7 +1146,7 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
             </div>
             {totalInitialCost > 0 && (
               <>
-                <div className="h-4 w-px bg-violet-200 dark:bg-violet-800" />
+                <div className="h-4 w-px bg-base-200 dark:bg-base-700" />
                 <div className="flex items-center gap-2" title="Total Initial Cost (locked snapshot)">
                   <BanknoteIcon className="size-4 text-gray-500" />
                   <span className="text-sm font-medium">Initial:</span>
@@ -1157,7 +1156,7 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
             )}
           </>
         )}
-        <div className="h-4 w-px bg-violet-200 dark:bg-violet-800" />
+        <div className="h-4 w-px bg-base-200 dark:bg-base-700" />
         <div className="flex items-center gap-2">
           <BarChart3Icon className="size-4 text-blue-600" />
           <span className="text-sm font-medium">Progress:</span>
@@ -1244,7 +1243,7 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
                 {/* Status submenu */}
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger>
-                    <BarChart3Icon className="size-4 mr-2 text-violet-500" />
+                    <BarChart3Icon className="size-4 mr-2 text-primary" />
                     Update Status
                   </DropdownMenuSubTrigger>
                   <DropdownMenuPortal>
@@ -1299,7 +1298,7 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
 
                 {/* Installation started actions */}
                 <DropdownMenuItem onClick={() => bulkUpdate("is_installation_started", true)}>
-                  <WrenchIcon className="size-4 mr-2 text-violet-600" />
+                  <WrenchIcon className="size-4 mr-2 text-primary" />
                   Mark Installation Started
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => bulkUpdate("is_installation_started", false)}>
@@ -1560,18 +1559,18 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
               </div>
 
               {/* Summary */}
-              <div className="p-3 rounded-lg bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 text-sm space-y-1">
-                <p className="font-medium text-violet-800 dark:text-violet-300">New item will be created:</p>
-                <p className="text-violet-700 dark:text-violet-400">
+              <div className="p-3 rounded-lg bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 text-sm space-y-1">
+                <p className="font-medium text-primary-800 dark:text-primary-300">New item will be created:</p>
+                <p className="text-primary-700 dark:text-primary-400">
                   • Code: <strong>{itemToSplit.item_code}.1</strong> (or next available)
                 </p>
-                <p className="text-violet-700 dark:text-violet-400">
+                <p className="text-primary-700 dark:text-primary-400">
                   • Name: <strong>{splitName || "(enter name)"}</strong>
                 </p>
-                <p className="text-violet-700 dark:text-violet-400">
+                <p className="text-primary-700 dark:text-primary-400">
                   • Path: <strong>{splitTargetPath}</strong>
                 </p>
-                <p className="text-violet-700 dark:text-violet-400">
+                <p className="text-primary-700 dark:text-primary-400">
                   • Quantity: <strong>{parseInt(splitQuantity) || 0} {itemToSplit.unit}</strong>
                 </p>
               </div>
@@ -1584,7 +1583,6 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
             <Button
               onClick={handleSplitSubmit}
               disabled={isPending || !splitName.trim() || !splitQuantity || parseInt(splitQuantity) <= 0}
-              className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700"
             >
               {isPending ? (
                 <>

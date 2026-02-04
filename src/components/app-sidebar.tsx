@@ -10,6 +10,7 @@ import {
   UsersIcon,
   FileTextIcon,
   SettingsIcon,
+  WalletIcon,
 } from "lucide-react";
 import { getVersionDisplay } from "@/lib/version";
 
@@ -24,7 +25,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail,
   SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { UserMenu } from "@/components/user-menu";
@@ -42,16 +42,18 @@ const routePermissions: Record<string, string[]> = {
   "/dashboard": ["admin", "pm", "production", "procurement", "management", "client"],
   "/projects": ["admin", "pm", "production", "procurement", "management", "client"], // Clients see assigned projects
   "/clients": ["admin", "pm"],
+  "/finance": ["admin", "management"],
   "/users": ["admin"],
   "/reports": ["admin", "pm", "management", "client"], // Clients see their project reports
   "/settings": ["admin"],
 };
 
-// Color mapping for each nav item to give visual variety
+// Color mapping for each nav item - using Forest Whisper theme (teal primary)
 const navItemColors: Record<string, string> = {
-  "/dashboard": "violet",
-  "/projects": "violet",
-  "/clients": "teal",
+  "/dashboard": "teal",
+  "/projects": "teal",
+  "/clients": "slate",
+  "/finance": "teal",
   "/users": "coral",
   "/reports": "amber",
   "/settings": "gray",
@@ -72,6 +74,11 @@ const mainNavItems = [
     title: "Clients",
     href: "/clients",
     icon: BuildingIcon,
+  },
+  {
+    title: "Finance",
+    href: "/finance",
+    icon: WalletIcon,
   },
 ];
 
@@ -99,36 +106,38 @@ function canAccess(href: string, role: string): boolean {
   return allowedRoles ? allowedRoles.includes(role) : false;
 }
 
-// Get active background class based on nav item color
+// Get active background class based on nav item color (Forest Whisper theme)
+// Force text color with ! to override shadcn defaults (data-[active=true] styles)
 function getActiveClasses(href: string, isActive: boolean): string {
   if (!isActive) return "";
 
-  const color = navItemColors[href] || "violet";
+  const color = navItemColors[href] || "teal";
   const colorMap: Record<string, string> = {
-    violet: "bg-violet-100 text-violet-700 hover:bg-violet-100",
-    teal: "bg-teal-100 text-teal-700 hover:bg-teal-100",
-    coral: "bg-orange-100 text-orange-700 hover:bg-orange-100",
-    amber: "bg-amber-100 text-amber-700 hover:bg-amber-100",
-    gray: "bg-gray-100 text-gray-700 hover:bg-gray-100",
+    teal: "bg-primary-100! text-primary-800! hover:bg-primary-150",
+    slate: "bg-secondary-100! text-secondary-800! hover:bg-secondary-150",
+    coral: "bg-orange-100! text-orange-700! hover:bg-orange-150",
+    amber: "bg-amber-100! text-amber-700! hover:bg-amber-150",
+    gray: "bg-base-100! text-base-700! hover:bg-base-150",
   };
 
-  return colorMap[color] || colorMap.violet;
+  return colorMap[color] || colorMap.teal;
 }
 
 // Get icon color class for active state
+// Force icon color with ! to override shadcn's data-[active=true] styles
 function getIconClasses(href: string, isActive: boolean): string {
   if (!isActive) return "text-muted-foreground group-hover:text-foreground";
 
-  const color = navItemColors[href] || "violet";
+  const color = navItemColors[href] || "teal";
   const colorMap: Record<string, string> = {
-    violet: "text-violet-600",
-    teal: "text-teal-600",
-    coral: "text-orange-600",
-    amber: "text-amber-600",
-    gray: "text-gray-600",
+    teal: "text-primary-700!",
+    slate: "text-secondary-700!",
+    coral: "text-orange-600!",
+    amber: "text-amber-600!",
+    gray: "text-base-600!",
   };
 
-  return colorMap[color] || colorMap.violet;
+  return colorMap[color] || colorMap.teal;
 }
 
 export function AppSidebar({ user }: AppSidebarProps) {
@@ -139,11 +148,11 @@ export function AppSidebar({ user }: AppSidebarProps) {
   const filteredManagementItems = managementNavItems.filter(item => canAccess(item.href, user.role));
 
   return (
-    <Sidebar collapsible="icon" className="border-r-0">
-      {/* Header with Gradient Logo */}
-      <SidebarHeader className="border-b border-sidebar-border/50">
-        <div className="flex items-center gap-3 px-2 py-2">
-          <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 text-white font-bold text-sm shadow-lg shadow-violet-500/25 shrink-0">
+    <Sidebar collapsible="icon" className="border-r-0!">
+      {/* Header with Logo - adapts to collapsed state */}
+      <SidebarHeader className="border-b border-sidebar-border/50 p-0">
+        <div className="flex items-center gap-2 px-3 py-3 group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:justify-center">
+          <div className="flex items-center justify-center size-8 rounded-lg bg-primary-700 text-white font-bold text-xs shrink-0">
             FC
           </div>
           <div className="flex flex-col min-w-0 group-data-[collapsible=icon]:hidden">
@@ -153,8 +162,8 @@ export function AppSidebar({ user }: AppSidebarProps) {
         </div>
       </SidebarHeader>
 
-      {/* Main Content */}
-      <SidebarContent className="px-2">
+      {/* Main Content - remove horizontal padding, let SidebarGroup handle it */}
+      <SidebarContent className="overflow-x-hidden">
         {/* Main Navigation */}
         {filteredMainItems.length > 0 && (
           <SidebarGroup>
@@ -174,7 +183,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
                         className={cn(
                           "group rounded-lg transition-all duration-200",
                           getActiveClasses(item.href, isActive),
-                          !isActive && "hover:bg-gray-100"
+                          !isActive && "hover:bg-primary/10 hover:text-foreground"
                         )}
                       >
                         <Link href={item.href}>
@@ -212,7 +221,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
                           className={cn(
                             "group rounded-lg transition-all duration-200",
                             getActiveClasses(item.href, isActive),
-                            !isActive && "hover:bg-gray-100"
+                            !isActive && "hover:bg-primary/10 hover:text-foreground"
                           )}
                         >
                           <Link href={item.href}>
@@ -230,23 +239,20 @@ export function AppSidebar({ user }: AppSidebarProps) {
         )}
       </SidebarContent>
 
-      {/* Footer - User Menu with subtle gradient background */}
-      <SidebarFooter className="border-t border-sidebar-border/50 bg-gradient-to-t from-gray-50/80 to-transparent">
+      {/* Footer - User Menu */}
+      <SidebarFooter className="border-t border-sidebar-border/50 p-2">
         <SidebarMenu>
           <SidebarMenuItem>
             <UserMenu user={user} />
           </SidebarMenuItem>
         </SidebarMenu>
         {/* Version display - subtle, bottom of sidebar */}
-        <div className="px-3 pb-2 group-data-[collapsible=icon]:hidden">
+        <div className="px-1 pb-1 group-data-[collapsible=icon]:hidden">
           <span className="text-[10px] text-muted-foreground/50 font-mono">
             {getVersionDisplay()}
           </span>
         </div>
       </SidebarFooter>
-
-      {/* Rail for collapse/expand on hover at edge */}
-      <SidebarRail />
     </Sidebar>
   );
 }

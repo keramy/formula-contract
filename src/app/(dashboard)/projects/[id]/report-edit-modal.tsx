@@ -437,7 +437,6 @@ export function ReportEditModal({
             <Button
               onClick={handleSaveReport}
               disabled={isSaving}
-              className="bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600"
             >
               {isSaving ? (
                 <>

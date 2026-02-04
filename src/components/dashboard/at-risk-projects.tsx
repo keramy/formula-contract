@@ -85,11 +85,11 @@ export function AtRiskProjects({ projects }: AtRiskProjectsProps) {
             <Link
               key={project.id}
               href={`/projects/${project.slug || project.id}`}
-              className={`group block p-3 rounded-lg border transition-all hover:shadow-md ${config.bgColor}`}
+              className={`group block p-3 rounded-lg border transition-colors hover:border-primary-300 ${config.bgColor}`}
             >
               <div className="flex items-start justify-between mb-2">
                 <div>
-                  <p className="font-medium text-sm group-hover:text-violet-700 transition-colors">
+                  <p className="font-medium text-sm group-hover:text-primary transition-colors">
                     {project.name}
                   </p>
                   <p className="text-xs text-muted-foreground">

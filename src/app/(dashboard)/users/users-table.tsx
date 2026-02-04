@@ -63,7 +63,7 @@ type RoleVariant = "danger" | "info" | "violet" | "coral" | "success" | "default
 const roleConfig: Record<string, { variant: RoleVariant; label: string }> = {
   admin: { variant: "danger", label: "Admin" },
   pm: { variant: "info", label: "Project Manager" },
-  production: { variant: "violet", label: "Production" },
+  production: { variant: "info", label: "Production" },
   procurement: { variant: "coral", label: "Procurement" },
   management: { variant: "success", label: "Management" },
   client: { variant: "default", label: "Client" },
@@ -147,7 +147,7 @@ export function UsersTable({ users }: UsersTableProps) {
             title="No users found"
             description="Get started by adding your first team member."
             action={
-              <Button onClick={handleAddUser} className="bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600">
+              <Button onClick={handleAddUser} >
                 <PlusIcon className="size-4" />
                 Add User
               </Button>
@@ -197,7 +197,7 @@ export function UsersTable({ users }: UsersTableProps) {
             </SelectContent>
           </Select>
         </div>
-        <Button onClick={handleAddUser} className="bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600">
+        <Button onClick={handleAddUser} >
           <PlusIcon className="size-4" />
           Add User
         </Button>
@@ -233,7 +233,7 @@ export function UsersTable({ users }: UsersTableProps) {
                 return (
                   <TableRow
                     key={user.id}
-                    className={`group hover:bg-gray-50/50 border-b border-gray-50 last:border-0 ${userStatus === "inactive" ? "opacity-60" : ""}`}
+                    className={`group hover:bg-primary/5 border-b border-base-50 last:border-0 ${userStatus === "inactive" ? "opacity-60" : ""}`}
                   >
                     <TableCell className="py-4">
                       <span className="text-sm font-mono font-medium text-orange-600">
