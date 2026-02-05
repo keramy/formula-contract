@@ -60,15 +60,16 @@ export default async function DashboardPage() {
   // Get assigned project IDs for operational roles
   let assignedProjectIds: string[] = [];
   if (!canSeeAllProjects && !isClient && user) {
-    const { data: assignments } = await supabase
+    const { data: assignments, error: assignmentError } = await supabase
       .from("project_assignments")
       .select("project_id")
       .eq("user_id", user.id);
+
     assignedProjectIds = (assignments || []).map(a => a.project_id);
   }
 
   // Fetch data based on role
-  let projectCounts = { total: 0, tender: 0, active: 0, on_hold: 0, completed: 0, cancelled: 0 };
+  let projectCounts = { total: 0, tender: 0, active: 0, on_hold: 0, completed: 0, cancelled: 0, not_awarded: 0 };
   let recentProjects: Array<{ id: string; slug: string | null; project_code: string; name: string; status: string; client: { company_name: string | null } | null }> = [];
   let clientCount = 0;
   let userCount = 0;
@@ -94,6 +95,9 @@ export default async function DashboardPage() {
   const isProduction = userRole === "production";
   const isProcurement = userRole === "procurement";
 
+  // For PM role, pass assignedProjectIds to filter data; for admin/management, pass undefined (all projects)
+  const projectFilter = isOperationalRole ? assignedProjectIds : undefined;
+
   const [
     tasksData,
     atRiskData,
@@ -107,19 +111,22 @@ export default async function DashboardPage() {
     projectsStatusData,
   ] = await Promise.all([
     // My Tasks - PM and Admin only (not production/procurement)
+    // PM sees only their assigned projects; Admin sees all
     (userRole === "pm" || canSeeAllProjects)
-      ? getMyTasks()
+      ? getMyTasks(userRole === "pm" ? assignedProjectIds : undefined)
       : Promise.resolve({ pendingMaterialApprovals: 0, rejectedDrawings: 0, draftReports: 0, overdueMilestones: 0, total: 0 }),
     // At-Risk Projects - admin/management/pm
+    // PM sees only their assigned projects; Admin sees all
     canSeeAllProjects || userRole === "pm"
-      ? getAtRiskProjects()
+      ? getAtRiskProjects(userRole === "pm" ? assignedProjectIds : undefined)
       : Promise.resolve([]),
     // Pending Approvals - Client only
     isClient ? getPendingApprovals(userId) : Promise.resolve([]),
     // Client Project Progress - Client only
     isClient ? getClientProjectProgress(userId) : Promise.resolve([]),
     // Upcoming Milestones - non-client users
-    !isClient ? getDashboardMilestones() : Promise.resolve([]),
+    // PM sees only their assigned projects; Admin sees all
+    !isClient ? getDashboardMilestones(userRole === "pm" ? assignedProjectIds : undefined) : Promise.resolve([]),
     // Production Queue - Production role
     isProduction ? getProductionQueue() : Promise.resolve({ inProduction: [], readyForProduction: [], pendingInstallation: [], totalInProduction: 0, totalReady: 0, totalPendingInstall: 0 }),
     // Procurement Queue - Procurement role
@@ -127,8 +134,9 @@ export default async function DashboardPage() {
     // Financial Overview - Admin/Management only
     canSeeAllProjects ? getFinancialOverview() : Promise.resolve({ totalContractValue: 0, byStatus: { tender: 0, active: 0, completed: 0 }, currency: "TRY", projectCount: 0 }),
     // This Week Summary - Admin/Management/PM (not production/procurement/client)
+    // PM sees only their assigned projects; Admin sees all
     (canSeeAllProjects || userRole === "pm")
-      ? getThisWeekSummary()
+      ? getThisWeekSummary(userRole === "pm" ? assignedProjectIds : undefined)
       : Promise.resolve({ itemsCompletedThisWeek: 0, reportsPublishedThisWeek: 0, upcomingMilestones: 0, milestonesOverdue: 0 }),
     // Projects by Status Chart - Admin/Management only
     canSeeAllProjects
@@ -181,39 +189,46 @@ export default async function DashboardPage() {
       <div className="p-6 space-y-5 pb-16">
         <DashboardHeader userName={userName} />
 
-        {/* Top Row: Overview + Financial (admin/management) or just Overview (PM) */}
+        {/* Top Section: Layout varies by role */}
         {canSeeAllProjects ? (
-          <div className="grid gap-5 lg:grid-cols-2">
-            <DashboardOverviewCard
-              thisWeek={thisWeekData}
-              projectsStatus={projectsStatusData}
-            />
-            <FinancialOverviewWidget financial={financialData} />
-          </div>
+          <>
+            {/* Admin/Management: Overview + Financial side by side */}
+            <div className="grid gap-5 lg:grid-cols-2">
+              <DashboardOverviewCard
+                thisWeek={thisWeekData}
+                projectsStatus={projectsStatusData}
+              />
+              <FinancialOverviewWidget financial={financialData} />
+            </div>
+            {/* Tasks + At Risk row */}
+            <div className="grid gap-5 lg:grid-cols-2">
+              <MyTasksWidget tasks={tasksData} />
+              <AtRiskProjects projects={atRiskData} />
+            </div>
+          </>
         ) : userRole === "pm" ? (
-          <DashboardOverviewCard
-            thisWeek={thisWeekData}
-            projectsStatus={{ tender: 0, active: 0, on_hold: 0, completed: 0, cancelled: 0, not_awarded: 0, total: 0 }}
-          />
-        ) : null}
-
-        {/* Role-Specific Widgets */}
-        {isProduction ? (
+          <>
+            {/* PM: Overview + Milestones on left, Tasks on right - tops and bottoms align */}
+            <div className="grid gap-5 lg:grid-cols-2">
+              <div className="flex flex-col justify-between gap-4">
+                <DashboardOverviewCard
+                  thisWeek={thisWeekData}
+                  projectsStatus={projectCounts}
+                />
+                <UpcomingMilestonesWidget milestones={milestonesData} />
+              </div>
+              <MyTasksWidget tasks={tasksData} />
+            </div>
+            {/* At Risk - same grid as above so widths align */}
+            <div className="grid gap-5 lg:grid-cols-2">
+              <AtRiskProjects projects={atRiskData} />
+            </div>
+          </>
+        ) : isProduction ? (
           <ProductionQueueWidget queue={productionQueueData} />
         ) : isProcurement ? (
           <ProcurementQueueWidget queue={procurementQueueData} />
-        ) : canSeeAllProjects ? (
-          <div className="grid gap-5 lg:grid-cols-2">
-            <MyTasksWidget tasks={tasksData} />
-            <AtRiskProjects projects={atRiskData} />
-          </div>
-        ) : (
-          <div className="grid gap-5 lg:grid-cols-3">
-            <MyTasksWidget tasks={tasksData} />
-            <AtRiskProjects projects={atRiskData} />
-            <UpcomingMilestonesWidget milestones={milestonesData} />
-          </div>
-        )}
+        ) : null}
 
         {/* Recent Projects & Activity Feed */}
         <div className="grid gap-5 lg:grid-cols-2">
