@@ -1,6 +1,6 @@
 # Formula Contract - Project Intelligence
 
-> **Last Updated:** February 3, 2026
+> **Last Updated:** February 4, 2026
 > **Version:** 1.1.0
 > **Supabase Project:** `lsuiaqrpkhejeavsrsqc` (contract-eu, eu-central-1)
 
@@ -81,6 +81,7 @@ formula-contract/
 │   │   │   │       ├── scope/    # Scope items tab
 │   │   │   │       └── reports/  # Reports tab
 │   │   │   ├── clients/          # Client management
+│   │   │   ├── finance/          # Financial overview (admin/management only)
 │   │   │   ├── users/            # User management (admin only)
 │   │   │   └── settings/         # User settings
 │   │   └── auth/callback/        # Supabase auth callback
@@ -95,6 +96,8 @@ formula-contract/
 │   │   ├── reports/              # Report components
 │   │   ├── notifications/        # Notification dropdown
 │   │   ├── dashboard/            # Dashboard widgets
+│   │   ├── finance/              # Finance charts and KPI cards
+│   │   ├── milestones/           # Milestone card components
 │   │   └── forms/                # Shared form components
 │   │
 │   ├── lib/
@@ -335,6 +338,17 @@ function formatCurrency(value: number | null, currency: string): string {
 }
 ```
 
+### Recharts Data Types
+```typescript
+// Recharts Pie/Bar components require index signature on data objects
+interface ChartDataItem {
+  name: string;
+  value: number;
+  fill?: string;
+  [key: string]: string | number | undefined; // Required for Recharts
+}
+```
+
 ---
 
 ## Supabase Security (CRITICAL)
@@ -404,6 +418,12 @@ CREATE INDEX IF NOT EXISTS idx_table_fk ON table(fk_column);
 8. **Functions need `SET search_path`** - Security requirement
 9. **Server actions for mutations** - Never mutate from client components
 10. **React Query for server state** - Don't duplicate in useState
+11. **Recharts index signature** - Data types need `[key: string]: string | number` for Pie/Bar charts
+
+### Git on Windows
+- CRLF warnings are normal (`LF will be replaced by CRLF`) - safe to ignore
+- If `gh` CLI unavailable, create PRs via GitHub web: `https://github.com/{owner}/{repo}/pull/new/{branch}`
+- Always use `-u` flag on first push: `git push -u origin branch-name`
 
 ---
 
@@ -510,6 +530,15 @@ const photoHeight = Math.min(
 
 **Rule:** When you don't want borders, always use `"F"` not `"FD"`.
 
+### PDF V2 Template Design (Feb 2026)
+- **2-column photo grid** (not 3) with 3:2 aspect ratio
+- **Smart photo layouts:** single (16:9 full-width), triple (hero + 2 side), standard (2-col grid)
+- **Inline teal section numbers** (01, 02) instead of badge boxes
+- **Section dividers** between sections (gray horizontal line)
+- **Print-friendly:** No page borders, minimal ink, "Confidential" in footer
+- **Helper function pattern:** Extract `drawImage()` for letterbox-fit logic
+- **COLORS constant:** Define all colors at top of file for consistency
+
 ### Code Extraction Pattern
 When two functions share 90%+ similar code:
 1. Extract the common logic into an internal function
@@ -568,9 +597,11 @@ Extracted to `src/lib/pdf/image-helpers.ts`:
 - Report creation wizard (2-step: Content → Share & Publish)
 - Report types update (daily, site, installation, snagging)
 - Code review & cleanup (RLS fix, schema bug fix, debug logs removed)
-
-### In Progress
-- Financial module (see FINANCIAL-MODULE-PLAN.md)
+- Finance module (`/finance` page with KPIs, budget charts, project costs table)
+- Dashboard consolidation (DashboardOverviewCard merges This Week + Projects Status)
+- PDF V2 template (2-column photos, inline section numbers, print-friendly)
+- Milestone cards view toggle (Cards/Timeline)
+- Team members stats card on Users page
 
 ### Planned
 - Mobile optimization

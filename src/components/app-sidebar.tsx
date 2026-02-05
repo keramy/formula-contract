@@ -150,8 +150,8 @@ export function AppSidebar({ user }: AppSidebarProps) {
   return (
     <Sidebar collapsible="icon" className="border-r-0!">
       {/* Header with Logo - adapts to collapsed state */}
-      <SidebarHeader className="border-b border-sidebar-border/50 p-0">
-        <div className="flex items-center gap-2 px-3 py-3 group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:justify-center">
+      <SidebarHeader className="h-14 border-b border-sidebar-border/50 p-0">
+        <div className="flex items-center gap-2 px-3 h-full group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:justify-center">
           <div className="flex items-center justify-center size-8 rounded-lg bg-primary-700 text-white font-bold text-xs shrink-0">
             FC
           </div>
