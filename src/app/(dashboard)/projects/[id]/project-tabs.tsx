@@ -19,6 +19,7 @@ import {
   AlertTriangleIcon,
   CalendarIcon,
   UsersIcon,
+  WalletIcon,
 } from "lucide-react";
 
 interface ProjectTabsProps {
@@ -34,6 +35,7 @@ interface ProjectTabsProps {
 
 // Tab configuration for the "More" dropdown
 const MORE_TABS = [
+  { value: "financials", label: "Financials", icon: WalletIcon, hideForClient: true },
   { value: "drawings", label: "Drawings", icon: PencilRulerIcon },
   { value: "materials", label: "Materials", icon: PackageIcon },
   { value: "snagging", label: "Snagging", icon: AlertTriangleIcon },
@@ -110,6 +112,12 @@ export function ProjectTabs({
         </TabsTrigger>
 
         {/* Secondary tabs - visible on desktop, hidden on mobile */}
+        {!isClient && (
+          <TabsTrigger value="financials" className="hidden md:flex">
+            <WalletIcon className="size-4 mr-1.5" />
+            Financials
+          </TabsTrigger>
+        )}
         <TabsTrigger value="drawings" className="hidden md:flex">
           Drawings
         </TabsTrigger>

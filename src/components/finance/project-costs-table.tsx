@@ -7,6 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -20,6 +27,7 @@ import {
   ArrowUpIcon,
   ArrowDownIcon,
   ExternalLinkIcon,
+  BuildingIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -66,14 +74,47 @@ const statusConfig: Record<string, { variant: "info" | "success" | "warning" | "
 type SortKey = "name" | "budget" | "actual" | "variance" | "variancePercentage";
 type SortDir = "asc" | "desc";
 
+// Status options for filter chips
+const STATUS_OPTIONS = [
+  { value: "all", label: "All" },
+  { value: "tender", label: "Tender" },
+  { value: "active", label: "Active" },
+  { value: "on_hold", label: "On Hold" },
+  { value: "completed", label: "Completed" },
+  { value: "cancelled", label: "Cancelled" },
+  { value: "not_awarded", label: "Not Awarded" },
+];
+
 export function ProjectCostsTable({ data }: ProjectCostsTableProps) {
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("budget");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [clientFilter, setClientFilter] = useState<string>("all");
+
+  // Extract unique client names for dropdown
+  const clientOptions = useMemo(() => {
+    const clients = data
+      .map((row) => row.client_name)
+      .filter((name): name is string => name !== null && name !== "")
+      .filter((name, index, self) => self.indexOf(name) === index) // unique
+      .sort((a, b) => a.localeCompare(b));
+    return clients;
+  }, [data]);
 
   // Filter and sort data
   const filteredData = useMemo(() => {
     let filtered = data;
+
+    // Apply status filter
+    if (statusFilter !== "all") {
+      filtered = filtered.filter((row) => row.status === statusFilter);
+    }
+
+    // Apply client filter
+    if (clientFilter !== "all") {
+      filtered = filtered.filter((row) => row.client_name === clientFilter);
+    }
 
     // Apply search filter
     if (search) {
@@ -102,7 +143,7 @@ export function ProjectCostsTable({ data }: ProjectCostsTableProps) {
     });
 
     return filtered;
-  }, [data, search, sortKey, sortDir]);
+  }, [data, search, sortKey, sortDir, statusFilter, clientFilter]);
 
   // Handle sort toggle
   const handleSort = (key: SortKey) => {
@@ -129,21 +170,61 @@ export function ProjectCostsTable({ data }: ProjectCostsTableProps) {
   return (
     <Card className="border border-base-200">
       <CardHeader className="pb-4">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <CardTitle className="text-base font-semibold">Project Costs</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Financial overview by project ({filteredData.length} of {data.length})
-            </p>
+        <div className="flex flex-col gap-4">
+          {/* Top row: Title and filters */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <CardTitle className="text-base font-semibold">Project Costs</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Financial overview by project ({filteredData.length} of {data.length})
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {/* Client filter dropdown */}
+              <Select value={clientFilter} onValueChange={setClientFilter}>
+                <SelectTrigger className="w-[180px]" size="sm">
+                  <BuildingIcon className="size-4 mr-2 text-muted-foreground" />
+                  <SelectValue placeholder="All Clients" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Clients</SelectItem>
+                  {clientOptions.map((client) => (
+                    <SelectItem key={client} value={client}>
+                      {client}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Search input */}
+              <div className="relative">
+                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search projects..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9 w-48 sm:w-64"
+                />
+              </div>
+            </div>
           </div>
-          <div className="relative">
-            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-            <Input
-              placeholder="Search projects..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 w-64"
-            />
+
+          {/* Status filter chips */}
+          <div className="flex flex-wrap items-center gap-2">
+            {STATUS_OPTIONS.map((option) => (
+              <Button
+                key={option.value}
+                variant={statusFilter === option.value ? "default" : "outline"}
+                size="sm"
+                onClick={() => setStatusFilter(option.value)}
+                className={cn(
+                  "h-7 text-xs",
+                  statusFilter === option.value && "shadow-sm"
+                )}
+              >
+                {option.label}
+              </Button>
+            ))}
           </div>
         </div>
       </CardHeader>
@@ -152,7 +233,7 @@ export function ProjectCostsTable({ data }: ProjectCostsTableProps) {
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="w-[280px]">
+                <TableHead className="w-[280px] pl-6">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -197,7 +278,7 @@ export function ProjectCostsTable({ data }: ProjectCostsTableProps) {
                     <SortIndicator column="variance" />
                   </Button>
                 </TableHead>
-                <TableHead className="w-[60px]"></TableHead>
+                <TableHead className="w-[60px] pr-6"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -211,7 +292,7 @@ export function ProjectCostsTable({ data }: ProjectCostsTableProps) {
 
                   return (
                     <TableRow key={row.id} className="group">
-                      <TableCell>
+                      <TableCell className="pl-6">
                         <div className="min-w-0">
                           <p className="font-medium truncate">{row.name}</p>
                           <p className="text-xs text-muted-foreground truncate">
@@ -263,7 +344,7 @@ export function ProjectCostsTable({ data }: ProjectCostsTableProps) {
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="pr-6">
                         <Button
                           variant="ghost"
                           size="icon"

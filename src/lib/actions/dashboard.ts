@@ -52,6 +52,7 @@ export interface DashboardStats {
     on_hold: number;
     completed: number;
     cancelled: number;
+    not_awarded: number;
   };
   recentProjects: Array<{
     id: string;
@@ -72,13 +73,13 @@ export async function getMyDashboardStats(assignedProjectIds: string[]): Promise
 
   if (assignedProjectIds.length === 0) {
     return {
-      projectCounts: { total: 0, tender: 0, active: 0, on_hold: 0, completed: 0, cancelled: 0 },
+      projectCounts: { total: 0, tender: 0, active: 0, on_hold: 0, completed: 0, cancelled: 0, not_awarded: 0 },
       recentProjects: [],
     };
   }
 
   // Fetch projects and clients in parallel
-  const [{ data: projectsData }, { data: clientsData }] = await Promise.all([
+  const [{ data: projectsData, error: projectsError }, { data: clientsData }] = await Promise.all([
     supabase
       .from("projects")
       .select("id, slug, project_code, name, status, client_id")
@@ -114,6 +115,7 @@ export async function getMyDashboardStats(assignedProjectIds: string[]): Promise
     on_hold: projects.filter(p => p.status === "on_hold").length,
     completed: projects.filter(p => p.status === "completed").length,
     cancelled: projects.filter(p => p.status === "cancelled").length,
+    not_awarded: projects.filter(p => p.status === "not_awarded").length,
   };
 
   // Get recent 5 projects with client info
@@ -132,51 +134,94 @@ export async function getMyDashboardStats(assignedProjectIds: string[]): Promise
 /**
  * Get aggregated task counts for PM/Admin dashboards
  * Shows what needs attention right now
+ * @param projectIds - Optional filter for specific projects (used by PM role)
  */
-export async function getMyTasks(): Promise<TaskSummary> {
+export async function getMyTasks(projectIds?: string[]): Promise<TaskSummary> {
   const supabase = await createClient();
   const now = new Date().toISOString();
 
-  // Parallel fetch for all task counts
+  // If filtering by projects and no projects assigned, return zeros
+  if (projectIds && projectIds.length === 0) {
+    return {
+      pendingMaterialApprovals: 0,
+      rejectedDrawings: 0,
+      draftReports: 0,
+      overdueMilestones: 0,
+      total: 0,
+    };
+  }
+
+  // Build base queries with optional project filtering
+  let materialsQuery = supabase
+    .from("materials")
+    .select("*", { count: "exact", head: true })
+    .eq("status", "sent_to_client")
+    .eq("is_deleted", false);
+
+  let reportsQuery = supabase
+    .from("reports")
+    .select("*", { count: "exact", head: true })
+    .eq("is_published", false);
+
+  let milestonesQuery = supabase
+    .from("milestones")
+    .select("*", { count: "exact", head: true })
+    .eq("is_completed", false)
+    .lt("due_date", now);
+
+  // Apply project filter if provided
+  if (projectIds) {
+    materialsQuery = materialsQuery.in("project_id", projectIds);
+    reportsQuery = reportsQuery.in("project_id", projectIds);
+    milestonesQuery = milestonesQuery.in("project_id", projectIds);
+  }
+
+  // For drawings, we need to get scope_item IDs first if filtering by project
+  let rejectedDrawingsCount = 0;
+  if (projectIds) {
+    const { data: scopeItems } = await supabase
+      .from("scope_items")
+      .select("id")
+      .in("project_id", projectIds)
+      .eq("is_deleted", false);
+
+    const itemIds = scopeItems?.map(s => s.id) || [];
+    if (itemIds.length > 0) {
+      const { count } = await supabase
+        .from("drawings")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "rejected")
+        .in("item_id", itemIds);
+      rejectedDrawingsCount = count || 0;
+    }
+  } else {
+    const { count } = await supabase
+      .from("drawings")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "rejected");
+    rejectedDrawingsCount = count || 0;
+  }
+
+  // Parallel fetch for other task counts
   const [
     { count: pendingMaterialApprovals },
-    { count: rejectedDrawings },
     { count: draftReports },
     { count: overdueMilestones },
   ] = await Promise.all([
-    // Materials pending client approval (status = sent_to_client)
-    supabase
-      .from("materials")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "sent_to_client")
-      .eq("is_deleted", false),
-    // Drawings rejected (need revision)
-    supabase
-      .from("drawings")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "rejected"),
-    // Reports in draft status
-    supabase
-      .from("reports")
-      .select("*", { count: "exact", head: true })
-      .eq("is_published", false),
-    // Overdue milestones (due_date < now and not completed)
-    supabase
-      .from("milestones")
-      .select("*", { count: "exact", head: true })
-      .eq("is_completed", false)
-      .lt("due_date", now),
+    materialsQuery,
+    reportsQuery,
+    milestonesQuery,
   ]);
 
   const total =
     (pendingMaterialApprovals || 0) +
-    (rejectedDrawings || 0) +
+    rejectedDrawingsCount +
     (draftReports || 0) +
     (overdueMilestones || 0);
 
   return {
     pendingMaterialApprovals: pendingMaterialApprovals || 0,
-    rejectedDrawings: rejectedDrawings || 0,
+    rejectedDrawings: rejectedDrawingsCount,
     draftReports: draftReports || 0,
     overdueMilestones: overdueMilestones || 0,
     total,
@@ -186,19 +231,32 @@ export async function getMyTasks(): Promise<TaskSummary> {
 /**
  * Get projects that have risk indicators
  * Used for PM/Admin dashboards to prioritize attention
+ * @param projectIds - Optional filter for specific projects (used by PM role)
  */
-export async function getAtRiskProjects(): Promise<AtRiskProject[]> {
+export async function getAtRiskProjects(projectIds?: string[]): Promise<AtRiskProject[]> {
   const supabase = await createClient();
   const now = new Date().toISOString();
 
+  // If filtering by projects and no projects assigned, return empty
+  if (projectIds && projectIds.length === 0) {
+    return [];
+  }
+
   // Get active projects with their client info (includes slug for URLs)
   // Note: slug column added by migration 015_add_project_slug.sql
-  const { data: projectsData } = await supabase
+  let query = supabase
     .from("projects")
     .select("id, slug, name, project_code, client_id")
     .eq("is_deleted", false)
     .in("status", ["active", "tender"])
     .limit(50);
+
+  // Apply project filter if provided (for PM role)
+  if (projectIds) {
+    query = query.in("id", projectIds);
+  }
+
+  const { data: projectsData } = await query;
 
   // Type assertion for projects with slug (column added by migration)
   const projects = projectsData as { id: string; slug: string | null; name: string; project_code: string; client_id: string | null }[] | null;
@@ -207,7 +265,7 @@ export async function getAtRiskProjects(): Promise<AtRiskProject[]> {
     return [];
   }
 
-  const projectIds = projects.map((p) => p.id);
+  const fetchedProjectIds = projects.map((p) => p.id);
   const clientIds = projects.map((p) => p.client_id).filter(Boolean) as string[];
 
   // Get client names separately
@@ -229,7 +287,7 @@ export async function getAtRiskProjects(): Promise<AtRiskProject[]> {
     supabase
       .from("milestones")
       .select("project_id")
-      .in("project_id", projectIds)
+      .in("project_id", fetchedProjectIds)
       .eq("is_completed", false)
       .lt("due_date", now),
     // Rejected drawings - get via scope_items
@@ -799,8 +857,22 @@ export interface ThisWeekSummary {
   milestonesOverdue: number;
 }
 
-export async function getThisWeekSummary(): Promise<ThisWeekSummary> {
+/**
+ * Get this week's activity summary
+ * @param projectIds - Optional filter for specific projects (used by PM role)
+ */
+export async function getThisWeekSummary(projectIds?: string[]): Promise<ThisWeekSummary> {
   const supabase = await createClient();
+
+  // If filtering by projects and no projects assigned, return zeros
+  if (projectIds && projectIds.length === 0) {
+    return {
+      itemsCompletedThisWeek: 0,
+      reportsPublishedThisWeek: 0,
+      upcomingMilestones: 0,
+      milestonesOverdue: 0,
+    };
+  }
 
   // Calculate date ranges
   const now = new Date();
@@ -818,6 +890,41 @@ export async function getThisWeekSummary(): Promise<ThisWeekSummary> {
   const nowISO = now.toISOString();
   const sevenDaysISO = sevenDaysFromNow.toISOString();
 
+  // Build queries with optional project filtering
+  let itemsQuery = supabase
+    .from("scope_items")
+    .select("*", { count: "exact", head: true })
+    .eq("status", "complete")
+    .eq("is_deleted", false)
+    .gte("updated_at", startOfWeekISO);
+
+  let reportsQuery = supabase
+    .from("reports")
+    .select("*", { count: "exact", head: true })
+    .eq("is_published", true)
+    .gte("published_at", startOfWeekISO);
+
+  let upcomingMilestonesQuery = supabase
+    .from("milestones")
+    .select("*", { count: "exact", head: true })
+    .eq("is_completed", false)
+    .gte("due_date", nowISO)
+    .lte("due_date", sevenDaysISO);
+
+  let overdueMilestonesQuery = supabase
+    .from("milestones")
+    .select("*", { count: "exact", head: true })
+    .eq("is_completed", false)
+    .lt("due_date", nowISO);
+
+  // Apply project filter if provided
+  if (projectIds) {
+    itemsQuery = itemsQuery.in("project_id", projectIds);
+    reportsQuery = reportsQuery.in("project_id", projectIds);
+    upcomingMilestonesQuery = upcomingMilestonesQuery.in("project_id", projectIds);
+    overdueMilestonesQuery = overdueMilestonesQuery.in("project_id", projectIds);
+  }
+
   // Parallel fetch for all stats
   const [
     { count: itemsCompletedThisWeek },
@@ -825,36 +932,10 @@ export async function getThisWeekSummary(): Promise<ThisWeekSummary> {
     { count: upcomingMilestones },
     { count: milestonesOverdue },
   ] = await Promise.all([
-    // Items marked complete this week (status changed to 'complete')
-    // We check updated_at since we don't have a completed_at field on scope_items
-    supabase
-      .from("scope_items")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "complete")
-      .eq("is_deleted", false)
-      .gte("updated_at", startOfWeekISO),
-
-    // Reports published this week
-    supabase
-      .from("reports")
-      .select("*", { count: "exact", head: true })
-      .eq("is_published", true)
-      .gte("published_at", startOfWeekISO),
-
-    // Milestones due in next 7 days (not completed)
-    supabase
-      .from("milestones")
-      .select("*", { count: "exact", head: true })
-      .eq("is_completed", false)
-      .gte("due_date", nowISO)
-      .lte("due_date", sevenDaysISO),
-
-    // Overdue milestones
-    supabase
-      .from("milestones")
-      .select("*", { count: "exact", head: true })
-      .eq("is_completed", false)
-      .lt("due_date", nowISO),
+    itemsQuery,
+    reportsQuery,
+    upcomingMilestonesQuery,
+    overdueMilestonesQuery,
   ]);
 
   return {
@@ -906,29 +987,42 @@ export async function getProjectsByStatus(): Promise<ProjectsByStatus> {
   return counts;
 }
 
-export async function getDashboardMilestones(): Promise<DashboardMilestone[]> {
+/**
+ * Get dashboard milestones
+ * @param projectIds - Optional filter for specific projects (used by PM role)
+ */
+export async function getDashboardMilestones(projectIds?: string[]): Promise<DashboardMilestone[]> {
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return [];
 
-  // Get all milestones from all projects (admin/management will see all)
-  // For now, get all incomplete milestones sorted by due date
-  const today = new Date().toISOString().split("T")[0];
+  // If filtering by projects and no projects assigned, return empty
+  if (projectIds && projectIds.length === 0) {
+    return [];
+  }
 
   // Get milestones due in next 30 days or overdue
   const thirtyDaysFromNow = new Date();
   thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
   const thirtyDaysLater = thirtyDaysFromNow.toISOString().split("T")[0];
 
-  // First get milestones
-  const { data: milestones, error } = await supabase
+  // Build query with optional project filtering
+  let query = supabase
     .from("milestones")
     .select("id, project_id, name, due_date, is_completed")
     .eq("is_completed", false)
     .lte("due_date", thirtyDaysLater)
     .order("due_date", { ascending: true })
     .limit(10);
+
+  // Apply project filter if provided (for PM role)
+  if (projectIds) {
+    query = query.in("project_id", projectIds);
+  }
+
+  // First get milestones
+  const { data: milestones, error } = await query;
 
   if (error) {
     console.error("Error fetching dashboard milestones:", error);
@@ -940,11 +1034,11 @@ export async function getDashboardMilestones(): Promise<DashboardMilestone[]> {
   }
 
   // Get project info for these milestones
-  const projectIds = [...new Set(milestones.map(m => m.project_id))];
+  const milestoneProjectIds = [...new Set(milestones.map(m => m.project_id))];
   const { data: projectsData } = await supabase
     .from("projects")
     .select("id, name, project_code, slug")
-    .in("id", projectIds);
+    .in("id", milestoneProjectIds);
 
   // Type assertion for projects with slug (column added by migration)
   const projects = projectsData as { id: string; name: string; project_code: string; slug: string | null }[] | null;

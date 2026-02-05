@@ -47,6 +47,7 @@ export const getCachedDashboardStats = unstable_cache(
       on_hold: projects.filter((p) => p.status === "on_hold").length,
       completed: projects.filter((p) => p.status === "completed").length,
       cancelled: projects.filter((p) => p.status === "cancelled").length,
+      not_awarded: projects.filter((p) => p.status === "not_awarded").length,
     };
 
     console.log(`  📊 [CACHE] Dashboard stats fetched in ${(performance.now() - start).toFixed(0)}ms`);

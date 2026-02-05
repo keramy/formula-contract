@@ -10,6 +10,7 @@ import { SnaggingOverview } from "./snagging-overview";
 import { MilestonesOverview } from "./milestones-overview";
 import { TeamOverview } from "./team-overview";
 import { ReportsOverview } from "./reports-overview";
+import { FinancialsOverview } from "./financials-overview";
 import { ProjectDetailHeader } from "./project-detail-header";
 import { ProjectOverview } from "./project-overview";
 import { getProjectAssignments } from "@/lib/actions/project-assignments";
@@ -591,6 +592,25 @@ export default async function ProjectDetailPage({
             userRole={userRole}
           />
         </TabsContent>
+
+        {/* Financials Tab - hidden from clients */}
+        {!isClient && (
+          <TabsContent value="financials">
+            <FinancialsOverview
+              scopeItems={scopeItems.map((item) => ({
+                id: item.id,
+                item_code: item.item_code,
+                name: item.name,
+                item_path: item.item_path,
+                quantity: item.quantity,
+                initial_total_cost: item.initial_total_cost,
+                actual_unit_cost: item.actual_unit_cost,
+              }))}
+              currency={project.currency}
+              isClient={isClient}
+            />
+          </TabsContent>
+        )}
 
         {/* Team Tab */}
         <TabsContent value="team">

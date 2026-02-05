@@ -46,12 +46,12 @@ export function DashboardOverviewCard({ thisWeek, projectsStatus }: DashboardOve
   return (
     <TooltipProvider delayDuration={200}>
       <Card className="border border-base-200">
-        <CardContent className="py-4 space-y-4">
+        <CardContent className="py-3 space-y-3">
           {/* This Week Row */}
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="flex items-center gap-2 pr-4 border-r border-base-200">
-              <div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                <CalendarDaysIcon className="size-4 text-primary" />
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 pr-3 border-r border-base-200">
+              <div className="size-7 rounded-lg bg-primary/10 flex items-center justify-center">
+                <CalendarDaysIcon className="size-3.5 text-primary" />
               </div>
               <span className="text-sm font-semibold text-muted-foreground">This Week</span>
             </div>
@@ -129,8 +129,8 @@ export function DashboardOverviewCard({ thisWeek, projectsStatus }: DashboardOve
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <FolderKanbanIcon className="size-4 text-primary" />
+                <div className="size-7 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <FolderKanbanIcon className="size-3.5 text-primary" />
                 </div>
                 <span className="text-sm font-semibold text-muted-foreground">Projects</span>
               </div>
