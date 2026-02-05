@@ -31,6 +31,8 @@ import {
   CalendarIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { ExportButton } from "@/components/ui/export-button";
+import { formatters } from "@/lib/export/export-utils";
 import { MilestoneFormDialog } from "@/app/(dashboard)/projects/[id]/milestone-form-dialog";
 
 interface Milestone {
@@ -217,7 +219,30 @@ export function MilestoneCards({
               </p>
             </div>
           </div>
-          <CardAction>
+          <CardAction className="flex items-center gap-2">
+            <ExportButton
+              data={milestones.map((m) => ({
+                name: m.name,
+                description: m.description || "",
+                due_date: m.due_date,
+                is_completed: m.is_completed,
+                completed_at: m.completed_at || "",
+                alert_days_before: m.alert_days_before || 7,
+                project_name: m.project?.name || "",
+              }))}
+              columns={[
+                { key: "name", header: "Milestone Name" },
+                { key: "description", header: "Description" },
+                { key: "due_date", header: "Due Date", format: formatters.date },
+                { key: "is_completed", header: "Completed", format: formatters.boolean() },
+                { key: "completed_at", header: "Completed At", format: formatters.date },
+                { key: "alert_days_before", header: "Alert Days" },
+                ...(showProjectBadge ? [{ key: "project_name", header: "Project" }] : []),
+              ]}
+              filename="milestones"
+              sheetName="Milestones"
+              iconOnly
+            />
             <Button onClick={handleAdd} size="sm">
               <PlusIcon className="size-4 mr-1.5" />
               Add Milestone

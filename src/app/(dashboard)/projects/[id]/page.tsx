@@ -11,6 +11,7 @@ import { MilestonesOverview } from "./milestones-overview";
 import { TeamOverview } from "./team-overview";
 import { ReportsOverview } from "./reports-overview";
 import { FinancialsOverview } from "./financials-overview";
+import { TimelineOverview } from "./timeline-overview";
 import { ProjectDetailHeader } from "./project-detail-header";
 import { ProjectOverview } from "./project-overview";
 import { getProjectAssignments } from "@/lib/actions/project-assignments";
@@ -128,6 +129,44 @@ interface Milestone {
   alert_days_before: number | null;
 }
 
+interface TimelineItemData {
+  id: string;
+  project_id: string;
+  name: string;
+  description: string | null;
+  item_type: "phase" | "task";
+  start_date: string;
+  end_date: string;
+  color: string | null;
+  sort_order: number;
+  // Hierarchy fields
+  parent_id: string | null;
+  hierarchy_level: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  linked_scope_items?: Array<{
+    id: string;
+    scope_item_id: string;
+    scope_item?: {
+      id: string;
+      item_code: string;
+      name: string;
+      production_percentage: number | null;
+    };
+  }>;
+  linked_milestones?: Array<{
+    id: string;
+    milestone_id: string;
+    milestone?: {
+      id: string;
+      name: string;
+      due_date: string;
+      is_completed: boolean;
+    };
+  }>;
+}
+
 // Status colors/labels are now handled by ProjectDetailHeader component
 
 export default async function ProjectDetailPage({
@@ -205,6 +244,7 @@ export default async function ProjectDetailPage({
     reportsResult,
     assignmentsResult,
     activitiesResult,
+    timelineItemsResult,
   ] = await Promise.all([
     // 1. Project with Client (includes slug for URL generation)
     (async () => {
@@ -325,6 +365,31 @@ export default async function ProjectDetailPage({
       console.log(`  📝 Recent Activities: ${(performance.now() - start).toFixed(0)}ms`);
       return { data: activitiesWithUsers };
     })(),
+    // 9. Timeline Items (for Gantt chart)
+    // Note: project_timelines table added in migration 036, regenerate types after applying migration
+    (async () => {
+      const start = performance.now();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = await (supabase as any)
+        .from("project_timelines")
+        .select(`
+          *,
+          linked_scope_items:timeline_scope_items(
+            id,
+            scope_item_id,
+            scope_item:scope_items(id, item_code, name, production_percentage)
+          ),
+          linked_milestones:timeline_milestones(
+            id,
+            milestone_id,
+            milestone:milestones(id, name, due_date, is_completed)
+          )
+        `)
+        .eq("project_id", projectId)
+        .order("sort_order", { ascending: true });
+      console.log(`  📅 Timeline Items: ${(performance.now() - start).toFixed(0)}ms`);
+      return result;
+    })(),
   ]);
   console.log(`  ⏱️ Parallel queries total: ${(performance.now() - parallelStart).toFixed(0)}ms`);
   console.log(`📊 [PROFILE] Project Detail Total: ${(performance.now() - pageStart).toFixed(0)}ms\n`);
@@ -388,6 +453,29 @@ export default async function ProjectDetailPage({
 
   // Extract milestones
   const milestones = (milestonesResult.data || []) as Milestone[];
+
+  // Extract timeline items with calculated progress
+  const timelineItemsRaw = (timelineItemsResult.data || []) as TimelineItemData[];
+  const timelineItems = timelineItemsRaw.map((item) => {
+    const linkedItems = item.linked_scope_items || [];
+    let progress = 0;
+
+    if (linkedItems.length > 0) {
+      const totalPercentage = linkedItems.reduce((sum, link) => {
+        const pct = link.scope_item?.production_percentage || 0;
+        return sum + pct;
+      }, 0);
+      progress = Math.round(totalPercentage / linkedItems.length);
+    }
+
+    return {
+      ...item,
+      // Ensure hierarchy fields have defaults for backward compatibility
+      parent_id: item.parent_id ?? null,
+      hierarchy_level: item.hierarchy_level ?? 0,
+      progress,
+    };
+  });
 
   // Reports, assignments, and activities are already extracted from Promise.all
   const reports = reportsResult;
@@ -608,6 +696,25 @@ export default async function ProjectDetailPage({
               }))}
               currency={project.currency}
               isClient={isClient}
+            />
+          </TabsContent>
+        )}
+
+        {/* Timeline Tab - hidden from clients */}
+        {!isClient && (
+          <TabsContent value="timeline">
+            <TimelineOverview
+              projectId={projectId}
+              milestones={milestones}
+              timelineItems={timelineItems}
+              scopeItems={scopeItems.map((item) => ({
+                id: item.id,
+                item_code: item.item_code,
+                name: item.name,
+                production_percentage: item.production_percentage,
+              }))}
+              installationDate={project.installation_date}
+              canEdit={canEdit}
             />
           </TabsContent>
         )}
