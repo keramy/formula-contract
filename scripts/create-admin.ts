@@ -37,7 +37,7 @@ async function createAdminUser() {
   console.log("✅ Auth user created:", authData.user.id);
 
   // Step 2: Insert into users table
-  const { data: userData, error: userError } = await supabase
+  const { data: _userData, error: userError } = await supabase
     .from("users")
     .insert({
       id: authData.user.id,

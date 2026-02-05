@@ -105,11 +105,8 @@ test.describe("Dashboard", () => {
     // Page should still be functional
     await expect(page.locator("main, [role='main']")).toBeVisible();
 
-    // Mobile menu button might be visible
-    const mobileMenu = page.locator(
-      "[class*='menu'], [class*='hamburger'], button[aria-label*='menu']"
-    );
-    // Just check page renders, mobile menu is optional
+    // Mobile menu button might be visible - just verify page renders
+    // Mobile menu check removed as it's optional and varies by viewport
     await expect(page).toHaveURL(/dashboard/);
   });
 });

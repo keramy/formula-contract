@@ -106,7 +106,7 @@ function login() {
   let jsonBody = null;
   try {
     jsonBody = res.json();
-  } catch (e) {
+  } catch {
     return null;
   }
 
@@ -132,6 +132,7 @@ function getProjectId(headers) {
 // MAIN TEST FUNCTION
 // ============================================================================
 
+// eslint-disable-next-line import/no-anonymous-default-export
 export default function () {
   // Login first
   const accessToken = login();
@@ -193,7 +194,7 @@ export default function () {
             return true;
           }
           return false;
-        } catch (e) {
+        } catch {
           return false;
         }
       },
@@ -227,7 +228,7 @@ export default function () {
         try {
           const data = r.json();
           return data && data.length > 0;
-        } catch (e) {
+        } catch {
           return false;
         }
       },
@@ -327,7 +328,7 @@ export default function () {
         try {
           const data = r.json();
           return data && data[0] && data[0].quantity === 5;
-        } catch (e) {
+        } catch {
           return false;
         }
       },

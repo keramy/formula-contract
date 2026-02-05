@@ -75,7 +75,7 @@ export default function ForgotPasswordPage() {
                 <CheckCircle2Icon className="w-6 h-6 text-emerald-600" />
               </div>
               <p className="text-sm text-muted-foreground text-center">
-                We've sent a password reset link to <strong className="text-foreground">{email}</strong>.
+                We&apos;ve sent a password reset link to <strong className="text-foreground">{email}</strong>.
                 Please check your inbox.
               </p>
               <Link href="/login" className="w-full">

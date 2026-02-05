@@ -19,7 +19,7 @@ import { Trend, Rate, Counter } from "k6/metrics";
 // CONFIGURATION
 // ============================================================================
 
-const BASE_URL = __ENV.BASE_URL || "http://localhost:3000";
+const _BASE_URL = __ENV.BASE_URL || "http://localhost:3000"; // Reserved for future browser tests
 const SUPABASE_URL = "https://lsuiaqrpkhejeavsrsqc.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxzdWlhcXJwa2hlamVhdnNyc3FjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3NTIyNDcsImV4cCI6MjA4NDMyODI0N30.3vwSeWtDkpL6HUIiAJgJ4aoIpsLzkIzCXBkI041AFk8";
 
@@ -167,6 +167,7 @@ function login() {
 // MAIN TEST FUNCTION
 // ============================================================================
 
+// eslint-disable-next-line import/no-anonymous-default-export
 export default function () {
   let accessToken = null;
 

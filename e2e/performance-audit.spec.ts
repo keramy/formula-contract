@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, Page, ConsoleMessage } from "@playwright/test";
 
 /**
  * Performance Audit Tests
@@ -28,12 +28,12 @@ interface PerformanceMetrics {
 }
 
 async function measurePagePerformance(
-  page: any,
+  page: Page,
   url: string
 ): Promise<PerformanceMetrics> {
   const consoleErrors: string[] = [];
 
-  page.on("console", (msg: any) => {
+  page.on("console", (msg: ConsoleMessage) => {
     if (msg.type() === "error") {
       consoleErrors.push(msg.text());
     }
@@ -273,12 +273,11 @@ test.describe("Memory & Console Health", () => {
       return;
     }
 
-    // Get initial heap size
+    // Get initial heap size (performance.memory is Chrome-only)
     const initialHeap = await page.evaluate(() => {
-      if ((performance as any).memory) {
-        return (performance as any).memory.usedJSHeapSize;
-      }
-      return 0;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const perf = performance as any;
+      return perf.memory?.usedJSHeapSize ?? 0;
     });
 
     // Navigate around - use domcontentloaded for faster navigation
@@ -289,19 +288,18 @@ test.describe("Memory & Console Health", () => {
     await page.goto("/projects", { waitUntil: "domcontentloaded" });
     await page.waitForLoadState("networkidle").catch(() => {});
 
-    // Force garbage collection if available
+    // Force garbage collection if available (requires --expose-gc flag)
     await page.evaluate(() => {
-      if ((window as any).gc) {
-        (window as any).gc();
-      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const win = window as any;
+      if (win.gc) win.gc();
     });
 
-    // Get final heap size
+    // Get final heap size (performance.memory is Chrome-only)
     const finalHeap = await page.evaluate(() => {
-      if ((performance as any).memory) {
-        return (performance as any).memory.usedJSHeapSize;
-      }
-      return 0;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const perf = performance as any;
+      return perf.memory?.usedJSHeapSize ?? 0;
     });
 
     if (initialHeap > 0 && finalHeap > 0) {

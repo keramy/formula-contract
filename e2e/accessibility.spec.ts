@@ -25,8 +25,17 @@ const MAX_CRITICAL_VIOLATIONS = 15; // Start permissive, tighten over time
 // Increase timeout for accessibility tests (axe analysis takes time)
 test.describe.configure({ timeout: 60000 }); // 60 seconds per test
 
+// Axe violation type for formatting
+interface AxeViolation {
+  id: string;
+  impact: string;
+  description: string;
+  helpUrl: string;
+  nodes: { length: number }[];
+}
+
 // Helper to format violations for logging
-function formatViolations(violations: any[]) {
+function formatViolations(violations: AxeViolation[]) {
   return violations.map((v) => ({
     id: v.id,
     impact: v.impact,

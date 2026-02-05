@@ -1,0 +1,520 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 2000">
+  <defs>
+    <style>
+      .main-title { font-family: Arial, sans-serif; font-size: 42px; font-weight: bold; fill: #ffffff; }
+      .section-title { font-family: Arial, sans-serif; font-size: 20px; font-weight: bold; fill: #1a365d; }
+      .module-title { font-family: Arial, sans-serif; font-size: 11px; font-weight: bold; fill: white; }
+      .module-desc { font-family: Arial, sans-serif; font-size: 8px; fill: #e2e8f0; }
+      .step-text { font-family: Arial, sans-serif; font-size: 10px; font-weight: bold; fill: white; }
+      .label { font-family: Arial, sans-serif; font-size: 10px; fill: #4a5568; }
+      .small-label { font-family: Arial, sans-serif; font-size: 9px; fill: #718096; }
+    </style>
+    <marker id="arr" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#3182ce"/>
+    </marker>
+    <marker id="arr-g" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#38a169"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1400" height="2000" fill="#ffffff"/>
+
+  <!-- Header -->
+  <rect x="0" y="0" width="1400" height="120" fill="url(#headerGrad)"/>
+  <defs>
+    <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#1a365d"/>
+      <stop offset="100%" style="stop-color:#2c5282"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="1400" height="120" fill="#1a365d"/>
+  <text x="50" y="55" class="main-title">FORMULA CONTRACT</text>
+  <text x="50" y="90" fill="#a0aec0" font-family="Arial" font-size="24">Project Management System Overview</text>
+  <text x="1200" y="70" fill="#718096" font-family="Arial" font-size="14">January 2026</text>
+  <rect x="50" y="100" width="150" height="4" fill="#3182ce"/>
+
+  <!-- Section 1: System Overview (12 Modules) -->
+  <g transform="translate(50, 150)">
+    <text x="0" y="0" class="section-title">1. System Overview - 12 Modules</text>
+    <rect x="0" y="10" width="80" height="3" fill="#3182ce"/>
+
+    <!-- Modules Grid 3x4 -->
+    <g transform="translate(0, 30)">
+      <!-- Row 1 -->
+      <rect x="0" y="0" width="160" height="60" rx="6" fill="#1a365d"/>
+      <text x="10" y="20" class="module-title">01 Project Management</text>
+      <text x="10" y="35" class="module-desc">Create, scope, milestones</text>
+      <text x="10" y="48" class="module-desc">Kickoff docs, assignment</text>
+
+      <rect x="170" y="0" width="160" height="60" rx="6" fill="#1a365d"/>
+      <text x="180" y="20" class="module-title">02 Item Tracking</text>
+      <text x="180" y="35" class="module-desc">Scope items, workflow</text>
+      <text x="180" y="48" class="module-desc">Production/Procurement path</text>
+
+      <rect x="340" y="0" width="160" height="60" rx="6" fill="#1a365d"/>
+      <text x="350" y="20" class="module-title">03 Drawing Management</text>
+      <text x="350" y="35" class="module-desc">Upload, versions</text>
+      <text x="350" y="48" class="module-desc">Revision tracking</text>
+
+      <rect x="510" y="0" width="160" height="60" rx="6" fill="#1a365d"/>
+      <text x="520" y="20" class="module-title">04 Material Management</text>
+      <text x="520" y="35" class="module-desc">Library, images</text>
+      <text x="520" y="48" class="module-desc">Approval workflow</text>
+
+      <!-- Row 2 -->
+      <rect x="0" y="70" width="160" height="60" rx="6" fill="#2c5282"/>
+      <text x="10" y="90" class="module-title">05 Client Portal</text>
+      <text x="10" y="105" class="module-desc">Approvals, progress view</text>
+      <text x="10" y="118" class="module-desc">No pricing visible</text>
+
+      <rect x="170" y="70" width="160" height="60" rx="6" fill="#2c5282"/>
+      <text x="180" y="90" class="module-title">06 Procurement</text>
+      <text x="180" y="105" class="module-desc">Direct purchase items</text>
+      <text x="180" y="118" class="module-desc">Order status tracking</text>
+
+      <rect x="340" y="70" width="160" height="60" rx="6" fill="#2c5282"/>
+      <text x="350" y="90" class="module-title">07 Installation</text>
+      <text x="350" y="105" class="module-desc">Track completion</text>
+      <text x="350" y="118" class="module-desc">Snagging, sign-off</text>
+
+      <rect x="510" y="70" width="160" height="60" rx="6" fill="#3182ce"/>
+      <text x="520" y="90" class="module-title">08 Reporting</text>
+      <text x="520" y="105" class="module-desc">Weekly reports, photos</text>
+      <text x="520" y="118" class="module-desc">PDF export</text>
+
+      <!-- Row 3 -->
+      <rect x="0" y="140" width="160" height="60" rx="6" fill="#3182ce"/>
+      <text x="10" y="160" class="module-title">09 Dashboard</text>
+      <text x="10" y="175" class="module-desc">Role-based views</text>
+      <text x="10" y="188" class="module-desc">Activity feed, calendar</text>
+
+      <rect x="170" y="140" width="160" height="60" rx="6" fill="#3182ce"/>
+      <text x="180" y="160" class="module-title">10 Notifications</text>
+      <text x="180" y="175" class="module-desc">In-app + email alerts</text>
+      <text x="180" y="188" class="module-desc">Custom timing</text>
+
+      <rect x="340" y="140" width="160" height="60" rx="6" fill="#4a5568"/>
+      <text x="350" y="160" class="module-title">11 User Management</text>
+      <text x="350" y="175" class="module-desc">6 user roles</text>
+      <text x="350" y="188" class="module-desc">Permissions, activity log</text>
+
+      <rect x="510" y="140" width="160" height="60" rx="6" fill="#4a5568"/>
+      <text x="520" y="160" class="module-title">12 Project Close</text>
+      <text x="520" y="175" class="module-desc">Checklist, archive</text>
+      <text x="520" y="188" class="module-desc">Read-only access</text>
+    </g>
+
+    <!-- User Roles (Right Side) -->
+    <g transform="translate(720, 30)">
+      <rect x="0" y="0" width="580" height="200" rx="8" fill="#f7fafc" stroke="#e2e8f0"/>
+      <text x="20" y="25" fill="#1a365d" font-family="Arial" font-size="14" font-weight="bold">6 User Roles</text>
+
+      <g transform="translate(20, 40)">
+        <rect x="0" y="0" width="170" height="45" rx="5" fill="#1a365d"/>
+        <text x="10" y="20" class="module-title">👑 Admin</text>
+        <text x="10" y="35" class="module-desc">Full system access</text>
+
+        <rect x="180" y="0" width="170" height="45" rx="5" fill="#2c5282"/>
+        <text x="190" y="20" class="module-title">📋 PM</text>
+        <text x="190" y="35" class="module-desc">Project control</text>
+
+        <rect x="360" y="0" width="170" height="45" rx="5" fill="#3182ce"/>
+        <text x="370" y="20" class="module-title">🏭 Production</text>
+        <text x="370" y="35" class="module-desc">Update progress %</text>
+
+        <rect x="0" y="55" width="170" height="45" rx="5" fill="#805ad5"/>
+        <text x="10" y="75" class="module-title">🛒 Procurement</text>
+        <text x="10" y="90" class="module-desc">Order status</text>
+
+        <rect x="180" y="55" width="170" height="45" rx="5" fill="#38a169"/>
+        <text x="190" y="75" class="module-title">📊 Management</text>
+        <text x="190" y="90" class="module-desc">View only, reports</text>
+
+        <rect x="360" y="55" width="170" height="45" rx="5" fill="#d69e2e"/>
+        <text x="370" y="75" class="module-title">👤 Client</text>
+        <text x="370" y="90" class="module-desc">Approvals only</text>
+      </g>
+
+      <!-- Key Stats -->
+      <g transform="translate(20, 150)">
+        <rect x="0" y="0" width="150" height="35" rx="4" fill="#1a365d"/>
+        <text x="75" y="22" text-anchor="middle" fill="white" font-family="Arial" font-size="11" font-weight="bold">12 Modules</text>
+
+        <rect x="160" y="0" width="150" height="35" rx="4" fill="#2c5282"/>
+        <text x="235" y="22" text-anchor="middle" fill="white" font-family="Arial" font-size="11" font-weight="bold">6 User Roles</text>
+
+        <rect x="320" y="0" width="150" height="35" rx="4" fill="#3182ce"/>
+        <text x="395" y="22" text-anchor="middle" fill="white" font-family="Arial" font-size="11" font-weight="bold">100+ Requirements</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Section 2: Project Lifecycle Flow -->
+  <g transform="translate(50, 430)">
+    <text x="0" y="0" class="section-title">2. Project Lifecycle Flow</text>
+    <rect x="0" y="10" width="80" height="3" fill="#3182ce"/>
+
+    <g transform="translate(0, 40)">
+      <!-- Stage boxes with arrows -->
+      <rect x="0" y="0" width="180" height="70" rx="6" fill="#1a365d"/>
+      <text x="15" y="20" fill="#a0aec0" font-family="Arial" font-size="9">STAGE 1</text>
+      <text x="15" y="38" class="step-text">Project Created</text>
+      <text x="15" y="55" class="module-desc">Kickoff doc, assign PM</text>
+
+      <line x1="190" y1="35" x2="230" y2="35" stroke="#3182ce" stroke-width="2" marker-end="url(#arr)"/>
+
+      <rect x="240" y="0" width="180" height="70" rx="6" fill="#1a365d"/>
+      <text x="255" y="20" fill="#a0aec0" font-family="Arial" font-size="9">STAGE 2</text>
+      <text x="255" y="38" class="step-text">Scope Defined</text>
+      <text x="255" y="55" class="module-desc">Items + pricing, Excel import</text>
+
+      <line x1="430" y1="35" x2="470" y2="35" stroke="#3182ce" stroke-width="2" marker-end="url(#arr)"/>
+
+      <rect x="480" y="-15" width="220" height="100" rx="6" fill="#2c5282" stroke="#3182ce" stroke-width="2" stroke-dasharray="5,5"/>
+      <text x="495" y="8" fill="#a0aec0" font-family="Arial" font-size="9">STAGE 3 - PER ITEM</text>
+      <text x="495" y="26" class="step-text">Item Workflow</text>
+      <text x="495" y="42" class="module-desc">• Design/Drawings</text>
+      <text x="495" y="54" class="module-desc">• Client Approval</text>
+      <text x="495" y="66" class="module-desc">• Production/Procurement</text>
+
+      <line x1="710" y1="35" x2="750" y2="35" stroke="#38a169" stroke-width="2" marker-end="url(#arr-g)"/>
+
+      <rect x="760" y="0" width="160" height="70" rx="6" fill="#38a169"/>
+      <text x="775" y="20" fill="#c6f6d5" font-family="Arial" font-size="9">STAGE 4</text>
+      <text x="775" y="38" class="step-text">Installation</text>
+      <text x="775" y="55" class="module-desc">Snagging, sign-off</text>
+
+      <line x1="930" y1="35" x2="970" y2="35" stroke="#38a169" stroke-width="2" marker-end="url(#arr-g)"/>
+
+      <rect x="980" y="0" width="140" height="70" rx="6" fill="#38a169"/>
+      <text x="995" y="20" fill="#c6f6d5" font-family="Arial" font-size="9">STAGE 5</text>
+      <text x="995" y="38" class="step-text">Project Close</text>
+      <text x="995" y="55" class="module-desc">Archive</text>
+
+      <!-- Status indicators -->
+      <g transform="translate(1140, 0)">
+        <rect x="0" y="0" width="150" height="70" rx="6" fill="#f7fafc" stroke="#e2e8f0"/>
+        <text x="10" y="18" fill="#1a365d" font-family="Arial" font-size="9" font-weight="bold">Status Options:</text>
+        <circle cx="20" cy="32" r="5" fill="#d69e2e"/>
+        <text x="30" y="36" class="small-label">Tender</text>
+        <circle cx="80" cy="32" r="5" fill="#3182ce"/>
+        <text x="90" y="36" class="small-label">Active</text>
+        <circle cx="20" cy="50" r="5" fill="#718096"/>
+        <text x="30" y="54" class="small-label">On Hold</text>
+        <circle cx="80" cy="50" r="5" fill="#38a169"/>
+        <text x="90" y="54" class="small-label">Completed</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Section 3: Item Workflow - Two Paths -->
+  <g transform="translate(50, 580)">
+    <text x="0" y="0" class="section-title">3. Item Workflow: Two Paths</text>
+    <rect x="0" y="10" width="80" height="3" fill="#3182ce"/>
+
+    <!-- Starting point -->
+    <g transform="translate(550, 35)">
+      <rect x="0" y="0" width="160" height="35" rx="17" fill="#1a365d"/>
+      <text x="80" y="23" text-anchor="middle" fill="white" font-family="Arial" font-size="11" font-weight="bold">ITEM CREATED</text>
+    </g>
+
+    <!-- Decision diamond -->
+    <g transform="translate(570, 85)">
+      <polygon points="60,0 120,30 60,60 0,30" fill="#d69e2e"/>
+      <text x="60" y="35" text-anchor="middle" fill="white" font-family="Arial" font-size="9" font-weight="bold">PM Assigns Path</text>
+    </g>
+
+    <!-- Split lines -->
+    <line x1="570" y1="115" x2="300" y2="115" stroke="#1a365d" stroke-width="2"/>
+    <line x1="300" y1="115" x2="300" y2="155" stroke="#1a365d" stroke-width="2"/>
+    <line x1="690" y1="115" x2="960" y2="115" stroke="#1a365d" stroke-width="2"/>
+    <line x1="960" y1="115" x2="960" y2="155" stroke="#1a365d" stroke-width="2"/>
+
+    <!-- Production Path -->
+    <g transform="translate(50, 160)">
+      <rect x="0" y="0" width="500" height="280" rx="10" fill="#edf2f7" stroke="#2c5282" stroke-width="2"/>
+      <rect x="150" y="10" width="200" height="30" rx="15" fill="#2c5282"/>
+      <text x="250" y="30" text-anchor="middle" fill="white" font-family="Arial" font-size="12" font-weight="bold">PRODUCTION PATH</text>
+
+      <g transform="translate(30, 55)">
+        <rect x="0" y="0" width="200" height="35" rx="5" fill="#2c5282"/>
+        <text x="100" y="22" text-anchor="middle" class="step-text">1. In Design</text>
+
+        <line x1="100" y1="40" x2="100" y2="55" stroke="#2c5282" stroke-width="2"/>
+
+        <rect x="0" y="60" width="200" height="35" rx="5" fill="#2c5282"/>
+        <text x="100" y="82" text-anchor="middle" class="step-text">2. Awaiting Approval</text>
+
+        <line x1="100" y1="100" x2="100" y2="115" stroke="#2c5282" stroke-width="2"/>
+
+        <rect x="0" y="120" width="200" height="35" rx="5" fill="#805ad5"/>
+        <text x="100" y="142" text-anchor="middle" class="step-text">3. Approved</text>
+
+        <line x1="100" y1="160" x2="100" y2="175" stroke="#d69e2e" stroke-width="2"/>
+
+        <rect x="0" y="180" width="200" height="35" rx="5" fill="#d69e2e"/>
+        <text x="100" y="202" text-anchor="middle" class="step-text">4. In Production</text>
+      </g>
+
+      <g transform="translate(270, 55)">
+        <rect x="0" y="0" width="200" height="215" rx="6" fill="white" stroke="#e2e8f0"/>
+        <text x="100" y="20" text-anchor="middle" fill="#1a365d" font-family="Arial" font-size="10" font-weight="bold">Production Details</text>
+        <text x="15" y="45" fill="#4a5568" font-family="Arial" font-size="9">✓ Upload shop drawings</text>
+        <text x="15" y="65" fill="#4a5568" font-family="Arial" font-size="9">✓ Client reviews in portal</text>
+        <text x="15" y="85" fill="#4a5568" font-family="Arial" font-size="9">✓ Material approval required</text>
+        <text x="15" y="105" fill="#4a5568" font-family="Arial" font-size="9">✓ Track % completion</text>
+        <text x="15" y="125" fill="#4a5568" font-family="Arial" font-size="9">✓ Custom steps optional</text>
+        <text x="15" y="155" fill="#38a169" font-family="Arial" font-size="9" font-weight="bold">Revision Cycle:</text>
+        <text x="15" y="175" fill="#4a5568" font-family="Arial" font-size="8">Rejected → New revision</text>
+        <text x="15" y="190" fill="#4a5568" font-family="Arial" font-size="8">→ Client reviews again</text>
+      </g>
+    </g>
+
+    <!-- Procurement Path -->
+    <g transform="translate(710, 160)">
+      <rect x="0" y="0" width="500" height="280" rx="10" fill="#faf5ff" stroke="#805ad5" stroke-width="2"/>
+      <rect x="150" y="10" width="200" height="30" rx="15" fill="#805ad5"/>
+      <text x="250" y="30" text-anchor="middle" fill="white" font-family="Arial" font-size="12" font-weight="bold">PROCUREMENT PATH</text>
+
+      <g transform="translate(30, 55)">
+        <rect x="0" y="0" width="200" height="35" rx="5" fill="#805ad5"/>
+        <text x="100" y="22" text-anchor="middle" class="step-text">1. PM Approval</text>
+
+        <line x1="100" y1="40" x2="100" y2="55" stroke="#805ad5" stroke-width="2"/>
+
+        <rect x="0" y="60" width="200" height="35" rx="5" fill="#805ad5"/>
+        <text x="100" y="82" text-anchor="middle" class="step-text">2. Not Ordered</text>
+
+        <line x1="100" y1="100" x2="100" y2="115" stroke="#805ad5" stroke-width="2"/>
+
+        <rect x="0" y="120" width="200" height="35" rx="5" fill="#9f7aea"/>
+        <text x="100" y="142" text-anchor="middle" class="step-text">3. Ordered</text>
+
+        <line x1="100" y1="160" x2="100" y2="175" stroke="#38a169" stroke-width="2"/>
+
+        <rect x="0" y="180" width="200" height="35" rx="5" fill="#38a169"/>
+        <text x="100" y="202" text-anchor="middle" class="step-text">4. Received</text>
+      </g>
+
+      <g transform="translate(270, 55)">
+        <rect x="0" y="0" width="200" height="215" rx="6" fill="white" stroke="#e2e8f0"/>
+        <text x="100" y="20" text-anchor="middle" fill="#553c9a" font-family="Arial" font-size="10" font-weight="bold">Procurement Details</text>
+        <text x="15" y="45" fill="#4a5568" font-family="Arial" font-size="9">✓ Direct purchase items</text>
+        <text x="15" y="65" fill="#4a5568" font-family="Arial" font-size="9">✓ PM internal approval only</text>
+        <text x="15" y="85" fill="#4a5568" font-family="Arial" font-size="9">✓ No drawing approval</text>
+        <text x="15" y="105" fill="#4a5568" font-family="Arial" font-size="9">✓ No material approval</text>
+        <text x="15" y="125" fill="#4a5568" font-family="Arial" font-size="9">✓ Procurement mgr updates</text>
+        <text x="15" y="155" fill="#805ad5" font-family="Arial" font-size="9" font-weight="bold">Key Benefit:</text>
+        <text x="15" y="175" fill="#4a5568" font-family="Arial" font-size="8">Faster path for items</text>
+        <text x="15" y="190" fill="#4a5568" font-family="Arial" font-size="8">that don't need production</text>
+      </g>
+    </g>
+
+    <!-- Converge to Installation -->
+    <g transform="translate(500, 455)">
+      <rect x="0" y="0" width="260" height="40" rx="6" fill="#38a169"/>
+      <text x="130" y="26" text-anchor="middle" fill="white" font-family="Arial" font-size="14" font-weight="bold">→ INSTALLATION →</text>
+    </g>
+  </g>
+
+  <!-- Section 4: Approval Cycles -->
+  <g transform="translate(50, 1110)">
+    <text x="0" y="0" class="section-title">4. Approval Cycles</text>
+    <rect x="0" y="10" width="80" height="3" fill="#3182ce"/>
+
+    <!-- Drawing Approval -->
+    <g transform="translate(0, 35)">
+      <rect x="0" y="0" width="620" height="230" rx="8" fill="#f7fafc" stroke="#3182ce" stroke-width="2"/>
+      <rect x="200" y="10" width="220" height="28" rx="14" fill="#3182ce"/>
+      <text x="310" y="30" text-anchor="middle" fill="white" font-family="Arial" font-size="12" font-weight="bold">DRAWING APPROVAL CYCLE</text>
+
+      <!-- Steps -->
+      <g transform="translate(30, 50)">
+        <rect x="0" y="0" width="130" height="35" rx="4" fill="#1a365d"/>
+        <text x="65" y="22" text-anchor="middle" class="module-title">PM Uploads</text>
+
+        <text x="145" y="20" fill="#3182ce" font-family="Arial" font-size="16">→</text>
+
+        <rect x="160" y="0" width="130" height="35" rx="4" fill="#2c5282"/>
+        <text x="225" y="22" text-anchor="middle" class="module-title">Sends to Client</text>
+
+        <text x="305" y="20" fill="#3182ce" font-family="Arial" font-size="16">→</text>
+
+        <rect x="320" y="0" width="130" height="35" rx="4" fill="#3182ce"/>
+        <text x="385" y="22" text-anchor="middle" class="module-title">Client Reviews</text>
+
+        <text x="465" y="20" fill="#3182ce" font-family="Arial" font-size="16">→</text>
+
+        <rect x="480" y="0" width="100" height="35" rx="4" fill="#718096"/>
+        <text x="530" y="22" text-anchor="middle" class="module-title">Decision</text>
+      </g>
+
+      <!-- Decision outcomes -->
+      <g transform="translate(30, 100)">
+        <rect x="0" y="0" width="180" height="30" rx="4" fill="#38a169"/>
+        <text x="90" y="20" text-anchor="middle" fill="white" font-family="Arial" font-size="10" font-weight="bold">✓ Approved</text>
+
+        <rect x="190" y="0" width="180" height="30" rx="4" fill="#d69e2e"/>
+        <text x="280" y="20" text-anchor="middle" fill="white" font-family="Arial" font-size="10" font-weight="bold">⚡ Approved w/ Comments</text>
+
+        <rect x="380" y="0" width="180" height="30" rx="4" fill="#e53e3e"/>
+        <text x="470" y="20" text-anchor="middle" fill="white" font-family="Arial" font-size="10" font-weight="bold">✗ Rejected → Revise</text>
+      </g>
+
+      <!-- Revision loop note -->
+      <g transform="translate(30, 145)">
+        <rect x="0" y="0" width="550" height="70" rx="6" fill="#fed7d7" stroke="#e53e3e" stroke-dasharray="4,4"/>
+        <text x="275" y="20" text-anchor="middle" fill="#c53030" font-family="Arial" font-size="10" font-weight="bold">↺ Revision Cycle</text>
+        <text x="275" y="40" text-anchor="middle" fill="#742a2a" font-family="Arial" font-size="9">Client uploads marked-up PDF → PM creates new revision (Rev B, C...) → Client reviews again</text>
+        <text x="275" y="58" text-anchor="middle" fill="#742a2a" font-family="Arial" font-size="9">Analytics: Revision count, days between revisions, avg approval time</text>
+      </g>
+    </g>
+
+    <!-- Material Approval -->
+    <g transform="translate(660, 35)">
+      <rect x="0" y="0" width="620" height="230" rx="8" fill="#faf5ff" stroke="#805ad5" stroke-width="2"/>
+      <rect x="200" y="10" width="220" height="28" rx="14" fill="#805ad5"/>
+      <text x="310" y="30" text-anchor="middle" fill="white" font-family="Arial" font-size="12" font-weight="bold">MATERIAL APPROVAL CYCLE</text>
+
+      <!-- Steps -->
+      <g transform="translate(30, 50)">
+        <rect x="0" y="0" width="130" height="35" rx="4" fill="#553c9a"/>
+        <text x="65" y="22" text-anchor="middle" class="module-title">PM Adds</text>
+
+        <text x="145" y="20" fill="#805ad5" font-family="Arial" font-size="16">→</text>
+
+        <rect x="160" y="0" width="130" height="35" rx="4" fill="#6b46c1"/>
+        <text x="225" y="22" text-anchor="middle" class="module-title">Sample Sent</text>
+
+        <text x="305" y="20" fill="#805ad5" font-family="Arial" font-size="16">→</text>
+
+        <rect x="320" y="0" width="130" height="35" rx="4" fill="#805ad5"/>
+        <text x="385" y="22" text-anchor="middle" class="module-title">Client Reviews</text>
+
+        <text x="465" y="20" fill="#805ad5" font-family="Arial" font-size="16">→</text>
+
+        <rect x="480" y="0" width="100" height="35" rx="4" fill="#718096"/>
+        <text x="530" y="22" text-anchor="middle" class="module-title">Decision</text>
+      </g>
+
+      <!-- Decision outcomes -->
+      <g transform="translate(30, 100)">
+        <rect x="0" y="0" width="260" height="30" rx="4" fill="#38a169"/>
+        <text x="130" y="20" text-anchor="middle" fill="white" font-family="Arial" font-size="10" font-weight="bold">✓ Approved (for whole project)</text>
+
+        <rect x="280" y="0" width="260" height="30" rx="4" fill="#e53e3e"/>
+        <text x="410" y="20" text-anchor="middle" fill="white" font-family="Arial" font-size="10" font-weight="bold">✗ Rejected (resubmit required)</text>
+      </g>
+
+      <!-- Key rule -->
+      <g transform="translate(30, 145)">
+        <rect x="0" y="0" width="550" height="70" rx="6" fill="#f3e8ff" stroke="#805ad5"/>
+        <text x="275" y="20" text-anchor="middle" fill="#553c9a" font-family="Arial" font-size="10" font-weight="bold">Key Rules</text>
+        <text x="275" y="40" text-anchor="middle" fill="#553c9a" font-family="Arial" font-size="9">• Material approved ONCE for entire project (not per item)</text>
+        <text x="275" y="58" text-anchor="middle" fill="#553c9a" font-family="Arial" font-size="9">• Physical sample sent separately • Images &amp; specs in system</text>
+      </g>
+    </g>
+
+    <!-- Combined Rule -->
+    <g transform="translate(0, 280)">
+      <rect x="0" y="0" width="1280" height="45" rx="6" fill="#edf2f7" stroke="#e53e3e" stroke-width="2"/>
+      <rect x="15" y="10" width="60" height="25" rx="4" fill="#e53e3e"/>
+      <text x="45" y="28" text-anchor="middle" fill="white" font-family="Arial" font-size="10" font-weight="bold">RULE</text>
+      <text x="90" y="28" fill="#1a365d" font-family="Arial" font-size="12" font-weight="bold">Production cannot start until BOTH Drawing AND Material are approved (PM can override with logged reason)</text>
+    </g>
+  </g>
+
+  <!-- Section 5: Report Builder -->
+  <g transform="translate(50, 1480)">
+    <text x="0" y="0" class="section-title">5. Report Builder Workflow</text>
+    <rect x="0" y="10" width="80" height="3" fill="#3182ce"/>
+
+    <!-- Workflow steps -->
+    <g transform="translate(0, 35)">
+      <rect x="0" y="0" width="200" height="60" rx="6" fill="#1a365d"/>
+      <text x="100" y="25" text-anchor="middle" fill="white" font-family="Arial" font-size="11" font-weight="bold">1. Select Project</text>
+      <text x="100" y="45" text-anchor="middle" class="module-desc">+ Custom report type name</text>
+
+      <text x="215" y="30" fill="#3182ce" font-family="Arial" font-size="20">→</text>
+
+      <rect x="240" y="0" width="200" height="60" rx="6" fill="#2c5282"/>
+      <text x="340" y="25" text-anchor="middle" fill="white" font-family="Arial" font-size="11" font-weight="bold">2. Add Lines</text>
+      <text x="340" y="45" text-anchor="middle" class="module-desc">Title + Desc + Photos (max 6)</text>
+
+      <text x="455" y="30" fill="#3182ce" font-family="Arial" font-size="20">→</text>
+
+      <rect x="480" y="0" width="200" height="60" rx="6" fill="#3182ce"/>
+      <text x="580" y="25" text-anchor="middle" fill="white" font-family="Arial" font-size="11" font-weight="bold">3. Preview</text>
+      <text x="580" y="45" text-anchor="middle" class="module-desc">See exact PDF output</text>
+
+      <text x="695" y="30" fill="#38a169" font-family="Arial" font-size="20">→</text>
+
+      <rect x="720" y="0" width="200" height="60" rx="6" fill="#38a169"/>
+      <text x="820" y="25" text-anchor="middle" fill="white" font-family="Arial" font-size="11" font-weight="bold">4. Publish + Share</text>
+      <text x="820" y="45" text-anchor="middle" class="module-desc">Client / Internal / Both</text>
+    </g>
+
+    <!-- Features -->
+    <g transform="translate(950, 35)">
+      <rect x="0" y="0" width="330" height="110" rx="6" fill="#f7fafc" stroke="#e2e8f0"/>
+      <text x="15" y="25" fill="#1a365d" font-family="Arial" font-size="11" font-weight="bold">Report Features:</text>
+      <text x="15" y="45" fill="#4a5568" font-family="Arial" font-size="9">✓ Unlimited lines per report</text>
+      <text x="15" y="60" fill="#4a5568" font-family="Arial" font-size="9">✓ Auto photo layout (1-6 photos)</text>
+      <text x="15" y="75" fill="#4a5568" font-family="Arial" font-size="9">✓ Editable after publish</text>
+      <text x="15" y="90" fill="#4a5568" font-family="Arial" font-size="9">✓ PDF export • Email notifications</text>
+      <text x="170" y="45" fill="#4a5568" font-family="Arial" font-size="9">✓ Filter by type, date</text>
+      <text x="170" y="60" fill="#4a5568" font-family="Arial" font-size="9">✓ Search by title</text>
+      <text x="170" y="75" fill="#4a5568" font-family="Arial" font-size="9">✓ Edit history logged</text>
+    </g>
+  </g>
+
+  <!-- Section 6: Next Steps -->
+  <g transform="translate(50, 1650)">
+    <text x="0" y="0" class="section-title">6. Summary &amp; Next Steps</text>
+    <rect x="0" y="10" width="80" height="3" fill="#3182ce"/>
+
+    <g transform="translate(0, 35)">
+      <!-- Status -->
+      <rect x="0" y="0" width="300" height="80" rx="8" fill="#c6f6d5" stroke="#38a169" stroke-width="2"/>
+      <text x="20" y="30" fill="#22543d" font-family="Arial" font-size="14" font-weight="bold">✓ Requirements Complete</text>
+      <text x="20" y="50" fill="#276749" font-family="Arial" font-size="11">All 12 modules defined</text>
+      <text x="20" y="68" fill="#276749" font-family="Arial" font-size="11">Ready for technical phase</text>
+
+      <!-- Next Steps -->
+      <g transform="translate(330, 0)">
+        <rect x="0" y="0" width="180" height="80" rx="6" fill="#3182ce"/>
+        <text x="90" y="25" text-anchor="middle" fill="white" font-family="Arial" font-size="10" font-weight="bold">NEXT: Tech Stack</text>
+        <text x="90" y="45" text-anchor="middle" fill="#bee3f8" font-family="Arial" font-size="9">Framework, database</text>
+        <text x="90" y="60" text-anchor="middle" fill="#bee3f8" font-family="Arial" font-size="9">hosting decision</text>
+
+        <rect x="200" y="0" width="180" height="80" rx="6" fill="#2c5282"/>
+        <text x="290" y="25" text-anchor="middle" fill="white" font-family="Arial" font-size="10" font-weight="bold">THEN: Database</text>
+        <text x="290" y="45" text-anchor="middle" fill="#bee3f8" font-family="Arial" font-size="9">Tables, relationships</text>
+        <text x="290" y="60" text-anchor="middle" fill="#bee3f8" font-family="Arial" font-size="9">ERD diagram</text>
+
+        <rect x="400" y="0" width="180" height="80" rx="6" fill="#1a365d"/>
+        <text x="490" y="25" text-anchor="middle" fill="white" font-family="Arial" font-size="10" font-weight="bold">THEN: Wireframes</text>
+        <text x="490" y="45" text-anchor="middle" fill="#a0aec0" font-family="Arial" font-size="9">Screen layouts</text>
+        <text x="490" y="60" text-anchor="middle" fill="#a0aec0" font-family="Arial" font-size="9">User flows</text>
+
+        <rect x="600" y="0" width="180" height="80" rx="6" fill="#4a5568"/>
+        <text x="690" y="25" text-anchor="middle" fill="white" font-family="Arial" font-size="10" font-weight="bold">FINALLY: Development</text>
+        <text x="690" y="45" text-anchor="middle" fill="#a0aec0" font-family="Arial" font-size="9">Phased build</text>
+        <text x="690" y="60" text-anchor="middle" fill="#a0aec0" font-family="Arial" font-size="9">Testing &amp; deploy</text>
+      </g>
+    </g>
+
+    <!-- Key Features Summary -->
+    <g transform="translate(0, 130)">
+      <rect x="0" y="0" width="1280" height="70" rx="8" fill="#1a365d"/>
+      <text x="30" y="25" fill="#a0aec0" font-family="Arial" font-size="11">KEY DIFFERENTIATORS:</text>
+      <text x="30" y="50" fill="white" font-family="Arial" font-size="11">✓ Dual item paths (Production/Procurement) • ✓ Client portal with approvals • ✓ Revision tracking &amp; analytics • ✓ Flexible report builder • ✓ Excel import • ✓ Role-based dashboards</text>
+    </g>
+  </g>
+
+  <!-- Footer -->
+  <rect x="0" y="1950" width="1400" height="50" fill="#1a365d"/>
+  <text x="50" y="1980" fill="#a0aec0" font-family="Arial" font-size="12">Formula Contract Project Management System | System Requirements Document | January 2026</text>
+  <text x="1200" y="1980" fill="#718096" font-family="Arial" font-size="11">Page 1 of 1</text>
+</svg>

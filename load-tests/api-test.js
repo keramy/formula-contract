@@ -22,7 +22,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const projectsListDuration = new Trend("projects_list_duration", true);
 const scopeItemsDuration = new Trend("scope_items_duration", true);
 const clientsDuration = new Trend("clients_duration", true);
-const authDuration = new Trend("auth_duration", true);
+const _authDuration = new Trend("auth_duration", true); // Reserved for future auth tests
 const apiErrors = new Rate("api_errors");
 const totalRequests = new Counter("total_requests");
 
@@ -88,6 +88,7 @@ const headers = {
   Prefer: "return=representation",
 };
 
+// eslint-disable-next-line import/no-anonymous-default-export
 export default function () {
   // Simulate a typical user session
 
@@ -250,7 +251,7 @@ export function handleSummary(data) {
 }
 
 // Helper function for text summary (k6 built-in)
-function textSummary(data, options) {
+function textSummary(data, _options) {
   // This returns the default k6 summary
   return `
 ================================================================================
