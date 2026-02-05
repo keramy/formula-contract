@@ -20,6 +20,7 @@ import {
   CalendarIcon,
   UsersIcon,
   WalletIcon,
+  GanttChartIcon,
 } from "lucide-react";
 
 interface ProjectTabsProps {
@@ -36,6 +37,7 @@ interface ProjectTabsProps {
 // Tab configuration for the "More" dropdown
 const MORE_TABS = [
   { value: "financials", label: "Financials", icon: WalletIcon, hideForClient: true },
+  { value: "timeline", label: "Timeline", icon: GanttChartIcon, hideForClient: true },
   { value: "drawings", label: "Drawings", icon: PencilRulerIcon },
   { value: "materials", label: "Materials", icon: PackageIcon },
   { value: "snagging", label: "Snagging", icon: AlertTriangleIcon },
@@ -116,6 +118,12 @@ export function ProjectTabs({
           <TabsTrigger value="financials" className="hidden md:flex">
             <WalletIcon className="size-4 mr-1.5" />
             Financials
+          </TabsTrigger>
+        )}
+        {!isClient && (
+          <TabsTrigger value="timeline" className="hidden md:flex">
+            <GanttChartIcon className="size-4 mr-1.5" />
+            Timeline
           </TabsTrigger>
         )}
         <TabsTrigger value="drawings" className="hidden md:flex">

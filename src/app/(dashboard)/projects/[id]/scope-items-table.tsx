@@ -85,6 +85,14 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import dynamic from "next/dynamic";
+import {
+  ScopeItemsFilterBar,
+  type ScopeItemsFilters,
+  defaultFilters,
+  applyFilters,
+} from "@/components/scope-items/scope-items-filter-bar";
+import { ExportButton } from "@/components/ui/export-button";
+import { type ColumnDefinition, formatters } from "@/lib/export/export-utils";
 
 // ============================================================================
 // PERFORMANCE: Lazy load the Sheet component
@@ -784,6 +792,9 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(() => getDefaultVisibleColumns());
   const [columnPopoverOpen, setColumnPopoverOpen] = useState(false);
 
+  // Filter state for scope items
+  const [filters, setFilters] = useState<ScopeItemsFilters>(defaultFilters);
+
   // Sheet state (merged view + edit)
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -873,11 +884,12 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
   );
 
   // ============================================================================
-  // PERFORMANCE: Memoize hierarchical items computation
+  // PERFORMANCE: Memoize filtered + hierarchical items computation
   // Before: Recalculated on every render
-  // After:  Only recalculated when items change
+  // After:  Only recalculated when items or filters change
   // ============================================================================
-  const hierarchicalItems = useMemo(() => organizeHierarchically(items), [items]);
+  const filteredItems = useMemo(() => applyFilters(items, filters), [items, filters]);
+  const hierarchicalItems = useMemo(() => organizeHierarchically(filteredItems), [filteredItems]);
 
   // ============================================================================
   // PERFORMANCE: Consolidated dialog state with useReducer
@@ -1216,8 +1228,44 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
               </div>
             </PopoverContent>
           </Popover>
+          {/* Export Button */}
+          <ExportButton
+            data={filteredItems.map(item => ({
+              ...item,
+              item_path: item.item_path,
+              status: item.status,
+            }))}
+            columns={[
+              { key: "item_code", header: "Code" },
+              { key: "name", header: "Name" },
+              { key: "item_path", header: "Path", format: formatters.status },
+              { key: "status", header: "Status", format: formatters.status },
+              { key: "quantity", header: "Quantity" },
+              { key: "unit", header: "Unit" },
+              { key: "initial_unit_cost", header: "Initial Unit Cost", format: formatters.currency(currency) },
+              { key: "initial_total_cost", header: "Initial Total Cost", format: formatters.currency(currency) },
+              { key: "actual_unit_cost", header: "Actual Unit Cost", format: formatters.currency(currency) },
+              { key: "actual_total_cost", header: "Actual Total Cost", format: formatters.currency(currency) },
+              { key: "unit_sales_price", header: "Unit Sales Price", format: formatters.currency(currency) },
+              { key: "total_sales_price", header: "Total Sales Price", format: formatters.currency(currency) },
+              { key: "production_percentage", header: "Production %", format: formatters.percentage },
+              { key: "is_shipped", header: "Shipped", format: formatters.boolean() },
+              { key: "is_installed", header: "Installed", format: formatters.boolean() },
+            ]}
+            filename={`scope-items-${projectId}`}
+            sheetName="Scope Items"
+          />
         </div>
       </div>
+
+      {/* Filter Bar */}
+      <ScopeItemsFilterBar
+        filters={filters}
+        onFiltersChange={setFilters}
+        totalCount={items.length}
+        filteredCount={filteredItems.length}
+      />
+
       {/* Selection Toolbar */}
       {selectedIds.size > 0 && (
         <div className="flex items-center gap-3 p-3 bg-muted/50 border rounded-lg">

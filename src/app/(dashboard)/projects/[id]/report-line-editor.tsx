@@ -23,8 +23,9 @@ import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
+import { RichTextDisplay, truncateHtml } from "@/components/ui/rich-text-display";
 import { Spinner } from "@/components/ui/spinner";
 import {
   Dialog,
@@ -107,15 +108,15 @@ function SortableLineItem({ line, onEdit, onDelete, disabled }: SortableLineItem
         {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
-            <div>
+            <div className="min-w-0 flex-1">
               <h4 className="font-medium">{line.title}</h4>
               {line.description && (
                 <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                  {line.description}
+                  {truncateHtml(line.description, 150)}
                 </p>
               )}
             </div>
-            <div className="flex gap-1">
+            <div className="flex gap-1 shrink-0">
               <Button
                 size="icon"
                 variant="ghost"
@@ -440,13 +441,12 @@ export function ReportLineEditor({
 
             {/* Description */}
             <div className="space-y-2">
-              <Label htmlFor="line-description">Description</Label>
-              <Textarea
-                id="line-description"
+              <Label>Description</Label>
+              <RichTextEditor
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                onChange={setDescription}
                 placeholder="Section description or notes..."
-                rows={4}
+                minHeight="120px"
               />
             </div>
 

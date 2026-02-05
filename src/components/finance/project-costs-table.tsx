@@ -30,6 +30,8 @@ import {
   BuildingIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ExportButton } from "@/components/ui/export-button";
+import { type ColumnDefinition, formatters } from "@/lib/export/export-utils";
 
 interface ProjectCostRow {
   id: string;
@@ -206,6 +208,25 @@ export function ProjectCostsTable({ data }: ProjectCostsTableProps) {
                   className="pl-9 w-48 sm:w-64"
                 />
               </div>
+
+              {/* Export Button */}
+              <ExportButton
+                data={filteredData as unknown as Record<string, unknown>[]}
+                columns={[
+                  { key: "project_code", header: "Project Code" },
+                  { key: "name", header: "Project Name" },
+                  { key: "client_name", header: "Client" },
+                  { key: "status", header: "Status", format: formatters.status },
+                  { key: "budget", header: "Budget" },
+                  { key: "actual", header: "Actual" },
+                  { key: "variance", header: "Variance" },
+                  { key: "variancePercentage", header: "Variance %", format: formatters.percentage },
+                  { key: "itemCount", header: "Items" },
+                  { key: "currency", header: "Currency" },
+                ]}
+                filename="project-costs"
+                sheetName="Project Costs"
+              />
             </div>
           </div>
 

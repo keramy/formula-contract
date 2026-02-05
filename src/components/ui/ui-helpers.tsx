@@ -43,13 +43,14 @@ const glassCardVariants = cva(
 );
 
 interface GlassCardProps
-  extends React.ComponentProps<typeof Card>,
+  extends Omit<React.ComponentProps<typeof Card>, "hover" | "shadow">,
     VariantProps<typeof glassCardVariants> {}
 
 function GlassCard({ className, variant, hover, ...props }: GlassCardProps) {
   return (
     <Card
       className={cn(glassCardVariants({ variant, hover }), className)}
+      hover="none" // GlassCard manages its own hover through glassCardVariants
       {...props}
     />
   );
