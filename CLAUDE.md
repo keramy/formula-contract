@@ -126,12 +126,13 @@ formula-contract/
 │   │   ├── welcome-email.tsx     # New user welcome
 │   │   ├── project-assignment-email.tsx  # Assigned to project
 │   │   ├── milestone-alert-email.tsx     # Milestone approaching/overdue
-│   │   └── report-published-email.tsx    # Report shared with client
+│   │   ├── report-published-email.tsx    # Report shared with client
+│   │   └── drawing-sent-to-client-email.tsx  # Drawings sent for approval
 │   │
 │   └── types/                    # TypeScript type definitions
 │
 ├── supabase/
-│   └── migrations/               # Database migrations (001-045)
+│   └── migrations/               # Database migrations (001-046)
 │
 └── docs/                         # Documentation
     ├── DATABASE.md               # Schema documentation
@@ -358,6 +359,22 @@ interface ChartDataItem {
   [key: string]: string | number | undefined; // Required for Recharts
 }
 ```
+
+### Drawing Send Workflow
+
+Drawings follow a controlled visibility pattern — clients only see drawings that have been explicitly "sent" by the PM:
+
+```
+PM uploads drawing → status: "uploaded" (invisible to client)
+PM sends to client → status: "sent_to_client" (visible to client)
+Client reviews → status: "approved" | "rejected" | "approved_with_comments"
+```
+
+**Server Action:** `src/lib/actions/drawings.ts` — `sendDrawingsToClient(projectId, drawingIds[])` handles both single and bulk sends. It updates drawing status, scope item status, creates in-app notifications, sends email via Resend batch API, and logs activity.
+
+**Client Filtering:** `drawings-overview.tsx` filters `visibleItems` for clients — only shows `sent_to_client`, `approved`, `approved_with_comments`, `rejected` statuses.
+
+**PM Badge:** Drawings tab shows amber badge with count of `uploaded` (unsent) drawings.
 
 ### Gantt Chart Architecture
 
@@ -689,6 +706,12 @@ Extracted to `src/lib/pdf/image-helpers.ts`:
 - Timeline hierarchy (phases → tasks → subtasks with indent/outdent)
 - Timeline drag-and-drop (bar move/resize + sidebar reorder via @dnd-kit)
 - Timeline priority system (Low/Normal/High/Critical with colored borders)
+- Bulk send drawings to client (single-click send all uploaded drawings)
+- Client drawing visibility filtering (clients only see sent/approved/rejected drawings)
+- Drawing email notifications (clients get email + in-app notification when drawings are sent)
+- PM reminder badge on Drawings tab (amber badge showing "X ready to send")
+- Drawing approval server action migration (single send also triggers email now)
+- Drawings overview UI polish (compact stats bar + flush table layout)
 
 ### In Progress
 - Gantt chart UI polish (testing phase — migration 045 needs to run on Supabase before data appears)
