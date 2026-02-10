@@ -278,17 +278,8 @@ export function ReportCreationModal({
             projectCode,
           });
 
-          // DEBUG: Log PDF generation result
-          console.log("[Report Publish] PDF generation result:", {
-            success: pdfResult.success,
-            hasBase64: !!pdfResult.base64,
-            base64Length: pdfResult.base64?.length || 0,
-            error: pdfResult.error || "none"
-          });
-
           if (!pdfResult.success || !pdfResult.base64) {
             console.error("[Report Publish] PDF generation failed:", pdfResult.error);
-            console.log("[Report Publish] Publishing WITHOUT PDF URL");
             await publishReport(newReport.id, notifyClients);
             toast.success("Report published (PDF generation failed)");
           } else {
@@ -298,25 +289,16 @@ export function ReportCreationModal({
             const uploadResult = await uploadReportPdf(
               newReport.id,
               pdfResult.base64,
+              projectId,
               projectCode,
               reportType
             );
 
-            // DEBUG: Log PDF upload result
-            console.log("[Report Publish] PDF upload result:", {
-              success: uploadResult.success,
-              url: uploadResult.url || "NONE",
-              error: uploadResult.error || "none"
-            });
-
             if (!uploadResult.success || !uploadResult.url) {
               console.error("[Report Publish] PDF upload failed:", uploadResult.error);
-              console.log("[Report Publish] Publishing WITHOUT PDF URL");
               await publishReport(newReport.id, notifyClients);
               toast.success("Report published (PDF upload failed)");
             } else {
-              // Publish with PDF URL
-              console.log("[Report Publish] Calling publishReport with pdfUrl:", uploadResult.url);
               await publishReport(newReport.id, notifyClients, uploadResult.url);
               toast.success("Report published successfully!");
             }

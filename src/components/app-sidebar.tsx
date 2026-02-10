@@ -152,9 +152,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
       {/* Header with Logo - adapts to collapsed state */}
       <SidebarHeader className="h-14 border-b border-sidebar-border/50 p-0">
         <div className="flex items-center gap-2 px-3 h-full group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:justify-center">
-          <div className="flex items-center justify-center size-8 rounded-lg bg-primary-700 text-white font-bold text-xs shrink-0">
-            FC
-          </div>
+          <img src="/icons/icon-192x192.png" alt="FC" className="size-8 rounded-lg shrink-0" />
           <div className="flex flex-col min-w-0 group-data-[collapsible=icon]:hidden">
             <span className="text-sm font-semibold tracking-tight truncate">Formula Contract</span>
             <span className="text-xs text-muted-foreground truncate">Project Management</span>

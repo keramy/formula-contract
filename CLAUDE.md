@@ -1,6 +1,6 @@
 # Formula Contract - Project Intelligence
 
-> **Last Updated:** February 9, 2026
+> **Last Updated:** February 11, 2026
 > **Version:** 1.1.0
 > **Supabase Project:** `lsuiaqrpkhejeavsrsqc` (contract-eu, eu-central-1)
 
@@ -499,8 +499,9 @@ CREATE INDEX IF NOT EXISTS idx_table_fk ON table(fk_column);
 10. **React Query for server state** - Don't duplicate in useState
 11. **Recharts index signature** - Data types need `[key: string]: string | number` for Pie/Bar charts
 12. **Gantt GlassCard needs `py-0 gap-0`** - Card base has both padding and flex gap that must be overridden
-13. **Timeline migration 045 required** - `045_gantt_rewrite.sql` must run on Supabase before Gantt UI works
+13. **Timeline migration 045 applied** - `045_gantt_rewrite.sql` has been run on Supabase
 14. **Adjacent panel alignment** — When two side-by-side panels need matching row heights, both header wrappers must set explicit `height` + `box-border` so `border-b` is counted inside
+15. **Storage paths MUST start with `{projectId}/`** — Migration 040 enforces RLS via `storage_project_id()` which extracts the first path segment as UUID. Any path that doesn't start with a valid project UUID will be silently rejected by storage policies. This applies to ALL buckets (drawings, materials, reports, scope-items).
 
 ### Git on Windows
 - CRLF warnings are normal (`LF will be replaced by CRLF`) - safe to ignore
@@ -511,10 +512,13 @@ CREATE INDEX IF NOT EXISTS idx_table_fk ON table(fk_column);
 
 ## File Storage (Supabase Storage)
 
+**CRITICAL:** All storage paths MUST start with `{project_id}/` as the first segment. Migration 040's `storage_project_id()` function extracts this UUID for RLS verification via `is_assigned_to_project()`. Paths that don't follow this pattern will fail silently.
+
 ```
 drawings/{project_id}/{item_id}/{revision}_drawing.pdf
 materials/{project_id}/{material_id}/image_1.jpg
 reports/{project_id}/{report_id}/photo_1.jpg
+reports/{project_id}/{report_id}/{project_code}_{type}_{date}_{id}.pdf   ← report PDFs
 scope-items/{project_id}/{item_id}/image_1.jpg
 ```
 
@@ -660,6 +664,29 @@ Extracted to `src/lib/pdf/image-helpers.ts`:
 
 **Key Rule:** When the Gantt sidebar feels cluttered, simplify — remove visual elements rather than adding more spacing. Indentation + text weight (bold parent vs muted child) is enough hierarchy signal.
 
+### Storage Path Bug (Feb 2026)
+
+| Issue | Wrong Approach | Correct Approach |
+|-------|---------------|------------------|
+| **Report PDF upload path** | `pdfs/${fileName}` — flat path without project UUID | `${projectId}/${reportId}/${fileName}` — matches RLS requirement |
+| **Missing projectId param** | `uploadReportPdf(reportId, base64, projectCode, type)` — no way to build correct path | Added `projectId` as 3rd parameter |
+| **Cascading silent failure** | Upload fails → report publishes anyway → email "View Report" links to page instead of PDF | Upload succeeds → `pdf_url` saved to DB → email links directly to PDF file |
+
+### Favicon / Icon Gotcha (Feb 2026)
+
+| Issue | Wrong Approach | Correct Approach |
+|-------|---------------|------------------|
+| **Turbopack ICO build failure** | Use `.ico` file with non-RGBA PNG embedded | Remove `.ico`, use `src/app/icon.png` (Next.js auto-serves it as favicon) |
+| **Branding via CSS text** | `<div class="bg-primary-700 text-white font-bold">FC</div>` | `<img src="/icons/icon-192x192.png" alt="FC" class="size-8 rounded-lg" />` |
+
+**Key Rule:** Next.js Turbopack requires RGBA-format PNGs inside `.ico` files. If your ICO fails to build, just use `src/app/icon.png` instead — Next.js auto-generates the `<link rel="icon">` tag from it.
+
+**Key Rule:** Every Supabase Storage upload path MUST start with `{projectId}/` — this is enforced by migration 040's `storage_project_id()` RLS function. When adding new upload code, always check: "Does my path start with a project UUID?"
+
+**Cascade Effect:** Storage upload failures can silently degrade downstream features. In this case:
+- `uploadReportPdf()` failed → `pdf_url` was never saved → email notifications fell back to page URL instead of direct PDF link
+- The report still "worked" (DB insert + client-side download) so the bug was hard to notice
+
 **Key Takeaways:**
 - Always use `(SELECT auth.uid())` pattern when creating new RLS policies
 - Database schema uses `initial_unit_cost` and `actual_unit_cost`, NOT `unit_cost`
@@ -667,6 +694,7 @@ Extracted to `src/lib/pdf/image-helpers.ts`:
 - Use `crypto.randomBytes()` for any security-sensitive random generation, never `Math.random()`
 - Wrap page content with `<ErrorBoundary>` to prevent white-screen crashes
 - Add `aria-label` to all icon-only buttons for accessibility (WCAG 2.1 compliance)
+- **All storage paths must start with `{projectId}/`** — migration 040 enforces this via RLS. Flat paths like `pdfs/` or `uploads/` will be silently rejected
 
 ---
 
@@ -712,9 +740,11 @@ Extracted to `src/lib/pdf/image-helpers.ts`:
 - PM reminder badge on Drawings tab (amber badge showing "X ready to send")
 - Drawing approval server action migration (single send also triggers email now)
 - Drawings overview UI polish (compact stats bar + flush table layout)
+- FC logo icon integration (favicon, apple-icon, PWA manifest, replaced CSS "FC" blocks with logo image across sidebar, mobile header, and all auth pages)
+- Report PDF storage path fix (paths now start with `{projectId}/` per RLS requirement)
 
 ### In Progress
-- Gantt chart UI polish (testing phase — migration 045 needs to run on Supabase before data appears)
+- Gantt chart UI polish (testing phase — migration 045 applied to Supabase, data is live)
 
 ### Planned
 - Global capacity view (cross-project phase workload overview)

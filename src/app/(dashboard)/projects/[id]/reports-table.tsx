@@ -155,14 +155,6 @@ export function ReportsTable({
           projectCode,
         });
 
-        // DEBUG: Log PDF generation result
-        console.log("[Report Toggle] PDF generation:", {
-          success: pdfResult.success,
-          hasBase64: !!pdfResult.base64,
-          base64Length: pdfResult.base64?.length || 0,
-          error: pdfResult.error || "none"
-        });
-
         if (!pdfResult.success || !pdfResult.base64) {
           console.error("[Report Toggle] PDF generation FAILED:", pdfResult.error);
           toast.error("Failed to generate PDF");
@@ -176,16 +168,10 @@ export function ReportsTable({
         const uploadResult = await uploadReportPdf(
           report.id,
           pdfResult.base64,
+          projectId,
           projectCode,
           report.report_type
         );
-
-        // DEBUG: Log PDF upload result
-        console.log("[Report Toggle] PDF upload:", {
-          success: uploadResult.success,
-          url: uploadResult.url || "NONE",
-          error: uploadResult.error || "none"
-        });
 
         if (!uploadResult.success || !uploadResult.url) {
           console.error("[Report Toggle] PDF upload FAILED:", uploadResult.error);
@@ -194,8 +180,6 @@ export function ReportsTable({
           return;
         }
 
-        // Publish with PDF URL
-        console.log("[Report Toggle] Calling publishReport with pdfUrl:", uploadResult.url);
         await publishReport(report.id, false, uploadResult.url);
         toast.success("Report published successfully!");
       } catch (error) {

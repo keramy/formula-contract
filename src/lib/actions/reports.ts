@@ -583,13 +583,15 @@ export async function deleteReport(reportId: string): Promise<ActionResult> {
 /**
  * Upload a PDF file to Supabase Storage
  * @param reportId - The report ID (used for file naming)
- * @param pdfBlob - The PDF blob to upload
+ * @param pdfBase64 - The PDF as base64 data URI
+ * @param projectId - The project UUID (required for storage RLS path)
  * @param projectCode - Project code for file naming
  * @param reportType - Report type for file naming
  */
 export async function uploadReportPdf(
   reportId: string,
   pdfBase64: string,
+  projectId: string,
   projectCode: string,
   reportType: string
 ): Promise<{ success: boolean; url?: string; error?: string }> {
@@ -610,9 +612,10 @@ export async function uploadReportPdf(
   const pdfBlob = new Blob([bytes], { type: "application/pdf" });
 
   // Generate filename: {projectCode}_{reportType}_{date}_{reportId}.pdf
+  // Path must start with projectId for storage RLS (migration 040)
   const dateStr = new Date().toISOString().split("T")[0].replace(/-/g, "");
   const fileName = `${projectCode}_${reportType}_${dateStr}_${reportId.slice(0, 8)}.pdf`;
-  const filePath = `pdfs/${fileName}`;
+  const filePath = `${projectId}/${reportId}/${fileName}`;
 
   // Upload to Supabase Storage
   const { error: uploadError } = await supabase.storage

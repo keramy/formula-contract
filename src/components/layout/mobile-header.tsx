@@ -54,9 +54,7 @@ export function MobileHeader({ className }: AppHeaderProps) {
 
       {/* App Logo & Title - Forest Whisper Teal */}
       <div className="flex items-center gap-2 flex-1">
-        <div className="flex items-center justify-center size-8 rounded-lg bg-gradient-to-br from-primary-500 to-primary-700 text-white font-bold text-xs shadow-md shadow-primary-500/25">
-          FC
-        </div>
+        <img src="/icons/icon-192x192.png" alt="FC" className="size-8 rounded-lg" />
         <span className="font-semibold text-sm">Formula Contract</span>
       </div>
 

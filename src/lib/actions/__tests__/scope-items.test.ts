@@ -559,7 +559,7 @@ describe("splitScopeItem", () => {
     // We set the mock to return data that works for the final insert call.
     // The original item's `id` will be whatever the mock returns in the first
     // single() call, which in this case is "new-item-001" (same as insert result).
-    mockTerminalResult = { data: { id: "new-item-001", ...makeScopeItem({ id: "new-item-001" }) }, error: null };
+    mockTerminalResult = { data: makeScopeItem({ id: "new-item-001" }), error: null };
 
     const result = await splitScopeItem({
       itemId: ITEM_ID,

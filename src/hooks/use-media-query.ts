@@ -42,11 +42,12 @@ export function useMediaQuery(query: string): boolean {
 
 /**
  * Convenience hook for common breakpoints
- * Based on Tailwind CSS default breakpoints
+ * Aligned with Tailwind CSS `md:` breakpoint (768px) for CSS/JS consistency.
+ * All CSS responsive classes in the codebase use `md:` as the mobile/desktop split.
  */
 export function useBreakpoint() {
-  const isMobile = useMediaQuery("(max-width: 639px)"); // < sm
-  const isTablet = useMediaQuery("(min-width: 640px) and (max-width: 1023px)"); // sm to lg
+  const isMobile = useMediaQuery("(max-width: 767px)"); // < md (matches Tailwind md: breakpoint)
+  const isTablet = useMediaQuery("(min-width: 768px) and (max-width: 1023px)"); // md to lg
   const isDesktop = useMediaQuery("(min-width: 1024px)"); // lg+
 
   return {

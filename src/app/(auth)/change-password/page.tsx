@@ -117,9 +117,7 @@ export default function ChangePasswordPage() {
       <GlassCard className="w-full border-base-200/80 shadow-sm">
         <CardHeader className="space-y-4 pb-2">
           <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center h-11 w-11 rounded-xl bg-gradient-to-br from-primary-600 to-primary-700 text-white font-bold text-sm shadow-sm">
-              FC
-            </div>
+            <img src="/icons/icon-192x192.png" alt="Formula Contract" className="h-11 w-11 rounded-xl" />
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Security Setup

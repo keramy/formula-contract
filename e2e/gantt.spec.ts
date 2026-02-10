@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-async function openFirstProjectTimeline(page): Promise<boolean> {
+async function openFirstProjectTimeline(page: import("@playwright/test").Page): Promise<boolean> {
   await page.goto("/projects");
   await page.waitForLoadState("networkidle");
 

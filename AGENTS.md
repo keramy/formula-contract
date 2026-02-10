@@ -325,10 +325,65 @@ UI polish:
 
 Build verified: `npm run build` passes.
 
+### Reports PDF Storage Path Fix + Cleanup (Feb 10, 2026)
+Agent: Claude Code
+
+**Root cause:** `uploadReportPdf()` used `pdfs/${fileName}` as storage path — violated migration 040's RLS which requires `{projectId}/...` format. Upload silently failed → `pdf_url` never saved → email "View Report" button linked to page instead of PDF.
+
+**Cascading fix:** Also fixed the email "View Report" button behavior — with the upload now succeeding, `pdf_url` gets saved to DB, and the email notification uses the direct PDF link instead of falling back to the reports page URL.
+
+Files changed:
+- `src/lib/actions/reports.ts` — Added `projectId` param to `uploadReportPdf()`, changed path to `${projectId}/${reportId}/${fileName}`
+- `src/app/(dashboard)/projects/[id]/report-creation-modal.tsx` — Pass `projectId` to `uploadReportPdf()`, removed 6 debug console.logs
+- `src/app/(dashboard)/projects/[id]/reports-table.tsx` — Pass `projectId` to `uploadReportPdf()`, removed 4 debug console.logs
+
+Documentation updated:
+- `CLAUDE.md` — Added storage path rule to Gotchas (#15), updated File Storage section with RLS note + PDF path, added Storage Path Bug lesson with cascade effect documentation
+
+All 289 tests pass. No type errors in changed files.
+
+---
+
+### FC Logo Icons Integration (Feb 11, 2026)
+Agent: Claude Code
+
+**Feature: Replace CSS-generated "FC" text blocks with professional logo assets**
+
+Files created:
+- `src/app/manifest.ts` — PWA web manifest with app name, theme color (#0f3d2e), and icon references
+- `src/app/apple-icon.png` — 180x180 Apple touch icon (from fc_icons_vignette)
+- `src/app/icon.png` — 192x192 PWA icon (Next.js auto-serves as favicon)
+- `public/icons/icon-192x192.png` — Web manifest icon
+- `public/icons/icon-512x512.png` — PWA splash / Android icon
+- `public/icons/icon-32x32.png` — Standard favicon PNG
+
+Files modified:
+- `src/app/layout.tsx` — Added `icons` metadata (32x32 icon + 180x180 apple-touch-icon)
+- `src/components/app-sidebar.tsx` — Replaced CSS "FC" div with `<img>` tag
+- `src/components/layout/mobile-header.tsx` — Replaced CSS "FC" div with `<img>` tag
+- `src/app/(auth)/login/page.tsx` — Replaced CSS "FC" div with `<img>` tag
+- `src/app/(auth)/forgot-password/page.tsx` — Replaced CSS "FC" div with `<img>` tag
+- `src/app/(auth)/reset-password/page.tsx` — Replaced CSS "FC" div with `<img>` tag
+- `src/app/(auth)/change-password/page.tsx` — Replaced CSS "FC" div with `<img>` tag
+- `src/app/(auth)/setup-password/page.tsx` — Replaced CSS "FC" div with `<img>` tag
+
+Files deleted:
+- `src/app/favicon.ico` — Removed (contained non-RGBA PNG, incompatible with Turbopack)
+- `public/file.svg`, `public/globe.svg`, `public/next.svg`, `public/vercel.svg`, `public/window.svg` — Unused default Next.js assets
+
+Notes:
+- The original `favicon.ico` had a non-RGBA PNG embedded which caused Turbopack build failure. Removed it — Next.js auto-serves `src/app/icon.png` as the favicon instead.
+- Build verified: `npm run build` passes, Next.js auto-generates `/apple-icon.png`, `/icon.png`, `/manifest.webmanifest` routes.
+
 ---
 
 ## Open Issues / Warnings
-- **Migration required**: `supabase/migrations/045_gantt_rewrite.sql` must be executed manually on Supabase before Gantt UI shows data
+- **Migration 045 applied**: `045_gantt_rewrite.sql` has been executed on Supabase — Gantt data is live
 - **Migration 046 applied**: `046_client_drawing_approval_rls.sql` has been applied to Supabase (client drawing approval RLS + SECURITY DEFINER helper)
-- **Reports PDF upload path broken**: `src/lib/actions/reports.ts` line 615 uses `pdfs/${fileName}` which doesn't start with project UUID — will fail with storage policies from migration 040. Needs fixing separately.
+- ~~**Reports PDF upload path broken**~~ — **FIXED** (Feb 10, 2026): Changed storage path from `pdfs/${fileName}` to `${projectId}/${reportId}/${fileName}` in `uploadReportPdf()`. Also added `projectId` parameter to function signature and updated both callers (`report-creation-modal.tsx`, `reports-table.tsx`). Debug console.logs removed from both callers.
 - **Do not modify `src/test/setup.ts`** during parallel test writing — both agents depend on it
+- **Gantt sidebar test fixed**: Pre-existing test mismatch was already corrected by Codex agent — all 289 tests pass
+- ~~**Pre-existing TS error**~~ — **FIXED**: `e2e/accessibility.spec.ts` replaced custom `AxeViolation` interface with `import type { Result } from "axe-core"`
+- ~~**Remaining TS errors**~~ — **FIXED**: `e2e/gantt.spec.ts:3` added `Page` type annotation, `scope-items.test.ts:562` removed redundant `id` before spread
+- **TypeScript: 0 errors** — full codebase compiles clean as of Feb 10, 2026
+- **Tests: 289 passing, 0 failures** — all 14 test files pass

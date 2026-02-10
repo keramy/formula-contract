@@ -10,6 +10,14 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Formula Contract - Project Management",
   description: "Project management system for furniture manufacturing",
+  icons: {
+    icon: [
+      { url: "/icons/icon-32x32.png", sizes: "32x32", type: "image/png" },
+    ],
+    apple: [
+      { url: "/apple-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
 };
 
 export default function RootLayout({
