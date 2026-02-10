@@ -25,6 +25,7 @@ export interface PendingApproval {
   id: string;
   type: "drawing" | "material";
   title: string;
+  itemCode: string | null;
   projectId: string;
   projectSlug: string | null;
   projectName: string;
@@ -392,12 +393,12 @@ export async function getPendingApprovals(userId: string): Promise<PendingApprov
   // Get pending drawings via scope_items
   const { data: scopeItems } = await supabase
     .from("scope_items")
-    .select("id, project_id, name")
+    .select("id, project_id, name, item_code")
     .in("project_id", projectIds)
     .eq("is_deleted", false);
 
   const scopeItemIds = scopeItems?.map(s => s.id) || [];
-  const scopeItemMap = new Map(scopeItems?.map(s => [s.id, { project_id: s.project_id, name: s.name }]) || []);
+  const scopeItemMap = new Map(scopeItems?.map(s => [s.id, { project_id: s.project_id, name: s.name, item_code: s.item_code }]) || []);
 
   // Get drawings with sent_to_client status
   const { data: pendingDrawings } = scopeItemIds.length > 0
@@ -433,6 +434,7 @@ export async function getPendingApprovals(userId: string): Promise<PendingApprov
             id: drawing.id,
             type: "drawing",
             title: scopeItem.name || "Drawing",
+            itemCode: scopeItem.item_code || null,
             projectId: scopeItem.project_id,
             projectSlug: project.slug,
             projectName: project.name,
@@ -453,6 +455,7 @@ export async function getPendingApprovals(userId: string): Promise<PendingApprov
           id: material.id,
           type: "material",
           title: material.name,
+          itemCode: null,
           projectId: material.project_id,
           projectSlug: project.slug,
           projectName: project.name,

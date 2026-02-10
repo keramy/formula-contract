@@ -236,7 +236,27 @@ export function getFileExtension(fileName: string): string {
 }
 
 /**
- * Sanitize file name - removes dangerous characters
+ * Transliterate common non-ASCII characters to ASCII equivalents.
+ * Covers Turkish, German, French, Spanish, and other Latin-script diacritics.
+ */
+const CHAR_MAP: Record<string, string> = {
+  // Turkish
+  ı: "i", İ: "I", ş: "s", Ş: "S", ğ: "g", Ğ: "G",
+  ü: "u", Ü: "U", ö: "o", Ö: "O", ç: "c", Ç: "C",
+  // German / Nordic
+  ä: "a", Ä: "A", ß: "ss", å: "a", Å: "A", ø: "o", Ø: "O", æ: "ae", Æ: "AE",
+  // French / Spanish / Portuguese
+  é: "e", è: "e", ê: "e", ë: "e", à: "a", â: "a", ô: "o", î: "i", ï: "i",
+  ñ: "n", Ñ: "N", ã: "a", õ: "o", ú: "u", ù: "u", û: "u",
+};
+
+function transliterate(str: string): string {
+  return str.replace(/[^\x00-\x7F]/g, (ch) => CHAR_MAP[ch] || "_");
+}
+
+/**
+ * Sanitize file name - removes dangerous characters and non-ASCII chars.
+ * Supabase Storage (S3-compatible) requires ASCII-safe keys.
  */
 export function sanitizeFileName(fileName: string): string {
   // Get extension
@@ -244,7 +264,7 @@ export function sanitizeFileName(fileName: string): string {
   const name = ext ? fileName.slice(0, -(ext.length + 1)) : fileName;
 
   // Remove or replace dangerous characters
-  const sanitized = name
+  const sanitized = transliterate(name)
     // Remove path traversal attempts
     .replace(/\.\./g, "")
     // Remove dangerous characters
@@ -256,14 +276,17 @@ export function sanitizeFileName(fileName: string): string {
     // Limit consecutive underscores
     .replace(/_+/g, "_");
 
+  // Sanitize extension too in case path separators are smuggled in
+  const sanitizedExt = ext.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+
   // Return with extension
-  return ext ? `${sanitized}.${ext.toLowerCase()}` : sanitized;
+  return sanitizedExt ? `${sanitized}.${sanitizedExt}` : sanitized;
 }
 
 /**
  * Check for suspicious file names that might indicate an attack
  */
-function isSuspiciousFileName(fileName: string): boolean {
+export function isSuspiciousFileName(fileName: string): boolean {
   const suspiciousPatterns = [
     /\.\./,           // Path traversal
     /%00/,            // Null byte

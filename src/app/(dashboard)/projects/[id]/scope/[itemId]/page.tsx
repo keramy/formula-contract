@@ -278,7 +278,7 @@ export default async function ScopeItemDetailPage({
 
   // Role-based permissions
   const canEdit = ["admin", "pm"].includes(userRole);
-  const canUploadDrawings = ["admin", "pm", "production", "client"].includes(userRole);
+  const canUploadDrawings = ["admin", "pm", "production"].includes(userRole);
   const canApproveDrawings = ["admin", "pm", "client"].includes(userRole);
   const canEditProgress = ["admin", "pm", "production"].includes(userRole);
   const canManageMaterials = ["admin", "pm"].includes(userRole);
@@ -536,9 +536,11 @@ export default async function ScopeItemDetailPage({
                 </div>
                 {canUploadDrawings && (
                   <DrawingUpload
+                    projectId={projectId}
                     scopeItemId={itemId}
                     currentRevision={drawing?.current_revision || null}
                     hasDrawing={!!drawing}
+                    drawingStatus={drawing?.status}
                   />
                 )}
               </div>

@@ -10,7 +10,7 @@ import { CardContent, CardDescription, CardHeader, CardTitle } from "@/component
 import { Spinner } from "@/components/ui/spinner";
 import { FormulaLoader } from "@/components/ui/formula-loader";
 import { GlassCard } from "@/components/ui/ui-helpers";
-import { AlertCircleIcon, ShieldAlertIcon } from "lucide-react";
+import { AlertCircleIcon, EyeIcon, EyeOffIcon, ShieldAlertIcon, SparklesIcon } from "lucide-react";
 import { loginAction } from "@/lib/actions/auth";
 
 function LoginForm() {
@@ -18,6 +18,7 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isRateLimited, setIsRateLimited] = useState(false);
@@ -69,26 +70,36 @@ function LoginForm() {
   }
 
   return (
-    <div className="flex flex-col gap-8">
-      {/* Logo */}
-      <div className="flex flex-col items-center gap-2">
-        <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-rose-500 text-white font-bold text-xl shadow-lg shadow-orange-500/30">
-          FC
+    <div className="relative flex flex-col gap-6 animate-in fade-in duration-300">
+      <div className="pointer-events-none absolute -top-6 -left-4 h-24 w-24 rounded-full bg-primary/15 blur-2xl" />
+      <div className="pointer-events-none absolute -right-6 top-20 h-20 w-20 rounded-full bg-orange-500/10 blur-2xl" />
+
+      <div className="flex items-center justify-center">
+        <div className="inline-flex items-center gap-2 rounded-full border border-base-200 bg-card px-3 py-1.5 shadow-xs">
+          <SparklesIcon className="size-3.5 text-primary" />
+          <span className="text-xs font-medium text-muted-foreground">Formula Contract</span>
         </div>
-        <h1 className="text-xl font-semibold bg-gradient-to-r from-orange-600 to-rose-600 bg-clip-text text-transparent">
-          Formula Contract
-        </h1>
       </div>
 
-      {/* Login Card */}
-      <GlassCard className="w-full">
-        <CardHeader className="text-center pb-2">
-          <CardTitle className="text-lg">Welcome back</CardTitle>
-          <CardDescription>Sign in to your account to continue</CardDescription>
+      <GlassCard className="w-full border-base-200/80 shadow-sm">
+        <CardHeader className="space-y-4 pb-2">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center h-11 w-11 rounded-xl bg-gradient-to-br from-primary-600 to-primary-700 text-white font-bold text-sm shadow-sm">
+              FC
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Formula Contract
+              </p>
+              <CardTitle className="mt-0.5 text-xl tracking-tight">Welcome back</CardTitle>
+            </div>
+          </div>
+          <CardDescription>
+            Sign in to continue to your project operations dashboard.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            {/* Error Message */}
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
             {error && (
               <div className={`p-3 rounded-lg text-sm flex items-center gap-2 ${
                 isRateLimited
@@ -104,9 +115,8 @@ function LoginForm() {
               </div>
             )}
 
-            {/* Email Field */}
             <div className="flex flex-col gap-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-sm font-medium">Work email</Label>
               <Input
                 id="email"
                 type="email"
@@ -116,36 +126,48 @@ function LoginForm() {
                 required
                 autoComplete="email"
                 disabled={isLoading}
+                className="h-10"
               />
             </div>
 
-            {/* Password Field */}
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password" className="text-sm font-medium">Password</Label>
                 <Link
                   href="/forgot-password"
                   className="text-sm text-muted-foreground hover:text-primary transition-colors"
                 >
-                  Forgot password?
+                    Forgot password?
                 </Link>
               </div>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Enter your password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoComplete="current-password"
-                disabled={isLoading}
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                  disabled={isLoading}
+                  className="h-10 pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
+                </Button>
+              </div>
             </div>
 
-            {/* Submit Button */}
             <Button
               type="submit"
-              className="w-full mt-2 bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600"
+              className="w-full mt-2 h-10 bg-primary hover:bg-primary/90"
               disabled={isLoading}
             >
               {isLoading ? (
@@ -157,13 +179,13 @@ function LoginForm() {
                 "Sign in"
               )}
             </Button>
+
           </form>
         </CardContent>
       </GlassCard>
 
-      {/* Footer */}
-      <p className="text-center text-sm text-muted-foreground">
-        Project Management System for Formula Contract
+      <p className="text-center text-xs text-muted-foreground">
+        Formula Contract Project Management System
       </p>
     </div>
   );
@@ -172,7 +194,7 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="flex flex-col items-center justify-center gap-8">
+      <div className="flex flex-col items-center justify-center gap-6">
         <FormulaLoader />
       </div>
     }>

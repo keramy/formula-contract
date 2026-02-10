@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { GlassCard } from "@/components/ui/ui-helpers";
-import { ArrowLeftIcon, CheckCircle2Icon, AlertCircleIcon, ShieldAlertIcon } from "lucide-react";
+import { ArrowLeftIcon, CheckCircle2Icon, AlertCircleIcon, ShieldAlertIcon, SparklesIcon } from "lucide-react";
 import { requestPasswordResetAction } from "@/lib/actions/auth";
 
 export default function ForgotPasswordPage() {
@@ -25,7 +25,6 @@ export default function ForgotPasswordPage() {
     setIsLoading(true);
 
     try {
-      // Call server action (includes rate limiting)
       const redirectUrl = `${window.location.origin}/auth/callback?next=/reset-password`;
       const result = await requestPasswordResetAction(email, redirectUrl);
 
@@ -47,25 +46,34 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="flex flex-col gap-8">
-      {/* Logo */}
-      <div className="flex flex-col items-center gap-2">
-        <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-rose-500 text-white font-bold text-xl shadow-lg shadow-orange-500/30">
-          FC
+    <div className="relative flex flex-col gap-6 animate-in fade-in duration-300">
+      <div className="pointer-events-none absolute -top-6 -left-4 h-24 w-24 rounded-full bg-primary/15 blur-2xl" />
+      <div className="pointer-events-none absolute -right-6 top-20 h-20 w-20 rounded-full bg-orange-500/10 blur-2xl" />
+
+      <div className="flex items-center justify-center">
+        <div className="inline-flex items-center gap-2 rounded-full border border-base-200 bg-card px-3 py-1.5 shadow-xs">
+          <SparklesIcon className="size-3.5 text-primary" />
+          <span className="text-xs font-medium text-muted-foreground">Formula Contract</span>
         </div>
-        <h1 className="text-xl font-semibold bg-gradient-to-r from-orange-600 to-rose-600 bg-clip-text text-transparent">
-          Formula Contract
-        </h1>
       </div>
 
-      {/* Forgot Password Card */}
-      <GlassCard className="w-full">
-        <CardHeader className="text-center pb-2">
-          <CardTitle className="text-lg">Reset password</CardTitle>
+      <GlassCard className="w-full border-base-200/80 shadow-sm">
+        <CardHeader className="space-y-4 pb-2">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center h-11 w-11 rounded-xl bg-gradient-to-br from-primary-600 to-primary-700 text-white font-bold text-sm shadow-sm">
+              FC
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Account Recovery
+              </p>
+              <CardTitle className="mt-0.5 text-xl tracking-tight">Reset password</CardTitle>
+            </div>
+          </div>
           <CardDescription>
             {isSuccess
               ? "Check your email for the reset link"
-              : "Enter your email and we'll send you a reset link"}
+              : "Enter your email and we will send you a reset link."}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -79,15 +87,14 @@ export default function ForgotPasswordPage() {
                 Please check your inbox.
               </p>
               <Link href="/login" className="w-full">
-                <Button variant="outline" className="w-full">
+                <Button variant="outline" className="w-full h-10">
                   <ArrowLeftIcon className="size-4" />
                   Back to sign in
                 </Button>
               </Link>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-              {/* Error Message */}
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
               {error && (
                 <div className={`p-3 rounded-lg text-sm flex items-center gap-2 ${
                   isRateLimited
@@ -103,9 +110,8 @@ export default function ForgotPasswordPage() {
                 </div>
               )}
 
-              {/* Email Field */}
               <div className="flex flex-col gap-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" className="text-sm font-medium">Work email</Label>
                 <Input
                   id="email"
                   type="email"
@@ -115,13 +121,13 @@ export default function ForgotPasswordPage() {
                   required
                   autoComplete="email"
                   disabled={isLoading}
+                  className="h-10"
                 />
               </div>
 
-              {/* Submit Button */}
               <Button
                 type="submit"
-                className="w-full mt-2 bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600"
+                className="w-full mt-2 h-10 bg-primary hover:bg-primary/90"
                 disabled={isLoading}
               >
                 {isLoading ? (
@@ -134,9 +140,8 @@ export default function ForgotPasswordPage() {
                 )}
               </Button>
 
-              {/* Back to login */}
               <Link href="/login" className="w-full">
-                <Button variant="ghost" className="w-full text-muted-foreground">
+                <Button variant="ghost" className="w-full h-10 text-muted-foreground">
                   <ArrowLeftIcon className="size-4" />
                   Back to sign in
                 </Button>
@@ -146,9 +151,8 @@ export default function ForgotPasswordPage() {
         </CardContent>
       </GlassCard>
 
-      {/* Footer */}
-      <p className="text-center text-sm text-muted-foreground">
-        Project Management System for Formula Contract
+      <p className="text-center text-xs text-muted-foreground">
+        Formula Contract Project Management System
       </p>
     </div>
   );

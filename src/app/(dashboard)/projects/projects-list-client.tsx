@@ -18,9 +18,14 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { SearchIcon, XIcon, CalendarIcon, Building2Icon, PlusIcon, FilterIcon } from "lucide-react";
+import { SearchIcon, XIcon, CalendarIcon, PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { ProjectsTable, type SortField, type SortDirection } from "./projects-table";
 import { ProjectEditSheet } from "./project-edit-sheet";
 import { ProjectCard } from "@/components/projects/project-card";
@@ -308,151 +313,146 @@ export function ProjectsListClient({ projects, clients = [], canCreateProject = 
 
   return (
     <>
-      {/* Filters Row */}
-      <div className="flex flex-col gap-4 mb-6">
-        <div className="flex flex-col sm:flex-row gap-3">
-          {/* Search Input */}
-          <div className="relative flex-1 max-w-md">
-            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by name or code..."
-              value={search}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              className="pl-9 bg-white/50 border-gray-200 focus:bg-white transition-colors"
+      {/* Filters, results count, view toggle and actions — single row */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+        {/* Search Input */}
+        <div className="relative w-full sm:w-[200px]">
+          <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+          <Input
+            placeholder="Search..."
+            value={search}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            className="pl-9 bg-white/50 border-gray-200 focus:bg-white transition-colors"
+          />
+        </div>
+
+        {/* Status Filter Dropdown */}
+        <Select value={status} onValueChange={handleStatusChange}>
+          <SelectTrigger className="w-full sm:w-[140px] bg-white/50 border-gray-200">
+            <SelectValue placeholder="All Statuses" />
+          </SelectTrigger>
+          <SelectContent>
+            {statusOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+                {option.value !== "all" && statusCounts[option.value] > 0 && (
+                  <span className="ml-2 text-muted-foreground">
+                    ({statusCounts[option.value]})
+                  </span>
+                )}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Client Filter */}
+        <Select value={clientId} onValueChange={handleClientChange}>
+          <SelectTrigger className="w-full sm:w-[150px] bg-white/50 border-gray-200">
+            <SelectValue placeholder="All Clients" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Clients</SelectItem>
+            {uniqueClients.map((client) => (
+              <SelectItem key={client.id} value={client.id}>
+                {client.company_name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Date Range Filter */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              className={cn(
+                "w-full sm:w-[200px] justify-start text-left font-normal bg-white/50 border-gray-200",
+                !dateRange?.from && "text-muted-foreground"
+              )}
+            >
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {dateRange?.from ? (
+                dateRange.to ? (
+                  <>
+                    {format(dateRange.from, "MMM d")} -{" "}
+                    {format(dateRange.to, "MMM d, yyyy")}
+                  </>
+                ) : (
+                  format(dateRange.from, "MMM d, yyyy")
+                )
+              ) : (
+                "Filter by date..."
+              )}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="range"
+              selected={dateRange}
+              onSelect={handleDateRangeChange}
+              numberOfMonths={2}
+            />
+            {dateRange?.from && (
+              <div className="p-3 border-t">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => handleDateRangeChange(undefined)}
+                >
+                  Clear dates
+                </Button>
+              </div>
+            )}
+          </PopoverContent>
+        </Popover>
+
+        {/* Clear All Filters */}
+        {hasFilters && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearFilters}
+            className="gap-1 text-muted-foreground hover:text-foreground"
+          >
+            <XIcon className="size-4" />
+            Clear{activeFilterCount > 1 ? ` (${activeFilterCount})` : ""}
+          </Button>
+        )}
+
+        {/* Spacer */}
+        <div className="hidden sm:block flex-1" />
+
+        {/* Results count */}
+        <div className="text-sm text-muted-foreground whitespace-nowrap">
+          {filteredProjects.length} of {projects.length}
+          {hasFilters && " (filtered)"}
+        </div>
+
+        {/* View toggle + New Project button */}
+        <div className="flex items-center gap-1">
+          <div className="hidden sm:block">
+            <ViewToggle
+              view={viewOverride || "table"}
+              onViewChange={setViewOverride}
             />
           </div>
-
-          {/* Status Filter Dropdown */}
-          <div className="flex items-center gap-2">
-            <FilterIcon className="size-4 text-muted-foreground hidden sm:block" />
-            <Select value={status} onValueChange={handleStatusChange}>
-              <SelectTrigger className="w-full sm:w-[160px] bg-white/50 border-gray-200">
-                <SelectValue placeholder="All Statuses" />
-              </SelectTrigger>
-              <SelectContent>
-                {statusOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                    {option.value !== "all" && statusCounts[option.value] > 0 && (
-                      <span className="ml-2 text-muted-foreground">
-                        ({statusCounts[option.value]})
-                      </span>
-                    )}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Client Filter */}
-          <div className="flex items-center gap-2">
-            <Building2Icon className="size-4 text-muted-foreground hidden sm:block" />
-            <Select value={clientId} onValueChange={handleClientChange}>
-              <SelectTrigger className="w-full sm:w-[180px] bg-white/50 border-gray-200">
-                <SelectValue placeholder="All Clients" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Clients</SelectItem>
-                {uniqueClients.map((client) => (
-                  <SelectItem key={client.id} value={client.id}>
-                    {client.company_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Date Range Filter */}
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className={cn(
-                  "w-full sm:w-[240px] justify-start text-left font-normal bg-white/50 border-gray-200",
-                  !dateRange?.from && "text-muted-foreground"
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {dateRange?.from ? (
-                  dateRange.to ? (
-                    <>
-                      {format(dateRange.from, "MMM d, yyyy")} -{" "}
-                      {format(dateRange.to, "MMM d, yyyy")}
-                    </>
-                  ) : (
-                    format(dateRange.from, "MMM d, yyyy")
-                  )
-                ) : (
-                  "Filter by date..."
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="range"
-                selected={dateRange}
-                onSelect={handleDateRangeChange}
-                numberOfMonths={2}
-              />
-              {dateRange?.from && (
-                <div className="p-3 border-t">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => handleDateRangeChange(undefined)}
-                  >
-                    Clear dates
-                  </Button>
-                </div>
-              )}
-            </PopoverContent>
-          </Popover>
-
-          {/* Clear All Filters */}
-          {hasFilters && (
-            <Button
-              variant="ghost"
-              onClick={clearFilters}
-              className="gap-1 text-muted-foreground hover:text-foreground"
-            >
-              <XIcon className="size-4" />
-              Clear{activeFilterCount > 1 ? ` (${activeFilterCount})` : ""}
-            </Button>
-          )}
-
-          {/* Spacer */}
-          <div className="flex-1" />
-
-          {/* New Project Button */}
           {canCreateProject && (
-            <Button asChild size="sm">
-              <Link href="/projects/new">
-                <PlusIcon className="size-4" />
-                New Project
-              </Link>
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Link
+                  href="/projects/new"
+                  className={cn(
+                    "inline-flex items-center justify-center rounded-md border px-3 py-1.5 transition-colors",
+                    "bg-primary text-primary-foreground hover:bg-primary/90"
+                  )}
+                >
+                  <PlusIcon className="size-4" />
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent>New Project</TooltipContent>
+            </Tooltip>
           )}
-        </div>
-      </div>
-
-      {/* Results count and view toggle */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="text-sm text-muted-foreground">
-          Showing {filteredProjects.length} of {projects.length} projects
-          {hasFilters && " (filtered)"}
-          {sortField && (
-            <span className="ml-2">
-              • Sorted by {sortField.replace("_", " ")} ({sortDirection})
-            </span>
-          )}
-        </div>
-        {/* Manual view toggle for users who prefer a specific view */}
-        <div className="hidden sm:block">
-          <ViewToggle
-            view={viewOverride || "table"}
-            onViewChange={setViewOverride}
-          />
         </div>
       </div>
 

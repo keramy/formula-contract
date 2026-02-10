@@ -54,6 +54,7 @@ export const ACTIVITY_ACTIONS = {
 
   // Bulk actions
   ITEMS_IMPORTED: "items_imported",
+  DRAWINGS_BULK_SENT_TO_CLIENT: "drawings_bulk_sent_to_client",
 } as const;
 
 export type ActivityAction = (typeof ACTIVITY_ACTIONS)[keyof typeof ACTIVITY_ACTIONS];

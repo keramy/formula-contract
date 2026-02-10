@@ -4,7 +4,48 @@
 
 export type GanttViewMode = "day" | "week" | "month";
 
-export type GanttItemType = "milestone" | "scope_item" | "phase" | "task";
+export type GanttItemType = "milestone" | "phase" | "task";
+
+// ============================================================================
+// PRIORITY TYPES AND CONSTANTS
+// ============================================================================
+
+export type Priority = 1 | 2 | 3 | 4;
+
+export const PRIORITY_LEVELS = {
+  LOW: 1,
+  NORMAL: 2,
+  HIGH: 3,
+  CRITICAL: 4,
+} as const;
+
+export const PRIORITY_LABELS: Record<Priority, string> = {
+  1: "Low",
+  2: "Normal",
+  3: "High",
+  4: "Critical",
+};
+
+export const PRIORITY_COLORS: Record<Priority, string> = {
+  1: "#94a3b8", // slate-400 (gray)
+  2: "#3b82f6", // blue-500
+  3: "#f59e0b", // amber-500
+  4: "#ef4444", // red-500
+};
+
+// ============================================================================
+// WEEKEND SETTINGS
+// ============================================================================
+
+export interface WeekendSettings {
+  includeSaturday: boolean;
+  includeSunday: boolean;
+}
+
+export const DEFAULT_WEEKEND_SETTINGS: WeekendSettings = {
+  includeSaturday: true,
+  includeSunday: true,
+};
 
 // ============================================================================
 // DEPENDENCY TYPES
@@ -67,7 +108,8 @@ export interface GanttItem {
   dependencies?: string[]; // IDs of items this depends on (legacy field)
   // Optional metadata
   status?: string;
-  path?: "production" | "procurement";
+  phaseKey?: "design" | "production" | "shipping" | "installation";
+  priority?: number; // 1=Low, 2=Normal, 3=High, 4=Critical
   // For editable timeline items
   isEditable?: boolean;
   timelineId?: string; // Original timeline item ID for CRUD operations
@@ -90,10 +132,51 @@ export interface GanttColumn {
   isWeekend: boolean;
 }
 
-// Utility to calculate days between dates
+// Utility to calculate days between dates (calendar days, inclusive)
 export function daysBetween(start: Date, end: Date): number {
   const oneDay = 24 * 60 * 60 * 1000;
-  return Math.round(Math.abs((end.getTime() - start.getTime()) / oneDay));
+  return Math.round(Math.abs((end.getTime() - start.getTime()) / oneDay)) + 1;
+}
+
+// Utility to calculate work days (excluding weekends based on settings)
+export function calculateWorkDays(
+  start: Date,
+  end: Date,
+  settings: WeekendSettings
+): number {
+  // If both weekend days are included, return calendar days
+  if (settings.includeSaturday && settings.includeSunday) {
+    return daysBetween(start, end);
+  }
+
+  let days = 0;
+  const current = new Date(start);
+  current.setHours(0, 0, 0, 0);
+
+  const endDate = new Date(end);
+  endDate.setHours(0, 0, 0, 0);
+
+  while (current <= endDate) {
+    const dayOfWeek = current.getDay();
+    const isSaturday = dayOfWeek === 6;
+    const isSunday = dayOfWeek === 0;
+
+    // Count the day if:
+    // - It's a weekday (Mon-Fri), OR
+    // - It's Saturday and Saturday is included, OR
+    // - It's Sunday and Sunday is included
+    if (
+      (!isSaturday && !isSunday) ||
+      (isSaturday && settings.includeSaturday) ||
+      (isSunday && settings.includeSunday)
+    ) {
+      days++;
+    }
+
+    current.setDate(current.getDate() + 1);
+  }
+
+  return days;
 }
 
 // Utility to check if a date is today

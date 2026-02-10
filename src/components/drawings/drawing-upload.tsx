@@ -16,15 +16,28 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { UploadIcon, FileIcon, XIcon } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { UploadIcon, FileIcon, XIcon, AlertTriangleIcon } from "lucide-react";
 import { validateFile, DRAWING_CONFIG, CAD_CONFIG, formatFileSize, sanitizeFileName } from "@/lib/file-validation";
 import { sanitizeText } from "@/lib/sanitize";
 import type { DrawingInsert, DrawingUpdate, DrawingRevisionInsert, ScopeItemUpdate } from "@/types/database";
 
 interface DrawingUploadProps {
+  projectId: string;
   scopeItemId: string;
   currentRevision: string | null;
   hasDrawing: boolean;
+  /** Current drawing status — used to show confirmation when uploading a new revision on an approved drawing */
+  drawingStatus?: string;
 }
 
 function getNextRevision(current: string | null): string {
@@ -42,13 +55,16 @@ function getNextRevision(current: string | null): string {
   return current.slice(0, -1) + String.fromCharCode(lastChar.charCodeAt(0) + 1);
 }
 
-export function DrawingUpload({ scopeItemId, currentRevision, hasDrawing }: DrawingUploadProps) {
+export function DrawingUpload({ projectId, scopeItemId, currentRevision, hasDrawing, drawingStatus }: DrawingUploadProps) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cadFileInputRef = useRef<HTMLInputElement>(null);
 
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const isApproved = drawingStatus === "approved" || drawingStatus === "approved_with_comments";
   const [error, setError] = useState<string | null>(null);
 
   const [pdfFile, setPdfFile] = useState<File | null>(null);
@@ -105,7 +121,7 @@ export function DrawingUpload({ scopeItemId, currentRevision, hasDrawing }: Draw
       // Generate unique file names with sanitized names
       const timestamp = Date.now();
       const sanitizedPdfName = sanitizeFileName(pdfFile.name);
-      const pdfFileName = `${scopeItemId}/${nextRevision}_${timestamp}_${sanitizedPdfName}`;
+      const pdfFileName = `${projectId}/${scopeItemId}/${nextRevision}_${timestamp}_${sanitizedPdfName}`;
 
       // Upload PDF/image to storage
       const { error: uploadError } = await supabase.storage
@@ -125,7 +141,7 @@ export function DrawingUpload({ scopeItemId, currentRevision, hasDrawing }: Draw
       // Upload CAD file if provided
       if (cadFile) {
         const sanitizedCadName = sanitizeFileName(cadFile.name);
-        const cadStorageName = `${scopeItemId}/${nextRevision}_${timestamp}_${sanitizedCadName}`;
+        const cadStorageName = `${projectId}/${scopeItemId}/${nextRevision}_${timestamp}_${sanitizedCadName}`;
         const { error: cadUploadError } = await supabase.storage
           .from("drawings")
           .upload(cadStorageName, cadFile);
@@ -232,13 +248,42 @@ export function DrawingUpload({ scopeItemId, currentRevision, hasDrawing }: Draw
   };
 
   return (
+    <>
+    {/* Confirmation dialog for uploading new revision on approved drawing */}
+    <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2">
+            <AlertTriangleIcon className="size-5 text-amber-500" />
+            Upload New Revision?
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            This drawing has already been approved by the client. Uploading a new revision will reset the approval status and the client will need to review again.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={() => setIsOpen(true)}>
+            Continue with New Revision
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm">
+      {isApproved ? (
+        <Button size="sm" onClick={() => setShowConfirm(true)}>
           <UploadIcon className="size-4" />
-          {hasDrawing ? "Upload Revision" : "Upload Drawing"}
+          Upload Revision
         </Button>
-      </DialogTrigger>
+      ) : (
+        <DialogTrigger asChild>
+          <Button size="sm">
+            <UploadIcon className="size-4" />
+            {hasDrawing ? "Upload Revision" : "Upload Drawing"}
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
@@ -360,5 +405,6 @@ export function DrawingUpload({ scopeItemId, currentRevision, hasDrawing }: Draw
         </form>
       </DialogContent>
     </Dialog>
+    </>
   );
 }

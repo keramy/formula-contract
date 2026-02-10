@@ -22,6 +22,8 @@ import {
   type DependencyType,
   type GanttViewMode,
   type GanttDateRange,
+  type WeekendSettings,
+  DEFAULT_WEEKEND_SETTINGS,
   generateColumns,
   calculateBarPosition,
 } from "./types";
@@ -33,14 +35,28 @@ import {
   CalendarRangeIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  ChevronDownIcon,
   PlusIcon,
   Maximize2Icon,
   Minimize2Icon,
   XIcon,
-  IndentIcon,
-  OutdentIcon,
   LinkIcon,
+  SettingsIcon,
+  ArrowUpIcon,
+  ArrowDownIcon,
+  IndentIncreaseIcon,
+  IndentDecreaseIcon,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuTrigger,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+} from "@/components/ui/dropdown-menu";
 
 // ============================================================================
 // GANTT CHART - Main timeline visualization component with advanced features
@@ -56,6 +72,8 @@ export interface GanttChartProps {
   onItemDatesChange?: (item: GanttItem, startDate: Date, endDate: Date) => void;
   onAddItem?: () => void;
   onReorderItems?: (itemIds: string[]) => void;
+  /** Change an item's parent (indent/outdent). Pass null to make top-level. */
+  onItemParentChange?: (itemId: string, newParentId: string | null) => void;
   // Dependency callbacks
   onCreateDependency?: (
     sourceId: string,
@@ -69,14 +87,12 @@ export interface GanttChartProps {
     lagDays: number
   ) => Promise<void>;
   onDeleteDependency?: (dependencyId: string) => Promise<void>;
-  // Hierarchy callbacks
-  onIndentItem?: (itemId: string) => Promise<void>;
-  onOutdentItem?: (itemId: string) => Promise<void>;
   className?: string;
   initialViewMode?: GanttViewMode;
   showSidebar?: boolean;
-  sidebarWidth?: number;
   showAddButton?: boolean;
+  /** Show the fullscreen toggle button. Set false when embedded (e.g. project detail tab). */
+  showFullscreenToggle?: boolean;
 }
 
 // Base column widths for each view mode
@@ -90,33 +106,37 @@ const BASE_COLUMN_WIDTHS: Record<GanttViewMode, number> = {
 const ZOOM_LEVELS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 const DEFAULT_ZOOM_INDEX = 2; // 1x
 
-const ROW_HEIGHT = 44;
+const ROW_HEIGHT = 36;
+
+// Sidebar resize constraints
 
 export function GanttChart({
   items,
   dependencies = [],
-  onItemClick,
+  onItemClick: _onItemClick, // Kept for API compatibility but single-click now only selects
   onItemEdit,
   onItemDuplicate,
   onItemDelete,
   onItemDatesChange,
   onAddItem,
   onReorderItems,
+  onItemParentChange,
   onCreateDependency,
   onUpdateDependency,
   onDeleteDependency,
-  onIndentItem,
-  onOutdentItem,
   className,
   initialViewMode = "week",
   showSidebar = true,
-  sidebarWidth = 250,
   showAddButton = false,
+  showFullscreenToggle = true,
 }: GanttChartProps) {
   const [viewMode, setViewMode] = React.useState<GanttViewMode>(initialViewMode);
   const [isFullscreen, setIsFullscreen] = React.useState(false);
   const [zoomIndex, setZoomIndex] = React.useState(DEFAULT_ZOOM_INDEX);
   const scrollRef = React.useRef<HTMLDivElement>(null);
+
+  // Weekend settings for duration calculation
+  const [weekendSettings, setWeekendSettings] = React.useState<WeekendSettings>(DEFAULT_WEEKEND_SETTINGS);
 
   // Selection state (for linking items)
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
@@ -174,15 +194,11 @@ export function GanttChart({
     return items.filter((item) => !hiddenIds.has(item.id));
   }, [items, collapsedIds]);
 
-  // Handle escape key to exit fullscreen or clear selection
+  // Handle escape key to clear selection (NOT exit fullscreen - user must use X button)
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        if (isFullscreen) {
-          setIsFullscreen(false);
-        } else if (selectedIds.size > 0) {
-          setSelectedIds(new Set());
-        }
+      if (e.key === "Escape" && selectedIds.size > 0) {
+        setSelectedIds(new Set());
       }
     };
 
@@ -244,7 +260,7 @@ export function GanttChart({
   const totalWidth = columns.length * columnWidth;
 
   // Calculate header height (2 rows for day/week, 1 for month)
-  const headerHeight = viewMode === "month" ? 50 : 60;
+  const headerHeight = 48; // Fixed height across all views to prevent layout shift
 
   // Build a map of bar positions for dependency arrows
   const barPositionMap = React.useMemo(() => {
@@ -299,13 +315,8 @@ export function GanttChart({
   };
 
   // Handle item click with multi-select support
+  // Single-click = SELECT only, Double-click = EDIT (handled separately)
   const handleItemClick = (item: GanttItem, event?: React.MouseEvent) => {
-    // Only allow selection for editable items
-    if (!item.isEditable) {
-      onItemClick?.(item);
-      return;
-    }
-
     // Multi-select with Ctrl/Cmd or Shift
     if (event?.ctrlKey || event?.metaKey) {
       setSelectedIds((prev) => {
@@ -337,8 +348,15 @@ export function GanttChart({
         setSelectedIds(new Set([item.id]));
       }
     }
+    // NOTE: We do NOT call onItemClick here - single-click only selects
+    // Double-click is handled by handleItemDoubleClick
+  };
 
-    onItemClick?.(item);
+  // Handle double-click to edit (only for editable items)
+  const handleItemDoubleClick = (item: GanttItem) => {
+    if (item.isEditable) {
+      onItemEdit?.(item);
+    }
   };
 
   // Handle sidebar item click (pass through to main handler)
@@ -357,11 +375,6 @@ export function GanttChart({
       }
       return next;
     });
-  };
-
-  // Handle reorder from sidebar
-  const handleReorder = (itemIds: string[]) => {
-    onReorderItems?.(itemIds);
   };
 
   // Link selected items
@@ -410,19 +423,100 @@ export function GanttChart({
     setSelectedDependency(null);
   };
 
-  // Indent selected item
-  const handleIndent = async () => {
-    if (selectedItems.length !== 1) return;
-    const item = selectedItems[0];
-    await onIndentItem?.(item.timelineId || item.id);
-  };
+  // Helper: Get sibling IDs in current order (same parent)
+  const getSiblingIds = React.useCallback((item: GanttItem): string[] => {
+    return items
+      .filter((i) => i.isEditable && i.type === "task" && i.parentId === item.parentId)
+      .map((i) => i.id);
+  }, [items]);
 
-  // Outdent selected item
-  const handleOutdent = async () => {
-    if (selectedItems.length !== 1) return;
+  // Move selected item up (swap with previous sibling at same level, move subtree together)
+  const handleMoveUp = React.useCallback(() => {
+    if (selectedItems.length !== 1 || !onReorderItems) return;
     const item = selectedItems[0];
-    await onOutdentItem?.(item.timelineId || item.id);
-  };
+    if (!item.isEditable || item.type !== "task") return;
+
+    const siblingIds = getSiblingIds(item);
+    const index = siblingIds.indexOf(item.id);
+    if (index <= 0) return;
+
+    const newOrder = [...siblingIds];
+    const swapWith = index - 1;
+    [newOrder[index], newOrder[swapWith]] = [newOrder[swapWith], newOrder[index]];
+
+    onReorderItems(newOrder);
+  }, [selectedItems, onReorderItems, getSiblingIds]);
+
+  // Move selected item down (swap with next sibling at same level, move subtree together)
+  const handleMoveDown = React.useCallback(() => {
+    if (selectedItems.length !== 1 || !onReorderItems) return;
+    const item = selectedItems[0];
+    if (!item.isEditable || item.type !== "task") return;
+
+    const siblingIds = getSiblingIds(item);
+    const index = siblingIds.indexOf(item.id);
+    if (index < 0 || index >= siblingIds.length - 1) return;
+
+    const newOrder = [...siblingIds];
+    const swapWith = index + 1;
+    [newOrder[index], newOrder[swapWith]] = [newOrder[swapWith], newOrder[index]];
+
+    onReorderItems(newOrder);
+  }, [selectedItems, onReorderItems, getSiblingIds]);
+
+  // Calculate whether move up/down is possible (only for editable items, check siblings)
+  const canMoveUp = React.useMemo(() => {
+    if (selectedItems.length !== 1 || !selectedItems[0].isEditable || selectedItems[0].type !== "task") return false;
+    const item = selectedItems[0];
+    const siblingIds = getSiblingIds(item);
+    return siblingIds.indexOf(item.id) > 0;
+  }, [selectedItems, getSiblingIds]);
+
+  const canMoveDown = React.useMemo(() => {
+    if (selectedItems.length !== 1 || !selectedItems[0].isEditable || selectedItems[0].type !== "task") return false;
+    const item = selectedItems[0];
+    const siblingIds = getSiblingIds(item);
+    const index = siblingIds.indexOf(item.id);
+    return index >= 0 && index < siblingIds.length - 1;
+  }, [selectedItems, getSiblingIds]);
+
+  // Indent: make selected item a child of its previous sibling
+  const handleIndent = React.useCallback(() => {
+    if (selectedItems.length !== 1 || !onItemParentChange) return;
+    const item = selectedItems[0];
+    const siblings = items.filter((i) => i.parentId === item.parentId);
+    const index = siblings.findIndex((i) => i.id === item.id);
+    if (index <= 0) return;
+    const newParent = siblings[index - 1];
+    if (newParent.type === "milestone") return;
+    onItemParentChange(item.timelineId || item.id, newParent.timelineId || newParent.id);
+  }, [selectedItems, items, onItemParentChange]);
+
+  // Outdent: move selected item up one hierarchy level
+  const handleOutdent = React.useCallback(() => {
+    if (selectedItems.length !== 1 || !onItemParentChange) return;
+    const item = selectedItems[0];
+    if (!item.parentId) return;
+    const parent = itemMap.get(item.parentId);
+    const newParentId = parent?.parentId
+      ? (parent.timelineId || parent.parentId)
+      : null;
+    onItemParentChange(item.timelineId || item.id, newParentId);
+  }, [selectedItems, itemMap, onItemParentChange]);
+
+  const canIndent = React.useMemo(() => {
+    if (selectedItems.length !== 1 || !onItemParentChange) return false;
+    const item = selectedItems[0];
+    const siblings = items.filter((i) => i.parentId === item.parentId);
+    const index = siblings.findIndex((i) => i.id === item.id);
+    if (index <= 0) return false;
+    return siblings[index - 1].type !== "milestone";
+  }, [selectedItems, items, onItemParentChange]);
+
+  const canOutdent = React.useMemo(() => {
+    if (selectedItems.length !== 1 || !onItemParentChange) return false;
+    return !!selectedItems[0].parentId;
+  }, [selectedItems, onItemParentChange]);
 
   // Clear selection on background click
   const handleBackgroundClick = (e: React.MouseEvent) => {
@@ -440,69 +534,61 @@ export function GanttChart({
   // Chart content (shared between normal and fullscreen modes)
   const chartContent = (
     <>
-      {/* Toolbar */}
-      <div className="flex items-center justify-between p-3 border-b border-base-200 bg-base-50/50 flex-wrap gap-2">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-muted-foreground">View:</span>
-          <div className="flex items-center border border-base-200 rounded-lg overflow-hidden">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setViewMode("day")}
-              className={cn(
-                "rounded-none h-8 px-3",
-                viewMode === "day" && "bg-primary/10 text-primary"
-              )}
-            >
-              <CalendarIcon className="h-4 w-4 mr-1.5" />
-              Day
+      {/* Toolbar - Compact layout, all buttons h-7 */}
+      <div className="flex items-center justify-between px-3 py-2 border-b border-base-200 bg-base-50/60 gap-2">
+        {/* Left side - Add button and selection actions */}
+        <div className="flex items-center gap-2 min-w-0">
+          {/* Add Task button */}
+          {showAddButton && onAddItem && (
+            <Button size="sm" onClick={onAddItem} className="h-7 px-2.5 text-xs">
+              <PlusIcon className="h-4 w-4 mr-1.5" />
+              Add Task
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setViewMode("week")}
-              className={cn(
-                "rounded-none h-8 px-3 border-x border-base-200",
-                viewMode === "week" && "bg-primary/10 text-primary"
-              )}
-            >
-              <CalendarDaysIcon className="h-4 w-4 mr-1.5" />
-              Week
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setViewMode("month")}
-              className={cn(
-                "rounded-none h-8 px-3",
-                viewMode === "month" && "bg-primary/10 text-primary"
-              )}
-            >
-              <CalendarRangeIcon className="h-4 w-4 mr-1.5" />
-              Month
-            </Button>
-          </div>
+          )}
 
-          {/* Hierarchy buttons (shown when 1 item selected) */}
-          {selectedItems.length === 1 && (onIndentItem || onOutdentItem) && (
-            <div className="flex items-center border border-base-200 rounded-lg overflow-hidden ml-2">
+          {/* Reorder buttons (shown when 1 item selected and reorder is enabled) */}
+          {selectedItems.length === 1 && onReorderItems && (
+            <div className="flex items-center border border-base-200 rounded-lg overflow-hidden">
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={handleIndent}
-                      disabled={!onIndentItem}
-                      className="rounded-none h-8 w-8"
-                      aria-label="Indent item"
+                      onClick={handleMoveUp}
+                      disabled={!canMoveUp}
+                      className="rounded-none h-7 w-7"
+                      aria-label="Move up"
                     >
-                      <IndentIcon className="h-4 w-4" />
+                      <ArrowUpIcon className="h-3.5 w-3.5" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>Indent (make child of above item)</TooltipContent>
+                  <TooltipContent>Move up</TooltipContent>
                 </Tooltip>
               </TooltipProvider>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleMoveDown}
+                      disabled={!canMoveDown}
+                      className="rounded-none h-7 w-7 border-l border-base-200"
+                      aria-label="Move down"
+                    >
+                      <ArrowDownIcon className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Move down</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          )}
+
+          {/* Indent/Outdent buttons (shown when 1 item selected and parent change is enabled) */}
+          {selectedItems.length === 1 && onItemParentChange && (
+            <div className="flex items-center border border-base-200 rounded-lg overflow-hidden">
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -510,14 +596,31 @@ export function GanttChart({
                       variant="ghost"
                       size="icon"
                       onClick={handleOutdent}
-                      disabled={!onOutdentItem || (selectedItems[0]?.hierarchyLevel || 0) === 0}
-                      className="rounded-none h-8 w-8 border-l border-base-200"
-                      aria-label="Outdent item"
+                      disabled={!canOutdent}
+                      className="rounded-none h-7 w-7"
+                      aria-label="Outdent"
                     >
-                      <OutdentIcon className="h-4 w-4" />
+                      <IndentDecreaseIcon className="h-3.5 w-3.5" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>Outdent (move up one level)</TooltipContent>
+                  <TooltipContent>Outdent (move to parent level)</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleIndent}
+                      disabled={!canIndent}
+                      className="rounded-none h-7 w-7 border-l border-base-200"
+                      aria-label="Indent"
+                    >
+                      <IndentIncreaseIcon className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Indent (make child of item above)</TooltipContent>
                 </Tooltip>
               </TooltipProvider>
             </div>
@@ -525,141 +628,185 @@ export function GanttChart({
 
           {/* Link button (shown when 2 items selected) */}
           {selectedItems.length === 2 && onCreateDependency && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleLinkItems}
-                    className="h-8 ml-2"
-                  >
-                    <LinkIcon className="h-4 w-4 mr-1.5" />
-                    Link Items
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Create dependency between selected items</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleLinkItems}
+              className="h-7 text-xs"
+            >
+              <LinkIcon className="h-3.5 w-3.5 mr-1.5" />
+              Link
+            </Button>
           )}
 
           {/* Selection indicator */}
           {selectedItems.length > 0 && (
-            <div className="flex items-center gap-2 ml-2 text-sm text-muted-foreground">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <span>{selectedItems.length} selected</span>
               <Button
                 variant="ghost"
-                size="sm"
+                size="icon"
                 onClick={() => setSelectedIds(new Set())}
-                className="h-6 px-2 text-xs"
+                className="h-7 w-7"
+                aria-label="Clear selection"
               >
-                Clear
+                <XIcon className="h-3 w-3" />
               </Button>
             </div>
           )}
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Add Timeline button */}
-          {showAddButton && onAddItem && (
-            <Button size="sm" onClick={onAddItem} className="h-8">
-              <PlusIcon className="h-4 w-4 mr-1.5" />
-              Add Timeline
-            </Button>
-          )}
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={scrollToToday}
-            className="h-8"
-          >
-            Today
-          </Button>
-
-          {/* Zoom controls */}
+        {/* Right side - Navigation, Settings and View */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* Today + Navigation arrows — grouped with border */}
           <div className="flex items-center border border-base-200 rounded-lg overflow-hidden">
             <Button
               variant="ghost"
-              size="icon"
-              onClick={zoomOut}
-              disabled={!canZoomOut}
-              className="rounded-none h-8 w-8"
-              aria-label="Zoom out"
+              size="sm"
+              onClick={scrollToToday}
+              className="rounded-none h-7 px-2 text-xs"
             >
-              <ZoomOutIcon className="h-4 w-4" />
+              Today
             </Button>
-            <span className="px-2 text-xs font-medium min-w-[3rem] text-center border-x border-base-200">
-              {Math.round(zoomLevel * 100)}%
-            </span>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={zoomIn}
-              disabled={!canZoomIn}
-              className="rounded-none h-8 w-8"
-              aria-label="Zoom in"
-            >
-              <ZoomInIcon className="h-4 w-4" />
-            </Button>
-          </div>
-
-          {/* Navigation */}
-          <div className="flex items-center border border-base-200 rounded-lg overflow-hidden">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => navigate("left")}
-              className="rounded-none h-8 w-8"
+              className="rounded-none h-7 w-7 border-l border-base-200"
               aria-label="Navigate left"
             >
-              <ChevronLeftIcon className="h-4 w-4" />
+              <ChevronLeftIcon className="h-3.5 w-3.5" />
             </Button>
             <Button
               variant="ghost"
               size="icon"
               onClick={() => navigate("right")}
-              className="rounded-none h-8 w-8 border-l border-base-200"
+              className="rounded-none h-7 w-7 border-l border-base-200"
               aria-label="Navigate right"
             >
-              <ChevronRightIcon className="h-4 w-4" />
+              <ChevronRightIcon className="h-3.5 w-3.5" />
             </Button>
           </div>
 
-          {/* Fullscreen toggle */}
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setIsFullscreen(!isFullscreen)}
-            className="h-8 w-8"
-            aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-          >
-            {isFullscreen ? (
-              <Minimize2Icon className="h-4 w-4" />
-            ) : (
-              <Maximize2Icon className="h-4 w-4" />
-            )}
-          </Button>
+          {/* Settings dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon" className="h-7 w-7">
+                <SettingsIcon className="h-3.5 w-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48 z-[10000]">
+              <DropdownMenuLabel>Workdays</DropdownMenuLabel>
+              <DropdownMenuCheckboxItem
+                checked={weekendSettings.includeSaturday}
+                onCheckedChange={(checked) =>
+                  setWeekendSettings((prev) => ({ ...prev, includeSaturday: checked }))
+                }
+              >
+                Include Saturday
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={weekendSettings.includeSunday}
+                onCheckedChange={(checked) =>
+                  setWeekendSettings((prev) => ({ ...prev, includeSunday: checked }))
+                }
+              >
+                Include Sunday
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Zoom ({Math.round(zoomLevel * 100)}%)</DropdownMenuLabel>
+              <div className="flex items-center justify-between px-2 py-1">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={zoomOut}
+                  disabled={!canZoomOut}
+                  className="h-7 w-7"
+                  aria-label="Zoom out"
+                >
+                  <ZoomOutIcon className="h-3.5 w-3.5" />
+                </Button>
+                <span className="text-xs font-medium">{Math.round(zoomLevel * 100)}%</span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={zoomIn}
+                  disabled={!canZoomIn}
+                  className="h-7 w-7"
+                  aria-label="Zoom in"
+                >
+                  <ZoomInIcon className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* View dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-7 px-2 text-xs">
+                {viewMode === "day" && <CalendarIcon className="h-3.5 w-3.5 mr-1.5" />}
+                {viewMode === "week" && <CalendarDaysIcon className="h-3.5 w-3.5 mr-1.5" />}
+                {viewMode === "month" && <CalendarRangeIcon className="h-3.5 w-3.5 mr-1.5" />}
+                {viewMode.charAt(0).toUpperCase() + viewMode.slice(1)}
+                <ChevronDownIcon className="h-3 w-3 ml-1 opacity-50" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="z-[10000]">
+              <DropdownMenuRadioGroup value={viewMode} onValueChange={(v) => setViewMode(v as GanttViewMode)}>
+                <DropdownMenuRadioItem value="day">
+                  <CalendarIcon className="h-4 w-4 mr-2" />
+                  Day
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="week">
+                  <CalendarDaysIcon className="h-4 w-4 mr-2" />
+                  Week
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="month">
+                  <CalendarRangeIcon className="h-4 w-4 mr-2" />
+                  Month
+                </DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Fullscreen toggle (hidden when embedded, e.g. in project detail tab) */}
+          {showFullscreenToggle && (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className="h-7 w-7"
+              aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+            >
+              {isFullscreen ? (
+                <Minimize2Icon className="h-3.5 w-3.5" />
+              ) : (
+                <Maximize2Icon className="h-3.5 w-3.5" />
+              )}
+            </Button>
+          )}
         </div>
       </div>
 
       {/* Chart area */}
       <div
-        className={cn("flex overflow-hidden", isFullscreen && "flex-1")}
-        style={{ height: isFullscreen ? "100%" : 400 }}
+        className="flex overflow-hidden flex-1 min-h-0"
       >
         {/* Sidebar */}
         {showSidebar && (
           <GanttSidebar
-            items={visibleItems}
+            items={items}
             rowHeight={ROW_HEIGHT}
             headerHeight={headerHeight}
-            width={sidebarWidth}
+            viewMode={viewMode}
             selectedIds={selectedIds}
             collapsedIds={collapsedIds}
+            weekendSettings={weekendSettings}
             onItemClick={handleSidebarItemClick}
+            onItemDoubleClick={handleItemDoubleClick}
             onToggleCollapse={handleToggleCollapse}
-            onReorder={onReorderItems ? handleReorder : undefined}
+            onReorderItems={onReorderItems}
           />
         )}
 
@@ -675,11 +822,12 @@ export function GanttChart({
               columns={columns}
               viewMode={viewMode}
               columnWidth={columnWidth}
+              headerHeight={headerHeight}
             />
 
             {/* Rows with dependency overlay */}
             <div className="relative">
-              {visibleItems.map((item) => (
+              {visibleItems.map((item, index) => (
                 <GanttRow
                   key={item.id}
                   item={item}
@@ -687,8 +835,10 @@ export function GanttChart({
                   dateRange={dateRange}
                   columnWidth={columnWidth}
                   rowHeight={ROW_HEIGHT}
+                  rowIndex={index}
                   isSelected={selectedIds.has(item.id)}
                   onItemClick={(clickedItem) => handleItemClick(clickedItem)}
+                  onItemDoubleClick={handleItemDoubleClick}
                   onItemEdit={onItemEdit}
                   onItemDuplicate={onItemDuplicate}
                   onItemDelete={onItemDelete}
@@ -753,14 +903,14 @@ export function GanttChart({
             <div className="flex items-center gap-3">
               <h2 className="text-lg font-semibold">Project Timeline</h2>
               <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
-                ESC to exit
+                ESC clears selection
               </span>
             </div>
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setIsFullscreen(false)}
-              aria-label="Close fullscreen (Escape)"
+              aria-label="Close fullscreen"
             >
               <XIcon className="h-5 w-5" />
             </Button>
@@ -778,7 +928,7 @@ export function GanttChart({
   return (
     <>
       {fullscreenOverlay}
-      <GlassCard className={cn("overflow-hidden", className)}>
+      <GlassCard className={cn("overflow-hidden py-0 gap-0", className)}>
         {chartContent}
       </GlassCard>
     </>

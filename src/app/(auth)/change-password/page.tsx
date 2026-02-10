@@ -8,7 +8,15 @@ import { Label } from "@/components/ui/label";
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { GlassCard } from "@/components/ui/ui-helpers";
-import { CheckCircleIcon, AlertCircleIcon, EyeIcon, EyeOffIcon, InfoIcon, ShieldAlertIcon } from "lucide-react";
+import {
+  CheckCircleIcon,
+  AlertCircleIcon,
+  EyeIcon,
+  EyeOffIcon,
+  InfoIcon,
+  ShieldAlertIcon,
+  SparklesIcon,
+} from "lucide-react";
 import { checkAuthStatusAction, updatePasswordAction } from "@/lib/actions/auth";
 
 export default function ChangePasswordPage() {
@@ -22,7 +30,6 @@ export default function ChangePasswordPage() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [isRateLimited, setIsRateLimited] = useState(false);
 
-  // Check if user is authenticated and needs to change password
   useEffect(() => {
     async function checkAuth() {
       const status = await checkAuthStatusAction();
@@ -32,9 +39,7 @@ export default function ChangePasswordPage() {
         return;
       }
 
-      // Check if user actually needs to change password
       if (!status.mustChangePassword) {
-        // User doesn't need to change password, redirect to dashboard
         router.push("/dashboard");
         return;
       }
@@ -46,25 +51,8 @@ export default function ChangePasswordPage() {
     checkAuth();
   }, [router]);
 
-  // Password validation
-  const passwordErrors = [];
-  if (newPassword.length > 0 && newPassword.length < 8) {
-    passwordErrors.push("Password must be at least 8 characters");
-  }
-  if (newPassword.length > 0 && !/[A-Z]/.test(newPassword)) {
-    passwordErrors.push("Password must contain at least one uppercase letter");
-  }
-  if (newPassword.length > 0 && !/[a-z]/.test(newPassword)) {
-    passwordErrors.push("Password must contain at least one lowercase letter");
-  }
-  if (newPassword.length > 0 && !/[0-9]/.test(newPassword)) {
-    passwordErrors.push("Password must contain at least one number");
-  }
-
-  const isPasswordValid = newPassword.length >= 8 &&
-    /[A-Z]/.test(newPassword) &&
-    /[a-z]/.test(newPassword) &&
-    /[0-9]/.test(newPassword);
+  const isPasswordValid =
+    newPassword.length >= 8 && /[A-Z]/.test(newPassword) && /[a-z]/.test(newPassword) && /[0-9]/.test(newPassword);
 
   const passwordsMatch = newPassword === confirmPassword && confirmPassword.length > 0;
 
@@ -86,7 +74,6 @@ export default function ChangePasswordPage() {
     setIsLoading(true);
 
     try {
-      // Call server action (includes rate limiting)
       const result = await updatePasswordAction(newPassword, true);
 
       if (!result.success) {
@@ -98,7 +85,6 @@ export default function ChangePasswordPage() {
         return;
       }
 
-      // Success - redirect to dashboard
       router.push("/dashboard");
       router.refresh();
     } catch {
@@ -117,37 +103,45 @@ export default function ChangePasswordPage() {
   }
 
   return (
-    <div className="flex flex-col gap-8">
-      {/* Logo */}
-      <div className="flex flex-col items-center gap-2">
-        <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-rose-500 text-white font-bold text-xl shadow-lg shadow-orange-500/30">
-          FC
+    <div className="relative flex flex-col gap-6 animate-in fade-in duration-300">
+      <div className="pointer-events-none absolute -top-6 -left-4 h-24 w-24 rounded-full bg-primary/15 blur-2xl" />
+      <div className="pointer-events-none absolute -right-6 top-20 h-20 w-20 rounded-full bg-orange-500/10 blur-2xl" />
+
+      <div className="flex items-center justify-center">
+        <div className="inline-flex items-center gap-2 rounded-full border border-base-200 bg-card px-3 py-1.5 shadow-xs">
+          <SparklesIcon className="size-3.5 text-primary" />
+          <span className="text-xs font-medium text-muted-foreground">Formula Contract</span>
         </div>
-        <h1 className="text-xl font-semibold bg-gradient-to-r from-orange-600 to-rose-600 bg-clip-text text-transparent">
-          Formula Contract
-        </h1>
       </div>
 
-      {/* Change Password Card */}
-      <GlassCard className="w-full">
-        <CardHeader className="text-center pb-2">
-          <CardTitle className="text-lg">Change Your Password</CardTitle>
+      <GlassCard className="w-full border-base-200/80 shadow-sm">
+        <CardHeader className="space-y-4 pb-2">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center h-11 w-11 rounded-xl bg-gradient-to-br from-primary-600 to-primary-700 text-white font-bold text-sm shadow-sm">
+              FC
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Security Setup
+              </p>
+              <CardTitle className="mt-0.5 text-xl tracking-tight">Change password</CardTitle>
+            </div>
+          </div>
           <CardDescription>
-            {userEmail && (
-              <span className="block mb-1">Logged in as <strong>{userEmail}</strong></span>
-            )}
-            Please set a new password to continue
+            {userEmail && <span className="block mb-1">Signed in as <strong>{userEmail}</strong></span>}
+            Set a new password to continue.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            {/* Error Message */}
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
             {error && (
-              <div className={`p-3 rounded-lg text-sm flex items-center gap-2 ${
-                isRateLimited
-                  ? "bg-amber-50 border border-amber-200 text-amber-700"
-                  : "bg-rose-50 border border-rose-200 text-rose-700"
-              }`}>
+              <div
+                className={`p-3 rounded-lg text-sm flex items-center gap-2 ${
+                  isRateLimited
+                    ? "bg-amber-50 border border-amber-200 text-amber-700"
+                    : "bg-rose-50 border border-rose-200 text-rose-700"
+                }`}
+              >
                 {isRateLimited ? (
                   <ShieldAlertIcon className="size-4 shrink-0" />
                 ) : (
@@ -157,15 +151,13 @@ export default function ChangePasswordPage() {
               </div>
             )}
 
-            {/* Info Alert */}
             <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-sm flex items-center gap-2">
               <InfoIcon className="size-4 shrink-0" />
               You are using a temporary password. Please create a new secure password.
             </div>
 
-            {/* New Password Field */}
             <div className="flex flex-col gap-2">
-              <Label htmlFor="newPassword">New Password</Label>
+              <Label htmlFor="newPassword" className="text-sm font-medium">New password</Label>
               <div className="relative">
                 <Input
                   id="newPassword"
@@ -175,24 +167,20 @@ export default function ChangePasswordPage() {
                   onChange={(e) => setNewPassword(e.target.value)}
                   required
                   disabled={isLoading}
-                  className="pr-10"
+                  className="h-10 pr-10"
                 />
                 <Button
                   type="button"
                   variant="ghost"
-                  size="icon"
-                  className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                  size="icon-sm"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
-                  {showPassword ? (
-                    <EyeOffIcon className="size-4 text-muted-foreground" />
-                  ) : (
-                    <EyeIcon className="size-4 text-muted-foreground" />
-                  )}
+                  {showPassword ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
                 </Button>
               </div>
 
-              {/* Password Requirements */}
               <div className="space-y-1 text-xs">
                 <div className={`flex items-center gap-1.5 ${newPassword.length >= 8 ? "text-green-600" : "text-muted-foreground"}`}>
                   <CheckCircleIcon className="size-3" />
@@ -213,9 +201,8 @@ export default function ChangePasswordPage() {
               </div>
             </div>
 
-            {/* Confirm Password Field */}
             <div className="flex flex-col gap-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Label htmlFor="confirmPassword" className="text-sm font-medium">Confirm password</Label>
               <Input
                 id="confirmPassword"
                 type={showPassword ? "text" : "password"}
@@ -224,6 +211,7 @@ export default function ChangePasswordPage() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
                 disabled={isLoading}
+                className="h-10"
               />
               {confirmPassword.length > 0 && (
                 <div className={`flex items-center gap-1.5 text-xs ${passwordsMatch ? "text-green-600" : "text-destructive"}`}>
@@ -242,10 +230,9 @@ export default function ChangePasswordPage() {
               )}
             </div>
 
-            {/* Submit Button */}
             <Button
               type="submit"
-              className="w-full mt-2 bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600"
+              className="w-full mt-2 h-10 bg-primary hover:bg-primary/90"
               disabled={isLoading || !isPasswordValid || !passwordsMatch}
             >
               {isLoading ? (
@@ -254,17 +241,14 @@ export default function ChangePasswordPage() {
                   Updating password...
                 </>
               ) : (
-                "Set New Password"
+                "Set new password"
               )}
             </Button>
           </form>
         </CardContent>
       </GlassCard>
 
-      {/* Footer */}
-      <p className="text-center text-sm text-muted-foreground">
-        Project Management System for Formula Contract
-      </p>
+      <p className="text-center text-xs text-muted-foreground">Formula Contract Project Management System</p>
     </div>
   );
 }

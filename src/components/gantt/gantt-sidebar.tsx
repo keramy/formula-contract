@@ -1,33 +1,73 @@
 "use client";
 
 import * as React from "react";
+import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { type GanttItem } from "./types";
 import {
-  FactoryIcon,
-  ShoppingCartIcon,
+  type GanttItem,
+  type Priority,
+  type WeekendSettings,
+  DEFAULT_WEEKEND_SETTINGS,
+  PRIORITY_COLORS,
+  calculateWorkDays,
+} from "./types";
+import {
   DiamondIcon,
-  FolderIcon,
-  GripVerticalIcon,
   ChevronRightIcon,
   ChevronDownIcon,
-  ListIcon,
 } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import type { GanttViewMode } from "./types";
 
 // ============================================================================
 // GANTT SIDEBAR - Left panel showing item names with hierarchy and drag support
 // ============================================================================
 
+// Default column widths
+const DEFAULT_COLUMN_WIDTHS = {
+  rowNum: 28,
+  name: 200,
+  start: 64,
+  end: 64,
+  days: 56,
+};
+
+// Per-column width constraints
+const COLUMN_CONSTRAINTS = {
+  rowNum: { min: 24, max: 60 },
+  name: { min: 140, max: 460 },
+  start: { min: 56, max: 140 },
+  end: { min: 56, max: 140 },
+  days: { min: 40, max: 100 },
+};
+
+// Hierarchy indentation per level (px)
+const INDENT_PER_LEVEL = 20;
+
 export interface GanttSidebarProps {
   items: GanttItem[];
   rowHeight: number;
   headerHeight: number;
-  width?: number;
+  viewMode?: GanttViewMode;
   selectedIds?: Set<string>;
   collapsedIds?: Set<string>;
+  weekendSettings?: WeekendSettings;
   onItemClick?: (item: GanttItem, event: React.MouseEvent) => void;
+  onItemDoubleClick?: (item: GanttItem) => void;
   onToggleCollapse?: (itemId: string) => void;
-  onReorder?: (itemIds: string[]) => void;
+  onReorderItems?: (itemIds: string[]) => void;
   className?: string;
 }
 
@@ -35,18 +75,78 @@ export function GanttSidebar({
   items,
   rowHeight,
   headerHeight,
-  width = 250,
+  viewMode = "week",
   selectedIds = new Set(),
   collapsedIds = new Set(),
+  weekendSettings = DEFAULT_WEEKEND_SETTINGS,
   onItemClick,
+  onItemDoubleClick,
   onToggleCollapse,
-  onReorder,
+  onReorderItems,
   className,
 }: GanttSidebarProps) {
-  // Drag state
-  const [draggedId, setDraggedId] = React.useState<string | null>(null);
-  const [dragOverId, setDragOverId] = React.useState<string | null>(null);
-  const [dropPosition, setDropPosition] = React.useState<"before" | "after" | null>(null);
+  // DnD sensors
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+
+  // Column resize state
+  const [columnWidths, setColumnWidths] = React.useState({
+    rowNum: DEFAULT_COLUMN_WIDTHS.rowNum,
+    name: DEFAULT_COLUMN_WIDTHS.name,
+    start: DEFAULT_COLUMN_WIDTHS.start,
+    end: DEFAULT_COLUMN_WIDTHS.end,
+    days: DEFAULT_COLUMN_WIDTHS.days,
+  });
+
+  // Auto-calculate sidebar width from column widths
+  const sidebarWidth = columnWidths.rowNum + columnWidths.name + columnWidths.start + columnWidths.end + columnWidths.days;
+
+  const [resizingColumn, setResizingColumn] = React.useState<string | null>(null);
+  const resizeStartX = React.useRef<number>(0);
+  const resizeStartWidth = React.useRef<number>(0);
+
+  // Ref for safe closure access during resize
+  const columnWidthsRef = React.useRef(columnWidths);
+  React.useEffect(() => {
+    columnWidthsRef.current = columnWidths;
+  }, [columnWidths]);
+
+  // Column resize handlers
+  const handleColumnResizeStart = React.useCallback((e: React.MouseEvent, column: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setResizingColumn(column);
+    resizeStartX.current = e.clientX;
+    resizeStartWidth.current = columnWidthsRef.current[column as keyof typeof columnWidthsRef.current];
+  }, []);
+
+  React.useEffect(() => {
+    if (!resizingColumn) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const constraints = COLUMN_CONSTRAINTS[resizingColumn as keyof typeof COLUMN_CONSTRAINTS];
+      const deltaX = e.clientX - resizeStartX.current;
+      const newWidth = Math.min(
+        constraints.max,
+        Math.max(constraints.min, resizeStartWidth.current + deltaX)
+      );
+      setColumnWidths(prev => ({
+        ...prev,
+        [resizingColumn]: newWidth,
+      }));
+    };
+
+    const handleMouseUp = () => {
+      setResizingColumn(null);
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [resizingColumn]);
 
   // Build a map of item ID to children count for collapse indicator
   const childrenMap = React.useMemo(() => {
@@ -63,7 +163,6 @@ export function GanttSidebar({
   const visibleItems = React.useMemo(() => {
     if (collapsedIds.size === 0) return items;
 
-    // Build set of all collapsed parent IDs and their descendants
     const hiddenParentIds = new Set<string>();
 
     const collectHiddenIds = (parentId: string) => {
@@ -80,209 +179,273 @@ export function GanttSidebar({
     return items.filter((item) => !hiddenParentIds.has(item.id));
   }, [items, collapsedIds]);
 
-  // Handle drag start
-  const handleDragStart = (e: React.DragEvent, item: GanttItem) => {
-    if (!item.isEditable) {
-      e.preventDefault();
-      return;
-    }
-    setDraggedId(item.id);
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", item.id);
-  };
+  // Stable row number map: item ID → original 1-based index in full list
+  const originalIndexMap = React.useMemo(() => {
+    return new Map(items.map((item, i) => [item.id, i + 1]));
+  }, [items]);
 
-  // Handle drag over
-  const handleDragOver = (e: React.DragEvent, item: GanttItem) => {
-    e.preventDefault();
-    if (!draggedId || draggedId === item.id) return;
+  // Reorder within the same parent (tasks only)
+  const reorderSubtree = React.useCallback((activeId: string, overId: string) => {
+    if (activeId === overId) return;
 
-    const rect = e.currentTarget.getBoundingClientRect();
-    const y = e.clientY - rect.top;
-    const position = y < rect.height / 2 ? "before" : "after";
+    const activeParent = items.find((i) => i.id === activeId)?.parentId || null;
+    const overItem = items.find((i) => i.id === overId);
+    const overParent = overItem?.parentId || null;
+    if (activeParent !== overParent && overId !== activeParent) return;
 
-    setDragOverId(item.id);
-    setDropPosition(position);
-  };
+    const siblings = items.filter(
+      (i) => i.isEditable && i.type === "task" && i.parentId === activeParent
+    );
+    const siblingIds = siblings.map((i) => i.id);
+    if (!siblingIds.includes(activeId) || !siblingIds.includes(overId)) return;
 
-  // Handle drag leave
-  const handleDragLeave = () => {
-    setDragOverId(null);
-    setDropPosition(null);
-  };
+    const nextOrder = siblingIds.filter((id) => id !== activeId);
+    const insertIndex = overId === activeParent ? 0 : Math.max(0, nextOrder.indexOf(overId));
+    nextOrder.splice(insertIndex, 0, activeId);
 
-  // Handle drop
-  const handleDrop = (e: React.DragEvent, targetItem: GanttItem) => {
-    e.preventDefault();
+    onReorderItems?.(nextOrder);
+  }, [items, onReorderItems]);
 
-    if (!draggedId || !onReorder || draggedId === targetItem.id) {
-      resetDragState();
-      return;
-    }
+  // Resize handle component
+  const ResizeHandle = ({ column }: { column: string }) => (
+    <div
+      className={cn(
+        "absolute -right-[3px] top-0 bottom-0 w-[7px] cursor-col-resize z-10 group/resize",
+        "flex items-center justify-center"
+      )}
+      onMouseDown={(e) => handleColumnResizeStart(e, column)}
+    >
+      <div
+        className={cn(
+          "w-[3px] h-full transition-colors",
+          resizingColumn === column
+            ? "bg-primary"
+            : "bg-transparent group-hover/resize:bg-primary/50"
+        )}
+      />
+    </div>
+  );
 
-    // Calculate new order
-    const currentOrder = visibleItems.map((i) => i.id);
-    const draggedIndex = currentOrder.indexOf(draggedId);
-    let targetIndex = currentOrder.indexOf(targetItem.id);
+  const SortableRow = ({ item, index, originalIndex }: { item: GanttItem; index: number; originalIndex: number }) => {
+    const sortable = useSortable({
+      id: item.id,
+      disabled: !item.isEditable || item.type !== "task",
+    });
 
-    if (draggedIndex === -1 || targetIndex === -1) {
-      resetDragState();
-      return;
-    }
+    const style = {
+      transform: CSS.Transform.toString(sortable.transform),
+      transition: sortable.transition,
+      opacity: sortable.isDragging ? 0.6 : 1,
+      zIndex: sortable.isDragging ? 5 : "auto",
+    };
 
-    // Remove dragged item from current position
-    currentOrder.splice(draggedIndex, 1);
+    const hasChildren = (childrenMap.get(item.id) || 0) > 0;
+    const isCollapsed = collapsedIds.has(item.id);
+    const isSelected = selectedIds.has(item.id);
+    const hierarchyLevel = item.hierarchyLevel || 0;
+    const isChild = hierarchyLevel > 0;
 
-    // Adjust target index after removal
-    if (draggedIndex < targetIndex) {
-      targetIndex--;
-    }
+    // Calculate duration based on weekend settings
+    const duration = calculateWorkDays(item.startDate, item.endDate, weekendSettings);
 
-    // Insert at new position
-    const insertIndex = dropPosition === "after" ? targetIndex + 1 : targetIndex;
-    currentOrder.splice(insertIndex, 0, draggedId);
+    // Priority color for left border accent
+    const priorityColor = item.priority ? PRIORITY_COLORS[item.priority as Priority] : undefined;
+    const showPriorityBorder = priorityColor && item.priority !== 2;
 
-    onReorder(currentOrder);
-    resetDragState();
-  };
+    return (
+      <div
+        key={item.id}
+        ref={sortable.setNodeRef}
+        style={{
+          ...style,
+          height: rowHeight,
+          borderLeftColor: !isSelected && showPriorityBorder ? priorityColor : undefined,
+          borderLeftWidth: !isSelected && showPriorityBorder ? 3 : undefined,
+        }}
+        className={cn(
+          "flex items-center border-b border-base-200 relative px-2",
+          "transition-colors",
+          // Selection
+          isSelected && "bg-primary/10 border-l-[3px] border-l-primary",
+          // Hover
+          !isSelected && "hover:bg-base-50/80",
+          // Child depth background
+          !isSelected && isChild && "bg-base-50/70",
+          !isSelected && hierarchyLevel > 1 && "bg-base-100/50",
+        )}
+      >
+        {/* Row number — also serves as drag handle for reorderable items */}
+        <span
+          className={cn(
+            "shrink-0 text-center text-xs tabular-nums border-r border-base-200 flex items-center justify-center",
+            item.isEditable && item.type === "task" ? "cursor-grab active:cursor-grabbing text-muted-foreground/70" : "text-muted-foreground"
+          )}
+          style={{ width: columnWidths.rowNum }}
+          ref={item.isEditable && item.type === "task" ? sortable.setActivatorNodeRef : undefined}
+          {...(item.isEditable && item.type === "task" ? { ...sortable.attributes, ...sortable.listeners } : {})}
+        >
+          {originalIndex}
+        </span>
 
-  // Handle drag end
-  const handleDragEnd = () => {
-    resetDragState();
-  };
+        {/* Name section — clean indentation + optional chevron + name */}
+        <div
+          className="shrink-0 flex items-center min-w-0 border-r border-base-200"
+          style={{ width: columnWidths.name }}
+        >
+          {/* Indentation spacer */}
+          {hierarchyLevel > 0 && (
+            <div className="shrink-0" style={{ width: hierarchyLevel * INDENT_PER_LEVEL }} />
+          )}
 
-  const resetDragState = () => {
-    setDraggedId(null);
-    setDragOverId(null);
-    setDropPosition(null);
-  };
+          {/* Collapse/expand chevron for parents, small spacer for leaves */}
+          {hasChildren ? (
+            <button
+              className={cn(
+                "w-5 h-5 flex items-center justify-center rounded transition-colors shrink-0",
+                "text-muted-foreground hover:text-foreground hover:bg-base-200"
+              )}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleCollapse?.(item.id);
+              }}
+              aria-label={isCollapsed ? "Expand" : "Collapse"}
+            >
+              {isCollapsed ? (
+                <ChevronRightIcon className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronDownIcon className="h-3.5 w-3.5" />
+              )}
+            </button>
+          ) : (
+            <div className="w-1 shrink-0" />
+          )}
 
-  // Get icon for item type
-  const getItemIcon = (item: GanttItem) => {
-    switch (item.type) {
-      case "milestone":
-        return <DiamondIcon className="h-4 w-4" style={{ color: item.color }} />;
-      case "scope_item":
-        if (item.path === "production") {
-          return <FactoryIcon className="h-4 w-4 text-primary" />;
-        }
-        return <ShoppingCartIcon className="h-4 w-4 text-secondary" />;
-      case "phase":
-        return <FolderIcon className="h-4 w-4 text-muted-foreground" />;
-      case "task":
-        return <ListIcon className="h-4 w-4" style={{ color: item.color || "currentColor" }} />;
-      default:
-        return null;
-    }
+          {/* Milestone icon */}
+          {item.type === "milestone" && (
+            <DiamondIcon className="h-3.5 w-3.5 shrink-0 ml-0.5" style={{ color: item.color }} />
+          )}
+
+          {/* Name text */}
+          <button
+            className={cn(
+              "truncate flex-1 text-left cursor-pointer min-w-0 pl-1.5",
+              // Parent: bold, full color
+              hasChildren && "text-[13px] font-semibold text-foreground",
+              // Child: normal weight, muted
+              !hasChildren && "text-[13px] text-muted-foreground",
+              // Selected override
+              isSelected && "font-semibold text-foreground"
+            )}
+            onClick={(e) => onItemClick?.(item, e)}
+            onDoubleClick={() => onItemDoubleClick?.(item)}
+            title={item.isEditable ? "Double-click to edit" : item.name}
+          >
+            {item.name}
+          </button>
+        </div>
+
+        {/* Start date */}
+        <span
+          className="shrink-0 text-center text-xs text-muted-foreground tabular-nums border-r border-base-200"
+          style={{ width: columnWidths.start }}
+        >
+          {format(item.startDate, "MMM d")}
+        </span>
+
+        {/* End date */}
+        <span
+          className="shrink-0 text-center text-xs text-muted-foreground tabular-nums border-r border-base-200"
+          style={{ width: columnWidths.end }}
+        >
+          {format(item.endDate, "MMM d")}
+        </span>
+
+        {/* Duration */}
+        <span
+          className="shrink-0 text-center text-xs text-muted-foreground tabular-nums"
+          style={{ width: columnWidths.days }}
+        >
+          {duration}
+        </span>
+      </div>
+    );
   };
 
   return (
     <div
       className={cn(
-        "border-r border-base-200 bg-white shrink-0 flex flex-col",
+        "border-r border-base-200 bg-white shrink-0 flex flex-col overflow-hidden",
+        resizingColumn && "select-none",
         className
       )}
-      style={{ width }}
+      style={{ width: sidebarWidth }}
     >
-      {/* Header */}
+      {/* Header with column titles */}
       <div
-        className="border-b border-base-200 bg-base-50 px-3 flex items-end pb-2"
+        className="border-b border-base-300 bg-base-50 shrink-0"
         style={{ height: headerHeight }}
       >
-        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-          Items
-        </span>
+        <div
+          className="flex items-center px-2 text-[11px] font-semibold text-foreground/70 uppercase tracking-wider h-full"
+        >
+          <div
+            className="shrink-0 text-center relative border-r border-base-300"
+            style={{ width: columnWidths.rowNum }}
+          >
+            #
+            <ResizeHandle column="rowNum" />
+          </div>
+
+          <div
+            className="shrink-0 pl-1 min-w-0 relative border-r border-base-300"
+            style={{ width: columnWidths.name }}
+          >
+            Name
+            <ResizeHandle column="name" />
+          </div>
+
+          <div
+            className="shrink-0 text-center relative border-r border-base-300"
+            style={{ width: columnWidths.start }}
+          >
+            Begin
+            <ResizeHandle column="start" />
+          </div>
+
+          <div
+            className="shrink-0 text-center relative border-r border-base-300"
+            style={{ width: columnWidths.end }}
+          >
+            End
+            <ResizeHandle column="end" />
+          </div>
+
+          <div
+            className="shrink-0 text-center relative"
+            style={{ width: columnWidths.days }}
+          >
+            Days
+            <ResizeHandle column="days" />
+          </div>
+        </div>
       </div>
 
-      {/* Items list */}
-      <div className="flex-1 overflow-auto">
-        {visibleItems.map((item) => {
-          const hasChildren = childrenMap.has(item.id);
-          const isCollapsed = collapsedIds.has(item.id);
-          const isSelected = selectedIds.has(item.id);
-          const isDragging = draggedId === item.id;
-          const isDragOver = dragOverId === item.id;
-
-          return (
-            <div
-              key={item.id}
-              className={cn(
-                "flex items-center gap-1 border-b border-base-100 relative",
-                "transition-colors",
-                isSelected && "bg-primary/10",
-                !isSelected && "hover:bg-base-50",
-                isDragging && "opacity-50",
-                isDragOver && dropPosition === "before" && "border-t-2 border-t-primary",
-                isDragOver && dropPosition === "after" && "border-b-2 border-b-primary"
-              )}
-              style={{ height: rowHeight }}
-              draggable={item.isEditable}
-              onDragStart={(e) => handleDragStart(e, item)}
-              onDragOver={(e) => handleDragOver(e, item)}
-              onDragLeave={handleDragLeave}
-              onDrop={(e) => handleDrop(e, item)}
-              onDragEnd={handleDragEnd}
-            >
-              {/* Drag handle - only for editable items */}
-              {item.isEditable ? (
-                <div className="shrink-0 pl-1 cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground">
-                  <GripVerticalIcon className="h-4 w-4" />
-                </div>
-              ) : (
-                <div className="shrink-0 w-5" /> // Spacer for non-editable items
-              )}
-
-              {/* Hierarchy indentation + collapse toggle */}
-              <div
-                className="shrink-0 flex items-center"
-                style={{ width: Math.max(0, (item.hierarchyLevel || 0) * 16) + 20 }}
-              >
-                {/* Indentation spacer */}
-                <div style={{ width: (item.hierarchyLevel || 0) * 16 }} />
-
-                {/* Collapse/expand toggle */}
-                {hasChildren ? (
-                  <button
-                    className="p-0.5 hover:bg-base-200 rounded text-muted-foreground"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onToggleCollapse?.(item.id);
-                    }}
-                    aria-label={isCollapsed ? "Expand" : "Collapse"}
-                  >
-                    {isCollapsed ? (
-                      <ChevronRightIcon className="h-3.5 w-3.5" />
-                    ) : (
-                      <ChevronDownIcon className="h-3.5 w-3.5" />
-                    )}
-                  </button>
-                ) : (
-                  <div className="w-4" /> // Spacer for items without children
-                )}
-              </div>
-
-              {/* Icon based on type */}
-              <div className="shrink-0">{getItemIcon(item)}</div>
-
-              {/* Name */}
-              <button
-                className={cn(
-                  "text-sm truncate flex-1 text-left cursor-pointer px-1",
-                  isSelected && "font-medium"
-                )}
-                onClick={(e) => onItemClick?.(item, e)}
-              >
-                {item.name}
-              </button>
-
-              {/* Progress (for items with progress > 0) */}
-              {item.progress > 0 && (
-                <span className="text-xs text-muted-foreground shrink-0 pr-2">
-                  {item.progress}%
-                </span>
-              )}
-            </div>
-          );
-        })}
+      {/* Items list — vertical scroll only */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={({ active, over }) => {
+            if (!active?.id || !over?.id) return;
+            reorderSubtree(String(active.id), String(over.id));
+          }}
+        >
+          <SortableContext items={visibleItems.map((item) => item.id)} strategy={verticalListSortingStrategy}>
+            {visibleItems.map((item, index) => (
+              <SortableRow key={item.id} item={item} index={index} originalIndex={originalIndexMap.get(item.id) ?? index + 1} />
+            ))}
+          </SortableContext>
+        </DndContext>
 
         {/* Empty state */}
         {visibleItems.length === 0 && (

@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, createContext, useContext, useState } from "react";
+import { ReactNode, createContext, useContext, useState, useEffect } from "react";
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { NotificationsDropdown } from "@/components/notifications/notifications-dropdown";
 import { cn } from "@/lib/utils";
@@ -15,6 +15,12 @@ interface PageHeaderContent {
   icon?: ReactNode;
   title?: string;
   description?: string;
+  /** Render a back link before the icon/title */
+  backLink?: ReactNode;
+  /** Render a badge/status after the title */
+  badge?: ReactNode;
+  /** Render action buttons in the right zone (before notifications) */
+  actions?: ReactNode;
 }
 
 interface PageHeaderContextType {
@@ -70,7 +76,14 @@ export function AppHeader({ className }: AppHeaderProps) {
         {isMobile ? <MenuIcon className="size-5" /> : <PanelLeftIcon className="size-5" />}
       </SidebarTrigger>
 
-      {/* Page Icon + Title + Description */}
+      {/* Back Link (optional) */}
+      {content.backLink && (
+        <div className="shrink-0">
+          {content.backLink}
+        </div>
+      )}
+
+      {/* Page Icon + Title + Description + Badge */}
       {(content.icon || content.title) && (
         <div className="flex items-center gap-3 min-w-0">
           {content.icon && (
@@ -88,6 +101,11 @@ export function AppHeader({ className }: AppHeaderProps) {
               </p>
             )}
           </div>
+          {content.badge && (
+            <div className="shrink-0 hidden sm:block">
+              {content.badge}
+            </div>
+          )}
         </div>
       )}
 
@@ -106,8 +124,9 @@ export function AppHeader({ className }: AppHeaderProps) {
         </Button>
       </div>
 
-      {/* Right: Notifications */}
-      <div className="shrink-0">
+      {/* Right: Page Actions + Notifications */}
+      <div className="shrink-0 flex items-center gap-1">
+        {content.actions}
         <NotificationsDropdown />
       </div>
     </header>
@@ -117,8 +136,6 @@ export function AppHeader({ className }: AppHeaderProps) {
 // ============================================================================
 // Hook for pages to set their header content
 // ============================================================================
-
-import { useEffect } from "react";
 
 export function useSetPageHeader(content: PageHeaderContent) {
   const { setContent } = usePageHeader();

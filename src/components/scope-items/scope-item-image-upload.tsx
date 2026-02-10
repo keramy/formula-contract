@@ -8,6 +8,7 @@ import { ImageIcon, XIcon, UploadIcon } from "lucide-react";
 import Image from "next/image";
 
 interface ScopeItemImageUploadProps {
+  projectId: string;
   images: string[];
   onChange: (images: string[]) => void;
   disabled?: boolean;
@@ -17,6 +18,7 @@ interface ScopeItemImageUploadProps {
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 export function ScopeItemImageUpload({
+  projectId,
   images,
   onChange,
   disabled = false,
@@ -60,7 +62,7 @@ export function ScopeItemImageUpload({
         const timestamp = Date.now();
         const randomId = Math.random().toString(36).substring(2, 8);
         const ext = file.name.split(".").pop() || "jpg";
-        const fileName = `${timestamp}-${randomId}.${ext}`;
+        const fileName = `${projectId}/${timestamp}-${randomId}.${ext}`;
 
         // Upload to storage
         const { data, error: uploadError } = await supabase.storage

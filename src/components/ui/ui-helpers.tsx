@@ -4,10 +4,7 @@ import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "./card";
-import { Button } from "./button";
-import { Input } from "./input";
-import { PanelLeftIcon, SearchIcon, BellIcon, PlusIcon, TrendingUpIcon, TrendingDownIcon } from "lucide-react";
-import { useSidebar } from "./sidebar";
+import { TrendingUpIcon, TrendingDownIcon } from "lucide-react";
 
 // ============================================================================
 // GLASS CARD - Card with glassmorphism effect
@@ -107,83 +104,6 @@ function GradientIcon({ className, size, color, icon, ...props }: GradientIconPr
 }
 
 // ============================================================================
-// PAGE HEADER - Compact header with sidebar toggle and actions
-// ============================================================================
-
-interface PageHeaderProps {
-  title: string;
-  subtitle?: string;
-  showSearch?: boolean;
-  searchPlaceholder?: string;
-  searchValue?: string;
-  onSearchChange?: (value: string) => void;
-  showNotifications?: boolean;
-  notificationCount?: number;
-  actions?: React.ReactNode;
-  className?: string;
-}
-
-function PageHeader({
-  title,
-  subtitle,
-  showSearch = false,
-  searchPlaceholder = "Search...",
-  searchValue,
-  onSearchChange,
-  showNotifications = false,
-  notificationCount = 0,
-  actions,
-  className,
-}: PageHeaderProps) {
-  const { toggleSidebar } = useSidebar();
-
-  return (
-    <div className={cn("flex items-center justify-between gap-4 mb-6", className)}>
-      <div className="flex items-center gap-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={toggleSidebar}
-          className="size-9 shrink-0"
-        >
-          <PanelLeftIcon className="size-5" />
-        </Button>
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
-          {subtitle && (
-            <p className="text-sm text-muted-foreground">{subtitle}</p>
-          )}
-        </div>
-      </div>
-      <div className="flex items-center gap-2">
-        {showSearch && (
-          <div className="relative">
-            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-            <Input
-              placeholder={searchPlaceholder}
-              value={searchValue}
-              onChange={(e) => onSearchChange?.(e.target.value)}
-              className="pl-9 w-64 bg-white/50"
-            />
-          </div>
-        )}
-        {showNotifications && (
-          <Button variant="ghost" size="icon" className="relative">
-            <BellIcon className="size-5" />
-            {notificationCount > 0 && (
-              <span className="absolute -top-1 -right-1 size-5 rounded-full bg-rose-500 text-xs text-white flex items-center justify-center">
-                {notificationCount > 9 ? "9+" : notificationCount}
-              </span>
-            )}
-          </Button>
-        )}
-        {actions}
-      </div>
-    </div>
-  );
-}
-
-// ============================================================================
 // STAT CARD - Stats display with icon and trend
 // ============================================================================
 
@@ -278,6 +198,18 @@ const statusBadgeVariants = cva(
   }
 );
 
+const statusDotColors: Record<string, string> = {
+  default: "bg-gray-500",
+  primary: "bg-primary",
+  success: "bg-emerald-500",
+  warning: "bg-amber-500",
+  danger: "bg-rose-500",
+  info: "bg-blue-500",
+  coral: "bg-orange-500",
+  teal: "bg-teal-500",
+  violet: "bg-violet-500",
+};
+
 interface StatusBadgeProps
   extends React.HTMLAttributes<HTMLSpanElement>,
     VariantProps<typeof statusBadgeVariants> {
@@ -288,20 +220,7 @@ function StatusBadge({ className, variant, dot, children, ...props }: StatusBadg
   return (
     <span className={cn(statusBadgeVariants({ variant }), className)} {...props}>
       {dot && (
-        <span
-          className={cn(
-            "size-1.5 rounded-full",
-            variant === "success" && "bg-emerald-500",
-            variant === "warning" && "bg-amber-500",
-            variant === "danger" && "bg-rose-500",
-            variant === "info" && "bg-blue-500",
-            variant === "coral" && "bg-orange-500",
-            variant === "teal" && "bg-teal-500",
-            variant === "violet" && "bg-violet-500",
-            variant === "primary" && "bg-primary",
-            (!variant || variant === "default") && "bg-gray-500"
-          )}
-        />
+        <span className={cn("size-1.5 rounded-full", statusDotColors[variant || "default"])} />
       )}
       {children}
     </span>
@@ -425,7 +344,6 @@ export {
   glassCardVariants,
   GradientIcon,
   gradientIconVariants,
-  PageHeader,
   StatCard,
   StatusBadge,
   statusBadgeVariants,

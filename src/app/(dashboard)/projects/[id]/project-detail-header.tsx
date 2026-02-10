@@ -6,6 +6,11 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeftIcon, PencilIcon, FolderKanbanIcon } from "lucide-react";
 import { GradientIcon, StatusBadge } from "@/components/ui/ui-helpers";
 import { usePageHeader } from "@/components/layout/app-header";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type StatusVariant = "info" | "success" | "warning" | "default" | "danger";
 
@@ -24,7 +29,6 @@ interface ProjectDetailHeaderProps {
   projectCode: string;
   status: string;
   canEdit: boolean;
-  showEditButton?: boolean;
 }
 
 export function ProjectDetailHeader({
@@ -33,44 +37,45 @@ export function ProjectDetailHeader({
   projectCode,
   status,
   canEdit,
-  showEditButton = false,
 }: ProjectDetailHeaderProps) {
   const { setContent } = usePageHeader();
   const config = statusConfig[status] || { variant: "default" as StatusVariant, label: status };
 
-  // Set the header content
+  // Push everything into the app header — no local row rendered
   useEffect(() => {
     setContent({
-      icon: <GradientIcon icon={<FolderKanbanIcon className="size-4" />} color="primary" size="sm" />,
-      title: projectName,
-      description: projectCode,
-    });
-    return () => setContent({});
-  }, [projectName, projectCode, setContent]);
-
-  // Render navigation and action buttons below the header
-  return (
-    <div className="flex items-center justify-between gap-4 mb-4">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/projects" className="text-muted-foreground hover:text-foreground">
+      backLink: (
+        <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground">
+          <Link href="/projects">
             <ArrowLeftIcon className="size-4 mr-1" />
             Projects
           </Link>
         </Button>
-        <div className="h-5 w-px bg-border" />
+      ),
+      icon: <GradientIcon icon={<FolderKanbanIcon className="size-4" />} color="primary" size="sm" />,
+      title: projectName,
+      description: projectCode,
+      badge: (
         <StatusBadge variant={config.variant} dot>
           {config.label}
         </StatusBadge>
-      </div>
-      {canEdit && showEditButton && (
-        <Button asChild size="sm">
-          <Link href={`/projects/${projectId}/edit`}>
-            <PencilIcon className="size-4" />
-            Edit Project
-          </Link>
-        </Button>
-      )}
-    </div>
-  );
+      ),
+      actions: canEdit ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" className="size-9" asChild>
+              <Link href={`/projects/${projectId}/edit`}>
+                <PencilIcon className="size-4" />
+              </Link>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Edit Project</TooltipContent>
+        </Tooltip>
+      ) : undefined,
+    });
+    return () => setContent({});
+  }, [projectName, projectCode, status, canEdit, projectId, setContent, config.variant, config.label]);
+
+  // Nothing to render — everything is in the header
+  return null;
 }

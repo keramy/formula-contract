@@ -1,23 +1,21 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   Select,
   SelectContent,
@@ -34,16 +32,19 @@ import {
 import { format } from "date-fns";
 import { toast } from "sonner";
 import {
-  createTimelineItem,
-  updateTimelineItem,
-  type TimelineItem,
-  type TimelineItemType,
+  useCreateTimelineItem,
+  useUpdateTimelineItem,
+} from "@/lib/react-query/timelines";
+import {
+  type GanttItem as TimelineItem,
+  type GanttItemType,
+  type Priority,
 } from "@/lib/actions/timelines";
 import {
-  LayersIcon,
   ListTodoIcon,
   LinkIcon,
   SearchIcon,
+  FlagIcon,
 } from "lucide-react";
 
 // ============================================================================
@@ -53,7 +54,17 @@ import {
 const TIMELINE_COLORS = {
   phase: "#64748b", // Slate
   task: "#3b82f6", // Blue
+  milestone: "#f59e0b", // Amber
 } as const;
+
+const NO_PARENT_VALUE = "__none__";
+
+const PRIORITY_OPTIONS: { value: Priority; label: string; color: string }[] = [
+  { value: 1, label: "Low", color: "#94a3b8" },
+  { value: 2, label: "Normal", color: "#3b82f6" },
+  { value: 3, label: "High", color: "#f59e0b" },
+  { value: 4, label: "Critical", color: "#ef4444" },
+];
 
 // ============================================================================
 // Types
@@ -66,20 +77,13 @@ interface ScopeItem {
   production_percentage: number | null;
 }
 
-interface Milestone {
-  id: string;
-  name: string;
-  due_date: string;
-  is_completed: boolean;
-}
-
 interface TimelineFormDialogProps {
   projectId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editItem: TimelineItem | null;
   scopeItems: ScopeItem[];
-  milestones: Milestone[];
+  timelineItems: TimelineItem[];
 }
 
 // ============================================================================
@@ -92,39 +96,64 @@ export function TimelineFormDialog({
   onOpenChange,
   editItem,
   scopeItems,
-  milestones,
+  timelineItems,
 }: TimelineFormDialogProps) {
-  const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
+  // React Query mutations
+  const createMutation = useCreateTimelineItem(projectId);
+  const updateMutation = useUpdateTimelineItem(projectId);
+
+  const isLoading = createMutation.isPending || updateMutation.isPending;
 
   // Form state
   const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [itemType, setItemType] = useState<TimelineItemType>("task");
+  const [itemType, setItemType] = useState<GanttItemType>("task");
+  const [priority, setPriority] = useState<Priority>(2); // Default to Normal
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [linkedScopeItemIds, setLinkedScopeItemIds] = useState<string[]>([]);
-  const [linkedMilestoneIds, setLinkedMilestoneIds] = useState<string[]>([]);
+  const [phaseId, setPhaseId] = useState<string>("");
+  const [parentTaskId, setParentTaskId] = useState<string>("");
 
   // Duration mode state
   const [useDuration, setUseDuration] = useState(false);
   const [duration, setDuration] = useState<number>(7);
   const [durationUnit, setDurationUnit] = useState<"days" | "weeks">("days");
 
+  // Calculate duration from dates when switching to duration mode
+  const handleToggleDuration = () => {
+    if (!useDuration && startDate && endDate) {
+      // Switching TO duration mode - calculate from existing dates
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const diffTime = end.getTime() - start.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 because start day counts
+      setDuration(diffDays);
+      setDurationUnit("days");
+    }
+    setUseDuration(!useDuration);
+  };
+
   // Search state
   const [scopeSearch, setScopeSearch] = useState("");
-  const [milestoneSearch, setMilestoneSearch] = useState("");
 
   // Calculate end date when duration changes
   useEffect(() => {
-    if (useDuration && startDate && duration > 0) {
+    if (useDuration && startDate && duration > 0 && itemType !== "milestone") {
       const start = new Date(startDate);
       const daysToAdd = durationUnit === "weeks" ? duration * 7 : duration;
       const end = new Date(start);
       end.setDate(end.getDate() + daysToAdd - 1); // -1 because start day counts
       setEndDate(format(end, "yyyy-MM-dd"));
     }
-  }, [useDuration, startDate, duration, durationUnit]);
+  }, [useDuration, startDate, duration, durationUnit, itemType]);
+
+  // Milestones are single-day items
+  useEffect(() => {
+    if (itemType === "milestone" && startDate) {
+      setUseDuration(false);
+      setEndDate(startDate);
+    }
+  }, [itemType, startDate]);
 
   const isEditing = !!editItem;
 
@@ -139,46 +168,77 @@ export function TimelineFormDialog({
     );
   }, [scopeItems, scopeSearch]);
 
-  // Filter milestones by search
-  const filteredMilestones = useMemo(() => {
-    if (!milestoneSearch) return milestones;
-    const search = milestoneSearch.toLowerCase();
-    return milestones.filter((m) => m.name.toLowerCase().includes(search));
-  }, [milestones, milestoneSearch]);
+  const phases = useMemo(() => {
+    return timelineItems.filter((i) => i.item_type === "phase");
+  }, [timelineItems]);
+
+  const itemById = useMemo(() => {
+    return new Map(timelineItems.map((i) => [i.id, i]));
+  }, [timelineItems]);
+
+  const getPhaseIdForTask = (task: TimelineItem): string => {
+    let currentParentId = task.parent_id;
+    while (currentParentId) {
+      const parent = itemById.get(currentParentId);
+      if (!parent) break;
+      if (parent.item_type === "phase") return parent.id;
+      currentParentId = parent.parent_id || null;
+    }
+    return "";
+  };
+
+  const tasksByPhase = useMemo(() => {
+    if (phaseId) {
+      return timelineItems.filter(
+        (i) => i.item_type === "task" && i.parent_id === phaseId && i.id !== editItem?.id
+      );
+    }
+
+    // No phase selected: only show top-level tasks as potential parents
+    return timelineItems.filter(
+      (i) => i.item_type === "task" && !i.parent_id && i.id !== editItem?.id
+    );
+  }, [timelineItems, phaseId, editItem]);
 
   // Sync form with editItem
   useEffect(() => {
     if (open) {
       if (editItem) {
         setName(editItem.name);
-        setDescription(editItem.description || "");
         setItemType(editItem.item_type);
+        setPriority((editItem.priority || 2) as Priority);
         setStartDate(format(new Date(editItem.start_date), "yyyy-MM-dd"));
         setEndDate(format(new Date(editItem.end_date), "yyyy-MM-dd"));
         setLinkedScopeItemIds(
-          editItem.linked_scope_items?.map((l) => l.scope_item_id) || []
+          editItem.linked_scope_item_ids || []
         );
-        setLinkedMilestoneIds(
-          editItem.linked_milestones?.map((l) => l.milestone_id) || []
-        );
+        if (editItem.item_type === "task") {
+          const directParent = editItem.parent_id ? itemById.get(editItem.parent_id) : null;
+          const phaseForTask = getPhaseIdForTask(editItem);
+          setPhaseId(phaseForTask || phases[0]?.id || "");
+          setParentTaskId(directParent?.item_type === "task" ? directParent.id : "");
+        } else {
+          setPhaseId("");
+          setParentTaskId("");
+        }
         setUseDuration(false); // Edit mode uses direct dates
       } else {
         // Reset form for new item
         setName("");
-        setDescription("");
         setItemType("task");
+        setPriority(2); // Normal
         setStartDate("");
         setEndDate("");
         setLinkedScopeItemIds([]);
-        setLinkedMilestoneIds([]);
+        setPhaseId("");
+        setParentTaskId("");
         setUseDuration(false);
         setDuration(7);
         setDurationUnit("days");
       }
       setScopeSearch("");
-      setMilestoneSearch("");
     }
-  }, [open, editItem]);
+  }, [open, editItem, phases, itemById]);
 
   // Auto-set end date when start date changes (for new items)
   useEffect(() => {
@@ -197,12 +257,6 @@ export function TimelineFormDialog({
     );
   };
 
-  const toggleMilestone = (id: string) => {
-    setLinkedMilestoneIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-  };
-
   const handleSubmit = async () => {
     if (!name.trim() || !startDate || !endDate) return;
 
@@ -212,69 +266,54 @@ export function TimelineFormDialog({
       return;
     }
 
-    setIsLoading(true);
+    const data = {
+      project_id: projectId,
+      name: name.trim(),
+      item_type: itemType,
+      priority,
+      start_date: startDate,
+      end_date: itemType === "milestone" ? startDate : endDate,
+      parent_id: itemType === "task" ? (parentTaskId || phaseId || null) : null,
+      linked_scope_item_ids: itemType === "task" ? linkedScopeItemIds : [],
+      is_completed: itemType === "milestone" ? false : undefined,
+    };
 
-    try {
-      const data = {
-        project_id: projectId,
-        name: name.trim(),
-        description: description.trim() || null,
-        item_type: itemType,
-        start_date: startDate,
-        end_date: endDate,
-        linked_scope_item_ids: linkedScopeItemIds,
-        linked_milestone_ids: linkedMilestoneIds,
-      };
-
-      let result;
-      if (isEditing && editItem) {
-        result = await updateTimelineItem(editItem.id, data);
-      } else {
-        result = await createTimelineItem(data);
-      }
-
-      if (!result.success) {
-        toast.error(result.error || "Failed to save timeline item");
-        return;
-      }
-
-      toast.success(isEditing ? "Timeline item updated" : "Timeline item created");
-      handleClose();
-      router.refresh();
-    } catch (error) {
-      console.error("Failed to save timeline item:", error);
-      toast.error("Failed to save timeline item");
-    } finally {
-      setIsLoading(false);
+    if (isEditing && editItem) {
+      updateMutation.mutate(
+        { timelineId: editItem.id, input: data },
+        { onSuccess: () => handleClose() }
+      );
+    } else {
+      createMutation.mutate(data, { onSuccess: () => handleClose() });
     }
   };
 
   // Get type color preview
-  const typeColor = TIMELINE_COLORS[itemType];
+  const typeColor = TIMELINE_COLORS[itemType] || "#64748b";
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>
+    <Sheet open={open} onOpenChange={handleClose}>
+      <SheetContent side="right" className="w-full sm:max-w-xl lg:max-w-2xl p-6">
+        <SheetHeader>
+          <SheetTitle>
             {isEditing ? "Edit Timeline Item" : "Add Timeline Item"}
-          </DialogTitle>
-          <DialogDescription>
+          </SheetTitle>
+          <SheetDescription>
             {isEditing
               ? "Update the timeline item details and linked items"
-              : "Create a new phase or task for your project timeline"}
-          </DialogDescription>
-        </DialogHeader>
+              : "Create a new task or milestone for your project timeline"}
+          </SheetDescription>
+        </SheetHeader>
 
-        <Tabs defaultValue="details" className="w-full">
+        <Tabs defaultValue="details" className="w-full mt-4">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="links" className="gap-1.5">
               <LinkIcon className="size-3.5" />
               Links
-              {(linkedScopeItemIds.length > 0 || linkedMilestoneIds.length > 0) && (
+              {linkedScopeItemIds.length > 0 && (
                 <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">
-                  {linkedScopeItemIds.length + linkedMilestoneIds.length}
+                  {linkedScopeItemIds.length}
                 </Badge>
               )}
             </TabsTrigger>
@@ -288,21 +327,21 @@ export function TimelineFormDialog({
               <div className="flex gap-2">
                 <Button
                   type="button"
-                  variant={itemType === "phase" ? "default" : "outline"}
-                  className="flex-1"
-                  onClick={() => setItemType("phase")}
-                >
-                  <LayersIcon className="size-4 mr-2" />
-                  Phase
-                </Button>
-                <Button
-                  type="button"
                   variant={itemType === "task" ? "default" : "outline"}
                   className="flex-1"
                   onClick={() => setItemType("task")}
                 >
                   <ListTodoIcon className="size-4 mr-2" />
                   Task
+                </Button>
+                <Button
+                  type="button"
+                  variant={itemType === "milestone" ? "default" : "outline"}
+                  className="flex-1"
+                  onClick={() => setItemType("milestone")}
+                >
+                  <FlagIcon className="size-4 mr-2" />
+                  Milestone
                 </Button>
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -311,11 +350,82 @@ export function TimelineFormDialog({
                   style={{ backgroundColor: typeColor }}
                 />
                 <span>
-                  {itemType === "phase"
-                    ? "Phases are broader time periods (e.g., Design Phase)"
-                    : "Tasks are specific activities (e.g., Order materials)"}
+                  {itemType === "milestone"
+                    ? "Milestones are single dates (e.g., Client Approval)"
+                    : "Tasks belong under fixed phases (Design/Production/Shipping/Installation)"}
                 </span>
               </div>
+            </div>
+
+            {/* Phase selection (tasks only) */}
+            {itemType === "task" && (
+              <div className="space-y-2">
+                <Label>Phase (optional)</Label>
+                <Select value={phaseId || NO_PARENT_VALUE} onValueChange={(v) => setPhaseId(v === NO_PARENT_VALUE ? "" : v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="No phase (ungrouped)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_PARENT_VALUE}>No phase</SelectItem>
+                    {phases.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Parent task (optional, tasks only) */}
+            {itemType === "task" && (
+              <div className="space-y-2">
+                <Label>Parent Task (optional)</Label>
+                <Select
+                  value={parentTaskId || NO_PARENT_VALUE}
+                  onValueChange={(value) =>
+                    setParentTaskId(value === NO_PARENT_VALUE ? "" : value)
+                  }
+                >
+                  <SelectTrigger>
+                  <SelectValue placeholder="No parent (top-level task)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_PARENT_VALUE}>No parent</SelectItem>
+                  {tasksByPhase.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Priority */}
+            <div className="space-y-2">
+              <Label>Priority</Label>
+              <Select
+                value={priority.toString()}
+                onValueChange={(v) => setPriority(parseInt(v, 10) as Priority)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PRIORITY_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value.toString()}>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="size-2.5 rounded-full"
+                          style={{ backgroundColor: opt.color }}
+                        />
+                        {opt.label}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Name */}
@@ -324,8 +434,8 @@ export function TimelineFormDialog({
               <Input
                 id="name"
                 placeholder={
-                  itemType === "phase"
-                    ? "e.g., Production Phase"
+                  itemType === "milestone"
+                    ? "e.g., Client Approval"
                     : "e.g., Factory inspection"
                 }
                 value={name}
@@ -333,23 +443,11 @@ export function TimelineFormDialog({
               />
             </div>
 
-            {/* Description */}
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                placeholder="Additional details..."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={2}
-              />
-            </div>
-
             {/* Date Range */}
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="start_date">Start Date *</Label>
+                  <Label htmlFor="start_date">{itemType === "milestone" ? "Date *" : "Start Date *"}</Label>
                   <Input
                     id="start_date"
                     type="date"
@@ -362,15 +460,17 @@ export function TimelineFormDialog({
                     <Label htmlFor="end_date">
                       {useDuration ? "Duration *" : "End Date *"}
                     </Label>
-                    <button
-                      type="button"
-                      onClick={() => setUseDuration(!useDuration)}
-                      className="text-xs text-primary hover:underline"
-                    >
-                      {useDuration ? "Use end date" : "Use duration"}
-                    </button>
+                    {itemType !== "milestone" && (
+                      <button
+                        type="button"
+                        onClick={handleToggleDuration}
+                        className="text-xs text-primary hover:underline"
+                      >
+                        {useDuration ? "Use end date" : "Use duration"}
+                      </button>
+                    )}
                   </div>
-                  {useDuration ? (
+                  {useDuration && itemType !== "milestone" ? (
                     <div className="flex gap-2">
                       <Input
                         id="duration"
@@ -416,7 +516,8 @@ export function TimelineFormDialog({
           {/* Links Tab */}
           <TabsContent value="links" className="space-y-4 mt-4">
             {/* Scope Items Section */}
-            <div className="space-y-2">
+            {itemType === "task" && (
+              <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label>Linked Scope Items</Label>
                 <span className="text-xs text-muted-foreground">
@@ -466,64 +567,11 @@ export function TimelineFormDialog({
                 )}
               </ScrollArea>
             </div>
-
-            {/* Milestones Section */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Linked Milestones</Label>
-                <span className="text-xs text-muted-foreground">
-                  {linkedMilestoneIds.length} selected
-                </span>
-              </div>
-              <div className="relative">
-                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search milestones..."
-                  value={milestoneSearch}
-                  onChange={(e) => setMilestoneSearch(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-              <ScrollArea className="h-32 rounded-md border p-2">
-                {filteredMilestones.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">
-                    {milestoneSearch ? "No matches found" : "No milestones available"}
-                  </p>
-                ) : (
-                  <div className="space-y-1">
-                    {filteredMilestones.map((milestone) => (
-                      <label
-                        key={milestone.id}
-                        className="flex items-center gap-2 p-2 rounded hover:bg-muted cursor-pointer"
-                      >
-                        <Checkbox
-                          checked={linkedMilestoneIds.includes(milestone.id)}
-                          onCheckedChange={() => toggleMilestone(milestone.id)}
-                        />
-                        <span className="text-sm truncate flex-1">
-                          {milestone.name}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {format(new Date(milestone.due_date), "MMM d")}
-                        </span>
-                        {milestone.is_completed && (
-                          <Badge
-                            variant="outline"
-                            className="text-xs text-emerald-600"
-                          >
-                            Done
-                          </Badge>
-                        )}
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </ScrollArea>
-            </div>
+            )}
           </TabsContent>
         </Tabs>
 
-        <DialogFooter className="mt-4">
+        <SheetFooter className="mt-6 gap-2">
           <Button variant="outline" onClick={handleClose} disabled={isLoading}>
             Cancel
           </Button>
@@ -534,8 +582,8 @@ export function TimelineFormDialog({
             {isLoading && <Spinner className="size-4 mr-2" />}
             {isEditing ? "Save Changes" : "Add to Timeline"}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }

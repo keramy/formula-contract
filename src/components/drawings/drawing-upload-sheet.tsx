@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -78,6 +78,13 @@ export function DrawingUploadSheet({
   const [cadFile, setCadFile] = useState<File | null>(null);
   const [notes, setNotes] = useState("");
 
+  // Sync selectedItemId when sheet opens or preselectedItemId changes
+  useEffect(() => {
+    if (open) {
+      setSelectedItemId(preselectedItemId || "");
+    }
+  }, [open, preselectedItemId]);
+
   const selectedItem = scopeItems.find((item) => item.id === selectedItemId);
   const hasDrawing = selectedItem?.hasDrawing || false;
   const currentRevision = selectedItem?.currentRevision || null;
@@ -117,8 +124,8 @@ export function DrawingUploadSheet({
       return;
     }
 
-    if (!pdfFile) {
-      setError("Please select a PDF or image file");
+    if (!pdfFile && !cadFile) {
+      setError("Please select at least one file (PDF/image or CAD)");
       return;
     }
 
@@ -132,25 +139,37 @@ export function DrawingUploadSheet({
       if (!user) throw new Error("Not authenticated");
 
       const timestamp = Date.now();
-      const sanitizedPdfName = sanitizeFileName(pdfFile.name);
-      const pdfFileName = `${selectedItemId}/${nextRevision}_${timestamp}_${sanitizedPdfName}`;
+      let primaryFileUrl = "";
+      let primaryFileName = "";
+      let primaryFileSize = 0;
+      let cadFileUrl: string | null = null;
+      let cadFileName: string | null = null;
 
-      const { error: uploadError } = await supabase.storage
-        .from("drawings")
-        .upload(pdfFileName, pdfFile);
+      // Upload PDF/image if provided
+      if (pdfFile) {
+        const sanitizedPdfName = sanitizeFileName(pdfFile.name);
+        const pdfStorageName = `${projectId}/${selectedItemId}/${nextRevision}_${timestamp}_${sanitizedPdfName}`;
 
-      if (uploadError) throw uploadError;
+        const { error: uploadError } = await supabase.storage
+          .from("drawings")
+          .upload(pdfStorageName, pdfFile);
 
-      const { data: urlData } = supabase.storage
-        .from("drawings")
-        .getPublicUrl(pdfFileName);
+        if (uploadError) throw uploadError;
 
-      let cadFileUrl = null;
-      let cadFileName = null;
+        const { data: urlData } = supabase.storage
+          .from("drawings")
+          .getPublicUrl(pdfStorageName);
 
+        primaryFileUrl = urlData.publicUrl;
+        primaryFileName = sanitizedPdfName;
+        primaryFileSize = pdfFile.size;
+      }
+
+      // Upload CAD file if provided
       if (cadFile) {
         const sanitizedCadName = sanitizeFileName(cadFile.name);
-        const cadStorageName = `${selectedItemId}/${nextRevision}_${timestamp}_${sanitizedCadName}`;
+        const cadStorageName = `${projectId}/${selectedItemId}/${nextRevision}_${timestamp}_${sanitizedCadName}`;
+
         const { error: cadUploadError } = await supabase.storage
           .from("drawings")
           .upload(cadStorageName, cadFile);
@@ -161,8 +180,16 @@ export function DrawingUploadSheet({
           .from("drawings")
           .getPublicUrl(cadStorageName);
 
-        cadFileUrl = cadUrlData.publicUrl;
-        cadFileName = cadFile.name;
+        if (pdfFile) {
+          // Both files uploaded: CAD goes to secondary fields
+          cadFileUrl = cadUrlData.publicUrl;
+          cadFileName = sanitizedCadName;
+        } else {
+          // CAD-only: use as primary file
+          primaryFileUrl = cadUrlData.publicUrl;
+          primaryFileName = sanitizedCadName;
+          primaryFileSize = cadFile.size;
+        }
       }
 
       let drawingId: string;
@@ -206,11 +233,11 @@ export function DrawingUploadSheet({
       const revisionInsert: DrawingRevisionInsert = {
         drawing_id: drawingId,
         revision: nextRevision,
-        file_url: urlData.publicUrl,
-        file_name: sanitizedPdfName,
-        file_size: pdfFile.size,
+        file_url: primaryFileUrl,
+        file_name: primaryFileName,
+        file_size: primaryFileSize,
         cad_file_url: cadFileUrl,
-        cad_file_name: cadFileName ? sanitizeFileName(cadFileName) : null,
+        cad_file_name: cadFileName,
         notes: notes ? sanitizeText(notes) : null,
         uploaded_by: user.id,
       };
@@ -318,7 +345,7 @@ export function DrawingUploadSheet({
 
           {/* PDF/Image Upload */}
           <div className="space-y-2">
-            <Label>Drawing File (PDF or Image) *</Label>
+            <Label>Drawing File (PDF or Image)</Label>
             <Input
               ref={fileInputRef}
               type="file"
@@ -403,7 +430,7 @@ export function DrawingUploadSheet({
           >
             Reset
           </Button>
-          <Button onClick={handleSubmit} disabled={isLoading || !pdfFile || !selectedItemId}>
+          <Button onClick={handleSubmit} disabled={isLoading || (!pdfFile && !cadFile) || !selectedItemId}>
             {isLoading ? (
               <>
                 <Spinner className="size-4" />

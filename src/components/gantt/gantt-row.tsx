@@ -15,8 +15,10 @@ export interface GanttRowProps {
   dateRange: GanttDateRange;
   columnWidth: number;
   rowHeight: number;
+  rowIndex: number;
   isSelected?: boolean;
   onItemClick?: (item: GanttItem) => void;
+  onItemDoubleClick?: (item: GanttItem) => void;
   onItemEdit?: (item: GanttItem) => void;
   onItemDuplicate?: (item: GanttItem) => void;
   onItemDelete?: (item: GanttItem) => void;
@@ -30,8 +32,10 @@ export function GanttRow({
   dateRange,
   columnWidth,
   rowHeight,
+  rowIndex,
   isSelected = false,
   onItemClick,
+  onItemDoubleClick,
   onItemEdit,
   onItemDuplicate,
   onItemDelete,
@@ -122,20 +126,24 @@ export function GanttRow({
   return (
     <div
       className={cn(
-        "relative border-b border-base-100 flex shrink-0",
-        isSelected && "bg-primary/5",
+        "relative border-b border-base-200 flex shrink-0",
+        !isSelected && rowIndex % 2 === 1 && "bg-base-50/60",
+        isSelected && "bg-primary/10",
         className
       )}
       style={{ height: rowHeight }}
+      onDoubleClick={() => onItemDoubleClick?.(item)}
     >
       {/* Grid columns (background) */}
       {columns.map((col, idx) => (
         <div
           key={idx}
           className={cn(
-            "border-r border-base-100 last:border-r-0 shrink-0",
-            col.isToday && "bg-primary/5",
-            col.isWeekend && "bg-base-50"
+            "border-r border-base-200 last:border-r-0 shrink-0",
+            // Only apply column backgrounds when row is NOT selected
+            // This ensures full-width highlighting for selected rows
+            !isSelected && col.isToday && "bg-primary/5",
+            !isSelected && col.isWeekend && "bg-base-100"
           )}
           style={{ width: columnWidth, height: "100%" }}
         />
@@ -147,6 +155,7 @@ export function GanttRow({
         left={left}
         width={width}
         onClick={onItemClick}
+        onDoubleClick={onItemDoubleClick}
         onEdit={onItemEdit}
         onDuplicate={onItemDuplicate}
         onDelete={onItemDelete}

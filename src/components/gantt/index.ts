@@ -10,9 +10,17 @@ export type {
   GanttViewMode,
   GanttDependency,
   DependencyType,
+  Priority,
+  WeekendSettings,
 } from "./types";
 export {
   DEPENDENCY_TYPES,
   DEPENDENCY_LABELS,
   DEPENDENCY_SHORT_LABELS,
+  PRIORITY_LEVELS,
+  PRIORITY_LABELS,
+  PRIORITY_COLORS,
+  DEFAULT_WEEKEND_SETTINGS,
+  calculateWorkDays,
+  daysBetween,
 } from "./types";

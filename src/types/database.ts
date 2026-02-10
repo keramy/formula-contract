@@ -50,8 +50,22 @@ export type Database = {
             foreignKeyName: "activity_log_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
+            referencedRelation: "client_projects_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_log_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "client_team_view"
+            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "activity_log_user_id_fkey"
@@ -144,6 +158,13 @@ export type Database = {
             foreignKeyName: "drafts_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
+            referencedRelation: "client_team_view"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "drafts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
           },
@@ -204,8 +225,22 @@ export type Database = {
             foreignKeyName: "drawing_revisions_drawing_id_fkey"
             columns: ["drawing_id"]
             isOneToOne: false
+            referencedRelation: "client_drawings_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drawing_revisions_drawing_id_fkey"
+            columns: ["drawing_id"]
+            isOneToOne: false
             referencedRelation: "drawings"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drawing_revisions_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "client_team_view"
+            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "drawing_revisions_uploaded_by_fkey"
@@ -286,6 +321,13 @@ export type Database = {
             foreignKeyName: "drawings_approved_by_fkey"
             columns: ["approved_by"]
             isOneToOne: false
+            referencedRelation: "client_team_view"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "drawings_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
           },
@@ -300,6 +342,13 @@ export type Database = {
             foreignKeyName: "drawings_item_id_fkey"
             columns: ["item_id"]
             isOneToOne: true
+            referencedRelation: "client_scope_items_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drawings_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: true
             referencedRelation: "scope_items"
             referencedColumns: ["id"]
           },
@@ -307,6 +356,13 @@ export type Database = {
             foreignKeyName: "drawings_not_required_by_fkey"
             columns: ["not_required_by"]
             isOneToOne: false
+            referencedRelation: "client_team_view"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "drawings_not_required_by_fkey"
+            columns: ["not_required_by"]
+            isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
           },
@@ -321,6 +377,13 @@ export type Database = {
             foreignKeyName: "drawings_pm_override_by_fkey"
             columns: ["pm_override_by"]
             isOneToOne: false
+            referencedRelation: "client_team_view"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "drawings_pm_override_by_fkey"
+            columns: ["pm_override_by"]
+            isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
           },
@@ -329,6 +392,232 @@ export type Database = {
             columns: ["pm_override_by"]
             isOneToOne: false
             referencedRelation: "v_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gantt_dependencies: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          dependency_type: number
+          id: string
+          lag_days: number
+          project_id: string
+          source_id: string
+          target_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          dependency_type?: number
+          id?: string
+          lag_days?: number
+          project_id: string
+          source_id: string
+          target_id: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          dependency_type?: number
+          id?: string
+          lag_days?: number
+          project_id?: string
+          source_id?: string
+          target_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gantt_dependencies_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "client_team_view"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "gantt_dependencies_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gantt_dependencies_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gantt_dependencies_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "client_projects_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gantt_dependencies_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gantt_dependencies_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "gantt_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gantt_dependencies_target_id_fkey"
+            columns: ["target_id"]
+            isOneToOne: false
+            referencedRelation: "gantt_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gantt_item_scope_items: {
+        Row: {
+          gantt_item_id: string
+          id: string
+          scope_item_id: string
+        }
+        Insert: {
+          gantt_item_id: string
+          id?: string
+          scope_item_id: string
+        }
+        Update: {
+          gantt_item_id?: string
+          id?: string
+          scope_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gantt_item_scope_items_gantt_item_id_fkey"
+            columns: ["gantt_item_id"]
+            isOneToOne: false
+            referencedRelation: "gantt_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gantt_item_scope_items_scope_item_id_fkey"
+            columns: ["scope_item_id"]
+            isOneToOne: false
+            referencedRelation: "client_scope_items_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gantt_item_scope_items_scope_item_id_fkey"
+            columns: ["scope_item_id"]
+            isOneToOne: false
+            referencedRelation: "scope_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gantt_items: {
+        Row: {
+          color: string | null
+          completed_at: string | null
+          created_at: string | null
+          created_by: string | null
+          end_date: string
+          id: string
+          is_completed: boolean | null
+          item_type: Database["public"]["Enums"]["gantt_item_type"]
+          name: string
+          parent_id: string | null
+          phase_key: Database["public"]["Enums"]["gantt_phase_key"] | null
+          priority: number
+          progress_override: number | null
+          project_id: string
+          sort_order: number
+          start_date: string
+          updated_at: string | null
+        }
+        Insert: {
+          color?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          end_date: string
+          id?: string
+          is_completed?: boolean | null
+          item_type: Database["public"]["Enums"]["gantt_item_type"]
+          name: string
+          parent_id?: string | null
+          phase_key?: Database["public"]["Enums"]["gantt_phase_key"] | null
+          priority?: number
+          progress_override?: number | null
+          project_id: string
+          sort_order?: number
+          start_date: string
+          updated_at?: string | null
+        }
+        Update: {
+          color?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          end_date?: string
+          id?: string
+          is_completed?: boolean | null
+          item_type?: Database["public"]["Enums"]["gantt_item_type"]
+          name?: string
+          parent_id?: string | null
+          phase_key?: Database["public"]["Enums"]["gantt_phase_key"] | null
+          priority?: number
+          progress_override?: number | null
+          project_id?: string
+          sort_order?: number
+          start_date?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gantt_items_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "client_team_view"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "gantt_items_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gantt_items_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "v_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gantt_items_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "gantt_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gantt_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "client_projects_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gantt_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
@@ -357,7 +646,21 @@ export type Database = {
             foreignKeyName: "item_materials_item_id_fkey"
             columns: ["item_id"]
             isOneToOne: false
+            referencedRelation: "client_scope_items_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "item_materials_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
             referencedRelation: "scope_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "item_materials_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "client_materials_view"
             referencedColumns: ["id"]
           },
           {
@@ -426,6 +729,13 @@ export type Database = {
             foreignKeyName: "materials_approved_by_fkey"
             columns: ["approved_by"]
             isOneToOne: false
+            referencedRelation: "client_team_view"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "materials_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
           },
@@ -434,6 +744,13 @@ export type Database = {
             columns: ["approved_by"]
             isOneToOne: false
             referencedRelation: "v_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "materials_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "client_projects_view"
             referencedColumns: ["id"]
           },
           {
@@ -489,6 +806,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "milestones_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "client_projects_view"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "milestones_project_id_fkey"
             columns: ["project_id"]
@@ -552,7 +876,21 @@ export type Database = {
             foreignKeyName: "notifications_drawing_id_fkey"
             columns: ["drawing_id"]
             isOneToOne: false
+            referencedRelation: "client_drawings_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_drawing_id_fkey"
+            columns: ["drawing_id"]
+            isOneToOne: false
             referencedRelation: "drawings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "client_scope_items_view"
             referencedColumns: ["id"]
           },
           {
@@ -566,7 +904,21 @@ export type Database = {
             foreignKeyName: "notifications_material_id_fkey"
             columns: ["material_id"]
             isOneToOne: false
+            referencedRelation: "client_materials_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
             referencedRelation: "materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "client_projects_view"
             referencedColumns: ["id"]
           },
           {
@@ -596,6 +948,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_reports"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "client_team_view"
+            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "notifications_user_id_fkey"
@@ -640,6 +999,13 @@ export type Database = {
             foreignKeyName: "project_assignments_assigned_by_fkey"
             columns: ["assigned_by"]
             isOneToOne: false
+            referencedRelation: "client_team_view"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "project_assignments_assigned_by_fkey"
+            columns: ["assigned_by"]
+            isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
           },
@@ -654,8 +1020,22 @@ export type Database = {
             foreignKeyName: "project_assignments_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
+            referencedRelation: "client_projects_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_assignments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_assignments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "client_team_view"
+            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "project_assignments_user_id_fkey"
@@ -759,6 +1139,13 @@ export type Database = {
             foreignKeyName: "projects_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
+            referencedRelation: "client_team_view"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "projects_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
           },
@@ -820,6 +1207,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_reports"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_activity_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "client_team_view"
+            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "report_activity_user_id_fkey"
@@ -937,6 +1331,13 @@ export type Database = {
             foreignKeyName: "report_shares_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
+            referencedRelation: "client_team_view"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "report_shares_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
           },
@@ -1000,6 +1401,13 @@ export type Database = {
             foreignKeyName: "reports_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
+            referencedRelation: "client_team_view"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "reports_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
           },
@@ -1014,8 +1422,22 @@ export type Database = {
             foreignKeyName: "reports_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
+            referencedRelation: "client_projects_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "client_team_view"
+            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "reports_updated_by_fkey"
@@ -1153,7 +1575,21 @@ export type Database = {
             foreignKeyName: "scope_items_parent_id_fkey"
             columns: ["parent_id"]
             isOneToOne: false
+            referencedRelation: "client_scope_items_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scope_items_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
             referencedRelation: "scope_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scope_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "client_projects_view"
             referencedColumns: ["id"]
           },
           {
@@ -1237,6 +1673,13 @@ export type Database = {
             foreignKeyName: "snagging_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
+            referencedRelation: "client_team_view"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "snagging_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
           },
@@ -1251,7 +1694,21 @@ export type Database = {
             foreignKeyName: "snagging_item_id_fkey"
             columns: ["item_id"]
             isOneToOne: false
+            referencedRelation: "client_scope_items_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "snagging_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
             referencedRelation: "scope_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "snagging_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "client_projects_view"
             referencedColumns: ["id"]
           },
           {
@@ -1260,6 +1717,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "snagging_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "client_team_view"
+            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "snagging_resolved_by_fkey"
@@ -1327,6 +1791,197 @@ export type Database = {
       }
     }
     Views: {
+      client_drawing_revisions_view: {
+        Row: {
+          created_at: string | null
+          drawing_id: string | null
+          file_name: string | null
+          file_url: string | null
+          id: string | null
+          revision: string | null
+          uploader_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drawing_revisions_drawing_id_fkey"
+            columns: ["drawing_id"]
+            isOneToOne: false
+            referencedRelation: "client_drawings_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drawing_revisions_drawing_id_fkey"
+            columns: ["drawing_id"]
+            isOneToOne: false
+            referencedRelation: "drawings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_drawings_view: {
+        Row: {
+          client_response_at: string | null
+          created_at: string | null
+          current_revision: string | null
+          id: string | null
+          item_id: string | null
+          sent_to_client_at: string | null
+          status: Database["public"]["Enums"]["drawing_status"] | null
+          updated_at: string | null
+        }
+        Insert: {
+          client_response_at?: string | null
+          created_at?: string | null
+          current_revision?: string | null
+          id?: string | null
+          item_id?: string | null
+          sent_to_client_at?: string | null
+          status?: Database["public"]["Enums"]["drawing_status"] | null
+          updated_at?: string | null
+        }
+        Update: {
+          client_response_at?: string | null
+          created_at?: string | null
+          current_revision?: string | null
+          id?: string | null
+          item_id?: string | null
+          sent_to_client_at?: string | null
+          status?: Database["public"]["Enums"]["drawing_status"] | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drawings_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: true
+            referencedRelation: "client_scope_items_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drawings_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: true
+            referencedRelation: "scope_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_materials_view: {
+        Row: {
+          client_response_at: string | null
+          created_at: string | null
+          id: string | null
+          images: Json | null
+          name: string | null
+          project_id: string | null
+          sent_to_client_at: string | null
+          specification: string | null
+          status: Database["public"]["Enums"]["material_status"] | null
+          updated_at: string | null
+        }
+        Insert: {
+          client_response_at?: string | null
+          created_at?: string | null
+          id?: string | null
+          images?: Json | null
+          name?: string | null
+          project_id?: string | null
+          sent_to_client_at?: string | null
+          specification?: string | null
+          status?: Database["public"]["Enums"]["material_status"] | null
+          updated_at?: string | null
+        }
+        Update: {
+          client_response_at?: string | null
+          created_at?: string | null
+          id?: string | null
+          images?: Json | null
+          name?: string | null
+          project_id?: string | null
+          sent_to_client_at?: string | null
+          specification?: string | null
+          status?: Database["public"]["Enums"]["material_status"] | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "materials_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "client_projects_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "materials_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_milestones_view: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          description: string | null
+          due_date: string | null
+          id: string | null
+          is_completed: boolean | null
+          name: string | null
+          project_id: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string | null
+          is_completed?: boolean | null
+          name?: string | null
+          project_id?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string | null
+          is_completed?: boolean | null
+          name?: string | null
+          project_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "milestones_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "client_projects_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "milestones_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_projects_view: {
+        Row: {
+          client_name: string | null
+          created_at: string | null
+          description: string | null
+          id: string | null
+          installation_date: string | null
+          name: string | null
+          project_code: string | null
+          status: Database["public"]["Enums"]["project_status"] | null
+          updated_at: string | null
+        }
+        Relationships: []
+      }
       client_reports_view: {
         Row: {
           created_at: string | null
@@ -1340,6 +1995,97 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "reports_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "client_projects_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_scope_items_view: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string | null
+          installed_at: string | null
+          is_installed: boolean | null
+          item_code: string | null
+          item_path: Database["public"]["Enums"]["item_path"] | null
+          name: string | null
+          production_percentage: number | null
+          project_id: string | null
+          status: Database["public"]["Enums"]["item_status"] | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string | null
+          installed_at?: string | null
+          is_installed?: boolean | null
+          item_code?: string | null
+          item_path?: Database["public"]["Enums"]["item_path"] | null
+          name?: string | null
+          production_percentage?: number | null
+          project_id?: string | null
+          status?: Database["public"]["Enums"]["item_status"] | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string | null
+          installed_at?: string | null
+          is_installed?: boolean | null
+          item_code?: string | null
+          item_path?: Database["public"]["Enums"]["item_path"] | null
+          name?: string | null
+          production_percentage?: number | null
+          project_id?: string | null
+          status?: Database["public"]["Enums"]["item_status"] | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scope_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "client_projects_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scope_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_team_view: {
+        Row: {
+          member_name: string | null
+          member_role: Database["public"]["Enums"]["user_role"] | null
+          project_id: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_assignments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "client_projects_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_assignments_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
@@ -1505,9 +2251,9 @@ export type Database = {
       generate_entity_code: { Args: { p_entity_type: string }; Returns: string }
       generate_report_code: { Args: { p_project_id: string }; Returns: string }
       generate_slug: { Args: { input_text: string }; Returns: string }
-      get_next_project_code: { Args: Record<PropertyKey, never>; Returns: string }
+      get_next_project_code: { Args: never; Returns: string }
       get_user_role: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: Database["public"]["Enums"]["user_role"]
       }
       get_year_sequence: {
@@ -1518,7 +2264,12 @@ export type Database = {
         Args: { project_uuid: string }
         Returns: boolean
       }
-      preview_next_project_code: { Args: Record<PropertyKey, never>; Returns: string }
+      is_client_for_project: {
+        Args: { project_uuid: string }
+        Returns: boolean
+      }
+      preview_next_project_code: { Args: never; Returns: string }
+      storage_project_id: { Args: { object_name: string }; Returns: string }
     }
     Enums: {
       currency: "TRY" | "USD" | "EUR"
@@ -1530,6 +2281,8 @@ export type Database = {
         | "rejected"
         | "approved_with_comments"
         | "not_required"
+      gantt_item_type: "phase" | "task" | "milestone"
+      gantt_phase_key: "design" | "production" | "shipping" | "installation"
       item_path: "production" | "procurement"
       item_status:
         | "pending"
@@ -1549,6 +2302,7 @@ export type Database = {
         | "completed"
         | "cancelled"
         | "not_awarded"
+      timeline_item_type: "phase" | "task"
       user_role:
         | "admin"
         | "pm"
@@ -1693,6 +2447,8 @@ export const Constants = {
         "approved_with_comments",
         "not_required",
       ],
+      gantt_item_type: ["phase", "task", "milestone"],
+      gantt_phase_key: ["design", "production", "shipping", "installation"],
       item_path: ["production", "procurement"],
       item_status: [
         "pending",
@@ -1714,6 +2470,7 @@ export const Constants = {
         "cancelled",
         "not_awarded",
       ],
+      timeline_item_type: ["phase", "task"],
       user_role: [
         "admin",
         "pm",
@@ -1726,54 +2483,26 @@ export const Constants = {
   },
 } as const
 
-// ============================================
-// Convenience Type Aliases (for backwards compatibility)
-// ============================================
+// ============================================================================
+// Convenience Type Aliases
+// ============================================================================
 
-// Enum Types
-export type UserRole = Database["public"]["Enums"]["user_role"]
-export type ProjectStatus = Database["public"]["Enums"]["project_status"]
-export type ItemPath = Database["public"]["Enums"]["item_path"]
-export type ItemStatus = Database["public"]["Enums"]["item_status"]
-export type ProcurementStatus = Database["public"]["Enums"]["procurement_status"]
-export type DrawingStatus = Database["public"]["Enums"]["drawing_status"]
-export type MaterialStatus = Database["public"]["Enums"]["material_status"]
-export type Currency = Database["public"]["Enums"]["currency"]
+// Enum aliases
+export type ProjectStatus = Enums<"project_status">;
+export type Currency = Enums<"currency">;
+export type DrawingStatus = Enums<"drawing_status">;
+export type ProcurementStatus = Enums<"procurement_status">;
+export type ItemPath = Enums<"item_path">;
+export type ItemStatus = Enums<"item_status">;
+export type UserRole = Enums<"user_role">;
 
-// Row types
-export type User = Database["public"]["Tables"]["users"]["Row"]
-export type Client = Database["public"]["Tables"]["clients"]["Row"]
-export type Project = Database["public"]["Tables"]["projects"]["Row"]
-export type ProjectAssignment = Database["public"]["Tables"]["project_assignments"]["Row"]
-export type Milestone = Database["public"]["Tables"]["milestones"]["Row"]
-export type ScopeItem = Database["public"]["Tables"]["scope_items"]["Row"]
-export type Drawing = Database["public"]["Tables"]["drawings"]["Row"]
-export type DrawingRevision = Database["public"]["Tables"]["drawing_revisions"]["Row"]
-export type Material = Database["public"]["Tables"]["materials"]["Row"]
-export type ItemMaterial = Database["public"]["Tables"]["item_materials"]["Row"]
-export type Snagging = Database["public"]["Tables"]["snagging"]["Row"]
-export type Report = Database["public"]["Tables"]["reports"]["Row"]
-export type ReportLine = Database["public"]["Tables"]["report_lines"]["Row"]
-export type ReportShare = Database["public"]["Tables"]["report_shares"]["Row"]
-export type ReportActivity = Database["public"]["Tables"]["report_activity"]["Row"]
-export type Notification = Database["public"]["Tables"]["notifications"]["Row"]
-export type ActivityLog = Database["public"]["Tables"]["activity_log"]["Row"]
-export type Draft = Database["public"]["Tables"]["drafts"]["Row"]
-
-// Insert types
-export type UserInsert = Database["public"]["Tables"]["users"]["Insert"]
-export type ClientInsert = Database["public"]["Tables"]["clients"]["Insert"]
-export type ProjectInsert = Database["public"]["Tables"]["projects"]["Insert"]
-export type ScopeItemInsert = Database["public"]["Tables"]["scope_items"]["Insert"]
-export type DrawingInsert = Database["public"]["Tables"]["drawings"]["Insert"]
-export type DrawingRevisionInsert = Database["public"]["Tables"]["drawing_revisions"]["Insert"]
-export type MaterialInsert = Database["public"]["Tables"]["materials"]["Insert"]
-export type ReportInsert = Database["public"]["Tables"]["reports"]["Insert"]
-
-// Update types
-export type UserUpdate = Database["public"]["Tables"]["users"]["Update"]
-export type ClientUpdate = Database["public"]["Tables"]["clients"]["Update"]
-export type ProjectUpdate = Database["public"]["Tables"]["projects"]["Update"]
-export type ScopeItemUpdate = Database["public"]["Tables"]["scope_items"]["Update"]
-export type DrawingUpdate = Database["public"]["Tables"]["drawings"]["Update"]
-export type MaterialUpdate = Database["public"]["Tables"]["materials"]["Update"]
+// Table Insert/Update aliases
+export type ClientInsert = TablesInsert<"clients">;
+export type ClientUpdate = TablesUpdate<"clients">;
+export type ProjectInsert = TablesInsert<"projects">;
+export type ProjectUpdate = TablesUpdate<"projects">;
+export type ScopeItemInsert = TablesInsert<"scope_items">;
+export type ScopeItemUpdate = TablesUpdate<"scope_items">;
+export type DrawingInsert = TablesInsert<"drawings">;
+export type DrawingUpdate = TablesUpdate<"drawings">;
+export type DrawingRevisionInsert = TablesInsert<"drawing_revisions">;

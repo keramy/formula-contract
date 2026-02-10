@@ -9,13 +9,14 @@ import { Label } from "@/components/ui/label";
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { GlassCard } from "@/components/ui/ui-helpers";
-import { CheckCircle2Icon, AlertCircleIcon, ShieldAlertIcon } from "lucide-react";
+import { CheckCircle2Icon, AlertCircleIcon, ShieldAlertIcon, EyeIcon, EyeOffIcon, SparklesIcon } from "lucide-react";
 import { updatePasswordAction } from "@/lib/actions/auth";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -26,13 +27,11 @@ export default function ResetPasswordPage() {
     setError(null);
     setIsRateLimited(false);
 
-    // Validate passwords match
     if (password !== confirmPassword) {
       setError("Passwords do not match");
       return;
     }
 
-    // Validate password strength
     if (password.length < 8) {
       setError("Password must be at least 8 characters");
       return;
@@ -41,7 +40,6 @@ export default function ResetPasswordPage() {
     setIsLoading(true);
 
     try {
-      // Call server action (includes rate limiting)
       const result = await updatePasswordAction(password, false);
 
       if (!result.success) {
@@ -55,7 +53,6 @@ export default function ResetPasswordPage() {
 
       setIsSuccess(true);
 
-      // Redirect to dashboard after 2 seconds
       setTimeout(() => {
         router.push("/dashboard");
       }, 2000);
@@ -66,25 +63,32 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="flex flex-col gap-8">
-      {/* Logo */}
-      <div className="flex flex-col items-center gap-2">
-        <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-rose-500 text-white font-bold text-xl shadow-lg shadow-orange-500/30">
-          FC
+    <div className="relative flex flex-col gap-6 animate-in fade-in duration-300">
+      <div className="pointer-events-none absolute -top-6 -left-4 h-24 w-24 rounded-full bg-primary/15 blur-2xl" />
+      <div className="pointer-events-none absolute -right-6 top-20 h-20 w-20 rounded-full bg-orange-500/10 blur-2xl" />
+
+      <div className="flex items-center justify-center">
+        <div className="inline-flex items-center gap-2 rounded-full border border-base-200 bg-card px-3 py-1.5 shadow-xs">
+          <SparklesIcon className="size-3.5 text-primary" />
+          <span className="text-xs font-medium text-muted-foreground">Formula Contract</span>
         </div>
-        <h1 className="text-xl font-semibold bg-gradient-to-r from-orange-600 to-rose-600 bg-clip-text text-transparent">
-          Formula Contract
-        </h1>
       </div>
 
-      {/* Reset Password Card */}
-      <GlassCard className="w-full">
-        <CardHeader className="text-center pb-2">
-          <CardTitle className="text-lg">Set new password</CardTitle>
+      <GlassCard className="w-full border-base-200/80 shadow-sm">
+        <CardHeader className="space-y-4 pb-2">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center h-11 w-11 rounded-xl bg-gradient-to-br from-primary-600 to-primary-700 text-white font-bold text-sm shadow-sm">
+              FC
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Account Recovery
+              </p>
+              <CardTitle className="mt-0.5 text-xl tracking-tight">Set new password</CardTitle>
+            </div>
+          </div>
           <CardDescription>
-            {isSuccess
-              ? "Your password has been updated"
-              : "Enter your new password below"}
+            {isSuccess ? "Your password has been updated" : "Create a new password for your account."}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -98,8 +102,7 @@ export default function ResetPasswordPage() {
               </p>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-              {/* Error Message */}
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
               {error && (
                 <div className={`p-3 rounded-lg text-sm flex items-center gap-2 ${
                   isRateLimited
@@ -115,40 +118,51 @@ export default function ResetPasswordPage() {
                 </div>
               )}
 
-              {/* New Password Field */}
               <div className="flex flex-col gap-2">
-                <Label htmlFor="password">New password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Enter new password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  autoComplete="new-password"
-                  disabled={isLoading}
-                />
+                <Label htmlFor="password" className="text-sm font-medium">New password</Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter new password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    autoComplete="new-password"
+                    disabled={isLoading}
+                    className="h-10 pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
+                  </Button>
+                </div>
               </div>
 
-              {/* Confirm Password Field */}
               <div className="flex flex-col gap-2">
-                <Label htmlFor="confirmPassword">Confirm password</Label>
+                <Label htmlFor="confirmPassword" className="text-sm font-medium">Confirm password</Label>
                 <Input
                   id="confirmPassword"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   placeholder="Confirm new password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
                   autoComplete="new-password"
                   disabled={isLoading}
+                  className="h-10"
                 />
               </div>
 
-              {/* Submit Button */}
               <Button
                 type="submit"
-                className="w-full mt-2 bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600"
+                className="w-full mt-2 h-10 bg-primary hover:bg-primary/90"
                 disabled={isLoading}
               >
                 {isLoading ? (
@@ -161,8 +175,7 @@ export default function ResetPasswordPage() {
                 )}
               </Button>
 
-              {/* Back to login */}
-              <Link href="/login" className="text-center text-sm text-muted-foreground hover:text-orange-600 transition-colors">
+              <Link href="/login" className="text-center text-sm text-muted-foreground hover:text-primary transition-colors">
                 Back to sign in
               </Link>
             </form>
@@ -170,9 +183,8 @@ export default function ResetPasswordPage() {
         </CardContent>
       </GlassCard>
 
-      {/* Footer */}
-      <p className="text-center text-sm text-muted-foreground">
-        Project Management System for Formula Contract
+      <p className="text-center text-xs text-muted-foreground">
+        Formula Contract Project Management System
       </p>
     </div>
   );

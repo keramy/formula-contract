@@ -38,6 +38,8 @@ import {
   TruckIcon,
   WrenchIcon,
   CheckCircleIcon,
+  DownloadIcon,
+  FileTextIcon,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ScopeItemImageUpload } from "@/components/scope-items/scope-item-image-upload";
@@ -91,10 +93,20 @@ interface ScopeItemData {
   installed_at: string | null;
 }
 
+interface DrawingRevision {
+  id: string;
+  revision: string;
+  file_url: string;
+  file_name: string;
+  cad_file_url: string | null;
+  cad_file_name: string | null;
+}
+
 interface Drawing {
   id: string;
   status: string;
   current_revision: string | null;
+  revisions: DrawingRevision[];
 }
 
 interface Material {
@@ -247,7 +259,7 @@ export function ScopeItemSheet({
           .single(),
         supabase
           .from("drawings")
-          .select("id, status, current_revision")
+          .select("id, status, current_revision, revisions:drawing_revisions(id, revision, file_url, file_name, cad_file_url, cad_file_name)")
           .eq("item_id", id)
           .maybeSingle(),
         supabase
@@ -741,6 +753,7 @@ export function ScopeItemSheet({
                   )
                 ) : (
                   <ScopeItemImageUpload
+                    projectId={projectId}
                     images={images}
                     onChange={setImages}
                   />
@@ -781,17 +794,51 @@ export function ScopeItemSheet({
                           <span className="text-sm font-medium">Drawing</span>
                         </div>
                         {drawing ? (
-                          <div className="flex items-center gap-2">
-                            <StatusBadge
-                              variant={drawingStatusConfig[drawing.status]?.variant || "default"}
-                            >
-                              {drawingStatusConfig[drawing.status]?.label || drawing.status}
-                            </StatusBadge>
-                            {drawing.current_revision && (
-                              <span className="text-xs text-muted-foreground">
-                                Rev {drawing.current_revision}
-                              </span>
-                            )}
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <StatusBadge
+                                variant={drawingStatusConfig[drawing.status]?.variant || "default"}
+                              >
+                                {drawingStatusConfig[drawing.status]?.label || drawing.status}
+                              </StatusBadge>
+                              {drawing.current_revision && (
+                                <span className="text-xs text-muted-foreground">
+                                  Rev {drawing.current_revision}
+                                </span>
+                              )}
+                            </div>
+                            {/* File download links for the current revision */}
+                            {drawing.revisions && drawing.revisions.length > 0 && (() => {
+                              const currentRev = drawing.revisions.find(
+                                r => r.revision === drawing.current_revision
+                              ) || drawing.revisions[drawing.revisions.length - 1];
+                              return (
+                                <div className="flex flex-wrap gap-2">
+                                  <a
+                                    href={currentRev.file_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-white border border-sky-200 text-sky-700 hover:bg-sky-50 transition-colors"
+                                  >
+                                    <FileTextIcon className="size-3.5" />
+                                    View Drawing PDF
+                                    <DownloadIcon className="size-3" />
+                                  </a>
+                                  {currentRev.cad_file_url && (
+                                    <a
+                                      href={currentRev.cad_file_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors"
+                                    >
+                                      <FileIcon className="size-3.5" />
+                                      Download CAD
+                                      <DownloadIcon className="size-3" />
+                                    </a>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </div>
                         ) : (
                           <p className="text-sm text-muted-foreground">No drawing uploaded</p>
@@ -804,7 +851,7 @@ export function ScopeItemSheet({
                               drawingStatus={drawing?.status || "not_uploaded"}
                               currentRevision={drawing?.current_revision || null}
                               scopeItemId={itemId}
-                              userRole={userRole}
+                              userRole={isClient ? "client" : userRole}
                               projectId={projectId}
                               itemCode={formData.item_code}
                               onStatusChange={(newStatus) => {

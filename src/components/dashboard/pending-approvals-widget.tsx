@@ -72,7 +72,7 @@ export function PendingApprovalsWidget({ approvals }: PendingApprovalsWidgetProp
           return (
             <Link
               key={`${approval.type}-${approval.id}`}
-              href={`/projects/${approval.projectSlug || approval.projectId}`}
+              href={`/projects/${approval.projectSlug || approval.projectId}?tab=${approval.type === "drawing" ? "drawings" : "materials"}`}
               className="group block p-3 rounded-lg bg-amber-50/50 border border-amber-100 hover:bg-amber-100/70 transition-colors"
             >
               <div className="flex items-start gap-3">
@@ -89,6 +89,9 @@ export function PendingApprovalsWidget({ approvals }: PendingApprovalsWidgetProp
                     </span>
                   </div>
                   <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">
+                    {approval.itemCode && (
+                      <span className="font-mono text-muted-foreground mr-1">{approval.itemCode}</span>
+                    )}
                     {approval.title}
                   </p>
                   <p className="text-xs text-muted-foreground">

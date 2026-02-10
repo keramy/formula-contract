@@ -32,6 +32,7 @@ export interface GanttBarProps {
   left: number;
   width: number;
   onClick?: (item: GanttItem) => void;
+  onDoubleClick?: (item: GanttItem) => void;
   onEdit?: (item: GanttItem) => void;
   onDuplicate?: (item: GanttItem) => void;
   onDelete?: (item: GanttItem) => void;
@@ -46,6 +47,7 @@ export function GanttBar({
   left,
   width,
   onClick,
+  onDoubleClick,
   onEdit,
   onDuplicate,
   onDelete,
@@ -82,6 +84,7 @@ export function GanttBar({
     edge: "left" | "right" | "middle"
   ) => {
     if (!isEditable) return;
+    if (e.detail > 1) return; // allow double-click to edit without starting drag
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(true);
@@ -117,6 +120,7 @@ export function GanttBar({
               )}
               style={{ left: left + width / 2 - 12 }}
               onClick={() => onClick?.(item)}
+              onDoubleClick={() => onDoubleClick?.(item)}
             >
               <DiamondIcon
                 className="h-6 w-6"
@@ -145,24 +149,25 @@ export function GanttBar({
     <div
       className={cn(
         "absolute top-1/2 -translate-y-1/2 rounded-md cursor-pointer",
-        "transition-all hover:shadow-md",
+        "transition-colors",
         isDragging && "opacity-70 shadow-lg ring-2 ring-primary",
         // Phase styling: taller, more muted
-        isPhase && "h-8",
+        isPhase && "h-7",
         // Task styling: standard height
-        isTask && "h-7",
+        isTask && "h-6",
         // Default (scope_item): standard height
-        !isPhase && !isTask && "h-7",
+        !isPhase && !isTask && "h-6",
         className
       )}
       style={{
         left,
         width,
-        backgroundColor: `${item.color}${isPhase ? "20" : "30"}`, // Phases more transparent
-        border: `2px solid ${item.color}`,
+        backgroundColor: `${item.color}${isPhase ? "18" : "26"}`, // Phases more transparent
+        border: `1px solid ${item.color}`,
         borderStyle: isPhase ? "dashed" : "solid", // Dashed border for phases
       }}
       onClick={() => onClick?.(item)}
+      onDoubleClick={() => onDoubleClick?.(item)}
     >
       {/* Progress fill */}
       {item.progress > 0 && (
@@ -180,7 +185,7 @@ export function GanttBar({
       {width > 60 && (
         <div className="absolute inset-0 px-2 flex items-center overflow-hidden pointer-events-none z-[5]">
           <span
-            className="text-xs font-medium truncate"
+            className="text-[11px] font-medium truncate"
             style={{ color: item.color, textShadow: "0 0 2px white, 0 0 2px white" }}
           >
             {item.name}

@@ -1,6 +1,6 @@
 # Formula Contract - Project Intelligence
 
-> **Last Updated:** February 4, 2026
+> **Last Updated:** February 9, 2026
 > **Version:** 1.1.0
 > **Supabase Project:** `lsuiaqrpkhejeavsrsqc` (contract-eu, eu-central-1)
 
@@ -63,6 +63,8 @@ Each scope item tracks workflow progress through multiple states:
 | Client State | Zustand |
 | Forms | react-hook-form + zod |
 | Tables | @tanstack/react-table |
+| Gantt Chart | Custom built (components/gantt/) |
+| Drag & Drop | @dnd-kit/core + @dnd-kit/sortable |
 | Deployment | Vercel |
 
 ---
@@ -79,7 +81,8 @@ formula-contract/
 │   │   │   ├── projects/         # Project list and details
 │   │   │   │   └── [id]/         # Project detail with tabs
 │   │   │   │       ├── scope/    # Scope items tab
-│   │   │   │       └── reports/  # Reports tab
+│   │   │   │       ├── reports/  # Reports tab
+│   │   │   │       └── timeline/ # Standalone Gantt timeline page
 │   │   │   ├── clients/          # Client management
 │   │   │   ├── finance/          # Financial overview (admin/management only)
 │   │   │   ├── users/            # User management (admin only)
@@ -98,12 +101,13 @@ formula-contract/
 │   │   ├── dashboard/            # Dashboard widgets
 │   │   ├── finance/              # Finance charts and KPI cards
 │   │   ├── milestones/           # Milestone card components
+│   │   ├── gantt/                # Gantt chart components (7 files)
 │   │   └── forms/                # Shared form components
 │   │
 │   ├── lib/
 │   │   ├── actions/              # Server actions (mutations)
 │   │   ├── supabase/             # Supabase client (server/client)
-│   │   ├── react-query/          # React Query hooks
+│   │   ├── react-query/          # React Query hooks (incl. timelines.ts)
 │   │   ├── pdf/                  # PDF generation (reports)
 │   │   │   ├── generate-report-pdf.ts  # Main PDF generator
 │   │   │   └── image-helpers.ts        # Image loading/sizing utils
@@ -127,7 +131,7 @@ formula-contract/
 │   └── types/                    # TypeScript type definitions
 │
 ├── supabase/
-│   └── migrations/               # Database migrations (001-035)
+│   └── migrations/               # Database migrations (001-045)
 │
 └── docs/                         # Documentation
     ├── DATABASE.md               # Schema documentation
@@ -137,7 +141,7 @@ formula-contract/
 
 ---
 
-## Database Schema (17 Tables)
+## Database Schema (19 Tables)
 
 ### Core Entities
 
@@ -152,6 +156,8 @@ formula-contract/
 | `materials` | Material samples | id, project_id, name, status, images |
 | `reports` | Progress reports | id, project_id, is_published, share_with_client |
 | `report_lines` | Report content | id, report_id, title, description, photos |
+| `project_timelines` | Gantt timeline items | id, project_id, name, item_type, phase_key, parent_id, sort_order, start_date, end_date, priority, progress_override, is_completed |
+| `timeline_dependencies` | Dependencies between items | id, project_id, source_id, target_id, dependency_type, lag_days |
 
 ### Supporting Entities
 
@@ -177,6 +183,10 @@ DrawingStatus: "not_uploaded" | "uploaded" | "sent_to_client" | "approved" | "re
 MaterialStatus: "pending" | "sent_to_client" | "approved" | "rejected"
 ProcurementStatus: "pm_approval" | "not_ordered" | "ordered" | "received"
 Currency: "TRY" | "USD" | "EUR"
+GanttItemType: "phase" | "task" | "milestone"
+PhaseKey: "design" | "production" | "shipping" | "installation"
+DependencyType: 0 (FS) | 1 (SS) | 2 (FF) | 3 (SF)
+Priority: 1 (Low) | 2 (Normal) | 3 (High) | 4 (Critical)
 ```
 
 **Note:** `not_awarded` status is used when a tender is lost to a competitor (distinct from `cancelled` which is an internal decision).
@@ -349,6 +359,58 @@ interface ChartDataItem {
 }
 ```
 
+### Gantt Chart Architecture
+
+The Gantt chart is a custom-built component system (not a library). It lives in `src/components/gantt/` with 7 files:
+
+```
+gantt-chart.tsx      # Main orchestrator — toolbar, sidebar, timeline, state management
+gantt-sidebar.tsx    # Left panel — item names, hierarchy, drag-and-drop reorder
+gantt-header.tsx     # Timeline column headers (day/week/month labels)
+gantt-row.tsx        # Individual timeline row (background, grid lines, today marker)
+gantt-bar.tsx        # Draggable bar for each item (move, resize, progress)
+gantt-dependencies.tsx # SVG dependency arrows between items
+dependency-dialog.tsx  # Dialog for creating/editing dependency links
+types.ts             # Shared types, constants, utility functions
+index.ts             # Barrel exports
+```
+
+**Key Architecture Decisions:**
+- **Sidebar width is auto-calculated** from column widths sum (no manual resize handle)
+- **Fixed header height = 48px** across all view modes (day/week/month)
+- **Chart area uses `flex-1 min-h-0`** to fill available space (no fixed pixel height)
+- **GlassCard wrapper uses `py-0 gap-0`** to override Card base padding
+- **Hierarchy is visual only** — indent spacer (20px/level) + chevron, no tree connector lines
+- **Row numbers are stable** — pre-computed from full `items` array via `originalIndexMap`, not re-indexed on collapse
+- **DnD activation on row numbers** — no visible grip icon, keeps sidebar compact
+- **Priority shown as colored left border** (3px) — not inline dot/badge
+
+**Sidebar Column Layout:**
+
+| Column | Default Width | Min | Max |
+|--------|--------------|-----|-----|
+| # (row num) | 28px | 24 | 60 |
+| Name | 200px | 140 | 460 |
+| Begin | 64px | 56 | 140 |
+| End | 64px | 56 | 140 |
+| Days | 56px | 40 | 100 |
+
+**Data Flow:**
+```
+page.tsx (Server) → fetches project + scope items
+  ↓
+timeline-client.tsx (Client) → React Query fetches timeline items + dependencies
+  ↓
+GanttChart → manages view mode, selection, scroll sync, toolbar actions
+  ↓
+GanttSidebar + GanttHeader + GanttRow/GanttBar + GanttDependencies
+```
+
+**React Query Pattern (timelines.ts):**
+- All mutations use optimistic updates (cancel queries → snapshot → update cache → rollback on error)
+- Query key factory: `timelineKeys.list(projectId)`, `timelineKeys.dependencyList(projectId)`
+- `staleTime: 30s` — timeline data changes frequently during editing sessions
+
 ---
 
 ## Supabase Security (CRITICAL)
@@ -419,6 +481,9 @@ CREATE INDEX IF NOT EXISTS idx_table_fk ON table(fk_column);
 9. **Server actions for mutations** - Never mutate from client components
 10. **React Query for server state** - Don't duplicate in useState
 11. **Recharts index signature** - Data types need `[key: string]: string | number` for Pie/Bar charts
+12. **Gantt GlassCard needs `py-0 gap-0`** - Card base has both padding and flex gap that must be overridden
+13. **Timeline migration 045 required** - `045_gantt_rewrite.sql` must run on Supabase before Gantt UI works
+14. **Adjacent panel alignment** — When two side-by-side panels need matching row heights, both header wrappers must set explicit `height` + `box-border` so `border-b` is counted inside
 
 ### Git on Windows
 - CRLF warnings are normal (`LF will be replaced by CRLF`) - safe to ignore
@@ -562,6 +627,22 @@ Extracted to `src/lib/pdf/image-helpers.ts`:
 | **Missing Error Boundary** | `src/app/(dashboard)/layout.tsx` | Added ErrorBoundary component to catch rendering errors gracefully |
 | **Missing ARIA labels** | `scope-items-table.tsx:618` | Added `aria-label` to icon-only buttons for screen reader accessibility |
 
+### Gantt Chart Layout Lessons (Feb 2026)
+
+| Issue | Wrong Approach | Correct Approach |
+|-------|---------------|------------------|
+| **Tree connector lines** | Complex L-shaped SVG/CSS connectors with `treeLineInfo` map | Simple indent spacer (`level * 20px`) + chevron icon — clean and predictable |
+| **Card base padding** | Assumed `py-0` was enough to kill whitespace | Card base has both `py-6` AND `gap-6` — must override both: `py-0 gap-0` |
+| **Fixed chart height** | `height: 400px` on chart area | Use `flex-1 min-h-0` to fill available space dynamically |
+| **Sidebar resize handle** | Draggable resize divider between sidebar and timeline | Auto-width from column widths sum — simpler and aligned |
+| **Row numbers on collapse** | `visibleItems.map((_, index) => index + 1)` re-indexes | Pre-compute `originalIndexMap` from full items array |
+| **Duration column header** | "DURATION" truncated at 56px | Renamed to "DAYS" — fits the column width |
+| **Priority display** | Inline colored dot/badge taking horizontal space | Colored left border (3px) on the row — space-efficient |
+| **DnD grip icon** | Visible 6-dot grip icon causing alignment issues | Move DnD activation to row number span — invisible but functional |
+| **Panel header alignment** | Wrapper div with `border-b` but no explicit `height` — border adds outside children = 1px taller | Set explicit `height` + `box-border` + `overflow-hidden` on both sidebar and timeline header wrappers |
+
+**Key Rule:** When the Gantt sidebar feels cluttered, simplify — remove visual elements rather than adding more spacing. Indentation + text weight (bold parent vs muted child) is enough hierarchy signal.
+
 **Key Takeaways:**
 - Always use `(SELECT auth.uid())` pattern when creating new RLS policies
 - Database schema uses `initial_unit_cost` and `actual_unit_cost`, NOT `unit_cost`
@@ -602,8 +683,18 @@ Extracted to `src/lib/pdf/image-helpers.ts`:
 - PDF V2 template (2-column photos, inline section numbers, print-friendly)
 - Milestone cards view toggle (Cards/Timeline)
 - Team members stats card on Users page
+- Gantt chart system (custom-built, 7 components in `components/gantt/`)
+- Standalone timeline page (`/projects/[id]/timeline`) with React Query + optimistic updates
+- Timeline dependencies (FS/SS/FF/SF with lag days)
+- Timeline hierarchy (phases → tasks → subtasks with indent/outdent)
+- Timeline drag-and-drop (bar move/resize + sidebar reorder via @dnd-kit)
+- Timeline priority system (Low/Normal/High/Critical with colored borders)
+
+### In Progress
+- Gantt chart UI polish (testing phase — migration 045 needs to run on Supabase before data appears)
 
 ### Planned
+- Global capacity view (cross-project phase workload overview)
 - Mobile optimization
 - Command menu (Cmd+K)
 - PDF Executive Summary generation
@@ -680,3 +771,53 @@ Extracted to `src/lib/pdf/image-helpers.ts`:
 | Card Hover | `shadow` |
 | Dropdown | `shadow-md` |
 | Modal | `shadow-lg` |
+
+### Button Sizing
+
+| Context | Size Prop | Dimensions | Example |
+|---------|-----------|------------|---------|
+| Icon-only (toolbar, header) | `size="icon"` | `size-9` (36px) | Edit, Delete icons |
+| Compact row actions | `size="sm"` | `h-8 px-3` | Filter clear, view toggle |
+| Standard actions | default | `h-9 px-4 py-2` | Submit, Cancel, Save |
+| Large CTA | `size="lg"` | `h-10 px-6` | Primary page actions |
+
+**Rules:**
+- Icon-only buttons must always have `aria-label` for accessibility
+- Icon-only buttons should use `Tooltip` wrapper for discoverability
+- Use `size="sm"` for inline/toolbar actions to keep UI compact
+
+### Sheet vs Dialog Usage
+
+| Component | Use For | Position | Example |
+|-----------|---------|----------|---------|
+| **Sheet** | Quick edit/create from tables | Side panel (right) | Add scope item, edit project |
+| **Dialog** | Confirmations, alerts, small forms | Centered modal | Delete confirm, approval reason |
+| **AlertDialog** | Destructive confirmations | Centered modal | Delete project, remove user |
+
+**Rules:**
+- **Sheet** for any form triggered from a table row or list (preserves context)
+- **Dialog** for confirmation prompts, small inputs, or actions that don't need table context
+- **AlertDialog** when the action is destructive and needs explicit "are you sure?"
+- Sheet width: `w-full sm:max-w-lg` (standard), `sm:max-w-2xl` (wide forms)
+
+### Component Hierarchy (ui-helpers.tsx)
+
+| Component | Purpose | Usage |
+|-----------|---------|-------|
+| `GlassCard` | Primary card wrapper | 44+ files, dominant pattern |
+| `StatusBadge` | Semantic status pills with optional dot | Project/item statuses |
+| `Badge` | Generic label/count badges | Counts, tags, categories |
+| `GradientIcon` | Icon with colored background | Card headers, empty states |
+| `GradientAvatar` | User initials with gradient | Team lists, assignments |
+| `EmptyState` | Placeholder for empty content | Lists with no data |
+| `StatCard` | KPI display with trend | Dashboard, finance |
+
+**Note:** `StatusBadge` and `Badge` are complementary — StatusBadge handles semantic statuses (success/warning/danger) with rounded-full pills; Badge is a generic rectangular label. Do NOT try to merge them.
+
+###
+Before starting any task, read AGENTS.md for the latest context from other agents.
+After completing any task, update AGENTS.md with:
+- What you did
+- Which files you changed
+- Any warnings or issues for the next agent
+- What should be done next

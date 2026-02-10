@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   DropdownMenu,
@@ -13,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   ActivityIcon,
   FileTextIcon,
-  MoreHorizontalIcon,
+  ChevronDownIcon,
   PencilRulerIcon,
   PackageIcon,
   AlertTriangleIcon,
@@ -31,10 +32,11 @@ interface ProjectTabsProps {
   incompleteMilestonesCount: number;
   reportsCount: number;
   assignmentsCount: number;
+  drawingsReadyCount?: number;
   isClient: boolean;
 }
 
-// Tab configuration for the "More" dropdown
+// Tabs that go into the "More" dropdown on all screen sizes
 const MORE_TABS = [
   { value: "financials", label: "Financials", icon: WalletIcon, hideForClient: true },
   { value: "timeline", label: "Timeline", icon: GanttChartIcon, hideForClient: true },
@@ -54,9 +56,19 @@ export function ProjectTabs({
   incompleteMilestonesCount,
   reportsCount,
   assignmentsCount,
+  drawingsReadyCount,
   isClient,
 }: ProjectTabsProps) {
-  const [activeTab, setActiveTab] = useState("overview");
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState(tabParam || "overview");
+
+  // Sync tab when URL search params change (e.g., from pending approvals link)
+  useEffect(() => {
+    if (tabParam) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
 
   // Filter tabs based on client status
   const visibleMoreTabs = MORE_TABS.filter(tab => !tab.hideForClient || !isClient);
@@ -79,6 +91,12 @@ export function ProjectTabs({
             {incompleteMilestonesCount}/{milestonesCount}
           </Badge>
         ) : null;
+      case "drawings":
+        return drawingsReadyCount && drawingsReadyCount > 0 && !isClient ? (
+          <Badge className="ml-1.5 text-xs px-1.5 bg-amber-100 text-amber-700 border-amber-200">
+            {drawingsReadyCount}
+          </Badge>
+        ) : null;
       case "team":
         return assignmentsCount > 0 ? (
           <Badge variant="secondary" className="ml-1.5 text-xs px-1.5">
@@ -92,7 +110,7 @@ export function ProjectTabs({
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-      <TabsList className="bg-white/80 backdrop-blur border shadow-sm p-1 h-auto flex-wrap">
+      <TabsList className="bg-white/80 backdrop-blur border shadow-sm p-1 h-auto">
         {/* Primary tabs - always visible */}
         <TabsTrigger value="overview">Overview</TabsTrigger>
         <TabsTrigger value="scope">
@@ -113,97 +131,44 @@ export function ProjectTabs({
           )}
         </TabsTrigger>
 
-        {/* Secondary tabs - visible on desktop, hidden on mobile */}
-        {!isClient && (
-          <TabsTrigger value="financials" className="hidden md:flex">
-            <WalletIcon className="size-4 mr-1.5" />
-            Financials
-          </TabsTrigger>
-        )}
-        {!isClient && (
-          <TabsTrigger value="timeline" className="hidden md:flex">
-            <GanttChartIcon className="size-4 mr-1.5" />
-            Timeline
-          </TabsTrigger>
-        )}
-        <TabsTrigger value="drawings" className="hidden md:flex">
-          Drawings
-        </TabsTrigger>
-        <TabsTrigger value="materials" className="hidden md:flex">
-          Materials
-        </TabsTrigger>
-        <TabsTrigger value="snagging" className="hidden md:flex">
-          Snagging
-          {openSnaggingCount > 0 && (
-            <Badge variant="destructive" className="ml-2 text-xs">
-              {openSnaggingCount}
-            </Badge>
-          )}
-        </TabsTrigger>
-        {!isClient && (
-          <TabsTrigger value="milestones" className="hidden md:flex">
-            Milestones
-            {milestonesCount > 0 && (
-              <Badge variant="secondary" className="ml-2 text-xs">
-                {incompleteMilestonesCount}/{milestonesCount}
-              </Badge>
-            )}
-          </TabsTrigger>
-        )}
-        <TabsTrigger value="team" className="hidden md:flex">
-          Team
-          {assignmentsCount > 0 && (
-            <Badge variant="secondary" className="ml-2 text-xs">
-              {assignmentsCount}
-            </Badge>
-          )}
-        </TabsTrigger>
-        <TabsTrigger value="activity" className="hidden md:flex">
-          <ActivityIcon className="size-4 mr-1.5" />
-          Activity
-        </TabsTrigger>
-
-        {/* "More" dropdown - visible only on mobile */}
-        <div className="md:hidden">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant={activeTabInMore ? "secondary" : "ghost"}
-                size="sm"
-                className="h-8 px-3 gap-1.5"
-              >
-                {activeMoreTab ? (
-                  <>
-                    <activeMoreTab.icon className="size-4" />
-                    {activeMoreTab.label}
-                  </>
-                ) : (
-                  <>
-                    <MoreHorizontalIcon className="size-4" />
-                    More
-                  </>
-                )}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              {visibleMoreTabs.map((tab) => {
-                const Icon = tab.icon;
-                const badge = getBadgeForTab(tab.value);
-                return (
-                  <DropdownMenuItem
-                    key={tab.value}
-                    onClick={() => setActiveTab(tab.value)}
-                    className={activeTab === tab.value ? "bg-accent" : ""}
-                  >
-                    <Icon className="size-4 mr-2" />
-                    {tab.label}
-                    {badge}
-                  </DropdownMenuItem>
-                );
-              })}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+        {/* "More" dropdown - always visible */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant={activeTabInMore ? "secondary" : "ghost"}
+              size="sm"
+              className="h-8 px-3 gap-1.5"
+            >
+              {activeMoreTab ? (
+                <>
+                  <activeMoreTab.icon className="size-4" />
+                  {activeMoreTab.label}
+                  {getBadgeForTab(activeMoreTab.value)}
+                </>
+              ) : (
+                "More"
+              )}
+              <ChevronDownIcon className="size-3.5 opacity-50" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-48">
+            {visibleMoreTabs.map((tab) => {
+              const Icon = tab.icon;
+              const badge = getBadgeForTab(tab.value);
+              return (
+                <DropdownMenuItem
+                  key={tab.value}
+                  onClick={() => setActiveTab(tab.value)}
+                  className={activeTab === tab.value ? "bg-accent" : ""}
+                >
+                  <Icon className="size-4 mr-2" />
+                  {tab.label}
+                  {badge}
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </TabsList>
 
       {children}

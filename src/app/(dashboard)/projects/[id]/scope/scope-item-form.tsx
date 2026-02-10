@@ -478,6 +478,7 @@ export function ScopeItemForm({ projectId, projectCurrency = "TRY", initialData 
           <div className="space-y-2">
             <Label>Images</Label>
             <ScopeItemImageUpload
+              projectId={projectId}
               images={images}
               onChange={setImages}
               disabled={isLoading}
