@@ -152,7 +152,7 @@ export default async function DashboardPage() {
   if (isClient) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="p-6 space-y-5">
+        <div className="p-4 md:p-6 space-y-5">
           <DashboardHeader userName={userName} />
 
           <div className="grid gap-5">
@@ -186,7 +186,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-background relative">
-      <div className="p-6 space-y-5 pb-16">
+      <div className="p-4 md:p-6 space-y-5 pb-16">
         <DashboardHeader userName={userName} />
 
         {/* Top Section: Layout varies by role */}

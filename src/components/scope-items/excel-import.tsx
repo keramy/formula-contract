@@ -37,11 +37,12 @@ type ImportMode = "merge" | "replace";
 interface ExcelImportProps {
   projectId: string;
   projectCode: string;
+  compact?: boolean;
 }
 
 type ImportStep = "upload" | "preview" | "importing" | "complete";
 
-export function ExcelImport({ projectId, projectCode }: ExcelImportProps) {
+export function ExcelImport({ projectId, projectCode, compact = false }: ExcelImportProps) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -268,9 +269,16 @@ export function ExcelImport({ projectId, projectCode }: ExcelImportProps) {
   return (
     <Dialog open={isOpen} onOpenChange={(open) => (open ? setIsOpen(true) : handleClose())}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <FileSpreadsheetIcon className="size-4" />
-          Import Excel
+        <Button variant="outline" size="sm" className="h-8 px-2.5">
+          <FileSpreadsheetIcon className="size-3.5" />
+          {compact ? (
+            <>
+              <span className="sm:hidden">Import</span>
+              <span className="hidden sm:inline">Import Excel</span>
+            </>
+          ) : (
+            "Import Excel"
+          )}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">

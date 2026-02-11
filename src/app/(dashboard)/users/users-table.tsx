@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { ResponsiveDataView } from "@/components/ui/responsive-data-view";
 import {
   Table,
   TableBody,
@@ -176,7 +178,7 @@ export function UsersTable({ users }: UsersTableProps) {
             className="pl-9 bg-white/50 border-gray-200 focus:bg-white transition-colors"
           />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <FilterIcon className="size-4 text-muted-foreground hidden sm:block" />
           <Select
             value={searchParams.get("role") || "all"}
@@ -203,112 +205,187 @@ export function UsersTable({ users }: UsersTableProps) {
         </Button>
       </div>
 
-      {/* Table */}
-      <GlassCard className="py-0">
-        <Table>
-          <TableHeader>
-            <TableRow className="hover:bg-transparent border-b border-gray-100">
-              <TableHead className="py-4 w-24">Code</TableHead>
-              <TableHead>User</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Last Active</TableHead>
-              <TableHead className="w-[50px]"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {users.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                  No users found matching your filters.
-                </TableCell>
-              </TableRow>
-            ) : (
-              users.map((user, index) => {
-                const userStatus = getUserStatus(user);
-                const statusConf = statusConfig[userStatus];
-                const roleConf = roleConfig[user.role] || { variant: "default" as RoleVariant, label: user.role };
-
-                return (
-                  <TableRow
-                    key={user.id}
-                    className={`group hover:bg-primary/5 border-b border-base-50 last:border-0 ${userStatus === "inactive" ? "opacity-60" : ""}`}
-                  >
-                    <TableCell className="py-4">
-                      <span className="text-sm font-mono font-medium text-orange-600">
-                        {user.employee_code || "—"}
-                      </span>
-                    </TableCell>
-                    <TableCell className="py-4">
-                      <div className="flex items-center gap-3">
-                        <GradientAvatar name={user.name} size="sm" colorIndex={(index + 4) % 8} />
-                        <span className="font-medium">{user.name}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{user.email}</TableCell>
-                    <TableCell>
-                      <StatusBadge variant={roleConf.variant} dot>
-                        {roleConf.label}
-                      </StatusBadge>
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge variant={statusConf.variant} dot>
-                        {statusConf.label}
-                      </StatusBadge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {user.last_active_at
-                        ? format(new Date(user.last_active_at), "MMM d, yyyy 'at' h:mm a")
-                        : user.last_login_at
-                        ? format(new Date(user.last_login_at), "MMM d, yyyy 'at' h:mm a")
-                        : "Never"}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                            disabled={isLoading}
-                          >
-                            <MoreHorizontalIcon className="size-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48">
-                          <DropdownMenuItem onClick={() => handleEditUser(user)} className="cursor-pointer">
-                            <PencilIcon className="size-4 mr-2" />
-                            Edit User
-                          </DropdownMenuItem>
-                          {userStatus !== "pending" && (
-                            <>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => handleToggleActive(user)} className="cursor-pointer">
-                                {user.is_active ? (
-                                  <>
-                                    <UserXIcon className="size-4 mr-2" />
-                                    Deactivate
-                                  </>
-                                ) : (
-                                  <>
-                                    <UserCheckIcon className="size-4 mr-2" />
-                                    Activate
-                                  </>
-                                )}
-                              </DropdownMenuItem>
-                            </>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+      <ResponsiveDataView
+        data={users}
+        cardsClassName="grid grid-cols-1 gap-3"
+        emptyState={
+          <GlassCard>
+            <EmptyState
+              icon={<UsersIcon className="size-8" />}
+              title="No users found"
+              description="No users found matching your filters."
+            />
+          </GlassCard>
+        }
+        tableView={(
+          <GlassCard className="py-0">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent border-b border-gray-100">
+                  <TableHead className="py-4 w-24">Code</TableHead>
+                  <TableHead>User</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Last Active</TableHead>
+                  <TableHead className="w-[50px]"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {users.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      No users found matching your filters.
                     </TableCell>
                   </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </GlassCard>
+                ) : (
+                  users.map((user, index) => {
+                    const userStatus = getUserStatus(user);
+                    const statusConf = statusConfig[userStatus];
+                    const roleConf = roleConfig[user.role] || { variant: "default" as RoleVariant, label: user.role };
+
+                    return (
+                      <TableRow
+                        key={user.id}
+                        className={`group hover:bg-primary/5 border-b border-base-50 last:border-0 ${userStatus === "inactive" ? "opacity-60" : ""}`}
+                      >
+                        <TableCell className="py-4">
+                          <span className="text-sm font-mono font-medium text-orange-600">
+                            {user.employee_code || "—"}
+                          </span>
+                        </TableCell>
+                        <TableCell className="py-4">
+                          <div className="flex items-center gap-3">
+                            <GradientAvatar name={user.name} size="sm" colorIndex={(index + 4) % 8} />
+                            <span className="font-medium">{user.name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                        <TableCell>
+                          <StatusBadge variant={roleConf.variant} dot>
+                            {roleConf.label}
+                          </StatusBadge>
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge variant={statusConf.variant} dot>
+                            {statusConf.label}
+                          </StatusBadge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {user.last_active_at
+                            ? format(new Date(user.last_active_at), "MMM d, yyyy 'at' h:mm a")
+                            : user.last_login_at
+                            ? format(new Date(user.last_login_at), "MMM d, yyyy 'at' h:mm a")
+                            : "Never"}
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="size-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                                disabled={isLoading}
+                              >
+                                <MoreHorizontalIcon className="size-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuItem onClick={() => handleEditUser(user)} className="cursor-pointer">
+                                <PencilIcon className="size-4 mr-2" />
+                                Edit User
+                              </DropdownMenuItem>
+                              {userStatus !== "pending" && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={() => handleToggleActive(user)} className="cursor-pointer">
+                                    {user.is_active ? (
+                                      <>
+                                        <UserXIcon className="size-4 mr-2" />
+                                        Deactivate
+                                      </>
+                                    ) : (
+                                      <>
+                                        <UserCheckIcon className="size-4 mr-2" />
+                                        Activate
+                                      </>
+                                    )}
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </GlassCard>
+        )}
+        renderCard={(user, index) => {
+          const userStatus = getUserStatus(user);
+          const statusConf = statusConfig[userStatus];
+          const roleConf = roleConfig[user.role] || { variant: "default" as RoleVariant, label: user.role };
+          return (
+            <GlassCard key={user.id} className={`p-4 space-y-3 ${userStatus === "inactive" ? "opacity-60" : ""}`}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-3 min-w-0">
+                  <GradientAvatar name={user.name} size="sm" colorIndex={(index + 4) % 8} />
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">{user.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                  </div>
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="size-8" disabled={isLoading}>
+                      <MoreHorizontalIcon className="size-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem onClick={() => handleEditUser(user)} className="cursor-pointer">
+                      <PencilIcon className="size-4 mr-2" />
+                      Edit User
+                    </DropdownMenuItem>
+                    {userStatus !== "pending" && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => handleToggleActive(user)} className="cursor-pointer">
+                          {user.is_active ? (
+                            <>
+                              <UserXIcon className="size-4 mr-2" />
+                              Deactivate
+                            </>
+                          ) : (
+                            <>
+                              <UserCheckIcon className="size-4 mr-2" />
+                              Activate
+                            </>
+                          )}
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <StatusBadge variant={roleConf.variant} dot>{roleConf.label}</StatusBadge>
+                <StatusBadge variant={statusConf.variant} dot>{statusConf.label}</StatusBadge>
+                <Badge variant="outline" className="font-mono">{user.employee_code || "—"}</Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Last active: {user.last_active_at
+                  ? format(new Date(user.last_active_at), "MMM d, yyyy 'at' h:mm a")
+                  : user.last_login_at
+                  ? format(new Date(user.last_login_at), "MMM d, yyyy 'at' h:mm a")
+                  : "Never"}
+              </p>
+            </GlassCard>
+          );
+        }}
+      />
 
       {/* Form Dialog */}
       <UserFormDialog

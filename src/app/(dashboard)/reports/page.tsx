@@ -100,7 +100,7 @@ export default async function ReportsPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-6">
       {/* Page Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-foreground">Reports & Analytics</h1>

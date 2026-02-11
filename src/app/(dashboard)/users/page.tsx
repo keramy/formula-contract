@@ -47,7 +47,7 @@ export default async function UsersPage({
   const allUsers = (users || []) as User[];
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-6">
       {/* Page Header */}
       <UsersPageHeader />
 

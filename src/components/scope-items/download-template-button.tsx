@@ -8,9 +8,10 @@ import { downloadScopeItemsTemplate } from "@/lib/excel-template";
 
 interface DownloadTemplateButtonProps {
   projectCode: string;
+  compact?: boolean;
 }
 
-export function DownloadTemplateButton({ projectCode }: DownloadTemplateButtonProps) {
+export function DownloadTemplateButton({ projectCode, compact = false }: DownloadTemplateButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleDownload = async () => {
@@ -28,9 +29,17 @@ export function DownloadTemplateButton({ projectCode }: DownloadTemplateButtonPr
       size="sm"
       onClick={handleDownload}
       disabled={isLoading}
+      className="h-8 px-2.5"
     >
-      {isLoading ? <Spinner className="size-4" /> : <DownloadIcon className="size-4" />}
-      Download Template
+      {isLoading ? <Spinner className="size-3.5" /> : <DownloadIcon className="size-3.5" />}
+      {compact ? (
+        <>
+          <span className="sm:hidden">Template</span>
+          <span className="hidden sm:inline">Download Template</span>
+        </>
+      ) : (
+        "Download Template"
+      )}
     </Button>
   );
 }

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ResponsiveDataView } from "@/components/ui/responsive-data-view";
 import {
   Table,
   TableBody,
@@ -31,7 +32,16 @@ import {
   UploadIcon,
   AlertTriangleIcon,
   SendIcon,
+  Clock3Icon,
+  CheckCircle2Icon,
+  MoreHorizontalIcon,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { DrawingUploadSheet } from "@/components/drawings/drawing-upload-sheet";
 import { ScopeItemSheet } from "@/components/scope-items/scope-item-sheet";
 import { sendDrawingsToClient } from "@/lib/actions/drawings";
@@ -186,8 +196,44 @@ export function DrawingsOverview({ projectId, productionItems, drawings, project
   return (
     <div>
       {/* Stats + actions bar, flush above the table */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground md:hidden">
+          <PenToolIcon className="size-3.5 text-teal-600" />
+          <span className="font-medium text-foreground">{stats.total} items</span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-1.5 rounded-lg border border-base-200 bg-base-50/70 p-1.5 md:hidden">
+          <div className="rounded-md border border-base-200/80 bg-white px-2.5 py-1.5 dark:bg-base-950/40">
+            <div className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+              <UploadIcon className="size-3 text-orange-600" />
+              Need Upload
+            </div>
+            <p className="mt-1 text-sm font-semibold leading-none text-orange-700">{stats.needDrawing}</p>
+          </div>
+          <div className="rounded-md border border-base-200/80 bg-white px-2.5 py-1.5 dark:bg-base-950/40">
+            <div className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+              <Clock3Icon className="size-3 text-amber-600" />
+              Awaiting
+            </div>
+            <p className="mt-1 text-sm font-semibold leading-none text-amber-700">{stats.awaitingClient}</p>
+          </div>
+          <div className="rounded-md border border-base-200/80 bg-white px-2.5 py-1.5 dark:bg-base-950/40">
+            <div className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+              <AlertTriangleIcon className="size-3 text-rose-600" />
+              Rejected
+            </div>
+            <p className="mt-1 text-sm font-semibold leading-none text-rose-700">{stats.rejected}</p>
+          </div>
+          <div className="rounded-md border border-base-200/80 bg-white px-2.5 py-1.5 dark:bg-base-950/40">
+            <div className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+              <CheckCircle2Icon className="size-3 text-emerald-600" />
+              Approved
+            </div>
+            <p className="mt-1 text-sm font-semibold leading-none text-emerald-700">{stats.approved}</p>
+          </div>
+        </div>
+
+        <div className="hidden items-center gap-1.5 text-xs text-muted-foreground md:flex">
           <PenToolIcon className="size-3.5 text-teal-600" />
           <span className="font-medium text-foreground">{stats.total} items</span>
           {!isClient && (
@@ -203,20 +249,22 @@ export function DrawingsOverview({ projectId, productionItems, drawings, project
           )}
         </div>
         {!isClient && (
-          <div className="flex gap-1.5">
+          <div className="flex flex-wrap gap-1.5">
             {readyToSendCount > 0 && (
               <Button
                 variant="outline"
                 size="sm"
+                className="h-8 px-2.5 text-xs md:h-9 md:px-3 md:text-sm"
                 onClick={() => setBulkSendDialogOpen(true)}
                 disabled={isSending}
               >
                 <SendIcon className="size-3.5" />
-                Send All ({readyToSendCount})
+                Send ({readyToSendCount})
               </Button>
             )}
             <Button
               size="sm"
+              className="h-8 px-2.5 text-xs md:h-9 md:px-3 md:text-sm"
               onClick={() => {
                 setPreselectedItemId(undefined);
                 setUploadSheetOpen(true);
@@ -229,9 +277,13 @@ export function DrawingsOverview({ projectId, productionItems, drawings, project
         )}
       </div>
 
-      <GlassCard className="py-0 gap-0">
-        <div className="overflow-hidden">
-            <Table>
+      <ResponsiveDataView
+        data={visibleItems}
+        cardsClassName="grid grid-cols-1 gap-2.5"
+        tableView={(
+          <GlassCard className="py-0 gap-0">
+            <div className="overflow-hidden">
+              <Table>
               <TableHeader>
                 <TableRow className="bg-gray-50/50">
                   <TableHead className="w-12 text-center">#</TableHead>
@@ -312,9 +364,70 @@ export function DrawingsOverview({ projectId, productionItems, drawings, project
                   );
                 })}
               </TableBody>
-            </Table>
-        </div>
-      </GlassCard>
+              </Table>
+            </div>
+          </GlassCard>
+        )}
+        renderCard={(item, index) => {
+          const status = item.drawing?.status || "not_uploaded";
+          const config = statusConfig[status] || { variant: "default" as StatusVariant, label: status };
+          const isApproved = item.drawing?.status === "approved" || item.drawing?.status === "approved_with_comments";
+          return (
+            <GlassCard key={item.id} className="p-2.5 space-y-1.5">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-mono text-xs text-muted-foreground">{item.item_code}</p>
+                  <p className="text-sm font-medium truncate">{item.name}</p>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-xs text-muted-foreground">#{index + 1}</span>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon-sm" className="size-7" aria-label="Drawing actions">
+                        <MoreHorizontalIcon className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => openViewSheet(item.id)}>
+                        <EyeIcon className="size-4 mr-2" />
+                        View
+                      </DropdownMenuItem>
+                      {!isClient && (
+                        <DropdownMenuItem
+                          onClick={() => {
+                            if (isApproved) {
+                              setPendingNewRevItemId(item.id);
+                              setConfirmNewRevOpen(true);
+                            } else {
+                              setPreselectedItemId(item.id);
+                              setUploadSheetOpen(true);
+                            }
+                          }}
+                        >
+                          <UploadIcon className="size-4 mr-2" />
+                          {item.drawing ? "New Revision" : "Upload Drawing"}
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {item.drawing?.current_revision ? (
+                  <Badge variant="outline" className="h-5 px-2 text-[11px] font-mono bg-teal-50 text-teal-700 border-teal-200">
+                    Rev {item.drawing.current_revision}
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="h-5 px-2 text-[11px]">No Rev</Badge>
+                )}
+                <StatusBadge variant={config.variant} className="h-5 px-2 text-[11px]">
+                  {config.label}
+                </StatusBadge>
+              </div>
+            </GlassCard>
+          );
+        }}
+      />
 
       {/* Drawing Upload Sheet */}
       <DrawingUploadSheet

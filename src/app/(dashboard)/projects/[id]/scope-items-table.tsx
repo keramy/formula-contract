@@ -78,6 +78,8 @@ import {
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { GlassCard, EmptyState, StatusBadge } from "@/components/ui/ui-helpers";
+import { ResponsiveDataView } from "@/components/ui/responsive-data-view";
+import { useBreakpoint } from "@/hooks/use-media-query";
 import {
   Tooltip,
   TooltipContent,
@@ -91,8 +93,7 @@ import {
   defaultFilters,
   applyFilters,
 } from "@/components/scope-items/scope-items-filter-bar";
-import { ExportButton } from "@/components/ui/export-button";
-import { type ColumnDefinition, formatters } from "@/lib/export/export-utils";
+import { ScopeItemCard } from "@/components/scope-items/scope-item-card";
 
 // ============================================================================
 // PERFORMANCE: Lazy load the Sheet component
@@ -784,6 +785,7 @@ function organizeHierarchically(items: ScopeItem[]): HierarchicalScopeItem[] {
 }
 
 export function ScopeItemsTable({ projectId, items, materials, currency = "TRY", isClient = false, userRole = "pm" }: ScopeItemsTableProps) {
+  const { isMobile } = useBreakpoint();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -1130,131 +1132,121 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
   }
 
   // Extract memoized summary values for cleaner JSX
-  const { totalSalesPrice, totalActualCost, totalInitialCost, avgProgress } = summaryStats;
+  const { totalSalesPrice, totalActualCost, avgProgress } = summaryStats;
+
+  const renderColumnsControl = () => (
+    <Popover open={columnPopoverOpen} onOpenChange={setColumnPopoverOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="h-8 px-2.5">
+          <SlidersHorizontalIcon className="size-3.5 mr-1.5" />
+          Columns
+          <Badge variant="secondary" className="ml-1.5 text-xs px-1.5">
+            {visibleColumns.size}
+          </Badge>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-56 p-3">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="font-medium text-sm">Visible Columns</h4>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={resetToDefaults}
+            >
+              Reset
+            </Button>
+          </div>
+          <div className="space-y-1">
+            {COLUMNS
+              .filter(column => !isClient || !clientHiddenColumns.has(column.id))
+              .map((column) => (
+              <label
+                key={column.id}
+                className="flex items-center gap-2 p-1.5 hover:bg-muted rounded cursor-pointer"
+              >
+                <Checkbox
+                  checked={isColumnVisible(column.id)}
+                  onCheckedChange={() => toggleColumn(column.id)}
+                  disabled={column.id === "code" || column.id === "name"}
+                />
+                <span className="text-sm flex-1">{column.label}</span>
+                {isColumnVisible(column.id) ? (
+                  <EyeIcon className="size-3.5 text-muted-foreground" />
+                ) : (
+                  <EyeOffIcon className="size-3.5 text-muted-foreground" />
+                )}
+              </label>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Code and Name are always visible
+          </p>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 
   return (
     <div className="space-y-3">
       {/* Summary Bar */}
-      <div className="flex flex-wrap items-center gap-4 p-3 bg-base-50 dark:bg-base-900/20 border border-base-200 dark:border-base-800 rounded-lg">
-        <div className="flex items-center gap-2">
-          <ListIcon className="size-4 text-primary" />
-          <span className="text-sm font-medium">Items:</span>
-          <span className="text-sm font-bold text-primary">{items.length}</span>
-        </div>
-        {/* Hide cost/sales info from clients */}
-        {!isClient && (
-          <>
-            <div className="h-4 w-px bg-base-200 dark:bg-base-700" />
-            <div className="flex items-center gap-2" title="Total Sales Price (what client pays)">
-              <BanknoteIcon className="size-4 text-emerald-600" />
-              <span className="text-sm font-medium">Sales:</span>
-              <span className="text-sm font-bold text-emerald-700">{formatCurrency(totalSalesPrice)}</span>
+      <div className="rounded-lg border border-base-200 bg-base-50/70 p-1.5 dark:border-base-800 dark:bg-base-900/20">
+        <div className="grid grid-cols-2 gap-1.5">
+          <div className="rounded-md border border-base-200/80 bg-white px-2.5 py-1.5 dark:bg-base-950/40">
+            <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+              <span className="inline-flex items-center gap-1">
+                <ListIcon className="size-3 text-primary" />
+                Items
+              </span>
             </div>
-            <div className="h-4 w-px bg-base-200 dark:bg-base-700" />
-            <div className="flex items-center gap-2" title="Total Actual Cost (what we pay)">
-              <BanknoteIcon className="size-4 text-orange-600" />
-              <span className="text-sm font-medium">Actual Cost:</span>
-              <span className="text-sm font-bold text-orange-700">{formatCurrency(totalActualCost)}</span>
-            </div>
-            {totalInitialCost > 0 && (
-              <>
-                <div className="h-4 w-px bg-base-200 dark:bg-base-700" />
-                <div className="flex items-center gap-2" title="Total Initial Cost (locked snapshot)">
-                  <BanknoteIcon className="size-4 text-gray-500" />
-                  <span className="text-sm font-medium">Initial:</span>
-                  <span className="text-sm font-bold text-gray-600">{formatCurrency(totalInitialCost)}</span>
-                </div>
-              </>
-            )}
-          </>
-        )}
-        <div className="h-4 w-px bg-base-200 dark:bg-base-700" />
-        <div className="flex items-center gap-2">
-          <BarChart3Icon className="size-4 text-blue-600" />
-          <span className="text-sm font-medium">Progress:</span>
-          <span className="text-sm font-bold text-blue-700">{avgProgress}%</span>
-        </div>
+            <p className="mt-1 truncate text-sm font-semibold leading-none text-primary">{items.length}</p>
+          </div>
 
-        {/* Column Visibility Toggle */}
-        <div className="ml-auto">
-          <Popover open={columnPopoverOpen} onOpenChange={setColumnPopoverOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8">
-                <SlidersHorizontalIcon className="size-4 mr-1.5" />
-                Columns
-                <Badge variant="secondary" className="ml-1.5 text-xs px-1.5">
-                  {visibleColumns.size}
-                </Badge>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-56 p-3">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-medium text-sm">Visible Columns</h4>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={resetToDefaults}
-                  >
-                    Reset
-                  </Button>
-                </div>
-                <div className="space-y-1">
-                  {COLUMNS
-                    .filter(column => !isClient || !clientHiddenColumns.has(column.id))
-                    .map((column) => (
-                    <label
-                      key={column.id}
-                      className="flex items-center gap-2 p-1.5 hover:bg-muted rounded cursor-pointer"
-                    >
-                      <Checkbox
-                        checked={isColumnVisible(column.id)}
-                        onCheckedChange={() => toggleColumn(column.id)}
-                        disabled={column.id === "code" || column.id === "name"}
-                      />
-                      <span className="text-sm flex-1">{column.label}</span>
-                      {isColumnVisible(column.id) ? (
-                        <EyeIcon className="size-3.5 text-muted-foreground" />
-                      ) : (
-                        <EyeOffIcon className="size-3.5 text-muted-foreground" />
-                      )}
-                    </label>
-                  ))}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Code and Name are always visible
-                </p>
+          {!isClient && (
+            <div
+              className="rounded-md border border-base-200/80 bg-white px-2.5 py-1.5 dark:bg-base-950/40"
+              title="Total Sales Price (what client pays)"
+            >
+              <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                <span className="inline-flex items-center gap-1">
+                  <BanknoteIcon className="size-3 text-emerald-600" />
+                  Sales
+                </span>
               </div>
-            </PopoverContent>
-          </Popover>
-          {/* Export Button */}
-          <ExportButton
-            data={filteredItems.map(item => ({
-              ...item,
-              item_path: item.item_path,
-              status: item.status,
-            }))}
-            columns={[
-              { key: "item_code", header: "Code" },
-              { key: "name", header: "Name" },
-              { key: "item_path", header: "Path", format: formatters.status },
-              { key: "status", header: "Status", format: formatters.status },
-              { key: "quantity", header: "Quantity" },
-              { key: "unit", header: "Unit" },
-              { key: "initial_unit_cost", header: "Initial Unit Cost", format: formatters.currency(currency) },
-              { key: "initial_total_cost", header: "Initial Total Cost", format: formatters.currency(currency) },
-              { key: "actual_unit_cost", header: "Actual Unit Cost", format: formatters.currency(currency) },
-              { key: "actual_total_cost", header: "Actual Total Cost", format: formatters.currency(currency) },
-              { key: "unit_sales_price", header: "Unit Sales Price", format: formatters.currency(currency) },
-              { key: "total_sales_price", header: "Total Sales Price", format: formatters.currency(currency) },
-              { key: "production_percentage", header: "Production %", format: formatters.percentage },
-              { key: "is_shipped", header: "Shipped", format: formatters.boolean() },
-              { key: "is_installed", header: "Installed", format: formatters.boolean() },
-            ]}
-            filename={`scope-items-${projectId}`}
-            sheetName="Scope Items"
-          />
+              <p className="mt-1 truncate text-sm font-semibold leading-none text-emerald-700">
+                {formatCurrency(totalSalesPrice)}
+              </p>
+            </div>
+          )}
+
+          {!isClient && (
+            <div
+              className="rounded-md border border-base-200/80 bg-white px-2.5 py-1.5 dark:bg-base-950/40"
+              title="Total Actual Cost (what we pay)"
+            >
+              <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                <span className="inline-flex items-center gap-1">
+                  <BanknoteIcon className="size-3 text-orange-600" />
+                  Actual
+                </span>
+              </div>
+              <p className="mt-1 truncate text-sm font-semibold leading-none text-orange-700">
+                {formatCurrency(totalActualCost)}
+              </p>
+            </div>
+          )}
+
+          <div className="rounded-md border border-base-200/80 bg-white px-2.5 py-1.5 dark:bg-base-950/40">
+            <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+              <span className="inline-flex items-center gap-1">
+                <BarChart3Icon className="size-3 text-blue-600" />
+                Progress
+              </span>
+              <span className="text-xs font-semibold text-blue-700">{avgProgress}%</span>
+            </div>
+            <Progress value={avgProgress} className="mt-1 h-1.5 [&>div]:bg-teal-400" />
+          </div>
         </div>
       </div>
 
@@ -1264,6 +1256,7 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
         onFiltersChange={setFilters}
         totalCount={items.length}
         filteredCount={filteredItems.length}
+        renderExtraAction={isMobile ? undefined : renderColumnsControl}
       />
 
       {/* Selection Toolbar */}
@@ -1386,104 +1379,121 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
         </div>
       )}
 
-      {/* Table with mobile scroll hint */}
-      <GlassCard className="py-0 relative">
-        {/* Mobile scroll hint - gradient shadow on right edge */}
-        <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white/80 to-transparent pointer-events-none z-10 md:hidden" />
-        <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow className="hover:bg-transparent border-b border-gray-100">
-              <TableHead className="w-[40px] py-4">
-                <Checkbox
-                  checked={isAllSelected}
-                  ref={(el) => {
-                    if (el) {
-                      (el as HTMLButtonElement & { indeterminate?: boolean }).indeterminate = isSomeSelected;
-                    }
-                  }}
-                  onCheckedChange={toggleSelectAll}
-                />
-              </TableHead>
-              {isColumnVisible("row") && <TableHead className="w-[40px] text-center">#</TableHead>}
-              {isColumnVisible("code") && <TableHead>Code</TableHead>}
-              {isColumnVisible("name") && <TableHead>Name</TableHead>}
-              {isColumnVisible("path") && <TableHead>Path</TableHead>}
-              {isColumnVisible("status") && <TableHead>Status</TableHead>}
-              {isColumnVisible("quantity") && <TableHead className="text-right">Qty</TableHead>}
-              {isColumnVisible("initial_unit_cost") && (
-                <TableHead className="text-right text-blue-600">
-                  <Tooltip>
-                    <TooltipTrigger className="cursor-help underline decoration-dotted underline-offset-2">Init Unit</TooltipTrigger>
-                    <TooltipContent>Initial/Budget Unit Cost</TooltipContent>
-                  </Tooltip>
-                </TableHead>
-              )}
-              {isColumnVisible("initial_total_cost") && (
-                <TableHead className="text-right text-blue-600">
-                  <Tooltip>
-                    <TooltipTrigger className="cursor-help underline decoration-dotted underline-offset-2">Init Total</TooltipTrigger>
-                    <TooltipContent>Initial/Budget Total Cost (locked)</TooltipContent>
-                  </Tooltip>
-                </TableHead>
-              )}
-              {isColumnVisible("actual_unit_cost") && (
-                <TableHead className="text-right text-amber-600">
-                  <Tooltip>
-                    <TooltipTrigger className="cursor-help underline decoration-dotted underline-offset-2">Act Unit</TooltipTrigger>
-                    <TooltipContent>Actual Unit Cost (real cost per item)</TooltipContent>
-                  </Tooltip>
-                </TableHead>
-              )}
-              {isColumnVisible("actual_total_cost") && (
-                <TableHead className="text-right text-amber-600">
-                  <Tooltip>
-                    <TooltipTrigger className="cursor-help underline decoration-dotted underline-offset-2">Act Total</TooltipTrigger>
-                    <TooltipContent>Actual Total Cost (real cost)</TooltipContent>
-                  </Tooltip>
-                </TableHead>
-              )}
-              {isColumnVisible("unit_sales_price") && (
-                <TableHead className="text-right text-green-600">
-                  <Tooltip>
-                    <TooltipTrigger className="cursor-help underline decoration-dotted underline-offset-2">Sale Unit</TooltipTrigger>
-                    <TooltipContent>Selling Price per Unit</TooltipContent>
-                  </Tooltip>
-                </TableHead>
-              )}
-              {isColumnVisible("total_sales_price") && (
-                <TableHead className="text-right text-green-600">
-                  <Tooltip>
-                    <TooltipTrigger className="cursor-help underline decoration-dotted underline-offset-2">Sale Total</TooltipTrigger>
-                    <TooltipContent>Total Selling Price (unit × qty)</TooltipContent>
-                  </Tooltip>
-                </TableHead>
-              )}
-              {isColumnVisible("progress") && <TableHead className="w-[100px]">Progress</TableHead>}
-              {isColumnVisible("installed") && <TableHead className="text-center">Installed</TableHead>}
-              <TableHead className="w-[50px]"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {hierarchicalItems.map((item) => (
-              <ScopeItemRow
-                key={item.id}
-                item={item}
-                isSelected={selectedIds.has(item.id)}
-                projectId={projectId}
-                isColumnVisible={isColumnVisible}
-                formatCurrency={formatCurrency}
-                onToggleSelect={toggleSelect}
-                onOpenSplitDialog={openSplitDialog}
-                onOpenDeleteDialog={openDeleteDialog}
-                onEditItem={openItemSheet}
-                onViewItem={openItemSheet}
-              />
-            ))}
-          </TableBody>
-        </Table>
-        </div>
-      </GlassCard>
+      <ResponsiveDataView
+        data={hierarchicalItems}
+        cardsClassName="grid grid-cols-1 gap-3"
+        tableView={(
+          <GlassCard className="py-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent border-b border-gray-100">
+                    <TableHead className="w-[40px] py-4">
+                      <Checkbox
+                        checked={isAllSelected}
+                        ref={(el) => {
+                          if (el) {
+                            (el as HTMLButtonElement & { indeterminate?: boolean }).indeterminate = isSomeSelected;
+                          }
+                        }}
+                        onCheckedChange={toggleSelectAll}
+                      />
+                    </TableHead>
+                    {isColumnVisible("row") && <TableHead className="w-[40px] text-center">#</TableHead>}
+                    {isColumnVisible("code") && <TableHead>Code</TableHead>}
+                    {isColumnVisible("name") && <TableHead>Name</TableHead>}
+                    {isColumnVisible("path") && <TableHead>Path</TableHead>}
+                    {isColumnVisible("status") && <TableHead>Status</TableHead>}
+                    {isColumnVisible("quantity") && <TableHead className="text-right">Qty</TableHead>}
+                    {isColumnVisible("initial_unit_cost") && (
+                      <TableHead className="text-right text-blue-600">
+                        <Tooltip>
+                          <TooltipTrigger className="cursor-help underline decoration-dotted underline-offset-2">Init Unit</TooltipTrigger>
+                          <TooltipContent>Initial/Budget Unit Cost</TooltipContent>
+                        </Tooltip>
+                      </TableHead>
+                    )}
+                    {isColumnVisible("initial_total_cost") && (
+                      <TableHead className="text-right text-blue-600">
+                        <Tooltip>
+                          <TooltipTrigger className="cursor-help underline decoration-dotted underline-offset-2">Init Total</TooltipTrigger>
+                          <TooltipContent>Initial/Budget Total Cost (locked)</TooltipContent>
+                        </Tooltip>
+                      </TableHead>
+                    )}
+                    {isColumnVisible("actual_unit_cost") && (
+                      <TableHead className="text-right text-amber-600">
+                        <Tooltip>
+                          <TooltipTrigger className="cursor-help underline decoration-dotted underline-offset-2">Act Unit</TooltipTrigger>
+                          <TooltipContent>Actual Unit Cost (real cost per item)</TooltipContent>
+                        </Tooltip>
+                      </TableHead>
+                    )}
+                    {isColumnVisible("actual_total_cost") && (
+                      <TableHead className="text-right text-amber-600">
+                        <Tooltip>
+                          <TooltipTrigger className="cursor-help underline decoration-dotted underline-offset-2">Act Total</TooltipTrigger>
+                          <TooltipContent>Actual Total Cost (real cost)</TooltipContent>
+                        </Tooltip>
+                      </TableHead>
+                    )}
+                    {isColumnVisible("unit_sales_price") && (
+                      <TableHead className="text-right text-green-600">
+                        <Tooltip>
+                          <TooltipTrigger className="cursor-help underline decoration-dotted underline-offset-2">Sale Unit</TooltipTrigger>
+                          <TooltipContent>Selling Price per Unit</TooltipContent>
+                        </Tooltip>
+                      </TableHead>
+                    )}
+                    {isColumnVisible("total_sales_price") && (
+                      <TableHead className="text-right text-green-600">
+                        <Tooltip>
+                          <TooltipTrigger className="cursor-help underline decoration-dotted underline-offset-2">Sale Total</TooltipTrigger>
+                          <TooltipContent>Total Selling Price (unit × qty)</TooltipContent>
+                        </Tooltip>
+                      </TableHead>
+                    )}
+                    {isColumnVisible("progress") && <TableHead className="w-[100px]">Progress</TableHead>}
+                    {isColumnVisible("installed") && <TableHead className="text-center">Installed</TableHead>}
+                    <TableHead className="w-[50px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {hierarchicalItems.map((item) => (
+                    <ScopeItemRow
+                      key={item.id}
+                      item={item}
+                      isSelected={selectedIds.has(item.id)}
+                      projectId={projectId}
+                      isColumnVisible={isColumnVisible}
+                      formatCurrency={formatCurrency}
+                      onToggleSelect={toggleSelect}
+                      onOpenSplitDialog={openSplitDialog}
+                      onOpenDeleteDialog={openDeleteDialog}
+                      onEditItem={openItemSheet}
+                      onViewItem={openItemSheet}
+                    />
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </GlassCard>
+        )}
+        renderCard={(item) => (
+          <ScopeItemCard
+            key={item.id}
+            item={item}
+            isSelected={selectedIds.has(item.id)}
+            isClient={isClient}
+            formatCurrency={formatCurrency}
+            onToggleSelect={toggleSelect}
+            onView={openItemSheet}
+            onEdit={openItemSheet}
+            onSplit={openSplitDialog}
+            onDelete={openDeleteDialog}
+          />
+        )}
+      />
 
       {/* Materials Assignment Dialog */}
       <Dialog open={materialsDialogOpen} onOpenChange={(open) => !open && dispatch({ type: "CLOSE_DIALOG" })}>

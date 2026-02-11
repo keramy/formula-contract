@@ -21,6 +21,9 @@ import {
 import {
   PackageIcon,
   PlusIcon,
+  Clock3Icon,
+  CheckCircle2Icon,
+  XCircleIcon,
 } from "lucide-react";
 import { MaterialCard, type Material } from "@/components/materials/material-card";
 import { MaterialApproval } from "@/components/materials/material-approval";
@@ -188,35 +191,82 @@ export function MaterialsOverview({
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header with inline stats */}
-      <div className="flex items-center justify-between">
+    <div className="space-y-3">
+      {/* Header with compact mobile stats/actions */}
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-3">
           <GradientIcon icon={<PackageIcon className="size-5" />} color="teal" size="default" />
           <div>
             <h3 className="text-lg font-medium">Materials</h3>
-            <p className="text-sm text-muted-foreground">
-              {stats.total} material{stats.total !== 1 ? "s" : ""}
-              {!isClient && stats.total > 0 && (
-                <>
-                  {" "}({stats.pending > 0 && <span className="text-amber-600">{stats.pending} pending</span>}
-                  {stats.pending > 0 && stats.approved > 0 && ", "}
-                  {stats.approved > 0 && <span className="text-emerald-600">{stats.approved} approved</span>}
-                  {(stats.pending > 0 || stats.approved > 0) && stats.rejected > 0 && ", "}
-                  {stats.rejected > 0 && <span className="text-rose-600">{stats.rejected} rejected</span>})
-                </>
-              )}
-              {isClient && stats.pending > 0 && (
-                <span className="text-amber-600"> ({stats.pending} awaiting your review)</span>
-              )}
-            </p>
+            <p className="text-sm text-muted-foreground">{stats.total} material{stats.total !== 1 ? "s" : ""}</p>
           </div>
         </div>
-        <div className="flex gap-2">
+
+        <div className="grid grid-cols-2 gap-1.5 rounded-lg border border-base-200 bg-base-50/70 p-1.5 md:hidden">
+          <div className="rounded-md border border-base-200/80 bg-white px-2.5 py-1.5 dark:bg-base-950/40">
+            <div className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+              <PackageIcon className="size-3 text-primary" />
+              Total
+            </div>
+            <p className="mt-1 text-sm font-semibold leading-none text-primary">{stats.total}</p>
+          </div>
+          <div className="rounded-md border border-base-200/80 bg-white px-2.5 py-1.5 dark:bg-base-950/40">
+            <div className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+              <Clock3Icon className="size-3 text-amber-600" />
+              Pending
+            </div>
+            <p className="mt-1 text-sm font-semibold leading-none text-amber-700">{stats.pending}</p>
+          </div>
+          {!isClient && (
+            <>
+              <div className="rounded-md border border-base-200/80 bg-white px-2.5 py-1.5 dark:bg-base-950/40">
+                <div className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                  <CheckCircle2Icon className="size-3 text-emerald-600" />
+                  Approved
+                </div>
+                <p className="mt-1 text-sm font-semibold leading-none text-emerald-700">{stats.approved}</p>
+              </div>
+              <div className="rounded-md border border-base-200/80 bg-white px-2.5 py-1.5 dark:bg-base-950/40">
+                <div className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                  <XCircleIcon className="size-3 text-rose-600" />
+                  Rejected
+                </div>
+                <p className="mt-1 text-sm font-semibold leading-none text-rose-700">{stats.rejected}</p>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="hidden text-sm text-muted-foreground md:block">
+          {stats.total} material{stats.total !== 1 ? "s" : ""}
+          {!isClient && stats.total > 0 && (
+            <>
+              {" "}({stats.pending > 0 && <span className="text-amber-600">{stats.pending} pending</span>}
+              {stats.pending > 0 && stats.approved > 0 && ", "}
+              {stats.approved > 0 && <span className="text-emerald-600">{stats.approved} approved</span>}
+              {(stats.pending > 0 || stats.approved > 0) && stats.rejected > 0 && ", "}
+              {stats.rejected > 0 && <span className="text-rose-600">{stats.rejected} rejected</span>})
+            </>
+          )}
+          {isClient && stats.pending > 0 && (
+            <span className="text-amber-600"> ({stats.pending} awaiting your review)</span>
+          )}
+        </div>
+
+        <div className="flex flex-wrap gap-1.5 md:gap-2">
           {canManageMaterials && (
             <>
-              <MaterialsTemplateButton projectCode={projectCode} />
-              <MaterialsExcelImport projectId={projectId} projectCode={projectCode} />
+              <MaterialsTemplateButton
+                projectCode={projectCode}
+                compact
+                className="h-8 px-2.5 text-xs md:h-9 md:px-3 md:text-sm"
+              />
+              <MaterialsExcelImport
+                projectId={projectId}
+                projectCode={projectCode}
+                compact
+                className="h-8 px-2.5 text-xs md:h-9 md:px-3 md:text-sm"
+              />
             </>
           )}
           <MaterialsExcelExport
@@ -230,13 +280,17 @@ export function MaterialsOverview({
             }))}
             projectCode={projectCode}
             projectName={projectName}
+            compact
+            className="h-8 px-2.5 text-xs md:h-9 md:px-3 md:text-sm"
           />
           {canManageMaterials && (
             <Button
               onClick={handleAddMaterial}
-                          >
+              size="sm"
+              className="h-8 px-2.5 text-xs md:h-9 md:px-3 md:text-sm"
+            >
               <PlusIcon className="size-4" />
-              Add Material
+              Add
             </Button>
           )}
         </div>

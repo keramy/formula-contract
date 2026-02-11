@@ -67,7 +67,7 @@ export function AppHeader({ className }: AppHeaderProps) {
   return (
     <header
       className={cn(
-        "sticky top-0 z-40 flex h-14 items-center gap-4 border-b bg-card/95 backdrop-blur-sm px-4",
+        "sticky top-0 z-40 flex h-14 items-center gap-2 sm:gap-4 border-b bg-card/95 backdrop-blur-sm px-2 sm:px-4",
         className
       )}
     >
@@ -110,7 +110,7 @@ export function AppHeader({ className }: AppHeaderProps) {
       )}
 
       {/* Center: Search Bar */}
-      <div className="flex-1 flex justify-center max-w-xl mx-auto">
+      <div className="hidden md:flex flex-1 justify-center max-w-xl mx-auto">
         <Button
           variant="outline"
           onClick={handleSearchClick}
@@ -125,7 +125,18 @@ export function AppHeader({ className }: AppHeaderProps) {
       </div>
 
       {/* Right: Page Actions + Notifications */}
-      <div className="shrink-0 flex items-center gap-1">
+      <div className={cn("shrink-0 flex items-center gap-1", isMobile && "ml-auto")}>
+        {isMobile && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-9"
+            onClick={handleSearchClick}
+            aria-label="Open search"
+          >
+            <SearchIcon className="size-4" />
+          </Button>
+        )}
         {content.actions}
         <NotificationsDropdown />
       </div>

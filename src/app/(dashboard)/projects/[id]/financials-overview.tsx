@@ -73,16 +73,16 @@ function KPICard({
 }) {
   return (
     <Card>
-      <CardContent className="p-4">
+      <CardContent className="p-3 md:p-4">
         <div className="flex items-center justify-between">
           <div className="space-y-1">
-            <p className="text-sm font-medium text-muted-foreground">{title}</p>
-            <p className="text-2xl font-bold">{value}</p>
+            <p className="text-xs md:text-sm font-medium text-muted-foreground">{title}</p>
+            <p className="text-lg md:text-2xl font-bold leading-tight">{value}</p>
             {subtitle && (
-              <p className="text-xs text-muted-foreground">{subtitle}</p>
+              <p className="text-[11px] text-muted-foreground leading-tight">{subtitle}</p>
             )}
             {trendLabel && (
-              <div className="flex items-center gap-1 mt-1">
+              <div className="mt-1 flex items-center gap-1">
                 {trend === "positive" && (
                   <TrendingDownIcon className="size-3.5 text-emerald-500" />
                 )}
@@ -102,8 +102,8 @@ function KPICard({
               </div>
             )}
           </div>
-          <div className="p-3 rounded-lg bg-muted">
-            <Icon className="size-5 text-muted-foreground" />
+          <div className="rounded-lg bg-muted p-2 md:p-3">
+            <Icon className="size-4 md:size-5 text-muted-foreground" />
           </div>
         </div>
       </CardContent>
@@ -135,36 +135,36 @@ function PathBreakdownCard({
 
   return (
     <Card>
-      <CardHeader className="pb-2">
+      <CardHeader className="pb-1.5 md:pb-2">
         <div className="flex items-center gap-2">
-          <div className={cn("p-2 rounded-lg", colorClass)}>
+          <div className={cn("rounded-lg p-1.5 md:p-2", colorClass)}>
             <Icon className="size-4" />
           </div>
           <div>
-            <CardTitle className="text-sm font-semibold">{title}</CardTitle>
-            <p className="text-xs text-muted-foreground">{count} items</p>
+            <CardTitle className="text-sm font-semibold leading-tight">{title}</CardTitle>
+            <p className="text-[11px] text-muted-foreground">{count} items</p>
           </div>
         </div>
       </CardHeader>
-      <CardContent className="pt-2">
-        <div className="grid grid-cols-3 gap-4 text-center">
+      <CardContent className="pt-1.5 md:pt-2">
+        <div className="grid grid-cols-3 gap-2 md:gap-4 text-center">
           <div>
-            <p className="text-xs text-muted-foreground mb-1">Budget</p>
-            <p className="text-sm font-semibold">
+            <p className="mb-1 text-[11px] text-muted-foreground">Budget</p>
+            <p className="text-xs md:text-sm font-semibold">
               {formatCurrency(budget, currency)}
             </p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground mb-1">Actual</p>
-            <p className="text-sm font-semibold">
+            <p className="mb-1 text-[11px] text-muted-foreground">Actual</p>
+            <p className="text-xs md:text-sm font-semibold">
               {formatCurrency(actual, currency)}
             </p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground mb-1">Variance</p>
+            <p className="mb-1 text-[11px] text-muted-foreground">Variance</p>
             <p
               className={cn(
-                "text-sm font-semibold",
+                "text-xs md:text-sm font-semibold",
                 isPositiveVariance ? "text-emerald-600" : "text-rose-600"
               )}
             >
@@ -323,7 +323,7 @@ export function FinancialsOverview({
   const isPositiveVariance = totals.variance >= 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Header */}
       <div>
         <h3 className="text-lg font-medium">Financials</h3>
@@ -333,7 +333,7 @@ export function FinancialsOverview({
       </div>
 
       {/* KPI Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 md:gap-4 md:grid-cols-2 lg:grid-cols-4">
         <KPICard
           title="Budget"
           value={formatCurrency(totals.budget, currency)}
@@ -379,7 +379,7 @@ export function FinancialsOverview({
       </div>
 
       {/* Path Breakdown */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-2 md:gap-4 md:grid-cols-2">
         <PathBreakdownCard
           title="Production"
           icon={FactoryIcon}

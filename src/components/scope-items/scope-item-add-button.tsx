@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { PlusIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 // ============================================================================
 // PERFORMANCE: Lazy load the Sheet component
@@ -29,19 +30,32 @@ const ScopeItemSheet = dynamic(
 interface ScopeItemAddButtonProps {
   projectId: string;
   projectCurrency?: string;
+  size?: "default" | "sm" | "lg" | "icon";
+  className?: string;
+  compact?: boolean;
 }
 
 export function ScopeItemAddButton({
   projectId,
   projectCurrency,
+  size = "default",
+  className,
+  compact = false,
 }: ScopeItemAddButtonProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
 
   return (
     <>
-      <Button onClick={() => setSheetOpen(true)}>
-        <PlusIcon className="size-4" />
-        Add Item
+      <Button onClick={() => setSheetOpen(true)} size={size} className={cn(className)}>
+        <PlusIcon className="size-3.5" />
+        {compact ? (
+          <>
+            <span className="sm:hidden">Add</span>
+            <span className="hidden sm:inline">Add Item</span>
+          </>
+        ) : (
+          "Add Item"
+        )}
       </Button>
 
       {/* Only render when open - prevents loading until needed */}

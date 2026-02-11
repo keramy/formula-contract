@@ -130,7 +130,7 @@ export default async function TimelinePage({
       />
 
       {/* Timeline Content (React Query powered) - minimal padding for max Gantt space */}
-      <div className="flex-1 overflow-hidden px-4 pt-4 pb-2">
+      <div className="flex-1 overflow-hidden px-3 md:px-4 pt-4 pb-2">
         <TimelineClient
           projectId={projectId}
           scopeItems={scopeItems}

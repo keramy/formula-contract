@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ResponsiveDataView } from "@/components/ui/responsive-data-view";
 import {
   Select,
   SelectContent,
@@ -181,7 +182,7 @@ export function ProjectCostsTable({ data }: ProjectCostsTableProps) {
                 Financial overview by project ({filteredData.length} of {data.length})
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {/* Client filter dropdown */}
               <Select value={clientFilter} onValueChange={setClientFilter}>
                 <SelectTrigger className="w-[180px]" size="sm">
@@ -250,8 +251,12 @@ export function ProjectCostsTable({ data }: ProjectCostsTableProps) {
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="overflow-x-auto">
-          <Table>
+        <ResponsiveDataView
+          data={filteredData}
+          cardsClassName="grid grid-cols-1 gap-3 p-3"
+          tableView={(
+            <div className="overflow-x-auto">
+              <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
                 <TableHead className="w-[280px] pl-6">
@@ -391,8 +396,81 @@ export function ProjectCostsTable({ data }: ProjectCostsTableProps) {
                 </TableRow>
               )}
             </TableBody>
-          </Table>
-        </div>
+              </Table>
+            </div>
+          )}
+          renderCard={(row) => {
+            const status = statusConfig[row.status] || {
+              variant: "default" as const,
+              label: row.status,
+            };
+            const isPositiveVariance = row.variance >= 0;
+            return (
+              <Card key={row.id} className="border border-base-200">
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">{row.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {row.project_code}
+                        {row.client_name && ` • ${row.client_name}`}
+                      </p>
+                    </div>
+                    <Button variant="ghost" size="icon" asChild className="size-8">
+                      <Link href={`/projects/${row.slug || row.id}`}>
+                        <ExternalLinkIcon className="size-4" />
+                        <span className="sr-only">View project</span>
+                      </Link>
+                    </Button>
+                  </div>
+
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "text-xs",
+                      status.variant === "success" && "border-emerald-200 bg-emerald-50 text-emerald-700",
+                      status.variant === "warning" && "border-amber-200 bg-amber-50 text-amber-700",
+                      status.variant === "info" && "border-blue-200 bg-blue-50 text-blue-700",
+                      status.variant === "danger" && "border-rose-200 bg-rose-50 text-rose-700",
+                      status.variant === "default" && "border-gray-200 bg-gray-50 text-gray-700"
+                    )}
+                  >
+                    {status.label}
+                  </Badge>
+
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">Budget</p>
+                      <p className="font-mono">{formatCurrency(row.budget, row.currency)}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Actual</p>
+                      <p className="font-mono">{formatCurrency(row.actual, row.currency)}</p>
+                    </div>
+                  </div>
+
+                  <div className="text-sm">
+                    <p className="text-muted-foreground">Variance</p>
+                    <p
+                      className={cn(
+                        "font-mono font-medium",
+                        isPositiveVariance ? "text-emerald-600" : "text-rose-600"
+                      )}
+                    >
+                      {isPositiveVariance ? "+" : ""}
+                      {formatCurrency(row.variance, row.currency)} ({isPositiveVariance ? "+" : ""}{row.variancePercentage}%)
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          }}
+          emptyState={(
+            <div className="h-24 flex items-center justify-center text-muted-foreground">
+              <p>{search ? "No projects match your search" : "No projects found"}</p>
+            </div>
+          )}
+        />
       </CardContent>
     </Card>
   );

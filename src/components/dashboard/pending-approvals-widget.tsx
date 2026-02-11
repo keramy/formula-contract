@@ -99,7 +99,7 @@ export function PendingApprovalsWidget({ approvals }: PendingApprovalsWidgetProp
                   </p>
                 </div>
                 <Button variant="ghost" size="sm" className="shrink-0">
-                  Review
+                  <span className="hidden sm:inline">Review</span>
                   <ArrowRightIcon className="size-3 ml-1" />
                 </Button>
               </div>

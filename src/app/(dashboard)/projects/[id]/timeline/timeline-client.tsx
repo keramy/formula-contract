@@ -3,6 +3,7 @@
 import * as React from "react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useBreakpoint } from "@/hooks/use-media-query";
 import { GanttChart, type GanttItem, type GanttDependency } from "@/components/gantt";
 import { GlassCard, EmptyState } from "@/components/ui/ui-helpers";
 import { Button } from "@/components/ui/button";
@@ -78,6 +79,7 @@ export function TimelineClient({
   showHeader = true,
   showFullscreenToggle = true,
 }: TimelineClientProps) {
+  const { isMobileOrTablet } = useBreakpoint();
   // React Query hooks for timeline data
   const { data: timelineItems = [], isLoading: isLoadingItems } = useTimelineItems(projectId);
   const { data: timelineDependencies = [], isLoading: isLoadingDeps } = useTimelineDependencies(projectId);
@@ -291,6 +293,19 @@ export function TimelineClient({
           icon={<CalendarIcon className="size-8" />}
           title="No timeline data"
           description="Add tasks or milestones to visualize your project timeline."
+        />
+      </GlassCard>
+    );
+  }
+
+  // Explicit fallback for touch-first screens where drag/resize interactions are unreliable.
+  if (isMobileOrTablet) {
+    return (
+      <GlassCard className="p-6">
+        <EmptyState
+          icon={<CalendarIcon className="size-8" />}
+          title="Timeline is best viewed on desktop"
+          description="For precise drag/resize timeline editing, use a desktop browser. On tablet, landscape mode may improve readability."
         />
       </GlassCard>
     );

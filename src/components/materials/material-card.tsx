@@ -72,12 +72,12 @@ export const MaterialCard = memo(function MaterialCard({
   const firstImage = images[0];
 
   return (
-    <Card className="p-4">
-      <div className="flex gap-4">
+    <Card className="p-3 sm:p-4">
+      <div className="flex gap-3 sm:gap-4">
         {/* Image */}
         <div className="shrink-0">
           {firstImage ? (
-            <div className="relative size-20 rounded-md overflow-hidden bg-muted">
+            <div className="relative size-14 sm:size-20 rounded-md overflow-hidden bg-muted">
               <Image
                 src={firstImage}
                 alt={material.name}
@@ -91,8 +91,8 @@ export const MaterialCard = memo(function MaterialCard({
               )}
             </div>
           ) : (
-            <div className="size-20 rounded-md bg-muted flex items-center justify-center">
-              <ImageIcon className="size-8 text-muted-foreground" />
+            <div className="size-14 sm:size-20 rounded-md bg-muted flex items-center justify-center">
+              <ImageIcon className="size-6 sm:size-8 text-muted-foreground" />
             </div>
           )}
         </div>
@@ -100,33 +100,33 @@ export const MaterialCard = memo(function MaterialCard({
         {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
-            <div>
-              <div className="flex items-center gap-2">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 <span className="font-mono text-xs text-muted-foreground">{material.material_code}</span>
-                <h4 className="font-medium truncate">{material.name}</h4>
+                <h4 className="font-medium text-sm sm:text-base truncate">{material.name}</h4>
               </div>
               {material.specification && (
-                <p className="text-sm text-muted-foreground truncate">
+                <p className="text-xs sm:text-sm text-muted-foreground truncate">
                   {material.specification}
                 </p>
               )}
               {material.supplier && (
-                <p className="text-xs text-muted-foreground">
+                <p className="text-[11px] sm:text-xs text-muted-foreground truncate">
                   Supplier: {material.supplier}
                 </p>
               )}
             </div>
-            <Badge variant="secondary" className={statusColors[material.status]}>
+            <Badge variant="secondary" className={`${statusColors[material.status]} text-[10px] sm:text-xs`}>
               {statusLabels[material.status] || material.status}
             </Badge>
           </div>
 
-          <div className="flex items-center justify-between mt-3">
-            <p className="text-xs text-muted-foreground">
+          <div className="mt-2.5 sm:mt-3 flex items-center justify-between gap-2">
+            <p className="text-[11px] sm:text-xs text-muted-foreground">
               Used in: {material.assignedItemsCount} item{material.assignedItemsCount !== 1 ? "s" : ""}
             </p>
 
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 shrink-0">
               {/* Action buttons based on status - PM approval */}
               {(material.status === "pending" || material.status === "rejected") && onApprove && (
                 <>
@@ -135,9 +135,9 @@ export const MaterialCard = memo(function MaterialCard({
                     size="sm"
                     onClick={() => onApprove(material.id)}
                     disabled={disabled}
-                    className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                    className="h-7 px-2 text-xs text-green-600 hover:text-green-700 hover:bg-green-50"
                   >
-                    <CheckCircleIcon className="size-3 mr-1" />
+                    <CheckCircleIcon className="size-3" />
                     Approve
                   </Button>
                   {material.status === "pending" && onReject && (
@@ -146,9 +146,9 @@ export const MaterialCard = memo(function MaterialCard({
                       size="sm"
                       onClick={() => onReject(material.id)}
                       disabled={disabled}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      className="h-7 px-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
                     >
-                      <XCircleIcon className="size-3 mr-1" />
+                      <XCircleIcon className="size-3" />
                       Reject
                     </Button>
                   )}

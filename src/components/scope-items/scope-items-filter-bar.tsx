@@ -5,6 +5,9 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { useBreakpoint } from "@/hooks/use-media-query";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -96,6 +99,7 @@ interface ScopeItemsFilterBarProps {
   onFiltersChange: (filters: ScopeItemsFilters) => void;
   totalCount: number;
   filteredCount: number;
+  renderExtraAction?: () => React.ReactNode;
   className?: string;
 }
 
@@ -117,8 +121,19 @@ export function ScopeItemsFilterBar({
   onFiltersChange,
   totalCount,
   filteredCount,
+  renderExtraAction,
   className,
 }: ScopeItemsFilterBarProps) {
+  const { isMobile } = useBreakpoint();
+  const [mobileFiltersOpen, setMobileFiltersOpen] = React.useState(false);
+  const [draftFilters, setDraftFilters] = React.useState<ScopeItemsFilters>(filters);
+
+  React.useEffect(() => {
+    if (!mobileFiltersOpen) {
+      setDraftFilters(filters);
+    }
+  }, [filters, mobileFiltersOpen]);
+
   // Count active filters
   const activeFilterCount = React.useMemo(() => {
     let count = 0;
@@ -151,6 +166,159 @@ export function ScopeItemsFilterBar({
   const clearAllFilters = () => {
     onFiltersChange(defaultFilters);
   };
+
+  const updateDraftFilter = <K extends keyof ScopeItemsFilters>(
+    key: K,
+    value: ScopeItemsFilters[K]
+  ) => {
+    setDraftFilters((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const toggleDraftStatus = (status: ItemStatus) => {
+    const newStatuses = draftFilters.status.includes(status)
+      ? draftFilters.status.filter((s) => s !== status)
+      : [...draftFilters.status, status];
+    updateDraftFilter("status", newStatuses);
+  };
+
+  const applyMobileFilters = () => {
+    onFiltersChange(draftFilters);
+    setMobileFiltersOpen(false);
+  };
+
+  const clearMobileFilters = () => {
+    setDraftFilters(defaultFilters);
+    onFiltersChange(defaultFilters);
+    setMobileFiltersOpen(false);
+  };
+
+  if (isMobile) {
+    return (
+      <div className={cn("space-y-3", className)}>
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1 min-w-0">
+            <SearchIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Search by code or name..."
+              value={filters.search}
+              onChange={(e) => updateFilter("search", e.target.value)}
+              className="pl-8 h-8 text-sm"
+            />
+            {filters.search && (
+              <button
+                onClick={() => updateFilter("search", "")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-base-100 rounded"
+                aria-label="Clear search"
+              >
+                <XIcon className="h-3 w-3 text-muted-foreground" />
+              </button>
+            )}
+          </div>
+
+          {renderExtraAction && <div className="shrink-0">{renderExtraAction()}</div>}
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 px-2.5 shrink-0 gap-1.5"
+            onClick={() => setMobileFiltersOpen(true)}
+          >
+            <FilterIcon className="h-4 w-4" />
+            Filters
+            {activeFilterCount > 0 && (
+              <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                {activeFilterCount}
+              </Badge>
+            )}
+          </Button>
+        </div>
+
+        <p className="text-sm text-muted-foreground">
+          {hasActiveFilters ? (
+            <>
+              Showing <span className="font-medium text-foreground">{filteredCount}</span> of {totalCount}
+            </>
+          ) : (
+            <>{totalCount} items</>
+          )}
+        </p>
+
+        <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
+          <SheetContent
+            side="bottom"
+            className="h-[80vh] overflow-y-auto overscroll-contain pb-[calc(env(safe-area-inset-bottom)+1rem)]"
+          >
+            <SheetHeader>
+              <SheetTitle>Filter Scope Items</SheetTitle>
+              <SheetDescription>Apply path, status, and delivery filters.</SheetDescription>
+            </SheetHeader>
+
+            <div className="mt-4 space-y-6">
+              <div className="space-y-3">
+                <h4 className="text-sm font-medium">Path</h4>
+                <div className="grid grid-cols-1 gap-2">
+                  {pathOptions.map((option) => (
+                    <Button
+                      key={option.value}
+                      variant={draftFilters.path === option.value ? "default" : "outline"}
+                      size="sm"
+                      className="justify-start gap-2 h-10"
+                      onClick={() => updateDraftFilter("path", option.value)}
+                    >
+                      {option.icon}
+                      {option.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <h4 className="text-sm font-medium">Status</h4>
+                <div className="space-y-2">
+                  {statusOptions.map((option) => (
+                    <label key={option.value} className="flex items-center gap-3 p-2 border rounded-md">
+                      <Checkbox
+                        checked={draftFilters.status.includes(option.value)}
+                        onCheckedChange={() => toggleDraftStatus(option.value)}
+                      />
+                      <span className={cn("px-1.5 py-0.5 rounded text-xs", option.color)}>{option.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <h4 className="text-sm font-medium">Delivery</h4>
+                <div className="grid grid-cols-1 gap-2">
+                  {deliveryOptions.map((option) => (
+                    <Button
+                      key={option.value}
+                      variant={draftFilters.delivery === option.value ? "default" : "outline"}
+                      size="sm"
+                      className="justify-start gap-2 h-10"
+                      onClick={() => updateDraftFilter("delivery", option.value)}
+                    >
+                      {option.icon}
+                      {option.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="sticky bottom-0 mt-6 flex items-center gap-2 bg-background pt-3">
+              <Button variant="outline" className="flex-1" onClick={clearMobileFilters}>
+                Clear
+              </Button>
+              <Button className="flex-1" onClick={applyMobileFilters}>
+                Apply Filters
+              </Button>
+            </div>
+          </SheetContent>
+        </Sheet>
+      </div>
+    );
+  }
 
   return (
     <div className={cn("space-y-3", className)}>
@@ -292,6 +460,8 @@ export function ScopeItemsFilterBar({
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {renderExtraAction && renderExtraAction()}
 
         {/* Clear all filters */}
         {hasActiveFilters && (

@@ -48,7 +48,7 @@ export default async function DashboardLayout({
           {/* Unified top header with toggle, page info, search, notifications */}
           <AppHeader />
           {/* Page content - wrapped in ErrorBoundary for graceful error handling */}
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 overflow-auto overflow-x-hidden">
             <ErrorBoundary>
               {children}
             </ErrorBoundary>

@@ -417,7 +417,7 @@ export default async function ProjectDetailPage({
   const drawingsReadyCount = drawings.filter((d) => d.status === "uploaded").length;
 
   return (
-    <div className="px-6 pt-2 pb-6">
+    <div className="px-4 md:px-6 pt-2 pb-6">
       {/* Header - renders into the App Header bar via context */}
       <ProjectDetailHeader
         projectId={projectUrlId}
@@ -491,31 +491,42 @@ export default async function ProjectDetailPage({
 
         {/* Scope Items Tab */}
         <TabsContent value="scope" className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
               <h3 className="text-lg font-medium">Scope Items</h3>
               <p className="text-sm text-muted-foreground">
                 {scopeItems.length} items{!isClient && ` totaling ${formatCurrency(totalValue, project.currency)}`}
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:flex-wrap md:overflow-visible md:pb-0">
+              {canAddItems && (
+                <div className="shrink-0">
+                  <ScopeItemAddButton
+                    projectId={projectId}
+                    projectCurrency={project.currency}
+                    size="sm"
+                    compact
+                  />
+                </div>
+              )}
               {canImportExcel && (
                 <>
-                  <DownloadTemplateButton projectCode={project.project_code} />
-                  <ExcelImport projectId={projectId} projectCode={project.project_code} />
+                  <div className="shrink-0">
+                    <DownloadTemplateButton projectCode={project.project_code} compact />
+                  </div>
+                  <div className="shrink-0">
+                    <ExcelImport projectId={projectId} projectCode={project.project_code} compact />
+                  </div>
                 </>
               )}
-              <ExcelExport
-                items={scopeItems}
-                projectCode={project.project_code}
-                projectName={project.name}
-              />
-              {canAddItems && (
-                <ScopeItemAddButton
-                  projectId={projectId}
-                  projectCurrency={project.currency}
+              <div className="shrink-0">
+                <ExcelExport
+                  items={scopeItems}
+                  projectCode={project.project_code}
+                  projectName={project.name}
+                  compact
                 />
-              )}
+              </div>
             </div>
           </div>
           <ScopeItemsTable

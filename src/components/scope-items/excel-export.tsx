@@ -11,9 +11,10 @@ interface ExcelExportProps {
   projectCode: string;
   projectName: string;
   disabled?: boolean;
+  compact?: boolean;
 }
 
-export function ExcelExport({ items, projectCode, projectName, disabled }: ExcelExportProps) {
+export function ExcelExport({ items, projectCode, projectName, disabled, compact = false }: ExcelExportProps) {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleExport = async () => {
@@ -32,9 +33,17 @@ export function ExcelExport({ items, projectCode, projectName, disabled }: Excel
       size="sm"
       onClick={handleExport}
       disabled={disabled || items.length === 0 || isLoading}
+      className="h-8 px-2.5"
     >
-      {isLoading ? <Spinner className="size-4" /> : <DownloadIcon className="size-4" />}
-      Export Excel
+      {isLoading ? <Spinner className="size-3.5" /> : <DownloadIcon className="size-3.5" />}
+      {compact ? (
+        <>
+          <span className="sm:hidden">Export</span>
+          <span className="hidden sm:inline">Export Excel</span>
+        </>
+      ) : (
+        "Export Excel"
+      )}
     </Button>
   );
 }

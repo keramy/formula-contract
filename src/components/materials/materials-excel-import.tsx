@@ -22,9 +22,16 @@ import { toast } from "sonner";
 interface MaterialsExcelImportProps {
   projectId: string;
   projectCode: string;
+  compact?: boolean;
+  className?: string;
 }
 
-export function MaterialsExcelImport({ projectId, projectCode }: MaterialsExcelImportProps) {
+export function MaterialsExcelImport({
+  projectId,
+  projectCode,
+  compact = false,
+  className,
+}: MaterialsExcelImportProps) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
@@ -92,11 +99,12 @@ export function MaterialsExcelImport({ projectId, projectCode }: MaterialsExcelI
       <Button
         variant="outline"
         size="sm"
+        className={compact ? `h-8 px-2.5 text-xs ${className ?? ""}`.trim() : className}
         onClick={() => fileInputRef.current?.click()}
         disabled={isParsing}
       >
         {isParsing ? <Spinner className="size-4" /> : <UploadIcon className="size-4" />}
-        Import
+        {compact ? "Import" : "Import Excel"}
       </Button>
       <input
         ref={fileInputRef}

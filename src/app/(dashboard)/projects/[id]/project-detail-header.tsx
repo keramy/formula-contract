@@ -3,14 +3,9 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { ArrowLeftIcon, PencilIcon, FolderKanbanIcon } from "lucide-react";
+import { ArrowLeftIcon, FolderKanbanIcon } from "lucide-react";
 import { GradientIcon, StatusBadge } from "@/components/ui/ui-helpers";
 import { usePageHeader } from "@/components/layout/app-header";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 
 type StatusVariant = "info" | "success" | "warning" | "default" | "danger";
 
@@ -47,8 +42,8 @@ export function ProjectDetailHeader({
       backLink: (
         <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground">
           <Link href="/projects">
-            <ArrowLeftIcon className="size-4 mr-1" />
-            Projects
+            <ArrowLeftIcon className="size-4 sm:mr-1" />
+            <span className="hidden sm:inline">Projects</span>
           </Link>
         </Button>
       ),
@@ -60,18 +55,7 @@ export function ProjectDetailHeader({
           {config.label}
         </StatusBadge>
       ),
-      actions: canEdit ? (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="size-9" asChild>
-              <Link href={`/projects/${projectId}/edit`}>
-                <PencilIcon className="size-4" />
-              </Link>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Edit Project</TooltipContent>
-        </Tooltip>
-      ) : undefined,
+      actions: undefined,
     });
     return () => setContent({});
   }, [projectName, projectCode, status, canEdit, projectId, setContent, config.variant, config.label]);

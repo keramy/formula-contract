@@ -29,7 +29,7 @@ export default async function ClientsPage({
   }
 
   return (
-    <div className="p-6">
+    <div className="p-4 md:p-6">
       {/* Page Header */}
       <ClientsPageHeader />
 

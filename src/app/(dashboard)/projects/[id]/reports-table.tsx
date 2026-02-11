@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { ResponsiveDataView } from "@/components/ui/responsive-data-view";
 import {
   Table,
   TableBody,
@@ -20,19 +21,29 @@ import {
   PencilIcon,
   TrashIcon,
   EyeIcon,
+  MoreHorizontalIcon,
+  DownloadIcon,
 } from "lucide-react";
 import { GlassCard, StatusBadge } from "@/components/ui/ui-helpers";
 import { ReportPDFExport } from "@/components/reports/report-pdf-export";
 import { ReportActivityModal } from "@/components/reports/report-activity-modal";
 import { REPORT_TYPE_LABELS, REPORT_TYPE_SHORT_LABELS } from "@/components/reports/report-types";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   deleteReport,
   uploadReportPdf,
   publishReport,
   unpublishReport,
+  logReportActivity,
   type Report,
 } from "@/lib/actions/reports";
-import { generateReportPdfBase64 } from "@/lib/pdf/generate-report-pdf";
+import { generateReportPdfBase64, downloadReportPdf } from "@/lib/pdf/generate-report-pdf";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -192,6 +203,25 @@ export function ReportsTable({
     router.refresh();
   };
 
+  const handleDownloadPdf = async (report: Report) => {
+    try {
+      const success = await downloadReportPdf({
+        report,
+        projectName,
+        projectCode,
+      });
+
+      if (success) {
+        logReportActivity(report.id, "downloaded").catch(console.error);
+      } else {
+        toast.error("Failed to generate PDF");
+      }
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast.error("Failed to generate PDF");
+    }
+  };
+
   const SortHeader = ({
     field,
     children,
@@ -226,9 +256,13 @@ export function ReportsTable({
 
   return (
     <>
-      <GlassCard className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
+      <ResponsiveDataView
+        data={sortedReports}
+        cardsClassName="grid grid-cols-1 gap-2.5"
+        tableView={(
+          <GlassCard className="overflow-hidden">
+            <div className="overflow-x-auto">
+              <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
                 <TableHead className="w-32">Report Code</TableHead>
@@ -375,9 +409,105 @@ export function ReportsTable({
                 );
               })}
             </TableBody>
-          </Table>
-        </div>
-      </GlassCard>
+              </Table>
+            </div>
+          </GlassCard>
+        )}
+        renderCard={(report) => (
+          <GlassCard key={report.id} className="p-2.5 space-y-1.5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1 space-y-2">
+                <div>
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Code</p>
+                  <p className="mt-0.5 text-sm font-mono font-semibold leading-none text-teal-700">
+                    {report.report_code || "—"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Date</p>
+                  <p className="mt-0.5 text-[11px] leading-none text-muted-foreground">
+                    {format(new Date(report.created_at), "MMM d, yyyy HH:mm")}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Name</p>
+                  <p className="mt-0.5 text-[11px] font-medium leading-none text-muted-foreground">
+                    {report.creator?.name || "—"}
+                  </p>
+                </div>
+              </div>
+              <div className="flex shrink-0 flex-col items-end gap-1.5">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      className="shrink-0"
+                      aria-label="Report actions"
+                    >
+                      <MoreHorizontalIcon className="size-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => handleDownloadPdf(report)}>
+                      <DownloadIcon className="size-4 mr-2" />
+                      Download PDF
+                    </DropdownMenuItem>
+                    {isAdmin && (
+                      <DropdownMenuItem onClick={() => setActivityModalReport(report)}>
+                        <EyeIcon className="size-4 mr-2" />
+                        View Activity
+                      </DropdownMenuItem>
+                    )}
+                    {canManageReports && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => onEditReport(report)}>
+                          <PencilIcon className="size-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleDeleteClick(report.id)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <TrashIcon className="size-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <span
+                  className={`inline-flex h-5 items-center rounded-md px-2 text-[11px] font-semibold leading-none ${
+                    report.is_published
+                      ? "bg-emerald-100 text-emerald-700"
+                      : "bg-amber-100 text-amber-700"
+                  }`}
+                >
+                  {report.is_published ? "Published" : "Draft"}
+                </span>
+                <span
+                  className={`inline-flex h-5 items-center rounded-md px-2 text-[11px] font-semibold leading-none ${
+                    REPORT_TYPE_COLORS[report.report_type] || "bg-gray-100 text-gray-700"
+                  }`}
+                >
+                  {REPORT_TYPE_SHORT_LABELS[report.report_type]}
+                </span>
+                {report.share_internal && (
+                  <span className="inline-flex h-5 items-center rounded-md px-2 text-[11px] font-semibold leading-none bg-primary-100 text-primary-700">
+                    Internal
+                  </span>
+                )}
+                {report.share_with_client && (
+                  <span className="inline-flex h-5 items-center rounded-md px-2 text-[11px] font-semibold leading-none bg-sky-100 text-sky-700">
+                    Client
+                  </span>
+                )}
+              </div>
+            </div>
+          </GlassCard>
+        )}
+      />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

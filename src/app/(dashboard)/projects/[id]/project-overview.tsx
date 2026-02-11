@@ -1,9 +1,7 @@
 "use client";
-
-import { useState } from "react";
+import Link from "next/link";
 import { format, isPast, differenceInDays } from "date-fns";
 import { Button } from "@/components/ui/button";
-import { ProjectEditSheet } from "../project-edit-sheet";
 import { Progress } from "@/components/ui/progress";
 import { GlassCard, GradientIcon } from "@/components/ui/ui-helpers";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +12,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
-  PencilIcon,
   BuildingIcon,
   CalendarIcon,
   BanknoteIcon,
@@ -30,6 +27,7 @@ import {
   ClockIcon,
   FactoryIcon,
   WrenchIcon,
+  PencilIcon,
 } from "lucide-react";
 
 interface ProjectClient {
@@ -334,35 +332,13 @@ export function ProjectOverview({
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (overallProgress / 100) * circumference;
 
-  // Edit sheet state
-  const [editSheetOpen, setEditSheetOpen] = useState(false);
-
   return (
-    <div className="space-y-6">
-      {/* Edit Project Button */}
-      {canEdit && (
-        <div className="flex justify-end">
-          <Button onClick={() => setEditSheetOpen(true)}>
-            <PencilIcon className="size-4" />
-            Edit Project
-          </Button>
-        </div>
-      )}
-
-      {/* Edit Project Sheet */}
-      {canEdit && (
-        <ProjectEditSheet
-          projectId={projectId}
-          open={editSheetOpen}
-          onOpenChange={setEditSheetOpen}
-        />
-      )}
-
+    <div className="space-y-4 lg:space-y-5">
       {/* Main Dashboard Card - Progress + Info + Stats */}
-      <GlassCard className="p-6">
-        <div className="grid gap-6 lg:grid-cols-3 lg:divide-x">
+      <GlassCard className="p-4 lg:p-5">
+        <div className="grid gap-4 lg:gap-5 lg:grid-cols-3 lg:divide-x">
           {/* Left: Progress Ring + Status Bars */}
-          <div className="flex flex-col items-center pb-6 lg:pb-0 lg:pr-6 border-b lg:border-b-0">
+          <div className="flex flex-col items-center pb-4 lg:pb-0 lg:pr-5 border-b lg:border-b-0">
             {/* SVG Progress Ring */}
             <div className="relative size-32">
               <svg className="size-full -rotate-90" viewBox="0 0 120 120">
@@ -401,7 +377,7 @@ export function ProjectOverview({
             </div>
 
             {/* Project Status Bars */}
-            <div className="w-full mt-4 space-y-2">
+            <div className="w-full mt-3 space-y-1.5">
               {/* Drawings */}
               <div className="space-y-1">
                 <div className="flex items-center justify-between text-xs">
@@ -467,9 +443,9 @@ export function ProjectOverview({
           </div>
 
           {/* Right: Info Bar (top) + Quick Stats (bottom) */}
-          <div className="lg:col-span-2 flex flex-col lg:pl-6 pt-6 lg:pt-0">
+          <div className="lg:col-span-2 flex flex-col lg:pl-5 pt-4 lg:pt-0">
             {/* Info Bar - Aligned to Top */}
-            <div className="flex flex-wrap gap-x-6 gap-y-3 pb-4 mb-4 border-b">
+            <div className="flex flex-wrap gap-x-5 gap-y-2.5 pb-3 mb-3 border-b">
               {/* Client */}
               <div className="min-w-[100px]">
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
@@ -516,44 +492,54 @@ export function ProjectOverview({
                 </div>
               )}
 
-              {/* Team */}
+              {/* Team + Edit */}
               <div className="min-w-[80px] pl-6 border-l">
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
                   <UsersIcon className="size-3" />
                   Team
                 </div>
-                {assignments.length > 0 ? (
-                  <TooltipProvider delayDuration={100}>
-                    <div className="flex -space-x-1.5">
-                      {assignments.slice(0, 4).map((a) => (
-                        <Tooltip key={a.id}>
-                          <TooltipTrigger asChild>
-                            <div className="size-6 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 ring-1 ring-white flex items-center justify-center text-white text-[10px] font-medium cursor-default hover:z-10 hover:scale-110 transition-transform">
-                              {a.user.name.charAt(0).toUpperCase()}
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom" className="text-xs">
-                            {a.user.name}
-                          </TooltipContent>
-                        </Tooltip>
-                      ))}
-                      {assignments.length > 4 && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="size-6 rounded-full bg-muted ring-1 ring-white flex items-center justify-center text-[10px] font-medium cursor-default">
-                              +{assignments.length - 4}
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom" className="text-xs">
-                            {assignments.slice(4).map((a) => a.user.name).join(", ")}
-                          </TooltipContent>
-                        </Tooltip>
-                      )}
-                    </div>
-                  </TooltipProvider>
-                ) : (
-                  <p className="text-sm text-muted-foreground italic">None</p>
-                )}
+                <div className="flex items-center gap-3">
+                  {assignments.length > 0 ? (
+                    <TooltipProvider delayDuration={100}>
+                      <div className="flex -space-x-1.5">
+                        {assignments.slice(0, 4).map((a) => (
+                          <Tooltip key={a.id}>
+                            <TooltipTrigger asChild>
+                              <div className="size-6 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 ring-1 ring-white flex items-center justify-center text-white text-[10px] font-medium cursor-default hover:z-10 hover:scale-110 transition-transform">
+                                {a.user.name.charAt(0).toUpperCase()}
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="text-xs">
+                              {a.user.name}
+                            </TooltipContent>
+                          </Tooltip>
+                        ))}
+                        {assignments.length > 4 && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="size-6 rounded-full bg-muted ring-1 ring-white flex items-center justify-center text-[10px] font-medium cursor-default">
+                                +{assignments.length - 4}
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="text-xs">
+                              {assignments.slice(4).map((a) => a.user.name).join(", ")}
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </div>
+                    </TooltipProvider>
+                  ) : (
+                    <p className="text-sm text-muted-foreground italic">None</p>
+                  )}
+                  {canEdit && (
+                    <Button asChild size="sm" className="h-8 px-2.5 text-xs">
+                      <Link href={`/projects/${projectUrlId}/edit`}>
+                        <PencilIcon className="size-3.5" />
+                        Edit Project
+                      </Link>
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -615,7 +601,7 @@ export function ProjectOverview({
 
       {/* Attention Required Section - Compact with Tooltips */}
       {attentionItems.length > 0 && (
-        <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl border border-amber-200 bg-amber-50">
+        <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl border border-amber-200 bg-amber-50">
           <div className="flex items-center gap-2 shrink-0">
             <AlertTriangleIcon className="size-4 text-amber-600" />
             <span className="text-sm font-medium text-amber-800">Needs Attention</span>
@@ -630,7 +616,7 @@ export function ProjectOverview({
                         const tab = document.querySelector(`[data-state][value="${item.tab}"]`) as HTMLElement;
                         tab?.click();
                       }}
-                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-white/80 hover:bg-white transition-colors ${item.color}`}
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-white/85 hover:bg-white transition-colors ${item.color}`}
                     >
                       <span className="font-bold">{item.count}</span>
                       {item.label}{item.count !== 1 ? "s" : ""}
@@ -661,7 +647,7 @@ export function ProjectOverview({
 
       {/* All Clear Message - Compact */}
       {attentionItems.length === 0 && scopeItems.length > 0 && (
-        <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-emerald-200 bg-emerald-50">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-emerald-200 bg-emerald-50">
           <CheckCircleIcon className="size-4 text-emerald-600" />
           <span className="text-sm font-medium text-emerald-700">All Clear!</span>
           <span className="text-sm text-emerald-600">No items requiring attention</span>
