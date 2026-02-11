@@ -118,8 +118,8 @@ formula-contract/
 │   │   ├── use-autosave.ts       # Autosave form data to drafts
 │   │   ├── use-debounce.ts       # Debounce values
 │   │   ├── use-file-upload.ts    # File upload with validation
-│   │   ├── use-media-query.ts    # Responsive breakpoints
-│   │   ├── use-mobile.ts         # Mobile detection
+│   │   ├── use-media-query.ts    # useMediaQuery, useBreakpoint (standard responsive hook)
+│   │   ├── use-mobile.ts         # DEPRECATED — use useBreakpoint() instead
 │   │   └── use-toast.ts          # Toast notifications
 │   │
 │   ├── emails/                   # Email templates (react-email)
@@ -376,6 +376,62 @@ Client reviews → status: "approved" | "rejected" | "approved_with_comments"
 
 **PM Badge:** Drawings tab shows amber badge with count of `uploaded` (unsent) drawings.
 
+### Responsive Data View Pattern
+
+The app uses JS-based responsive switching (not CSS show/hide) via `ResponsiveDataView<T>`:
+
+```typescript
+// src/components/ui/responsive-data-view.tsx
+<ResponsiveDataView
+  data={items}
+  tableView={<ItemsTable items={items} columns={columns} />}
+  renderCard={(item) => <ItemCard key={item.id} item={item} />}
+  emptyState={<EmptyState />}
+  isLoading={isLoading}
+/>
+```
+
+**Key Architecture:**
+- Uses `useBreakpoint().isMobile` — only the active view is in the DOM (not both hidden/shown)
+- `forceView` prop allows manual override for user preference
+- `ViewToggle` companion component provides table/cards toggle buttons
+- Cards container uses `grid gap-4 sm:grid-cols-2` by default
+
+**`useBreakpoint()` hook** (from `src/hooks/use-media-query.ts`):
+```typescript
+const { isMobile, isTablet, isDesktop, isMobileOrTablet, isTabletOrDesktop } = useBreakpoint();
+// isMobile: max-width: 767px (aligns with Tailwind md: 768px)
+// isTablet: 768px-1023px
+// isDesktop: 1024px+ (aligns with Tailwind lg:)
+```
+
+**IMPORTANT:** Always use `useBreakpoint()` for responsive logic. The old `useIsMobile()` from `use-mobile.ts` is deprecated (used `768px` which was off-by-one vs Tailwind's `md:` breakpoint).
+
+### Mobile Tab Navigation Pattern
+
+Project detail tabs use bottom-sheet navigation on mobile:
+
+```typescript
+// Mobile: Sheet (side="bottom") with full tab list as buttons
+// Desktop: TabsList with overflow into DropdownMenu
+```
+
+**Key decisions:**
+- Mobile tabs open a full bottom sheet (not horizontal scroll)
+- Desktop shows first 3 tabs inline, rest in "More" dropdown
+- Tab badges (counts) are rendered consistently via `getBadgeText()` helper
+
+### Compact Button Pattern
+
+Action buttons accept a `compact` prop for mobile density:
+
+```typescript
+// Components: ScopeItemAddButton, ExcelImport, ExcelExport, DownloadTemplateButton
+<ScopeItemAddButton compact={isMobile} />
+// compact=true → size="sm" + smaller text
+// compact=false → default size
+```
+
 ### Gantt Chart Architecture
 
 The Gantt chart is a custom-built component system (not a library). It lives in `src/components/gantt/` with 7 files:
@@ -502,6 +558,8 @@ CREATE INDEX IF NOT EXISTS idx_table_fk ON table(fk_column);
 13. **Timeline migration 045 applied** - `045_gantt_rewrite.sql` has been run on Supabase
 14. **Adjacent panel alignment** — When two side-by-side panels need matching row heights, both header wrappers must set explicit `height` + `box-border` so `border-b` is counted inside
 15. **Storage paths MUST start with `{projectId}/`** — Migration 040 enforces RLS via `storage_project_id()` which extracts the first path segment as UUID. Any path that doesn't start with a valid project UUID will be silently rejected by storage policies. This applies to ALL buckets (drawings, materials, reports, scope-items).
+16. **Use `useBreakpoint()` not `useIsMobile()`** — The old hook from `use-mobile.ts` is deprecated. `useBreakpoint()` from `use-media-query.ts` aligns correctly with Tailwind's `md:` breakpoint (767px vs 768px).
+17. **Mobile card views need role guards** — When creating mobile card alternatives for tables, ensure client-role users can't see edit/delete/split actions. Tables have this via column definitions, but cards need explicit `{!isClient && ...}` checks.
 
 ### Git on Windows
 - CRLF warnings are normal (`LF will be replaced by CRLF`) - safe to ignore
@@ -617,13 +675,33 @@ const photoHeight = Math.min(
 **Rule:** When you don't want borders, always use `"F"` not `"FD"`.
 
 ### PDF V2 Template Design (Feb 2026)
-- **2-column photo grid** (not 3) with 3:2 aspect ratio
-- **Smart photo layouts:** single (16:9 full-width), triple (hero + 2 side), standard (2-col grid)
+- **2-column photo grid** with uniform 1:1 square frames (not 3:2 — works for all orientations)
+- **Smart photo layouts:** single (16:9 full-width hero), triple (hero + 2 square), standard (2-col square grid)
+- **Cover-crop via canvas pre-rendering:** `prepareImageForFrame()` renders each image into exact frame dimensions on a canvas, then passes the bitmap to jsPDF. Always uses cover mode (no contain/letterbox).
 - **Inline teal section numbers** (01, 02) instead of badge boxes
 - **Section dividers** between sections (gray horizontal line)
 - **Print-friendly:** No page borders, minimal ink, "Confidential" in footer
-- **Helper function pattern:** Extract `drawImage()` for letterbox-fit logic
+- **Description clamping:** Long descriptions truncated to 3 lines with ellipsis + "Description truncated for layout." note
+- **Image cache:** `preparedImageCache` (keyed by URL + frame dims) avoids reprocessing the same image
 - **COLORS constant:** Define all colors at top of file for consistency
+
+### PDF Photo Layout Lessons (Feb 2026)
+
+| Issue | Wrong Approach | Correct Approach |
+|-------|---------------|------------------|
+| **Cover/contain fit mode** | URL-based keyword detection (`_contain`, `detail`, `proof`) to auto-switch fit mode | Always use cover — users don't control URL markers, keywords cause false positives |
+| **Gray letterbox bars** | Canvas pre-filled with gray placeholder + contain mode → visible gray bars | Cover mode fills entire frame, no background needed |
+| **Varying grid row heights** | Per-row orientation detection (3:2 landscape, 3:4 portrait, 1:1 mixed) | Uniform 1:1 square grid — same height every row, works for all orientations |
+| **Cache key collision** | `imageData.base64.slice(0, 80)` — JPEG headers are identical across images | Use photo URL as cache key (unique per image) |
+| **Missing try/catch** | Single/triple layouts had no error handling on `drawImage` | Wrap all `drawImage` calls in try/catch with placeholder fallback |
+| **Dead import** | `calculateFitDimensions` imported but no longer used after canvas rewrite | Remove unused imports after refactoring |
+
+**Key Rule:** For PDF photo grids, use uniform 1:1 square frames with cover-crop. This handles any mix of landscape/portrait photos with consistent row heights. Don't try to be clever with per-photo orientation detection — it creates uneven rows that look amateur.
+
+**Photo Layout Reference:**
+- Single photo: full-width 16:9 hero frame
+- Triple: 16:9 hero + 2 square side-by-side
+- Grid (2+ photos): uniform 1:1 square frames, 2 columns
 
 ### Code Extraction Pattern
 When two functions share 90%+ similar code:
@@ -680,6 +758,19 @@ Extracted to `src/lib/pdf/image-helpers.ts`:
 | **Branding via CSS text** | `<div class="bg-primary-700 text-white font-bold">FC</div>` | `<img src="/icons/icon-192x192.png" alt="FC" class="size-8 rounded-lg" />` |
 
 **Key Rule:** Next.js Turbopack requires RGBA-format PNGs inside `.ico` files. If your ICO fails to build, just use `src/app/icon.png` instead — Next.js auto-generates the `<link rel="icon">` tag from it.
+
+### Mobile UI Density Pass (Feb 2026)
+
+| Issue | Wrong Approach | Correct Approach |
+|-------|---------------|------------------|
+| **CSS show/hide for responsive** | `<div className="hidden md:block">` for table + `<div className="md:hidden">` for cards — both in DOM | Use `ResponsiveDataView` with JS-based `useBreakpoint()` — only active view in DOM |
+| **Mobile breakpoint off-by-one** | `useIsMobile()` with `(max-width: 768px)` — overlaps Tailwind's `md: 768px` | `useBreakpoint()` with `(max-width: 767px)` — clean boundary at 768px |
+| **Mobile tab overflow** | Horizontal scrolling `TabsList` — tabs clip on narrow screens | Bottom sheet (`Sheet side="bottom"`) with full tab list as buttons |
+| **Desktop tab overflow** | All tabs in one row — wraps on medium screens | First 3 tabs visible + "More" `DropdownMenu` for the rest |
+| **Action button density** | Same button size on all breakpoints | `compact` prop pattern — `size="sm"` on mobile, default on desktop |
+| **Role guards on cards** | Tables enforce role via column visibility — assumed cards inherit | Cards need explicit `{!isClient && ...}` guards on edit/delete actions |
+
+**Key Rule:** When adding a mobile card view for an existing table, always audit the table's role-based column visibility and replicate those guards in the card's action menu. Tables hide columns for clients; cards must do the same with conditional rendering.
 
 **Key Rule:** Every Supabase Storage upload path MUST start with `{projectId}/` — this is enforced by migration 040's `storage_project_id()` RLS function. When adding new upload code, always check: "Does my path start with a project UUID?"
 
@@ -742,15 +833,25 @@ Extracted to `src/lib/pdf/image-helpers.ts`:
 - Drawings overview UI polish (compact stats bar + flush table layout)
 - FC logo icon integration (favicon, apple-icon, PWA manifest, replaced CSS "FC" blocks with logo image across sidebar, mobile header, and all auth pages)
 - Report PDF storage path fix (paths now start with `{projectId}/` per RLS requirement)
+- Mobile UI density pass — `ResponsiveDataView` component, `useBreakpoint()` hook, `ScopeItemCard`, bottom-sheet tab nav, compact action buttons, denser card layouts across all project detail tabs (scope items, drawings, materials, reports, financials, overview)
+- PDF photo improvements — canvas-based cover-crop rendering, uniform 1:1 square grid frames, description clamping (3 lines max), image cache, removed unused contain/keyword fit mode logic
 
 ### In Progress
 - Gantt chart UI polish (testing phase — migration 045 applied to Supabase, data is live)
+- Mobile optimization (responsive data views done, remaining: role guards on mobile cards, Gantt tablet support, full mobile E2E testing)
 
 ### Planned
 - Global capacity view (cross-project phase workload overview)
-- Mobile optimization
 - Command menu (Cmd+K)
 - PDF Executive Summary generation
+
+### Known Issues (from Codex mobile review)
+- `ScopeItemCard` missing client role guards — Edit/Split/Delete actions visible to client users
+- `ExportButton` removed from scope items — Excel export only available via separate button now
+- `totalInitialCost` display removed from scope items summary bar
+- `use-mobile.ts` orphaned — still exists but no longer imported anywhere (can be deleted)
+- `canEdit` prop on `ProjectDetailHeader` is dead code (accepted but unused)
+- Gantt chart blocked for tablets via `isMobileOrTablet` — may be too restrictive
 
 ---
 
@@ -799,12 +900,15 @@ Extracted to `src/lib/pdf/image-helpers.ts`:
 
 ### Spacing (Notion-style: generous whitespace)
 
-| Component | Padding | Gap |
-|-----------|---------|-----|
-| Page container | `px-6 py-6` | - |
-| Card | `p-6` | - |
-| Button | `px-4 py-2` | `gap-2` |
-| Form fields | - | `gap-6` (vertical) |
+| Component | Padding (Desktop) | Padding (Mobile) | Gap |
+|-----------|-------------------|-------------------|-----|
+| Page container | `px-6 py-6` | `px-4 py-4` | - |
+| Card | `p-6` | `p-3` to `p-4` | - |
+| Button | `px-4 py-2` | same | `gap-2` |
+| Form fields | - | - | `gap-6` (vertical) |
+| KPI/stat cards | `p-4` | `p-3` | - |
+
+**Mobile density pattern:** Use `p-3 md:p-4` or `p-4 md:p-6` for responsive card padding.
 
 ### Border Radius
 
@@ -864,6 +968,9 @@ Extracted to `src/lib/pdf/image-helpers.ts`:
 | `GradientAvatar` | User initials with gradient | Team lists, assignments |
 | `EmptyState` | Placeholder for empty content | Lists with no data |
 | `StatCard` | KPI display with trend | Dashboard, finance |
+| `ResponsiveDataView` | Table/card view switcher based on breakpoint | Scope items, drawings, reports, materials |
+| `ViewToggle` | Manual table/cards toggle button group | Used with ResponsiveDataView |
+| `ScopeItemCard` | Mobile card view for scope items | Scope items tab (mobile only) |
 
 **Note:** `StatusBadge` and `Badge` are complementary — StatusBadge handles semantic statuses (success/warning/danger) with rounded-full pills; Badge is a generic rectangular label. Do NOT try to merge them.
 

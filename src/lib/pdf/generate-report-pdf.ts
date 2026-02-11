@@ -21,7 +21,6 @@ import { REPORT_TYPE_LABELS } from "@/components/reports/report-types";
 import {
   type ImageData,
   loadImageWithDimensions,
-  calculateFitDimensions,
 } from "./image-helpers";
 
 export interface GeneratePdfOptions {
@@ -58,6 +57,8 @@ const COLORS = {
 // ============================================================================
 const MARGIN = 16;
 const FOOTER_HEIGHT = 12;
+const MAX_DESCRIPTION_LINES = 3;
+const IMAGE_RENDER_WIDTH = 1400;
 
 /**
  * Internal PDF generation — creates the jsPDF document
@@ -254,32 +255,63 @@ async function generatePdfDocument(options: GeneratePdfOptions): Promise<{
   }
 
   // ------------------------------------------------------------------
-  // Draw a single image into a frame (letterbox fit)
+  // Pre-render image into exact frame dimensions (cover-crop).
+  // Scales image to fill the frame completely, cropping overflow edges.
+  // This avoids jsPDF stretching/distortion from aspect ratio mismatch.
   // ------------------------------------------------------------------
-  function drawImage(
+  const preparedImageCache = new Map<string, string>();
+
+  async function prepareImageForFrame(
+    imageData: ImageData,
+    photoUrl: string,
+    frameW: number,
+    frameH: number
+  ): Promise<string> {
+    const cacheKey = `${photoUrl}|${frameW.toFixed(2)}|${frameH.toFixed(2)}`;
+    const cached = preparedImageCache.get(cacheKey);
+    if (cached) return cached;
+
+    const img = new window.Image();
+    img.src = imageData.base64;
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error("Failed to decode image"));
+    });
+
+    const targetW = IMAGE_RENDER_WIDTH;
+    const targetH = Math.max(1, Math.round(IMAGE_RENDER_WIDTH * (frameH / frameW)));
+    const canvas = document.createElement("canvas");
+    canvas.width = targetW;
+    canvas.height = targetH;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      return imageData.base64;
+    }
+
+    // Cover: scale up to fill both dimensions, center and crop overflow
+    const scale = Math.max(targetW / img.width, targetH / img.height);
+    const drawW = img.width * scale;
+    const drawH = img.height * scale;
+    const dx = (targetW - drawW) / 2;
+    const dy = (targetH - drawH) / 2;
+
+    ctx.drawImage(img, dx, dy, drawW, drawH);
+    const prepared = canvas.toDataURL("image/jpeg", 0.88);
+    preparedImageCache.set(cacheKey, prepared);
+    return prepared;
+  }
+
+  async function drawImage(
     imageData: ImageData | null,
+    photoUrl: string,
     photoX: number,
     photoY: number,
     frameW: number,
     frameH: number
   ) {
     if (imageData) {
-      const dims = calculateFitDimensions(
-        imageData.width,
-        imageData.height,
-        frameW,
-        frameH
-      );
-      const ox = (frameW - dims.width) / 2;
-      const oy = (frameH - dims.height) / 2;
-      doc.addImage(
-        imageData.base64,
-        "JPEG",
-        photoX + ox,
-        photoY + oy,
-        dims.width,
-        dims.height
-      );
+      const prepared = await prepareImageForFrame(imageData, photoUrl, frameW, frameH);
+      doc.addImage(prepared, "JPEG", photoX, photoY, frameW, frameH);
     } else {
       // Gray placeholder (no border — use "F" only)
       doc.setFillColor(COLORS.placeholder);
@@ -358,12 +390,26 @@ async function generatePdfDocument(options: GeneratePdfOptions): Promise<{
       doc.setFont(fontFamily, "normal");
 
       const descMaxW = contentWidth * 0.9;
-      const descLines = doc.splitTextToSize(line.description, descMaxW);
+      const descLines = doc.splitTextToSize(line.description, descMaxW) as string[];
+      const isClamped = descLines.length > MAX_DESCRIPTION_LINES;
+      const visibleLines = descLines.slice(0, MAX_DESCRIPTION_LINES);
+      if (isClamped && visibleLines.length > 0) {
+        visibleLines[visibleLines.length - 1] =
+          `${visibleLines[visibleLines.length - 1].replace(/\s+$/, "")}…`;
+      }
 
-      for (const dl of descLines) {
+      for (const dl of visibleLines) {
         checkPageBreak(4.5);
         doc.text(dl, MARGIN, y);
         y += 3.8;
+      }
+      if (isClamped) {
+        doc.setFontSize(7);
+        doc.setTextColor(COLORS.textLight);
+        doc.text("Description truncated for layout.", MARGIN, y);
+        y += 3.2;
+        doc.setFontSize(8);
+        doc.setTextColor(COLORS.textSecondary);
       }
       y += 4;
     }
@@ -372,7 +418,7 @@ async function generatePdfDocument(options: GeneratePdfOptions): Promise<{
     if (hasPhotos) {
       const gap = 3; // mm between photos
       const colW = (contentWidth - gap) / 2; // width of each column
-      const stdH = colW * (2 / 3); // 3:2 aspect ratio
+      const gridH = colW; // 1:1 square — uniform grid, works for all orientations
 
       // Load all images for this section
       const imageDataList: (ImageData | null)[] = await Promise.all(
@@ -380,50 +426,74 @@ async function generatePdfDocument(options: GeneratePdfOptions): Promise<{
       );
 
       if (photos.length === 1) {
-        // --- SINGLE PHOTO: full width, 16:9 ---
-        const singleH = contentWidth * (9 / 16);
+        // --- SINGLE PHOTO: full width, 1:1 square ---
+        const singleH = contentWidth * (9 / 16); // 16:9 hero for single
         checkPageBreak(singleH + 5);
-        drawImage(imageDataList[0], MARGIN, y, contentWidth, singleH);
+        try {
+          await drawImage(imageDataList[0], photos[0], MARGIN, y, contentWidth, singleH);
+        } catch {
+          doc.setFillColor(COLORS.placeholder);
+          doc.roundedRect(MARGIN, y, contentWidth, singleH, 1, 1, "F");
+        }
         y += singleH + 4;
 
       } else if (photos.length === 3) {
-        // --- TRIPLE: hero (full width 16:9) + 2 side-by-side (3:2) ---
+        // --- TRIPLE: hero (full width 16:9) + 2 square side-by-side ---
         const heroH = contentWidth * (9 / 16);
         checkPageBreak(heroH + 5);
-        drawImage(imageDataList[0], MARGIN, y, contentWidth, heroH);
+        try {
+          await drawImage(imageDataList[0], photos[0], MARGIN, y, contentWidth, heroH);
+        } catch {
+          doc.setFillColor(COLORS.placeholder);
+          doc.roundedRect(MARGIN, y, contentWidth, heroH, 1, 1, "F");
+        }
         y += heroH + gap;
 
-        checkPageBreak(stdH + 5);
-        drawImage(imageDataList[1], MARGIN, y, colW, stdH);
-        drawImage(imageDataList[2], MARGIN + colW + gap, y, colW, stdH);
-        y += stdH + 4;
+        checkPageBreak(gridH + 5);
+        try {
+          await drawImage(imageDataList[1], photos[1], MARGIN, y, colW, gridH);
+        } catch {
+          doc.setFillColor(COLORS.placeholder);
+          doc.roundedRect(MARGIN, y, colW, gridH, 1, 1, "F");
+        }
+        try {
+          await drawImage(imageDataList[2], photos[2], MARGIN + colW + gap, y, colW, gridH);
+        } catch {
+          doc.setFillColor(COLORS.placeholder);
+          doc.roundedRect(MARGIN + colW + gap, y, colW, gridH, 1, 1, "F");
+        }
+        y += gridH + 4;
 
       } else {
-        // --- STANDARD 2-COLUMN GRID (3:2 aspect) ---
-        for (let j = 0; j < photos.length; j++) {
-          const col = j % 2;
+        // --- STANDARD 2-COLUMN GRID (uniform 1:1 square frames) ---
+        for (let j = 0; j < photos.length; j += 2) {
+          const hasRight = j + 1 < photos.length;
 
-          // New row?
-          if (col === 0 && j > 0) {
-            y += stdH + gap;
-          }
-          if (col === 0) {
-            checkPageBreak(stdH + 5);
-          }
+          checkPageBreak(gridH + 5);
 
-          const px = MARGIN + col * (colW + gap);
-
+          // Left photo
           try {
-            drawImage(imageDataList[j], px, y, colW, stdH);
+            await drawImage(imageDataList[j], photos[j], MARGIN, y, colW, gridH);
           } catch {
-            // Fallback placeholder on any error
             doc.setFillColor(COLORS.placeholder);
-            doc.roundedRect(px, y, colW, stdH, 1, 1, "F");
+            doc.roundedRect(MARGIN, y, colW, gridH, 1, 1, "F");
           }
+
+          // Right photo (if exists)
+          if (hasRight) {
+            try {
+              await drawImage(imageDataList[j + 1], photos[j + 1], MARGIN + colW + gap, y, colW, gridH);
+            } catch {
+              doc.setFillColor(COLORS.placeholder);
+              doc.roundedRect(MARGIN + colW + gap, y, colW, gridH, 1, 1, "F");
+            }
+          }
+
+          y += gridH + gap;
         }
 
-        // Advance past the last row
-        y += stdH + 4;
+        // Replace last gap with final spacing
+        y += 4 - gap;
       }
     }
 

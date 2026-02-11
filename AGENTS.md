@@ -2,7 +2,7 @@
 
 ## Current Status
 Last updated by: Claude Code
-Timestamp: 2026-02-10
+Timestamp: 2026-02-11
 
 ---
 
@@ -374,6 +374,77 @@ Files deleted:
 Notes:
 - The original `favicon.ico` had a non-RGBA PNG embedded which caused Turbopack build failure. Removed it — Next.js auto-serves `src/app/icon.png` as the favicon instead.
 - Build verified: `npm run build` passes, Next.js auto-generates `/apple-icon.png`, `/icon.png`, `/manifest.webmanifest` routes.
+
+---
+
+### Codex Mobile UI Density Improvements (Feb 11, 2026)
+Agent: Codex (reviewed by Claude Code)
+
+**34 files modified, 1 new file created — mobile + desktop UI density/consistency improvements**
+
+Key changes:
+- `src/components/ui/responsive-data-view.tsx` (NEW) — Generic `ResponsiveDataView<T>` + `ViewToggle` for table/card switching
+- `src/components/scope-items/scope-item-card.tsx` (NEW) — Mobile card view for scope items
+- `src/hooks/use-media-query.ts` — Added `useBreakpoint()` hook (replaces `useIsMobile()`)
+- `src/app/(dashboard)/projects/[id]/project-tabs.tsx` — Bottom-sheet tabs (mobile) + dropdown overflow (desktop)
+- `src/app/(dashboard)/projects/[id]/scope-items-table.tsx` — ResponsiveDataView integration, 2x2 summary grid
+- `src/app/(dashboard)/projects/[id]/project-overview.tsx` — Removed inline ProjectEditSheet, links to `/edit` page
+- `src/app/(dashboard)/projects/[id]/project-detail-header.tsx` — Removed edit button from header
+- Multiple action buttons — Added `compact` prop for mobile density
+- All project detail tabs (drawings, materials, reports, financials) — Denser mobile layouts
+
+Review findings (open issues):
+- `ScopeItemCard` missing `{!isClient && ...}` guards on Edit/Split/Delete actions
+- `ExportButton` removed from scope items — users may miss Excel export
+- `totalInitialCost` no longer displayed in scope items summary
+- `use-mobile.ts` is orphaned (no imports) — safe to delete
+- `canEdit` prop on `ProjectDetailHeader` is dead code
+- Gantt chart blocked for tablets (`isMobileOrTablet`) — may be too restrictive
+
+Build verified: TypeScript clean, 289/289 tests pass.
+
+### PDF Photo Layout Improvements (Feb 11, 2026)
+Agent: Codex (initial), Claude Code (review + fixes)
+
+**Codex added canvas-based image rendering + description clamping. Claude Code reviewed and fixed bugs, then simplified.**
+
+Files modified:
+- `src/lib/pdf/generate-report-pdf.ts` — Major refactor of photo rendering pipeline
+
+What Codex added:
+- `prepareImageForFrame()` — canvas pre-rendering for deterministic cover/contain
+- `getPhotoFitMode()` — URL-based keyword detection for contain mode
+- Description clamping to 3 lines with ellipsis
+- Image cache for repeated same-image draws
+
+What Claude Code fixed/changed:
+- **Bug fix:** Cache key collision — changed from `base64.slice(0,80)` to photo URL
+- **Bug fix:** Added try/catch to single/triple photo layouts (grid already had it)
+- **Removed:** `getPhotoFitMode()`, `PhotoFitMode` type, `criticalKeywords` array — unnecessary, caused false-positive gray bars
+- **Removed:** Gray background fill in canvas — not needed with cover-only mode
+- **Removed:** Dead `calculateFitDimensions` import
+- **Simplified:** Always cover mode (no contain), uniform 1:1 square grid frames
+- **Deleted:** `report-layout-preview-after-implementation.png` (dev artifact)
+
+Final photo layout:
+- Single: 16:9 hero | Triple: 16:9 hero + 2 square | Grid: uniform 1:1 square
+- All photos cover-cropped into frames, no gray bars, uniform row heights
+
+Build verified: TypeScript clean, 289/289 tests pass.
+
+### CLAUDE.md Revision (Feb 11, 2026)
+Agent: Claude Code
+
+Updated CLAUDE.md with mobile UI + PDF session learnings:
+- Added `ResponsiveDataView`, `useBreakpoint()`, compact button, and mobile tab patterns to Code Patterns
+- Updated hooks section (deprecated `use-mobile.ts`)
+- Added `ResponsiveDataView`, `ViewToggle`, `ScopeItemCard` to Component Hierarchy
+- Added mobile density pass to Completed status
+- Moved Mobile optimization to In Progress
+- Added Known Issues section (from Codex review)
+- Added Mobile UI Density lessons learned table
+- Updated Design System spacing table with mobile padding values
+- Added gotchas #16 (`useBreakpoint` not `useIsMobile`) and #17 (mobile card role guards)
 
 ---
 
