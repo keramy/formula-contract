@@ -416,4 +416,114 @@ When building a new page/component, verify:
 
 ---
 
+---
+
+## 11. Code Token Quick Reference
+
+> Extracted from CLAUDE.md (Feb 2026). Specific values for implementation.
+
+### Exact Color Tokens
+
+| Token | Value | Usage |
+|-------|-------|-------|
+| Primary | `#2563eb` (blue-600) | Main actions, links, active states |
+| Primary Hover | `#1d4ed8` (blue-700) | Button hover |
+| Background | `#ffffff` | Page background |
+| Foreground | `#1f2937` (gray-800) | Primary text |
+| Muted | `#f9fafb` (gray-50) | Subtle backgrounds |
+| Muted Foreground | `#6b7280` (gray-500) | Secondary text |
+| Border | `#e5e7eb` (gray-200) | All borders |
+
+### Status Colors (Exact Hex)
+
+| Status | Background | Text | Border |
+|--------|------------|------|--------|
+| Tender | `#fef3c7` | `#92400e` | `#f59e0b` |
+| Active | `#dbeafe` | `#1e40af` | `#2563eb` |
+| On Hold | `#f3f4f6` | `#4b5563` | `#9ca3af` |
+| Completed | `#d1fae5` | `#065f46` | `#10b981` |
+| Cancelled | `#fee2e2` | `#991b1b` | `#ef4444` |
+
+### Semantic Colors
+
+- **Success:** `#10b981` (emerald-500)
+- **Warning:** `#f59e0b` (amber-500)
+- **Destructive:** `#ef4444` (red-500)
+
+### Item Path Colors
+
+| Path | Background | Text | Border |
+|------|------------|------|--------|
+| Production | `#dbeafe` | `#1e40af` | `#2563eb` |
+| Procurement | `#f3e8ff` | `#6b21a8` | `#9333ea` |
+
+### Responsive Spacing (Desktop/Mobile)
+
+| Component | Padding (Desktop) | Padding (Mobile) | Gap |
+|-----------|-------------------|-------------------|-----|
+| Page container | `px-6 py-6` | `px-4 py-4` | - |
+| Card | `p-6` | `p-3` to `p-4` | - |
+| Button | `px-4 py-2` | same | `gap-2` |
+| Form fields | - | - | `gap-6` (vertical) |
+| KPI/stat cards | `p-4` | `p-3` | - |
+
+**Mobile density pattern:** Use `p-3 md:p-4` or `p-4 md:p-6` for responsive card padding.
+
+### Border Radius
+
+| Component | Radius |
+|-----------|--------|
+| Button | `rounded-md` (6px) |
+| Input | `rounded-md` (6px) |
+| Card | `rounded-lg` (8px) |
+| Modal | `rounded-xl` (12px) |
+| Badge | `rounded-sm` (4px) |
+
+### Button Sizing
+
+| Context | Size Prop | Dimensions | Example |
+|---------|-----------|------------|---------|
+| Icon-only (toolbar, header) | `size="icon"` | `size-9` (36px) | Edit, Delete icons |
+| Compact row actions | `size="sm"` | `h-8 px-3` | Filter clear, view toggle |
+| Standard actions | default | `h-9 px-4 py-2` | Submit, Cancel, Save |
+| Large CTA | `size="lg"` | `h-10 px-6` | Primary page actions |
+
+**Rules:**
+- Icon-only buttons must always have `aria-label` for accessibility
+- Icon-only buttons should use `Tooltip` wrapper for discoverability
+- Use `size="sm"` for inline/toolbar actions to keep UI compact
+
+### Sheet vs Dialog Usage
+
+| Component | Use For | Position | Example |
+|-----------|---------|----------|---------|
+| **Sheet** | Quick edit/create from tables | Side panel (right) | Add scope item, edit project |
+| **Dialog** | Confirmations, alerts, small forms | Centered modal | Delete confirm, approval reason |
+| **AlertDialog** | Destructive confirmations | Centered modal | Delete project, remove user |
+
+**Rules:**
+- **Sheet** for any form triggered from a table row or list (preserves context)
+- **Dialog** for confirmation prompts, small inputs, or actions that don't need table context
+- **AlertDialog** when the action is destructive and needs explicit "are you sure?"
+- Sheet width: `w-full sm:max-w-lg` (standard), `sm:max-w-2xl` (wide forms)
+
+### Component Hierarchy (ui-helpers.tsx)
+
+| Component | Purpose | Usage |
+|-----------|---------|-------|
+| `GlassCard` | Primary card wrapper | 44+ files, dominant pattern |
+| `StatusBadge` | Semantic status pills with optional dot | Project/item statuses |
+| `Badge` | Generic label/count badges | Counts, tags, categories |
+| `GradientIcon` | Icon with colored background | Card headers, empty states |
+| `GradientAvatar` | User initials with gradient | Team lists, assignments |
+| `EmptyState` | Placeholder for empty content | Lists with no data |
+| `StatCard` | KPI display with trend | Dashboard, finance |
+| `ResponsiveDataView` | Table/card view switcher based on breakpoint | Scope items, drawings, reports, materials |
+| `ViewToggle` | Manual table/cards toggle button group | Used with ResponsiveDataView |
+| `ScopeItemCard` | Mobile card view for scope items | Scope items tab (mobile only) |
+
+**Note:** `StatusBadge` and `Badge` are complementary — StatusBadge handles semantic statuses (success/warning/danger) with rounded-full pills; Badge is a generic rectangular label. Do NOT try to merge them.
+
+---
+
 *This handbook is a living document. Update it as we refine the design system.*
