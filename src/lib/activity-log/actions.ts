@@ -47,8 +47,7 @@ export async function logActivity(data: {
     entity_type: data.entityType,
     entity_id: data.entityId || null,
     project_id: data.projectId || null,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    details: (data.details || null) as any,
+    details: (data.details || null) as import("@/types/database").Json,
   });
 
   if (error) {

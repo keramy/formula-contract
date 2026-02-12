@@ -299,7 +299,7 @@ export function ActivityFeed({
     const projectCode = activity.project?.project_code;
 
     // For project-level actions, show project name directly
-    if (activity.entity_type === "project" && (config as any).entityLabel === "project") {
+    if (activity.entity_type === "project" && config.entityLabel === "project") {
       return (
         <>
           <span className="font-semibold">{userName}</span>

@@ -10,9 +10,8 @@ import { createClient } from "@/lib/supabase/server";
 export async function getNextProjectCode(): Promise<string> {
   const supabase = await createClient();
 
-  // Try to use the database function first (type assertion needed as it's not in generated types)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase.rpc as any)("preview_next_project_code");
+  // Use the database function to preview next project code
+  const { data, error } = await supabase.rpc("preview_next_project_code");
 
   if (!error && data) {
     return data as string;

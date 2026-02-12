@@ -29,7 +29,7 @@ export function isUUID(str: string): boolean {
  * Returns { projectId, projectSlug } for use in queries and URLs
  */
 export async function resolveProjectIdentifier(
-  supabase: any,
+  supabase: Pick<import("@supabase/supabase-js").SupabaseClient, "from">,
   identifier: string
 ): Promise<{ projectId: string; projectSlug: string | null } | null> {
   // If it's a UUID, query by id

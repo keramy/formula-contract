@@ -91,7 +91,7 @@ export async function generateScopeItemsExcel() {
 
   // Data sheet with headers only (no example row)
   const dataRows = [
-    SCOPE_ITEMS_COLUMNS as unknown as string[],
+    [...SCOPE_ITEMS_COLUMNS],
   ];
   const dataSheet = XLSX.utils.aoa_to_sheet(dataRows);
 
@@ -539,7 +539,7 @@ export async function generateMaterialsExcel() {
   const workbook = XLSX.utils.book_new();
 
   // Data sheet with headers only
-  const dataRows = [MATERIALS_COLUMNS as unknown as string[]];
+  const dataRows = [[...MATERIALS_COLUMNS]];
   const dataSheet = XLSX.utils.aoa_to_sheet(dataRows);
 
   dataSheet["!cols"] = [

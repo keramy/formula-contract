@@ -481,7 +481,7 @@ export default async function ProjectDetailPage({
               is_resolved: s.is_resolved,
               description: s.description,
             }))}
-            assignments={assignments as any}
+            assignments={assignments}
             recentActivities={recentActivities}
             canEdit={canEdit}
             isClient={isClient}
@@ -646,7 +646,7 @@ export default async function ProjectDetailPage({
         <TabsContent value="team">
           <TeamOverview
             projectId={projectId}
-            assignments={assignments as any}
+            assignments={assignments}
             canManageTeam={canManageTeam}
           />
         </TabsContent>
