@@ -256,7 +256,7 @@ export function UsersTable({ users }: UsersTableProps) {
                         </TableCell>
                         <TableCell className="py-4">
                           <div className="flex items-center gap-3">
-                            <GradientAvatar name={user.name} size="sm" colorIndex={(index + 4) % 8} />
+                            <GradientAvatar name={user.name} size="sm" />
                             <span className="font-medium">{user.name}</span>
                           </div>
                         </TableCell>
@@ -332,7 +332,7 @@ export function UsersTable({ users }: UsersTableProps) {
             <GlassCard key={user.id} className={`p-4 space-y-3 ${userStatus === "inactive" ? "opacity-60" : ""}`}>
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-3 min-w-0">
-                  <GradientAvatar name={user.name} size="sm" colorIndex={(index + 4) % 8} />
+                  <GradientAvatar name={user.name} size="sm" />
                   <div className="min-w-0">
                     <p className="font-medium truncate">{user.name}</p>
                     <p className="text-xs text-muted-foreground truncate">{user.email}</p>

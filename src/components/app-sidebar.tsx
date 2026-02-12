@@ -148,9 +148,9 @@ export function AppSidebar({ user }: AppSidebarProps) {
   const filteredManagementItems = managementNavItems.filter(item => canAccess(item.href, user.role));
 
   return (
-    <Sidebar collapsible="icon" className="border-r-0!">
+    <Sidebar collapsible="icon" className="border-r border-sidebar-border">
       {/* Header with Logo - adapts to collapsed state */}
-      <SidebarHeader className="h-14 border-b border-sidebar-border/50 p-0">
+      <SidebarHeader className="h-14 border-b border-sidebar-border p-0">
         <div className="flex items-center gap-2 px-3 h-full group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:justify-center">
           <img src="/icons/icon-192x192.png" alt="FC" className="size-8 rounded-lg shrink-0" />
           <div className="flex flex-col min-w-0 group-data-[collapsible=icon]:hidden">
@@ -199,7 +199,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
 
         {filteredManagementItems.length > 0 && (
           <>
-            <SidebarSeparator className="my-2 bg-border/50" />
+            <SidebarSeparator className="my-2 bg-sidebar-border" />
 
             {/* Management Navigation */}
             <SidebarGroup>
@@ -238,7 +238,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
       </SidebarContent>
 
       {/* Footer - User Menu */}
-      <SidebarFooter className="border-t border-sidebar-border/50 p-2">
+      <SidebarFooter className="border-t border-sidebar-border p-2">
         <SidebarMenu>
           <SidebarMenuItem>
             <UserMenu user={user} />

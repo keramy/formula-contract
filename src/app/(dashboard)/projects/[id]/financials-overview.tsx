@@ -73,25 +73,25 @@ function KPICard({
 }) {
   return (
     <Card>
-      <CardContent className="p-3 md:p-4">
+      <CardContent className="p-2.5 md:p-3">
         <div className="flex items-center justify-between">
-          <div className="space-y-1">
-            <p className="text-xs md:text-sm font-medium text-muted-foreground">{title}</p>
-            <p className="text-lg md:text-2xl font-bold leading-tight">{value}</p>
+          <div className="space-y-0.5">
+            <p className="text-[11px] md:text-xs font-medium text-muted-foreground">{title}</p>
+            <p className="text-base md:text-lg font-bold leading-tight">{value}</p>
             {subtitle && (
-              <p className="text-[11px] text-muted-foreground leading-tight">{subtitle}</p>
+              <p className="text-[10px] md:text-[11px] text-muted-foreground leading-tight">{subtitle}</p>
             )}
             {trendLabel && (
-              <div className="mt-1 flex items-center gap-1">
+              <div className="mt-0.5 flex items-center gap-1">
                 {trend === "positive" && (
-                  <TrendingDownIcon className="size-3.5 text-emerald-500" />
+                  <TrendingDownIcon className="size-3 text-emerald-500" />
                 )}
                 {trend === "negative" && (
-                  <TrendingUpIcon className="size-3.5 text-rose-500" />
+                  <TrendingUpIcon className="size-3 text-rose-500" />
                 )}
                 <span
                   className={cn(
-                    "text-xs font-medium",
+                    "text-[11px] font-medium",
                     trend === "positive" && "text-emerald-600",
                     trend === "negative" && "text-rose-600",
                     trend === "neutral" && "text-muted-foreground"
@@ -102,8 +102,8 @@ function KPICard({
               </div>
             )}
           </div>
-          <div className="rounded-lg bg-muted p-2 md:p-3">
-            <Icon className="size-4 md:size-5 text-muted-foreground" />
+          <div className="rounded-md bg-muted p-1.5 md:p-2">
+            <Icon className="size-3.5 md:size-4 text-muted-foreground" />
           </div>
         </div>
       </CardContent>
@@ -135,33 +135,33 @@ function PathBreakdownCard({
 
   return (
     <Card>
-      <CardHeader className="pb-1.5 md:pb-2">
+      <CardHeader className="px-3 md:px-4 pb-1">
         <div className="flex items-center gap-2">
-          <div className={cn("rounded-lg p-1.5 md:p-2", colorClass)}>
-            <Icon className="size-4" />
+          <div className={cn("rounded-md p-1.5", colorClass)}>
+            <Icon className="size-3.5" />
           </div>
           <div>
-            <CardTitle className="text-sm font-semibold leading-tight">{title}</CardTitle>
-            <p className="text-[11px] text-muted-foreground">{count} items</p>
+            <CardTitle className="text-xs md:text-sm font-semibold leading-tight">{title}</CardTitle>
+            <p className="text-[10px] md:text-[11px] text-muted-foreground">{count} items</p>
           </div>
         </div>
       </CardHeader>
-      <CardContent className="pt-1.5 md:pt-2">
-        <div className="grid grid-cols-3 gap-2 md:gap-4 text-center">
+      <CardContent className="px-3 md:px-4 pt-1 pb-3">
+        <div className="grid grid-cols-3 gap-2 md:gap-3 text-center">
           <div>
-            <p className="mb-1 text-[11px] text-muted-foreground">Budget</p>
+            <p className="mb-0.5 text-[10px] md:text-[11px] text-muted-foreground">Budget</p>
             <p className="text-xs md:text-sm font-semibold">
               {formatCurrency(budget, currency)}
             </p>
           </div>
           <div>
-            <p className="mb-1 text-[11px] text-muted-foreground">Actual</p>
+            <p className="mb-0.5 text-[10px] md:text-[11px] text-muted-foreground">Actual</p>
             <p className="text-xs md:text-sm font-semibold">
               {formatCurrency(actual, currency)}
             </p>
           </div>
           <div>
-            <p className="mb-1 text-[11px] text-muted-foreground">Variance</p>
+            <p className="mb-0.5 text-[10px] md:text-[11px] text-muted-foreground">Variance</p>
             <p
               className={cn(
                 "text-xs md:text-sm font-semibold",
@@ -333,7 +333,7 @@ export function FinancialsOverview({
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 gap-2 md:gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 md:gap-3 lg:grid-cols-4">
         <KPICard
           title="Budget"
           value={formatCurrency(totals.budget, currency)}
@@ -379,7 +379,7 @@ export function FinancialsOverview({
       </div>
 
       {/* Path Breakdown */}
-      <div className="grid gap-2 md:gap-4 md:grid-cols-2">
+      <div className="grid gap-2 md:gap-3 md:grid-cols-2">
         <PathBreakdownCard
           title="Production"
           icon={FactoryIcon}

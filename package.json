@@ -3,7 +3,7 @@
   "version": "1.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "npx @react-grab/claude-code@latest && next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -111,6 +111,7 @@
     "jsdom": "^27.4.0",
     "lighthouse": "^12.8.2",
     "playwright-lighthouse": "^4.0.0",
+    "react-grab": "^0.1.14",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5",

@@ -6,6 +6,7 @@ import { NotificationsDropdown } from "@/components/notifications/notifications-
 import { cn } from "@/lib/utils";
 import { PanelLeftIcon, MenuIcon, SearchIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // ============================================================================
 // Page Header Context - allows pages to set their header content
@@ -76,9 +77,9 @@ export function AppHeader({ className }: AppHeaderProps) {
         {isMobile ? <MenuIcon className="size-5" /> : <PanelLeftIcon className="size-5" />}
       </SidebarTrigger>
 
-      {/* Back Link (optional) */}
+      {/* Back Link / Breadcrumb (optional) */}
       {content.backLink && (
-        <div className="shrink-0">
+        <div className="min-w-0">
           {content.backLink}
         </div>
       )}
@@ -109,35 +110,28 @@ export function AppHeader({ className }: AppHeaderProps) {
         </div>
       )}
 
-      {/* Center: Search Bar */}
-      <div className="hidden md:flex flex-1 justify-center max-w-xl mx-auto">
-        <Button
-          variant="outline"
-          onClick={handleSearchClick}
-          className="w-full max-w-md h-9 px-3 justify-start text-muted-foreground font-normal bg-base-50/50 border-base-200 hover:bg-primary/10 hover:border-primary/30"
-        >
-          <SearchIcon className="size-4 mr-2 shrink-0" />
-          <span className="truncate">Search projects, clients...</span>
-          <kbd className="ml-auto hidden sm:inline-flex h-5 items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
-            <span className="text-xs">⌘</span>K
-          </kbd>
-        </Button>
-      </div>
-
-      {/* Right: Page Actions + Notifications */}
-      <div className={cn("shrink-0 flex items-center gap-1", isMobile && "ml-auto")}>
-        {isMobile && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-9"
-            onClick={handleSearchClick}
-            aria-label="Open search"
-          >
-            <SearchIcon className="size-4" />
-          </Button>
-        )}
+      {/* Right: Page Actions + Search + Notifications */}
+      <div className="ml-auto shrink-0 flex items-center gap-1">
         {content.actions}
+        <TooltipProvider delayDuration={300}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-9 text-muted-foreground hover:text-foreground hover:bg-primary/10"
+                onClick={handleSearchClick}
+                aria-label="Search (⌘K)"
+              >
+                <SearchIcon className="size-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <span>Search</span>
+              <kbd className="ml-1.5 inline-flex h-4 items-center rounded border bg-muted px-1 font-mono text-[10px]">⌘K</kbd>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
         <NotificationsDropdown />
       </div>
     </header>

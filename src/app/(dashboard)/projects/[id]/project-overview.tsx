@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { format, isPast, differenceInDays } from "date-fns";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { GlassCard, GradientIcon } from "@/components/ui/ui-helpers";
@@ -11,6 +12,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   BuildingIcon,
   CalendarIcon,
@@ -78,8 +84,25 @@ interface Assignment {
   user: {
     id: string;
     name: string;
-    avatar_url: string | null;
+    email: string;
+    role: string;
   };
+}
+
+// Name-hash avatar colors — each person gets a unique gradient
+const avatarColors = [
+  "from-rose-400 to-orange-400",
+  "from-violet-400 to-purple-400",
+  "from-teal-400 to-cyan-400",
+  "from-amber-400 to-yellow-400",
+  "from-emerald-400 to-teal-400",
+  "from-blue-400 to-indigo-400",
+  "from-pink-400 to-rose-400",
+  "from-orange-400 to-amber-400",
+];
+
+function getAvatarColor(name: string): string {
+  return avatarColors[name.charCodeAt(0) % avatarColors.length];
 }
 
 interface Activity {
@@ -250,7 +273,7 @@ export function ProjectOverview({
   // === CRITICAL (Red) - Things that are broken or overdue ===
   if (overdueMilestonesList.length > 0) {
     attentionItems.push({
-      label: "overdue milestone",
+      label: "Overdue milestone",
       count: overdueMilestonesList.length,
       color: "text-rose-600",
       tab: "milestones",
@@ -259,7 +282,7 @@ export function ProjectOverview({
   }
   if (rejectedDrawingsList.length > 0) {
     attentionItems.push({
-      label: "rejected drawing",
+      label: "Rejected drawing",
       count: rejectedDrawingsList.length,
       color: "text-rose-600",
       tab: "drawings",
@@ -270,7 +293,7 @@ export function ProjectOverview({
   // === WARNING (Amber) - Things that need action ===
   if (pendingMaterialsList.length > 0) {
     attentionItems.push({
-      label: "pending material",
+      label: "Pending material",
       count: pendingMaterialsList.length,
       color: "text-amber-600",
       tab: "materials",
@@ -279,7 +302,7 @@ export function ProjectOverview({
   }
   if (openSnaggingList.length > 0) {
     attentionItems.push({
-      label: "open issue",
+      label: "Open issue",
       count: openSnaggingList.length,
       color: "text-amber-600",
       tab: "snagging",
@@ -290,7 +313,7 @@ export function ProjectOverview({
   // === MISSING (Sky/Blue) - Things not started yet ===
   if (productionItemsWithoutDrawings.length > 0) {
     attentionItems.push({
-      label: "item without drawing",
+      label: "Item without drawing",
       count: productionItemsWithoutDrawings.length,
       color: "text-sky-600",
       tab: "drawings",
@@ -299,8 +322,8 @@ export function ProjectOverview({
   }
   if (scopeItems.length > 0 && materials.length === 0) {
     attentionItems.push({
-      label: "no materials added",
-      count: 1,
+      label: "No materials added",
+      count: 0,
       color: "text-sky-600",
       tab: "materials",
       details: ["Add materials to track approvals"],
@@ -308,8 +331,8 @@ export function ProjectOverview({
   }
   if (milestones.length === 0) {
     attentionItems.push({
-      label: "no milestones set",
-      count: 1,
+      label: "No milestones set",
+      count: 0,
       color: "text-sky-600",
       tab: "milestones",
       details: ["Set milestones to track project timeline"],
@@ -349,7 +372,7 @@ export function ProjectOverview({
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="8"
-                  className="text-muted/20"
+                  className="text-gray-200"
                 />
                 <circle
                   cx="60"
@@ -505,26 +528,39 @@ export function ProjectOverview({
                         {assignments.slice(0, 4).map((a) => (
                           <Tooltip key={a.id}>
                             <TooltipTrigger asChild>
-                              <div className="size-6 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 ring-1 ring-white flex items-center justify-center text-white text-[10px] font-medium cursor-default hover:z-10 hover:scale-110 transition-transform">
+                              <div className={cn("size-6 rounded-full bg-gradient-to-br ring-1 ring-white flex items-center justify-center text-white text-[10px] font-medium cursor-default hover:z-10 hover:scale-110 transition-transform", getAvatarColor(a.user.name))}>
                                 {a.user.name.charAt(0).toUpperCase()}
                               </div>
                             </TooltipTrigger>
                             <TooltipContent side="bottom" className="text-xs">
-                              {a.user.name}
+                              {a.user.name} <span className="text-muted-foreground capitalize">· {a.user.role}</span>
                             </TooltipContent>
                           </Tooltip>
                         ))}
                         {assignments.length > 4 && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="size-6 rounded-full bg-muted ring-1 ring-white flex items-center justify-center text-[10px] font-medium cursor-default">
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <button className="size-6 rounded-full bg-muted ring-1 ring-white flex items-center justify-center text-[10px] font-medium cursor-pointer hover:bg-muted/80 hover:z-10 hover:scale-110 transition-transform">
                                 +{assignments.length - 4}
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent side="bottom" align="end" className="w-56 p-2">
+                              <p className="text-xs font-medium text-muted-foreground px-2 pb-1.5 border-b mb-1.5">
+                                Team · {assignments.length} members
+                              </p>
+                              <div className="max-h-48 overflow-y-auto space-y-0.5">
+                                {assignments.map((a) => (
+                                  <div key={a.id} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted/50">
+                                    <div className={cn("size-5 rounded-full bg-gradient-to-br flex items-center justify-center text-white text-[9px] font-medium shrink-0", getAvatarColor(a.user.name))}>
+                                      {a.user.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <span className="text-xs font-medium truncate">{a.user.name}</span>
+                                    <span className="text-[10px] text-muted-foreground capitalize ml-auto shrink-0">{a.user.role}</span>
+                                  </div>
+                                ))}
                               </div>
-                            </TooltipTrigger>
-                            <TooltipContent side="bottom" className="text-xs">
-                              {assignments.slice(4).map((a) => a.user.name).join(", ")}
-                            </TooltipContent>
-                          </Tooltip>
+                            </PopoverContent>
+                          </Popover>
                         )}
                       </div>
                     </TooltipProvider>
@@ -618,15 +654,15 @@ export function ProjectOverview({
                       }}
                       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-white/85 hover:bg-white transition-colors ${item.color}`}
                     >
-                      <span className="font-bold">{item.count}</span>
-                      {item.label}{item.count !== 1 ? "s" : ""}
+                      {item.count > 0 && <span className="font-bold">{item.count}</span>}
+                      {item.count > 0 ? `${item.label}${item.count !== 1 ? "s" : ""}` : item.label}
                       <ArrowRightIcon className="size-2.5" />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" className="max-w-xs">
                     <div className="text-xs space-y-1">
                       <p className="font-medium border-b pb-1 mb-1">
-                        {item.count} {item.label}{item.count !== 1 ? "s" : ""}:
+                        {item.count > 0 ? `${item.count} ${item.label}${item.count !== 1 ? "s" : ""}` : item.label}:
                       </p>
                       <ul className="space-y-0.5">
                         {item.details.slice(0, 5).map((detail, i) => (

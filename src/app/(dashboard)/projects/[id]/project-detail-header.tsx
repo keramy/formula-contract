@@ -2,9 +2,8 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { ArrowLeftIcon, FolderKanbanIcon } from "lucide-react";
-import { GradientIcon, StatusBadge } from "@/components/ui/ui-helpers";
+import { ChevronRightIcon } from "lucide-react";
+import { StatusBadge } from "@/components/ui/ui-helpers";
 import { usePageHeader } from "@/components/layout/app-header";
 
 type StatusVariant = "info" | "success" | "warning" | "default" | "danger";
@@ -38,22 +37,22 @@ export function ProjectDetailHeader({
   useEffect(() => {
     setContent({
       backLink: (
-        <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground">
-          <Link href="/projects">
-            <ArrowLeftIcon className="size-4 sm:mr-1" />
-            <span className="hidden sm:inline">Projects</span>
+        <nav className="flex items-center gap-1.5 min-w-0">
+          <Link
+            href="/projects"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors shrink-0"
+          >
+            Projects
           </Link>
-        </Button>
+          <ChevronRightIcon className="size-3.5 text-muted-foreground/50 shrink-0" />
+          <span className="text-sm font-semibold truncate">{projectName}</span>
+          <span className="text-sm text-muted-foreground shrink-0">·</span>
+          <span className="text-sm font-mono text-muted-foreground shrink-0">{projectCode}</span>
+          <StatusBadge variant={config.variant} dot>
+            {config.label}
+          </StatusBadge>
+        </nav>
       ),
-      icon: <GradientIcon icon={<FolderKanbanIcon className="size-4" />} color="primary" size="sm" />,
-      title: projectName,
-      description: projectCode,
-      badge: (
-        <StatusBadge variant={config.variant} dot>
-          {config.label}
-        </StatusBadge>
-      ),
-      actions: undefined,
     });
     return () => setContent({});
   }, [projectName, projectCode, status, projectId, setContent, config.variant, config.label]);
