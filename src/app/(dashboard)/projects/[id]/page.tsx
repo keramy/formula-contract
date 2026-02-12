@@ -424,7 +424,6 @@ export default async function ProjectDetailPage({
         projectName={project.name}
         projectCode={project.project_code}
         status={project.status}
-        canEdit={canEdit}
       />
 
       {/* Tabs - responsive with "More" dropdown on mobile */}

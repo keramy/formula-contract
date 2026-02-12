@@ -253,12 +253,8 @@ npm run version:major   # 1.0.0 → 2.0.0 (breaking changes)
 - PDF Executive Summary generation
 
 ### Known Issues
-- `ScopeItemCard` missing client role guards on Edit/Split/Delete actions
 - `ExportButton` removed from scope items — Excel export via separate button
 - `totalInitialCost` display removed from scope items summary bar
-- `use-mobile.ts` orphaned — can be deleted
-- `canEdit` prop on `ProjectDetailHeader` is dead code
-- Gantt chart blocked for tablets via `isMobileOrTablet` — may be too restrictive
 
 **Full changelog:** See [docs/CHANGELOG.md](./docs/CHANGELOG.md)
 

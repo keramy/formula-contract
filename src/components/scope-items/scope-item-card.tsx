@@ -100,7 +100,9 @@ export function ScopeItemCard<T extends ScopeItemCardData>({
   return (
     <GlassCard className="p-2.5 space-y-2">
       <div className="flex items-start gap-2">
-        <Checkbox checked={isSelected} onCheckedChange={() => onToggleSelect(item.id)} className="mt-0.5" />
+        {!isClient && (
+          <Checkbox checked={isSelected} onCheckedChange={() => onToggleSelect(item.id)} className="mt-0.5" />
+        )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 min-w-0">
             <p className="font-mono text-[11px] text-muted-foreground leading-none shrink-0">
@@ -137,21 +139,25 @@ export function ScopeItemCard<T extends ScopeItemCardData>({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => onView(item)}>View</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onEdit(item)}>
-              <PencilIcon className="size-4 mr-2" />
-              Edit
-            </DropdownMenuItem>
-            {!item.isChild && (
-              <DropdownMenuItem onClick={() => onSplit(item)}>
-                <SplitIcon className="size-4 mr-2" />
-                Split Item
-              </DropdownMenuItem>
+            {!isClient && (
+              <>
+                <DropdownMenuItem onClick={() => onEdit(item)}>
+                  <PencilIcon className="size-4 mr-2" />
+                  Edit
+                </DropdownMenuItem>
+                {!item.isChild && (
+                  <DropdownMenuItem onClick={() => onSplit(item)}>
+                    <SplitIcon className="size-4 mr-2" />
+                    Split Item
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => onDelete(item)} className="text-destructive focus:text-destructive">
+                  <TrashIcon className="size-4 mr-2" />
+                  Delete
+                </DropdownMenuItem>
+              </>
             )}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => onDelete(item)} className="text-destructive focus:text-destructive">
-              <TrashIcon className="size-4 mr-2" />
-              Delete
-            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

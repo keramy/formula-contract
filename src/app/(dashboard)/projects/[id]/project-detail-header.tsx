@@ -23,7 +23,6 @@ interface ProjectDetailHeaderProps {
   projectName: string;
   projectCode: string;
   status: string;
-  canEdit: boolean;
 }
 
 export function ProjectDetailHeader({
@@ -31,7 +30,6 @@ export function ProjectDetailHeader({
   projectName,
   projectCode,
   status,
-  canEdit,
 }: ProjectDetailHeaderProps) {
   const { setContent } = usePageHeader();
   const config = statusConfig[status] || { variant: "default" as StatusVariant, label: status };
@@ -58,7 +56,7 @@ export function ProjectDetailHeader({
       actions: undefined,
     });
     return () => setContent({});
-  }, [projectName, projectCode, status, canEdit, projectId, setContent, config.variant, config.label]);
+  }, [projectName, projectCode, status, projectId, setContent, config.variant, config.label]);
 
   // Nothing to render — everything is in the header
   return null;

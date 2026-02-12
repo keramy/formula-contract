@@ -79,7 +79,7 @@ export function TimelineClient({
   showHeader = true,
   showFullscreenToggle = true,
 }: TimelineClientProps) {
-  const { isMobileOrTablet } = useBreakpoint();
+  const { isMobile } = useBreakpoint();
   // React Query hooks for timeline data
   const { data: timelineItems = [], isLoading: isLoadingItems } = useTimelineItems(projectId);
   const { data: timelineDependencies = [], isLoading: isLoadingDeps } = useTimelineDependencies(projectId);
@@ -298,14 +298,15 @@ export function TimelineClient({
     );
   }
 
-  // Explicit fallback for touch-first screens where drag/resize interactions are unreliable.
-  if (isMobileOrTablet) {
+  // Block Gantt on phones where drag/resize interactions are unreliable.
+  // Tablets (768-1023px) can handle the chart in landscape mode.
+  if (isMobile) {
     return (
       <GlassCard className="p-6">
         <EmptyState
           icon={<CalendarIcon className="size-8" />}
-          title="Timeline is best viewed on desktop"
-          description="For precise drag/resize timeline editing, use a desktop browser. On tablet, landscape mode may improve readability."
+          title="Timeline is best viewed on a larger screen"
+          description="For precise drag/resize timeline editing, use a tablet in landscape or a desktop browser."
         />
       </GlassCard>
     );
