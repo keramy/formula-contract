@@ -39,6 +39,10 @@ export const getCachedDashboardStats = unstable_cache(
       supabase.from("users").select("*", { count: "exact", head: true }).eq("is_active", true),
     ]);
 
+    if (projectsResult.error) throw new Error(`[Cache] getDashboardStats/projects: ${projectsResult.error.message}`);
+    if (clientCountResult.error) throw new Error(`[Cache] getDashboardStats/clients: ${clientCountResult.error.message}`);
+    if (userCountResult.error) throw new Error(`[Cache] getDashboardStats/users: ${userCountResult.error.message}`);
+
     const projects = projectsResult.data || [];
     const projectCounts = {
       total: projects.length,
@@ -76,15 +80,16 @@ export const getCachedRecentProjects = unstable_cache(
 
     // Get recent projects (includes slug for URL-friendly links)
     // Note: slug column added by migration 015_add_project_slug.sql
-    const { data: projectsData } = await supabase
+    const projectsResult = await supabase
       .from("projects")
       .select("id, slug, project_code, name, status, client_id")
       .eq("is_deleted", false)
       .order("created_at", { ascending: false })
       .limit(5);
+    if (projectsResult.error) throw new Error(`[Cache] getRecentProjects/projects: ${projectsResult.error.message}`);
 
     // Type assertion for projects with slug (column added by migration)
-    const projects = projectsData as { id: string; slug: string | null; project_code: string; name: string; status: string; client_id: string | null }[] | null;
+    const projects = projectsResult.data as { id: string; slug: string | null; project_code: string; name: string; status: string; client_id: string | null }[] | null;
 
     if (!projects || projects.length === 0) {
       console.log(`  📊 [CACHE] Recent projects: 0 found in ${(performance.now() - start).toFixed(0)}ms`);
@@ -238,6 +243,12 @@ export const getCachedProjectDetail = unstable_cache(
     ]);
 
     console.log(`  📊 [CACHE] Project detail fetched in ${(performance.now() - start).toFixed(0)}ms`);
+
+    // Log non-critical errors but don't throw (enrichment queries)
+    if (scopeItemsResult.error) console.error("[Cache] getProjectDetail/scopeItems:", scopeItemsResult.error.message);
+    if (materialsResult.error) console.error("[Cache] getProjectDetail/materials:", materialsResult.error.message);
+    if (snaggingResult.error) console.error("[Cache] getProjectDetail/snagging:", snaggingResult.error.message);
+    if (milestonesResult.error) console.error("[Cache] getProjectDetail/milestones:", milestonesResult.error.message);
 
     return {
       project: projectResult.data,

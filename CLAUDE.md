@@ -245,7 +245,7 @@ npm run version:major   # 1.0.0 → 2.0.0 (breaking changes)
 
 ### In Progress
 - Gantt chart UI polish (migration 045 applied, data is live)
-- Mobile optimization (responsive data views done, remaining: role guards, Gantt tablet, E2E testing)
+- Mobile optimization (responsive data views done, Gantt tablet enabled, remaining: full E2E testing)
 
 ### Planned
 - Global capacity view (cross-project phase workload overview)
@@ -253,8 +253,7 @@ npm run version:major   # 1.0.0 → 2.0.0 (breaking changes)
 - PDF Executive Summary generation
 
 ### Known Issues
-- `ExportButton` removed from scope items — Excel export via separate button
-- `totalInitialCost` display removed from scope items summary bar
+- None currently tracked
 
 **Full changelog:** See [docs/CHANGELOG.md](./docs/CHANGELOG.md)
 

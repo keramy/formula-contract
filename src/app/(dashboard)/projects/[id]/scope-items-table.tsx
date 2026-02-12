@@ -1132,7 +1132,7 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
   }
 
   // Extract memoized summary values for cleaner JSX
-  const { totalSalesPrice, totalActualCost, avgProgress } = summaryStats;
+  const { totalSalesPrice, totalActualCost, totalInitialCost, avgProgress } = summaryStats;
 
   const renderColumnsControl = () => (
     <Popover open={columnPopoverOpen} onOpenChange={setColumnPopoverOpen}>
@@ -1216,6 +1216,23 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
               </div>
               <p className="mt-1 truncate text-sm font-semibold leading-none text-emerald-700">
                 {formatCurrency(totalSalesPrice)}
+              </p>
+            </div>
+          )}
+
+          {!isClient && totalInitialCost > 0 && (
+            <div
+              className="rounded-md border border-base-200/80 bg-white px-2.5 py-1.5 dark:bg-base-950/40"
+              title="Total Initial Cost (budgeted at creation, locked)"
+            >
+              <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                <span className="inline-flex items-center gap-1">
+                  <BanknoteIcon className="size-3 text-gray-500" />
+                  Initial
+                </span>
+              </div>
+              <p className="mt-1 truncate text-sm font-semibold leading-none text-gray-600">
+                {formatCurrency(totalInitialCost)}
               </p>
             </div>
           )}

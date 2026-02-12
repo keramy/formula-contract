@@ -2,6 +2,16 @@
 
 import { createClient } from "@/lib/supabase/server";
 
+/** Throw if a Supabase query returned an error so the page-level safe() wrapper can catch it. */
+function throwOnError(
+  result: { error: { message: string } | null },
+  context: string
+): void {
+  if (result.error) {
+    throw new Error(`[Dashboard] ${context}: ${result.error.message}`);
+  }
+}
+
 export interface TaskSummary {
   pendingMaterialApprovals: number;
   rejectedDrawings: number;
@@ -91,6 +101,8 @@ export async function getMyDashboardStats(assignedProjectIds: string[]): Promise
       .from("clients")
       .select("id, company_name"),
   ]);
+
+  if (projectsError) throwOnError({ error: projectsError }, "getMyDashboardStats/projects");
 
   // Type assertion for projects with slug (column added by migration 015)
   const projects = (projectsData as unknown as Array<{
@@ -204,15 +216,17 @@ export async function getMyTasks(projectIds?: string[]): Promise<TaskSummary> {
   }
 
   // Parallel fetch for other task counts
-  const [
-    { count: pendingMaterialApprovals },
-    { count: draftReports },
-    { count: overdueMilestones },
-  ] = await Promise.all([
+  const [materialsResult, reportsResult, milestonesResult] = await Promise.all([
     materialsQuery,
     reportsQuery,
     milestonesQuery,
   ]);
+  throwOnError(materialsResult, "getMyTasks/materials");
+  throwOnError(reportsResult, "getMyTasks/reports");
+  throwOnError(milestonesResult, "getMyTasks/milestones");
+  const pendingMaterialApprovals = materialsResult.count;
+  const draftReports = reportsResult.count;
+  const overdueMilestones = milestonesResult.count;
 
   const total =
     (pendingMaterialApprovals || 0) +
@@ -257,7 +271,9 @@ export async function getAtRiskProjects(projectIds?: string[]): Promise<AtRiskPr
     query = query.in("id", projectIds);
   }
 
-  const { data: projectsData } = await query;
+  const projectsResult = await query;
+  throwOnError(projectsResult, "getAtRiskProjects/projects");
+  const projectsData = projectsResult.data;
 
   // Type assertion for projects with slug (column added by migration)
   const projects = projectsData as { id: string; slug: string | null; name: string; project_code: string; client_id: string | null }[] | null;
@@ -369,10 +385,12 @@ export async function getPendingApprovals(userId: string): Promise<PendingApprov
   const supabase = await createClient();
 
   // Get projects assigned to this user (client)
-  const { data: assignments } = await supabase
+  const assignmentsResult = await supabase
     .from("project_assignments")
     .select("project_id")
     .eq("user_id", userId);
+  throwOnError(assignmentsResult, "getPendingApprovals/assignments");
+  const assignments = assignmentsResult.data;
 
   if (!assignments || assignments.length === 0) {
     return [];
@@ -382,10 +400,12 @@ export async function getPendingApprovals(userId: string): Promise<PendingApprov
 
   // Get project info (includes slug for URLs)
   // Note: slug column added by migration 015_add_project_slug.sql
-  const { data: projectsData } = await supabase
+  const projectsResult = await supabase
     .from("projects")
     .select("id, slug, name, project_code")
     .in("id", projectIds);
+  throwOnError(projectsResult, "getPendingApprovals/projects");
+  const projectsData = projectsResult.data;
 
   const projects = projectsData as { id: string; slug: string | null; name: string; project_code: string }[] | null;
   const projectMap = new Map(projects?.map(p => [p.id, { slug: p.slug, name: p.name, code: p.project_code }]) || []);
@@ -480,10 +500,12 @@ export async function getClientProjectProgress(userId: string): Promise<ClientPr
   const supabase = await createClient();
 
   // Get projects assigned to this user
-  const { data: assignments } = await supabase
+  const assignmentsResult = await supabase
     .from("project_assignments")
     .select("project_id")
     .eq("user_id", userId);
+  throwOnError(assignmentsResult, "getClientProjectProgress/assignments");
+  const assignments = assignmentsResult.data;
 
   if (!assignments || assignments.length === 0) {
     return [];
@@ -493,7 +515,7 @@ export async function getClientProjectProgress(userId: string): Promise<ClientPr
 
   // Get projects and scope items for progress calculation (includes slug for URLs)
   // Note: slug column added by migration 015_add_project_slug.sql
-  const [{ data: projectsData }, { data: scopeItems }] = await Promise.all([
+  const [projectsResult, scopeItemsResult] = await Promise.all([
     supabase
       .from("projects")
       .select("id, slug, name, project_code, status")
@@ -506,6 +528,10 @@ export async function getClientProjectProgress(userId: string): Promise<ClientPr
       .in("project_id", projectIds)
       .eq("is_deleted", false),
   ]);
+  throwOnError(projectsResult, "getClientProjectProgress/projects");
+  throwOnError(scopeItemsResult, "getClientProjectProgress/scopeItems");
+  const projectsData = projectsResult.data;
+  const scopeItems = scopeItemsResult.data;
 
   // Type assertion for projects with slug (column added by migration)
   const projects = projectsData as { id: string; slug: string | null; name: string; project_code: string; status: string }[] | null;
@@ -610,15 +636,16 @@ export async function getProductionQueue(): Promise<ProductionQueueSummary> {
   const supabase = await createClient();
 
   // Get scope items that are in production path
-  const { data: itemsData } = await supabase
+  const itemsResult = await supabase
     .from("scope_items")
     .select("id, item_code, name, project_id, production_percentage, status, is_installed, item_path")
     .eq("item_path", "production")
     .eq("is_deleted", false)
     .in("status", ["approved", "in_production", "complete"])
     .order("production_percentage", { ascending: true });
+  throwOnError(itemsResult, "getProductionQueue/scopeItems");
 
-  const items = itemsData || [];
+  const items = itemsResult.data || [];
   const projectIds = [...new Set(items.map(i => i.project_id))];
 
   // Get project info
@@ -701,15 +728,16 @@ export async function getProcurementQueue(): Promise<ProcurementQueueSummary> {
   const supabase = await createClient();
 
   // Get scope items that are in procurement path
-  const { data: itemsData } = await supabase
+  const itemsResult = await supabase
     .from("scope_items")
     .select("id, item_code, name, project_id, item_path, status")
     .eq("item_path", "procurement")
     .eq("is_deleted", false)
     .not("status", "eq", "complete")
     .not("status", "eq", "cancelled");
+  throwOnError(itemsResult, "getProcurementQueue/scopeItems");
 
-  const items = itemsData || [];
+  const items = itemsResult.data || [];
   const itemIds = items.map(i => i.id);
   const projectIds = [...new Set(items.map(i => i.project_id))];
 
@@ -818,13 +846,14 @@ export interface FinancialOverview {
 export async function getFinancialOverview(): Promise<FinancialOverview> {
   const supabase = await createClient();
 
-  const { data: projectsData } = await supabase
+  const financialResult = await supabase
     .from("projects")
     .select("status, contract_value_manual, currency")
     .eq("is_deleted", false)
     .not("status", "eq", "cancelled");
+  throwOnError(financialResult, "getFinancialOverview/projects");
 
-  const projects = projectsData || [];
+  const projects = financialResult.data || [];
 
   let totalContractValue = 0;
   const byStatus = { tender: 0, active: 0, completed: 0 };
@@ -929,23 +958,22 @@ export async function getThisWeekSummary(projectIds?: string[]): Promise<ThisWee
   }
 
   // Parallel fetch for all stats
-  const [
-    { count: itemsCompletedThisWeek },
-    { count: reportsPublishedThisWeek },
-    { count: upcomingMilestones },
-    { count: milestonesOverdue },
-  ] = await Promise.all([
+  const [itemsRes, reportsRes, upcomingRes, overdueRes] = await Promise.all([
     itemsQuery,
     reportsQuery,
     upcomingMilestonesQuery,
     overdueMilestonesQuery,
   ]);
+  throwOnError(itemsRes, "getThisWeekSummary/items");
+  throwOnError(reportsRes, "getThisWeekSummary/reports");
+  throwOnError(upcomingRes, "getThisWeekSummary/upcomingMilestones");
+  throwOnError(overdueRes, "getThisWeekSummary/overdueMilestones");
 
   return {
-    itemsCompletedThisWeek: itemsCompletedThisWeek || 0,
-    reportsPublishedThisWeek: reportsPublishedThisWeek || 0,
-    upcomingMilestones: upcomingMilestones || 0,
-    milestonesOverdue: milestonesOverdue || 0,
+    itemsCompletedThisWeek: itemsRes.count || 0,
+    reportsPublishedThisWeek: reportsRes.count || 0,
+    upcomingMilestones: upcomingRes.count || 0,
+    milestonesOverdue: overdueRes.count || 0,
   };
 }
 
@@ -965,10 +993,12 @@ export interface ProjectsByStatus {
 export async function getProjectsByStatus(): Promise<ProjectsByStatus> {
   const supabase = await createClient();
 
-  const { data: projects } = await supabase
+  const statusResult = await supabase
     .from("projects")
     .select("status")
     .eq("is_deleted", false);
+  throwOnError(statusResult, "getProjectsByStatus/projects");
+  const projects = statusResult.data;
 
   const counts = {
     tender: 0,
