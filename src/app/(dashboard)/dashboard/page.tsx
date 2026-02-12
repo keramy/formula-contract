@@ -35,6 +35,16 @@ const statusConfig: Record<string, { variant: "info" | "success" | "warning" | "
   not_awarded: { variant: "danger", label: "Not Awarded" },
 };
 
+// Safety wrapper — if a dashboard server action throws, return fallback instead of crashing the page
+async function safe<T>(promise: Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await promise;
+  } catch (error) {
+    console.error("[Dashboard] Data fetch failed:", error);
+    return fallback;
+  }
+}
+
 export default async function DashboardPage() {
   const pageStart = performance.now();
   console.log("\n📊 [PROFILE] Dashboard Data Fetch Starting...");
@@ -77,8 +87,8 @@ export default async function DashboardPage() {
   if (canSeeAllProjects) {
     // Admin/Management: See all projects (cached)
     const [cachedStats, cachedRecent] = await Promise.all([
-      getCachedDashboardStats(),
-      getCachedRecentProjects(),
+      safe(getCachedDashboardStats(), { projectCounts: { total: 0, active: 0, tender: 0, on_hold: 0, completed: 0, cancelled: 0, not_awarded: 0 }, clientCount: 0, userCount: 0 }),
+      safe(getCachedRecentProjects(), []),
     ]);
     projectCounts = cachedStats.projectCounts;
     clientCount = cachedStats.clientCount;
@@ -86,7 +96,10 @@ export default async function DashboardPage() {
     recentProjects = cachedRecent;
   } else if (isOperationalRole) {
     // PM/Production/Procurement: Only assigned projects
-    const myStats = await getMyDashboardStats(assignedProjectIds);
+    const myStats = await safe(
+      getMyDashboardStats(assignedProjectIds),
+      { projectCounts: { total: 0, tender: 0, active: 0, on_hold: 0, completed: 0, cancelled: 0, not_awarded: 0 }, recentProjects: [] }
+    );
     projectCounts = myStats.projectCounts;
     recentProjects = myStats.recentProjects;
   }
@@ -97,6 +110,13 @@ export default async function DashboardPage() {
 
   // For PM role, pass assignedProjectIds to filter data; for admin/management, pass undefined (all projects)
   const projectFilter = isOperationalRole ? assignedProjectIds : undefined;
+
+  const emptyTasks = { pendingMaterialApprovals: 0, rejectedDrawings: 0, draftReports: 0, overdueMilestones: 0, total: 0 };
+  const emptyProductionQueue = { inProduction: [], readyForProduction: [], pendingInstallation: [], totalInProduction: 0, totalReady: 0, totalPendingInstall: 0 };
+  const emptyProcurementQueue = { needsMaterials: [], pendingApproval: [], totalNeedsMaterials: 0, totalPendingApproval: 0 };
+  const emptyFinancial = { totalContractValue: 0, byStatus: { tender: 0, active: 0, completed: 0 }, currency: "TRY", projectCount: 0 };
+  const emptyThisWeek = { itemsCompletedThisWeek: 0, reportsPublishedThisWeek: 0, upcomingMilestones: 0, milestonesOverdue: 0 };
+  const emptyProjectsStatus = { tender: 0, active: 0, on_hold: 0, completed: 0, cancelled: 0, not_awarded: 0, total: 0 };
 
   const [
     tasksData,
@@ -110,38 +130,36 @@ export default async function DashboardPage() {
     thisWeekData,
     projectsStatusData,
   ] = await Promise.all([
-    // My Tasks - PM and Admin only (not production/procurement)
-    // PM sees only their assigned projects; Admin sees all
+    // My Tasks - PM and Admin only
     (userRole === "pm" || canSeeAllProjects)
-      ? getMyTasks(userRole === "pm" ? assignedProjectIds : undefined)
-      : Promise.resolve({ pendingMaterialApprovals: 0, rejectedDrawings: 0, draftReports: 0, overdueMilestones: 0, total: 0 }),
+      ? safe(getMyTasks(userRole === "pm" ? assignedProjectIds : undefined), emptyTasks)
+      : Promise.resolve(emptyTasks),
     // At-Risk Projects - admin/management/pm
-    // PM sees only their assigned projects; Admin sees all
-    canSeeAllProjects || userRole === "pm"
-      ? getAtRiskProjects(userRole === "pm" ? assignedProjectIds : undefined)
+    (canSeeAllProjects || userRole === "pm")
+      ? safe(getAtRiskProjects(userRole === "pm" ? assignedProjectIds : undefined), [])
       : Promise.resolve([]),
     // Pending Approvals - Client only
-    isClient ? getPendingApprovals(userId) : Promise.resolve([]),
+    isClient ? safe(getPendingApprovals(userId), []) : Promise.resolve([]),
     // Client Project Progress - Client only
-    isClient ? getClientProjectProgress(userId) : Promise.resolve([]),
+    isClient ? safe(getClientProjectProgress(userId), []) : Promise.resolve([]),
     // Upcoming Milestones - non-client users
-    // PM sees only their assigned projects; Admin sees all
-    !isClient ? getDashboardMilestones(userRole === "pm" ? assignedProjectIds : undefined) : Promise.resolve([]),
+    !isClient
+      ? safe(getDashboardMilestones(userRole === "pm" ? assignedProjectIds : undefined), [])
+      : Promise.resolve([]),
     // Production Queue - Production role
-    isProduction ? getProductionQueue() : Promise.resolve({ inProduction: [], readyForProduction: [], pendingInstallation: [], totalInProduction: 0, totalReady: 0, totalPendingInstall: 0 }),
+    isProduction ? safe(getProductionQueue(), emptyProductionQueue) : Promise.resolve(emptyProductionQueue),
     // Procurement Queue - Procurement role
-    isProcurement ? getProcurementQueue() : Promise.resolve({ needsMaterials: [], pendingApproval: [], totalNeedsMaterials: 0, totalPendingApproval: 0 }),
+    isProcurement ? safe(getProcurementQueue(), emptyProcurementQueue) : Promise.resolve(emptyProcurementQueue),
     // Financial Overview - Admin/Management only
-    canSeeAllProjects ? getFinancialOverview() : Promise.resolve({ totalContractValue: 0, byStatus: { tender: 0, active: 0, completed: 0 }, currency: "TRY", projectCount: 0 }),
-    // This Week Summary - Admin/Management/PM (not production/procurement/client)
-    // PM sees only their assigned projects; Admin sees all
+    canSeeAllProjects ? safe(getFinancialOverview(), emptyFinancial) : Promise.resolve(emptyFinancial),
+    // This Week Summary - Admin/Management/PM
     (canSeeAllProjects || userRole === "pm")
-      ? getThisWeekSummary(userRole === "pm" ? assignedProjectIds : undefined)
-      : Promise.resolve({ itemsCompletedThisWeek: 0, reportsPublishedThisWeek: 0, upcomingMilestones: 0, milestonesOverdue: 0 }),
+      ? safe(getThisWeekSummary(userRole === "pm" ? assignedProjectIds : undefined), emptyThisWeek)
+      : Promise.resolve(emptyThisWeek),
     // Projects by Status Chart - Admin/Management only
     canSeeAllProjects
-      ? getProjectsByStatus()
-      : Promise.resolve({ tender: 0, active: 0, on_hold: 0, completed: 0, cancelled: 0, not_awarded: 0, total: 0 }),
+      ? safe(getProjectsByStatus(), emptyProjectsStatus)
+      : Promise.resolve(emptyProjectsStatus),
   ]);
 
   console.log(`📊 [PROFILE] Dashboard Total: ${(performance.now() - pageStart).toFixed(0)}ms\n`);
