@@ -448,9 +448,34 @@ Updated CLAUDE.md with mobile UI + PDF session learnings:
 
 ---
 
+### Admin Views for Supabase Studio (Feb 12, 2026)
+Agent: Claude Code
+
+**Created 5 admin-friendly database views for browsing in Supabase Studio without UUID soup.**
+
+Files created:
+- `supabase/migrations/047_admin_views_scope_drawings_materials.sql` — 5 new views with `security_invoker = true`
+
+Views added:
+- `v_scope_items` — project_code, project_name, client_name + item data (118 rows)
+- `v_drawings` — project_code, item_code, item_name + drawing status, revision_count
+- `v_materials` — project_code, material_code + linked_items count
+- `v_milestones` — project_code, milestone_code + due_date
+- `v_snagging` — project_code, item_code + created_by_name, resolved_by_name
+
+Applied to Supabase: Yes (project lsuiaqrpkhejeavsrsqc)
+Security advisor: Clean (no new warnings from our views)
+
+Lesson learned: `CREATE OR REPLACE VIEW` defaults to `SECURITY DEFINER` — must use `DROP VIEW + CREATE VIEW WITH (security_invoker = true)` instead.
+
+CLAUDE.md updated: Added admin views table to Database Schema section, gotchas #18 and #19, migration 047 note.
+
+---
+
 ## Open Issues / Warnings
 - **Migration 045 applied**: `045_gantt_rewrite.sql` has been executed on Supabase — Gantt data is live
 - **Migration 046 applied**: `046_client_drawing_approval_rls.sql` has been applied to Supabase (client drawing approval RLS + SECURITY DEFINER helper)
+- **Migration 047 applied**: `047_admin_views_scope_drawings_materials.sql` has been applied to Supabase (5 admin views with security_invoker)
 - ~~**Reports PDF upload path broken**~~ — **FIXED** (Feb 10, 2026): Changed storage path from `pdfs/${fileName}` to `${projectId}/${reportId}/${fileName}` in `uploadReportPdf()`. Also added `projectId` parameter to function signature and updated both callers (`report-creation-modal.tsx`, `reports-table.tsx`). Debug console.logs removed from both callers.
 - **Do not modify `src/test/setup.ts`** during parallel test writing — both agents depend on it
 - **Gantt sidebar test fixed**: Pre-existing test mismatch was already corrected by Codex agent — all 289 tests pass

@@ -451,7 +451,7 @@ Located in `supabase/migrations/`:
 | File | Description |
 |------|-------------|
 | 001_performance_indexes.sql | Initial performance indexes |
-| 002_client_safe_views.sql | Client-safe database views |
+| 002_client_safe_views.sql | Client-safe database views (SECURITY INVOKER, updated in 043) |
 | 003_fix_function_search_paths.sql | Security fix for functions |
 | 004_fix_rls_init_plan.sql | RLS performance optimization |
 | 005_add_fk_indexes.sql | Foreign key indexes |
@@ -462,3 +462,5 @@ Located in `supabase/migrations/`:
 | 010_fix_rls_update_with_check.sql | RLS update policies |
 | 011_add_drawing_revisions_composite_index.sql | Drawing revisions index |
 | 012_add_drafts_table.sql | Autosave drafts table |
+| ... | (migrations 013-046 — see files in `supabase/migrations/`) |
+| 047_admin_views_scope_drawings_materials.sql | Admin views: v_scope_items, v_drawings, v_materials, v_milestones, v_snagging (SECURITY INVOKER) |

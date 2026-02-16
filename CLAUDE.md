@@ -88,6 +88,23 @@ docs/                 # Extended documentation (see "Documentation Map" below)
 
 **Supporting:** `project_assignments`, `item_materials`, `milestones`, `snagging`, `notifications`, `activity_log`, `drafts`, `report_shares`
 
+### Admin Views (for Supabase Studio browsing)
+Instead of browsing raw tables with UUID foreign keys, use these `v_*` views to see human-readable project/item context:
+
+| View | Shows | Key Columns |
+|------|-------|-------------|
+| `v_scope_items` | Scope items + project/client | `project_code`, `project_name`, `client_name`, `item_code` |
+| `v_drawings` | Drawings + project/item | `project_code`, `item_code`, `item_name`, `revision_count` |
+| `v_materials` | Materials + project | `project_code`, `material_code`, `linked_items` |
+| `v_milestones` | Milestones + project | `project_code`, `milestone_code`, `due_date` |
+| `v_snagging` | Snagging + project/item/user | `project_code`, `item_code`, `created_by_name` |
+| `v_reports` | Reports + project/creator | `project_code`, `report_code`, `created_by_name` |
+| `v_notifications` | Notifications + user/project | `employee_code`, `project_code`, `message_preview` |
+| `v_activity_logs` | Activity + user/project | `employee_code`, `project_code`, `action` |
+| `v_project_assignments` | Assignments + names | `project_code`, `employee_code`, `user_role` |
+| `v_clients` | Clients + project count | `client_code`, `company_name`, `project_count` |
+| `v_users` | Users + assignment count | `employee_code`, `role`, `assigned_projects` |
+
 ### Key Enums
 ```
 UserRole:         admin | pm | production | procurement | management | client
@@ -207,10 +224,13 @@ scope-items/{project_id}/{item_id}/image_1.jpg
 11. **Recharts index signature** - Data types need `[key: string]: string | number` for Pie/Bar charts
 12. **Gantt GlassCard needs `py-0 gap-0`** - Card base has both padding and flex gap that must be overridden
 13. **Timeline migration 045 applied** - `045_gantt_rewrite.sql` has been run on Supabase
+    **Admin views migration 047 applied** - `047_admin_views_scope_drawings_materials.sql` has been run on Supabase
 14. **Adjacent panel alignment** - Both header wrappers must set explicit `height` + `box-border`
 15. **Storage paths MUST start with `{projectId}/`** - Migration 040 enforces this via RLS
 16. **Use `useBreakpoint()` not `useIsMobile()`** - Old hook deprecated, use `use-media-query.ts`
 17. **Mobile card views need role guards** - Cards need explicit `{!isClient && ...}` checks
+18. **Views need `security_invoker`** - Always use `DROP VIEW + CREATE VIEW WITH (security_invoker = true)`, not `CREATE OR REPLACE VIEW` (defaults to SECURITY DEFINER, bypasses RLS)
+19. **Browse `v_*` views, not raw tables** - In Supabase Studio, use `v_scope_items` instead of `scope_items` to see `project_code`/`project_name` next to each record
 
 ### Git on Windows
 - CRLF warnings are normal (`LF will be replaced by CRLF`) - safe to ignore
