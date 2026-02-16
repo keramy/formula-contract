@@ -4,6 +4,7 @@
  * Drawings Server Actions
  *
  * Handles sending drawings to clients (single and bulk),
+ * PM override approval with server-side validation,
  * including email notifications and activity logging.
  */
 
@@ -221,4 +222,91 @@ export async function sendDrawingsToClient(
     emailsSent,
     emailsFailed,
   };
+}
+
+interface OverrideResult {
+  success: boolean;
+  error?: string;
+}
+
+/**
+ * PM Override — approve a drawing without client confirmation.
+ *
+ * Security fix: Previously this was done inline from the client component
+ * via direct Supabase .update(), meaning the override reason validation
+ * was UI-only. A PM could bypass the UI and call Supabase directly with
+ * an empty pm_override_reason.
+ *
+ * Now enforced server-side:
+ * 1. Validates authentication
+ * 2. Validates override reason is non-empty
+ * 3. Updates drawing status to approved with override metadata
+ * 4. Updates scope item status to approved
+ * 5. Logs activity
+ */
+export async function overrideDrawingApproval(
+  drawingId: string,
+  overrideReason: string,
+  scopeItemId: string,
+  projectId: string,
+  itemCode: string,
+  currentRevision: string
+): Promise<OverrideResult> {
+  const supabase = await createClient();
+
+  // 1. Auth check
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { success: false, error: "Not authenticated" };
+  }
+
+  // 2. Validate override reason server-side (security-critical)
+  if (!overrideReason || !overrideReason.trim()) {
+    return { success: false, error: "Override reason is required" };
+  }
+
+  const trimmedReason = overrideReason.trim();
+
+  // 3. Update drawing with override
+  const { error: drawingError } = await supabase
+    .from("drawings")
+    .update({
+      status: "approved",
+      pm_override: true,
+      pm_override_reason: trimmedReason,
+      pm_override_at: new Date().toISOString(),
+      pm_override_by: user.id,
+      approved_by: user.id,
+    })
+    .eq("id", drawingId);
+
+  if (drawingError) {
+    return { success: false, error: drawingError.message };
+  }
+
+  // 4. Update scope item status to approved
+  await supabase
+    .from("scope_items")
+    .update({ status: "approved" })
+    .eq("id", scopeItemId);
+
+  // 5. Log activity
+  await logActivity({
+    action: ACTIVITY_ACTIONS.DRAWING_PM_OVERRIDE,
+    entityType: "drawing",
+    entityId: drawingId,
+    projectId,
+    details: {
+      item_code: itemCode,
+      revision: currentRevision,
+      override_reason: trimmedReason,
+    },
+  });
+
+  // 6. Revalidate
+  revalidatePath(`/projects/${projectId}`);
+
+  return { success: true };
 }

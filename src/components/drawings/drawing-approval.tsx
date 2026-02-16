@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { logActivity } from "@/lib/activity-log/actions";
 import { ACTIVITY_ACTIONS } from "@/lib/activity-log/constants";
-import { sendDrawingsToClient } from "@/lib/actions/drawings";
+import { sendDrawingsToClient, overrideDrawingApproval } from "@/lib/actions/drawings";
 import { toast } from "sonner";
 import { validateFile, DRAWING_CONFIG, CAD_CONFIG, sanitizeFileName } from "@/lib/file-validation";
 import {
@@ -241,8 +241,9 @@ export function DrawingApproval({
   };
 
   const handlePMOverride = async () => {
-    if (!drawingId) return; // Safety check - should never happen for this action
+    if (!drawingId || !projectId) return;
 
+    // UI validation (first layer — server action enforces this too)
     if (!overrideReason.trim()) {
       setError("Please provide a reason for the override");
       return;
@@ -252,53 +253,25 @@ export function DrawingApproval({
     setError(null);
 
     try {
-      const supabase = createClient();
+      const result = await overrideDrawingApproval(
+        drawingId,
+        overrideReason,
+        scopeItemId,
+        projectId,
+        itemCode || "",
+        currentRevision || ""
+      );
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
-      const drawingUpdate: DrawingUpdate = {
-        status: "approved",
-        pm_override: true,
-        pm_override_reason: overrideReason,
-        pm_override_at: new Date().toISOString(),
-        pm_override_by: user.id,
-        approved_by: user.id,
-      };
-      const { error: updateError } = await supabase
-        .from("drawings")
-        .update(drawingUpdate)
-        .eq("id", drawingId);
-
-      if (updateError) throw updateError;
-
-      // Update scope item status
-      const scopeItemUpdate: ScopeItemUpdate = { status: "approved" };
-      await supabase
-        .from("scope_items")
-        .update(scopeItemUpdate)
-        .eq("id", scopeItemId);
-
-      // Log activity
-      if (projectId) {
-        await logActivity({
-          action: ACTIVITY_ACTIONS.DRAWING_PM_OVERRIDE,
-          entityType: "drawing",
-          entityId: drawingId,
-          projectId,
-          details: {
-            item_code: itemCode,
-            revision: currentRevision,
-            override_reason: overrideReason,
-          },
-        });
+      if (result.success) {
+        setIsOverrideDialogOpen(false);
+        setOverrideReason("");
+        toast.success("Drawing approved via PM override");
+        onStatusChange?.("approved");
+        router.refresh();
+      } else {
+        toast.error(result.error || "Failed to override");
+        setError(result.error || "Failed to override");
       }
-
-      setIsOverrideDialogOpen(false);
-      setOverrideReason("");
-      toast.success("Drawing approved via PM override");
-      onStatusChange?.("approved");
-      router.refresh();
     } catch (err) {
       toast.error("Failed to override");
       setError(err instanceof Error ? err.message : "Failed to override");

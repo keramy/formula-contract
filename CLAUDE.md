@@ -225,12 +225,14 @@ scope-items/{project_id}/{item_id}/image_1.jpg
 12. **Gantt GlassCard needs `py-0 gap-0`** - Card base has both padding and flex gap that must be overridden
 13. **Timeline migration 045 applied** - `045_gantt_rewrite.sql` has been run on Supabase
     **Admin views migration 047 applied** - `047_admin_views_scope_drawings_materials.sql` has been run on Supabase
+    **PM assignment RLS fix migration 048** - `048_fix_pm_assignment_privilege_escalation.sql` — PMs can only manage assignments for projects they're already assigned to
 14. **Adjacent panel alignment** - Both header wrappers must set explicit `height` + `box-border`
 15. **Storage paths MUST start with `{projectId}/`** - Migration 040 enforces this via RLS
 16. **Use `useBreakpoint()` not `useIsMobile()`** - Old hook deprecated, use `use-media-query.ts`
 17. **Mobile card views need role guards** - Cards need explicit `{!isClient && ...}` checks
 18. **Views need `security_invoker`** - Always use `DROP VIEW + CREATE VIEW WITH (security_invoker = true)`, not `CREATE OR REPLACE VIEW` (defaults to SECURITY DEFINER, bypasses RLS)
 19. **Browse `v_*` views, not raw tables** - In Supabase Studio, use `v_scope_items` instead of `scope_items` to see `project_code`/`project_name` next to each record
+20. **PM override uses server action** - `overrideDrawingApproval()` in `lib/actions/drawings.ts` enforces reason validation server-side; never bypass with inline Supabase calls
 
 ### Git on Windows
 - CRLF warnings are normal (`LF will be replaced by CRLF`) - safe to ignore

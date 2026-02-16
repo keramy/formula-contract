@@ -464,3 +464,4 @@ Located in `supabase/migrations/`:
 | 012_add_drafts_table.sql | Autosave drafts table |
 | ... | (migrations 013-046 — see files in `supabase/migrations/`) |
 | 047_admin_views_scope_drawings_materials.sql | Admin views: v_scope_items, v_drawings, v_materials, v_milestones, v_snagging (SECURITY INVOKER) |
+| 048_fix_pm_assignment_privilege_escalation.sql | Fix PM self-assignment: add is_assigned_to_project() check to project_assignments INSERT/UPDATE/DELETE policies |

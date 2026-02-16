@@ -472,6 +472,28 @@ CLAUDE.md updated: Added admin views table to Database Schema section, gotchas #
 
 ---
 
+### Shannon Pentest Fixes — PM Self-Assignment & Override Enforcement (Feb 16, 2026)
+Agent: Claude Code
+
+**2 security vulnerabilities fixed from Shannon AI pentest findings:**
+
+1. **PM Self-Assignment Privilege Escalation** — Migration 048 adds `is_assigned_to_project(project_id)` check to INSERT/UPDATE/DELETE policies on `project_assignments`. PMs can no longer self-assign to projects they're not already on. Admins unaffected.
+
+2. **PM Override Reason Not Enforced Server-Side** — Created `overrideDrawingApproval()` server action in `src/lib/actions/drawings.ts`. Updated `src/components/drawings/drawing-approval.tsx` to use it instead of inline Supabase `.update()`. Override reason validation is now server-enforced.
+
+Files created:
+- `supabase/migrations/048_fix_pm_assignment_privilege_escalation.sql`
+
+Files modified:
+- `src/lib/actions/drawings.ts` — Added `overrideDrawingApproval()` server action
+- `src/components/drawings/drawing-approval.tsx` — `handlePMOverride` now calls server action
+- `docs/DATABASE.md` — Added migration 048 to table
+- `CLAUDE.md` — Added migration 048 note + gotcha #20
+
+**Migration 048 status:** Created, NOT YET applied to Supabase. Apply before deploying.
+
+---
+
 ## Open Issues / Warnings
 - **Migration 045 applied**: `045_gantt_rewrite.sql` has been executed on Supabase — Gantt data is live
 - **Migration 046 applied**: `046_client_drawing_approval_rls.sql` has been applied to Supabase (client drawing approval RLS + SECURITY DEFINER helper)
