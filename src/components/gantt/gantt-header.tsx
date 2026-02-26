@@ -124,4 +124,3 @@ export function GanttHeader({
   );
 }
 
-export default GanttHeader;

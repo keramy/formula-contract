@@ -100,4 +100,3 @@ MilestoneAlertEmail.PreviewProps = {
   projectUrl: "https://formulacontractpm.com/projects/abc123",
 } satisfies MilestoneAlertEmailProps;
 
-export default MilestoneAlertEmail;

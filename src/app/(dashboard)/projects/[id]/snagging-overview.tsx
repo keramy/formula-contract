@@ -240,6 +240,7 @@ export function SnaggingOverview({
                         src={item.photos[0]}
                         alt="Issue photo"
                         fill
+                        sizes="64px"
                         className="object-cover"
                       />
                       {item.photos.length > 1 && (

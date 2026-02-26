@@ -24,6 +24,9 @@ import {
   MoreHorizontalIcon,
   DownloadIcon,
 } from "lucide-react";
+
+type SortField = "report_type" | "is_published" | "created_at" | "updated_at" | "creator";
+type SortDirection = "asc" | "desc";
 import { GlassCard, StatusBadge } from "@/components/ui/ui-helpers";
 import { ReportPDFExport } from "@/components/reports/report-pdf-export";
 import { ReportActivityModal } from "@/components/reports/report-activity-modal";
@@ -65,6 +68,43 @@ interface ReportsTableProps {
   onEditReport: (report: Report) => void;
 }
 
+// Module-scoped SortHeader to avoid re-creation on every render
+function SortHeader({
+  field,
+  sortField,
+  sortDirection,
+  onToggleSort,
+  children,
+  className = "",
+}: {
+  field: SortField;
+  sortField: SortField;
+  sortDirection: SortDirection;
+  onToggleSort: (field: SortField) => void;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <TableHead className={className}>
+      <button
+        className="flex items-center gap-1 hover:text-foreground transition-colors"
+        onClick={() => onToggleSort(field)}
+      >
+        {children}
+        {sortField === field ? (
+          sortDirection === "asc" ? (
+            <ArrowUpIcon className="size-3" />
+          ) : (
+            <ArrowDownIcon className="size-3" />
+          )
+        ) : (
+          <ArrowUpDownIcon className="size-3 opacity-50" />
+        )}
+      </button>
+    </TableHead>
+  );
+}
+
 const REPORT_TYPE_COLORS: Record<string, string> = {
   daily: "bg-blue-100 text-blue-700",
   weekly: "bg-teal-100 text-teal-700",
@@ -72,9 +112,6 @@ const REPORT_TYPE_COLORS: Record<string, string> = {
   installation: "bg-amber-100 text-amber-700",
   snagging: "bg-rose-100 text-rose-700",
 };
-
-type SortField = "report_type" | "is_published" | "created_at" | "updated_at" | "creator";
-type SortDirection = "asc" | "desc";
 
 export function ReportsTable({
   projectId,
@@ -222,34 +259,6 @@ export function ReportsTable({
     }
   };
 
-  const SortHeader = ({
-    field,
-    children,
-    className = "",
-  }: {
-    field: SortField;
-    children: React.ReactNode;
-    className?: string;
-  }) => (
-    <TableHead className={className}>
-      <button
-        className="flex items-center gap-1 hover:text-foreground transition-colors"
-        onClick={() => toggleSort(field)}
-      >
-        {children}
-        {sortField === field ? (
-          sortDirection === "asc" ? (
-            <ArrowUpIcon className="size-3" />
-          ) : (
-            <ArrowDownIcon className="size-3" />
-          )
-        ) : (
-          <ArrowUpDownIcon className="size-3 opacity-50" />
-        )}
-      </button>
-    </TableHead>
-  );
-
   if (reports.length === 0) {
     return null; // Empty state handled by parent
   }
@@ -266,20 +275,20 @@ export function ReportsTable({
             <TableHeader>
               <TableRow className="hover:bg-transparent">
                 <TableHead className="w-32">Report Code</TableHead>
-                <SortHeader field="report_type" className="w-28">
+                <SortHeader field="report_type" sortField={sortField} sortDirection={sortDirection} onToggleSort={toggleSort} className="w-28">
                   Type
                 </SortHeader>
-                <SortHeader field="is_published" className="w-24">
+                <SortHeader field="is_published" sortField={sortField} sortDirection={sortDirection} onToggleSort={toggleSort} className="w-24">
                   Status
                 </SortHeader>
                 <TableHead className="w-32">Shared With</TableHead>
-                <SortHeader field="creator" className="w-32">
+                <SortHeader field="creator" sortField={sortField} sortDirection={sortDirection} onToggleSort={toggleSort} className="w-32">
                   Created By
                 </SortHeader>
-                <SortHeader field="created_at" className="w-40">
+                <SortHeader field="created_at" sortField={sortField} sortDirection={sortDirection} onToggleSort={toggleSort} className="w-40">
                   Created
                 </SortHeader>
-                <SortHeader field="updated_at" className="w-40">
+                <SortHeader field="updated_at" sortField={sortField} sortDirection={sortDirection} onToggleSort={toggleSort} className="w-40">
                   Last Edited
                 </SortHeader>
                 <TableHead className="w-28 text-right">Actions</TableHead>

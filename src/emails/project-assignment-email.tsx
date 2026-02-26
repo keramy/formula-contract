@@ -65,4 +65,3 @@ ProjectAssignmentEmail.PreviewProps = {
   projectUrl: "https://formulacontractpm.com/projects/abc123",
 } satisfies ProjectAssignmentEmailProps;
 
-export default ProjectAssignmentEmail;

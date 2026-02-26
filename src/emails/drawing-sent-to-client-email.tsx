@@ -96,4 +96,3 @@ DrawingSentToClientEmail.PreviewProps = {
   drawingsPageUrl: "https://formulacontractpm.com/projects/abc123?tab=drawings",
 } satisfies DrawingSentToClientEmailProps;
 
-export default DrawingSentToClientEmail;

@@ -58,5 +58,3 @@ export function TimelineOverview({
     </div>
   );
 }
-
-export default TimelineOverview;

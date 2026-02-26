@@ -262,6 +262,7 @@ export function MaterialFormDialog({
                       src={url}
                       alt={`Material image ${index + 1}`}
                       fill
+                      sizes="64px"
                       className="object-cover"
                     />
                     <button

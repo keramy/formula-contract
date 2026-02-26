@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -75,7 +76,7 @@ export default function SetupPasswordPage() {
     <div className="flex flex-col gap-8">
       {/* Logo */}
       <div className="flex flex-col items-center gap-2">
-        <img src="/icons/icon-192x192.png" alt="Formula Contract" className="w-12 h-12 rounded-xl" />
+        <Image src="/icons/icon-192x192.png" alt="Formula Contract" width={48} height={48} className="w-12 h-12 rounded-xl" />
         <h1 className="text-xl font-semibold bg-gradient-to-r from-orange-600 to-rose-600 bg-clip-text text-transparent">
           Formula Contract
         </h1>

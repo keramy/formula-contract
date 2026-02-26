@@ -120,6 +120,7 @@ export function ScopeItemImageUpload({
                 src={url}
                 alt={`Image ${index + 1}`}
                 fill
+                sizes="96px"
                 className="object-cover"
               />
               {!disabled && (

@@ -54,8 +54,8 @@ export function TeamShareSelector({
 
   return (
     <div className="space-y-2">
-      <Label className="text-sm">Share with specific users</Label>
-      <div className="max-h-40 overflow-y-auto border rounded-md p-2 space-y-1">
+      <Label htmlFor="team-share-list" className="text-sm">Share with specific users</Label>
+      <div id="team-share-list" className="max-h-40 overflow-y-auto border rounded-md p-2 space-y-1">
         {teamMembers.map((member) => (
           <label
             key={member.id}

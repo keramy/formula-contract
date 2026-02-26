@@ -12,10 +12,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SortIndicator } from "@/components/ui/sort-indicator";
 import {
-  ArrowUpDownIcon,
-  ArrowUpIcon,
-  ArrowDownIcon,
   TrendingUpIcon,
   TrendingDownIcon,
   WalletIcon,
@@ -298,18 +296,6 @@ export function FinancialsOverview({
     }
   };
 
-  // Sort indicator component
-  const SortIndicator = ({ column }: { column: SortKey }) => {
-    if (sortKey !== column) {
-      return <ArrowUpDownIcon className="size-3.5 text-muted-foreground/50" />;
-    }
-    return sortDir === "asc" ? (
-      <ArrowUpIcon className="size-3.5 text-primary" />
-    ) : (
-      <ArrowDownIcon className="size-3.5 text-primary" />
-    );
-  };
-
   // Clients shouldn't see financial data
   if (isClient) {
     return (
@@ -425,7 +411,7 @@ export function FinancialsOverview({
                       className="-ml-3 h-8 font-medium"
                     >
                       #
-                      <SortIndicator column="rowNumber" />
+                      <SortIndicator column="rowNumber" activeColumn={sortKey} direction={sortDir} />
                     </Button>
                   </TableHead>
                   <TableHead className="w-[120px]">
@@ -436,7 +422,7 @@ export function FinancialsOverview({
                       className="-ml-3 h-8 font-medium"
                     >
                       Code
-                      <SortIndicator column="item_code" />
+                      <SortIndicator column="item_code" activeColumn={sortKey} direction={sortDir} />
                     </Button>
                   </TableHead>
                   <TableHead className="min-w-[200px]">
@@ -447,7 +433,7 @@ export function FinancialsOverview({
                       className="-ml-3 h-8 font-medium"
                     >
                       Description
-                      <SortIndicator column="name" />
+                      <SortIndicator column="name" activeColumn={sortKey} direction={sortDir} />
                     </Button>
                   </TableHead>
                   <TableHead className="text-center">Path</TableHead>
@@ -459,7 +445,7 @@ export function FinancialsOverview({
                       className="-mr-3 h-8 font-medium"
                     >
                       Budget
-                      <SortIndicator column="budget" />
+                      <SortIndicator column="budget" activeColumn={sortKey} direction={sortDir} />
                     </Button>
                   </TableHead>
                   <TableHead className="text-right">
@@ -470,7 +456,7 @@ export function FinancialsOverview({
                       className="-mr-3 h-8 font-medium"
                     >
                       Actual
-                      <SortIndicator column="actual" />
+                      <SortIndicator column="actual" activeColumn={sortKey} direction={sortDir} />
                     </Button>
                   </TableHead>
                   <TableHead className="text-right pr-6">
@@ -481,7 +467,7 @@ export function FinancialsOverview({
                       className="-mr-3 h-8 font-medium"
                     >
                       Variance
-                      <SortIndicator column="variance" />
+                      <SortIndicator column="variance" activeColumn={sortKey} direction={sortDir} />
                     </Button>
                   </TableHead>
                 </TableRow>

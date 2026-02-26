@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useTransition } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   Sheet,
@@ -740,10 +741,13 @@ export function ScopeItemSheet({
                   images.length > 0 ? (
                     <div className="flex flex-wrap gap-2">
                       {images.map((url, idx) => (
-                        <img
+                        <Image
                           key={idx}
                           src={url}
                           alt={`Item image ${idx + 1}`}
+                          width={80}
+                          height={80}
+                          unoptimized
                           className="w-20 h-20 object-cover rounded-lg border"
                         />
                       ))}

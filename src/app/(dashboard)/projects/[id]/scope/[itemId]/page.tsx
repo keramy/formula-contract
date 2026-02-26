@@ -510,6 +510,7 @@ export default async function ScopeItemDetailPage({
                     src={url}
                     alt={`${scopeItem.name} image ${index + 1}`}
                     fill
+                    sizes="96px"
                     className="object-cover"
                   />
                 </a>

@@ -193,4 +193,3 @@ export function ExportJSONButton(props: QuickExportButtonProps) {
   return <ExportButton {...props} formats={["json"]} />;
 }
 
-export default ExportButton;

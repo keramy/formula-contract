@@ -110,9 +110,11 @@ const ROW_HEIGHT = 36;
 
 // Sidebar resize constraints
 
+const EMPTY_DEPENDENCIES: GanttDependency[] = [];
+
 export function GanttChart({
   items,
-  dependencies = [],
+  dependencies = EMPTY_DEPENDENCIES,
   onItemClick: _onItemClick, // Kept for API compatibility but single-click now only selects
   onItemEdit,
   onItemDuplicate,
@@ -814,6 +816,7 @@ export function GanttChart({
         <div
           className="flex-1 overflow-auto"
           ref={scrollRef}
+          role="presentation"
           onClick={handleBackgroundClick}
         >
           <div style={{ width: totalWidth, minWidth: "100%" }}>
@@ -935,4 +938,3 @@ export function GanttChart({
   );
 }
 
-export default GanttChart;

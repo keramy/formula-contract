@@ -304,6 +304,7 @@ export function MaterialSheet({
                       src={url}
                       alt={`Material image ${index + 1}`}
                       fill
+                      sizes="80px"
                       className="object-cover"
                     />
                     <button

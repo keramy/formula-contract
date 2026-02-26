@@ -191,5 +191,3 @@ export function DependencyDialog({
     </Dialog>
   );
 }
-
-export default DependencyDialog;

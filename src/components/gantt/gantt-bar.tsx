@@ -119,8 +119,11 @@ export function GanttBar({
                 className
               )}
               style={{ left: left + width / 2 - 12 }}
+              role="button"
+              tabIndex={0}
               onClick={() => onClick?.(item)}
               onDoubleClick={() => onDoubleClick?.(item)}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onClick?.(item); }}
             >
               <DiamondIcon
                 className="h-6 w-6"
@@ -166,8 +169,11 @@ export function GanttBar({
         border: `1px solid ${item.color}`,
         borderStyle: isPhase ? "dashed" : "solid", // Dashed border for phases
       }}
+      role="button"
+      tabIndex={0}
       onClick={() => onClick?.(item)}
       onDoubleClick={() => onDoubleClick?.(item)}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onClick?.(item); }}
     >
       {/* Progress fill */}
       {item.progress > 0 && (
@@ -325,4 +331,3 @@ export function GanttBar({
   );
 }
 
-export default GanttBar;

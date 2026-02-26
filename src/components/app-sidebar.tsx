@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
@@ -152,7 +153,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
       {/* Header with Logo - adapts to collapsed state */}
       <SidebarHeader className="h-14 border-b border-sidebar-border p-0">
         <div className="flex items-center gap-2 px-3 h-full group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:justify-center">
-          <img src="/icons/icon-192x192.png" alt="FC" className="size-8 rounded-lg shrink-0" />
+          <Image src="/icons/icon-192x192.png" alt="FC" width={32} height={32} className="size-8 rounded-lg shrink-0" />
           <div className="flex flex-col min-w-0 group-data-[collapsible=icon]:hidden">
             <span className="text-sm font-semibold tracking-tight truncate">Formula Contract</span>
             <span className="text-xs text-muted-foreground truncate">Project Management</span>

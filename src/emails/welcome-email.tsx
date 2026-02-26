@@ -78,4 +78,3 @@ WelcomeEmail.PreviewProps = {
   loginUrl: "https://formulacontractpm.com/login",
 } satisfies WelcomeEmailProps;
 
-export default WelcomeEmail;

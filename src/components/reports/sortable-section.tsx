@@ -120,6 +120,7 @@ export function SortableSection({
                     src={url}
                     alt={`Photo ${idx + 1}`}
                     fill
+                    sizes="80px"
                     className="object-contain"
                   />
                 </div>

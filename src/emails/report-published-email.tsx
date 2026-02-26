@@ -75,4 +75,3 @@ ReportPublishedEmail.PreviewProps = {
   reportUrl: "https://formulacontractpm.com/projects/abc123?tab=reports",
 } satisfies ReportPublishedEmailProps;
 
-export default ReportPublishedEmail;

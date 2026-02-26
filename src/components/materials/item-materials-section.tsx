@@ -160,6 +160,7 @@ export function ItemMaterialsSection({
                       src={material.images[0]}
                       alt={material.name}
                       fill
+                      sizes="48px"
                       className="object-cover"
                     />
                   </div>
@@ -238,6 +239,7 @@ export function ItemMaterialsSection({
                           src={material.images[0]}
                           alt={material.name}
                           fill
+                          sizes="64px"
                           className="object-cover"
                         />
                       </div>

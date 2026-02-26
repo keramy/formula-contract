@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "./card";
@@ -277,9 +278,12 @@ function GradientAvatar({ name, image, size = "default", colorIndex, className }
       )}
     >
       {image ? (
-        <img
+        <Image
           src={image}
           alt={name}
+          fill
+          unoptimized
+          sizes="40px"
           className="absolute inset-0 rounded-full object-cover"
         />
       ) : (

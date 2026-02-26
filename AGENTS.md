@@ -2,7 +2,7 @@
 
 ## Current Status
 Last updated by: Claude Code
-Timestamp: 2026-02-11
+Timestamp: 2026-02-26
 
 ---
 
@@ -490,14 +490,75 @@ Files modified:
 - `docs/DATABASE.md` — Added migration 048 to table
 - `CLAUDE.md` — Added migration 048 note + gotcha #20
 
-**Migration 048 status:** Created, NOT YET applied to Supabase. Apply before deploying.
+**Migration 048 status:** Applied to Supabase (Feb 17, 2026).
 
 ---
 
-## Open Issues / Warnings
+### React Doctor Score Fix — 76 → 92 (Feb 18–26, 2026)
+Agent: Claude Code
+
+**Goal:** Improve React Doctor score from 76 to 85+. **Final score: 92/100 ("Great")**
+
+**Phase 1: Deleted 46 dead code files** (biggest impact — ~200+ warnings removed)
+- 15 source files: `use-autosave`, `use-file-upload`, `use-toast`, `mobile-header`, `page-header-setter`, `projects-status-chart`, `this-week-widget`, `project-activity-feed`, `compose-refs`, `profiling`, `actions/index.ts`, `react-query/index.ts`, `report-form-dialog`, `report-line-editor`, `emails/tailwind.config.ts`
+- 31 unused shadcn UI components: `accordion`, `aspect-ratio`, `breadcrumb`, `button-group`, `carousel`, `collapsible`, `draft-indicator`, `drawer`, `empty-state-illustrations`, `empty`, `field`, `form`, `hover-card`, `input-group`, `input-otp`, `item`, `kanban`, `kbd`, `menubar`, `native-select`, `navigation-menu`, `page-loader`, `pagination`, `reel`, `resizable`, `rich-text-display`, `rich-text-editor`, `sonner`, `timeline`, `toast`, `toggle-group`, `toggle`
+
+**Phase 2: Fixed 5 nested component errors**
+- Created `src/components/ui/sort-indicator.tsx` — shared component, replaced duplicates in `financials-overview.tsx` and `project-costs-table.tsx`
+- Moved `ResizeHandle` to module scope in `gantt-sidebar.tsx` with explicit props
+- Extracted `SortableRow` to `src/components/gantt/sortable-row.tsx` (145-line component)
+- Moved `SortHeader` to module scope in `reports-table.tsx` with explicit props
+
+**Phase 3: Next.js Image optimization**
+- Converted 6 static `<img>` to `<Image>` with width/height: `app-sidebar`, `login`, `forgot-password`, `setup-password`, `reset-password`, `change-password`
+- Converted 2 dynamic `<img>` to `<Image unoptimized>`: `scope-item-sheet`, `ui-helpers`
+- Added `sizes` to 11 fill Image instances: `material-card`, `scope-item-image-upload`, `item-materials-section` (×2), `sortable-section`, `section-form-dialog`, `snagging-form-dialog`, `snagging-overview`, `material-form-dialog`, `scope/[itemId]/page`, `material-sheet`
+
+### Accessibility & Warning Cleanup (Feb 18, 2026)
+Agent: Claude Code
+
+**Phase 4: Accessibility fixes**
+- `gantt-bar.tsx` — Added `role="button"`, `tabIndex={0}`, `onKeyDown` handler to milestone div and bar content div (2 interactive divs)
+- `gantt-chart.tsx` — Added `role="presentation"` to scrollable timeline div with `onClick={handleBackgroundClick}`
+- `team-share-selector.tsx` — Added `htmlFor="team-share-list"` to Label, added `id="team-share-list"` to associated container
+
+**Phase 5a: Removed duplicate `export default` (kept named exports)**
+Gantt files: `gantt-bar.tsx`, `gantt-chart.tsx`, `gantt-sidebar.tsx`, `gantt-header.tsx`, `gantt-dependencies.tsx`
+Email files: `welcome-email.tsx`, `project-assignment-email.tsx`, `milestone-alert-email.tsx`, `report-published-email.tsx`, `drawing-sent-to-client-email.tsx`
+UI files: `export-button.tsx`, `scope-items-filter-bar.tsx`
+
+Additional duplicate exports removed (Feb 26): `error-boundary.tsx`, `timeline-overview.tsx`, `dependency-dialog.tsx`, `gantt-row.tsx`
+Deleted dead file: `src/lib/actions/drafts.ts` (zero imports)
+
+**Phase 5b: Extracted `= []` default props to module-level constants**
+- `gantt-chart.tsx` — `EMPTY_DEPENDENCIES: GanttDependency[]` for `dependencies = []`
+- `project-overview.tsx` — `EMPTY_ACTIVITIES: Activity[]` for `recentActivities = []`
+- `projects-list-client.tsx` — `EMPTY_CLIENTS: Client[]` for `clients = []`
+
+Files changed (14 total):
+- `src/components/gantt/gantt-bar.tsx`
+- `src/components/gantt/gantt-chart.tsx`
+- `src/components/gantt/gantt-sidebar.tsx`
+- `src/components/gantt/gantt-header.tsx`
+- `src/components/gantt/gantt-dependencies.tsx`
+- `src/components/reports/team-share-selector.tsx`
+- `src/emails/welcome-email.tsx`
+- `src/emails/project-assignment-email.tsx`
+- `src/emails/milestone-alert-email.tsx`
+- `src/emails/report-published-email.tsx`
+- `src/emails/drawing-sent-to-client-email.tsx`
+- `src/components/ui/export-button.tsx`
+- `src/components/scope-items/scope-items-filter-bar.tsx`
+- `src/app/(dashboard)/projects/[id]/project-overview.tsx`
+- `src/app/(dashboard)/projects/projects-list-client.tsx`
+
+---
+
+## Applied Migrations & Warnings
 - **Migration 045 applied**: `045_gantt_rewrite.sql` has been executed on Supabase — Gantt data is live
 - **Migration 046 applied**: `046_client_drawing_approval_rls.sql` has been applied to Supabase (client drawing approval RLS + SECURITY DEFINER helper)
 - **Migration 047 applied**: `047_admin_views_scope_drawings_materials.sql` has been applied to Supabase (5 admin views with security_invoker)
+- **Migration 048 applied**: `048_fix_pm_assignment_privilege_escalation.sql` — PMs can only manage assignments for projects they're already assigned to
 - ~~**Reports PDF upload path broken**~~ — **FIXED** (Feb 10, 2026): Changed storage path from `pdfs/${fileName}` to `${projectId}/${reportId}/${fileName}` in `uploadReportPdf()`. Also added `projectId` parameter to function signature and updated both callers (`report-creation-modal.tsx`, `reports-table.tsx`). Debug console.logs removed from both callers.
 - **Do not modify `src/test/setup.ts`** during parallel test writing — both agents depend on it
 - **Gantt sidebar test fixed**: Pre-existing test mismatch was already corrected by Codex agent — all 289 tests pass

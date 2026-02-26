@@ -1,6 +1,6 @@
 # Formula Contract - Project Intelligence
 
-> **Last Updated:** February 12, 2026
+> **Last Updated:** February 26, 2026
 > **Version:** 1.1.0
 > **Supabase Project:** `lsuiaqrpkhejeavsrsqc` (contract-eu, eu-central-1)
 
@@ -70,7 +70,7 @@ src/
 ├── app/              # Next.js App Router — (auth)/, (dashboard)/, auth/callback
 ├── components/       # UI (shadcn), layout, projects, scope-items, drawings, materials, reports, gantt, dashboard, finance
 ├── lib/              # actions/ (server), supabase/ (client/server), react-query/, pdf/, activity-log/, notifications/
-├── hooks/            # use-autosave, use-debounce, use-file-upload, use-media-query, use-toast
+├── hooks/            # use-debounce, use-media-query
 ├── emails/           # React-email templates (welcome, assignment, milestone, report, drawing)
 └── types/            # TypeScript definitions
 
@@ -234,6 +234,19 @@ scope-items/{project_id}/{item_id}/image_1.jpg
 19. **Browse `v_*` views, not raw tables** - In Supabase Studio, use `v_scope_items` instead of `scope_items` to see `project_code`/`project_name` next to each record
 20. **PM override uses server action** - `overrideDrawingApproval()` in `lib/actions/drawings.ts` enforces reason validation server-side; never bypass with inline Supabase calls
 
+### React Code Health (React Doctor score: 92/100)
+21. **Never define components inside other components** - Nested components get recreated every render, destroying state and killing performance. Extract to module scope or a separate file with explicit props.
+22. **`next/image fill` always needs `sizes`** - Without `sizes`, Next.js serves the full-resolution image. Match `sizes` to the container: `sizes="64px"` for `size-16`, `sizes="96px"` for `size-24`, etc.
+23. **Don't mix named + default exports** - Use `export function Foo()` only. Don't also add `export default Foo` in the same file.
+24. **Default prop `[]` needs module constant** - `items = []` in destructuring creates a new array reference each render. Extract: `const EMPTY_ITEMS: Type[] = []` at module scope.
+25. **Interactive divs need a11y attrs** - Add `role="button"`, `tabIndex={0}`, `onKeyDown` to any `<div>` with `onClick`.
+26. **Deleted shadcn components can be re-added** - Run `npx shadcn@latest add <name>` to restore any removed component (accordion, drawer, form, etc.)
+
+### Security Testing
+- Shannon AI pentester targets `http://host.docker.internal:3000` — run `npm run dev` first
+- Pentest artifacts go in `shannon_auditfiles/` — excluded from tsconfig, do NOT commit
+- After fixing pentest findings: create migration + server action (never UI-only validation for security)
+
 ### Git on Windows
 - CRLF warnings are normal (`LF will be replaced by CRLF`) - safe to ignore
 - Always use `-u` flag on first push: `git push -u origin branch-name`
@@ -265,6 +278,9 @@ npm run version:major   # 1.0.0 → 2.0.0 (breaking changes)
 
 ## Current Status (Feb 2026)
 
+### Recently Completed
+- React Doctor code health audit: score improved from 76 → 92/100 (deleted 47 dead files, fixed 6 errors, 460 warnings reduced)
+
 ### In Progress
 - Gantt chart UI polish (migration 045 applied, data is live)
 - Mobile optimization (responsive data views done, Gantt tablet enabled, remaining: full E2E testing)
@@ -275,7 +291,7 @@ npm run version:major   # 1.0.0 → 2.0.0 (breaking changes)
 - PDF Executive Summary generation
 
 ### Known Issues
-- None currently tracked
+- `shannon_auditfiles/` excluded from tsconfig.json — contains pentest artifacts with TS errors (intentional)
 
 **Full changelog:** See [docs/CHANGELOG.md](./docs/CHANGELOG.md)
 

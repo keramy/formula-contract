@@ -613,4 +613,3 @@ export function applyFilters<T extends ScopeItemForFiltering>(
   });
 }
 
-export default ScopeItemsFilterBar;

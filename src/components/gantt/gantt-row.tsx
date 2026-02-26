@@ -166,5 +166,3 @@ export function GanttRow({
     </div>
   );
 }
-
-export default GanttRow;

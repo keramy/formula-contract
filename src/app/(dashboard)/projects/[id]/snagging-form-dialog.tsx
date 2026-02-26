@@ -229,6 +229,7 @@ export function SnaggingFormDialog({
                     src={url}
                     alt={`Photo ${index + 1}`}
                     fill
+                    sizes="80px"
                     className="object-cover"
                   />
                   <button

@@ -53,6 +53,8 @@ interface Client {
   company_name: string;
 }
 
+const EMPTY_CLIENTS: Client[] = [];
+
 interface ProjectsListClientProps {
   projects: Project[];
   clients?: Client[];
@@ -70,7 +72,7 @@ const statusOptions = [
   { value: "not_awarded", label: "Not Awarded" },
 ];
 
-export function ProjectsListClient({ projects, clients = [], canCreateProject = false }: ProjectsListClientProps) {
+export function ProjectsListClient({ projects, clients = EMPTY_CLIENTS, canCreateProject = false }: ProjectsListClientProps) {
   const searchParams = useSearchParams();
 
   // Initialize state from URL params (for bookmarking support)

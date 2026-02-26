@@ -24,12 +24,10 @@ import {
 } from "@/components/ui/table";
 import {
   SearchIcon,
-  ArrowUpDownIcon,
-  ArrowUpIcon,
-  ArrowDownIcon,
   ExternalLinkIcon,
   BuildingIcon,
 } from "lucide-react";
+import { SortIndicator } from "@/components/ui/sort-indicator";
 import { cn } from "@/lib/utils";
 import { ExportButton } from "@/components/ui/export-button";
 import { type ColumnDefinition, formatters } from "@/lib/export/export-utils";
@@ -158,18 +156,6 @@ export function ProjectCostsTable({ data }: ProjectCostsTableProps) {
     }
   };
 
-  // Sort indicator
-  const SortIndicator = ({ column }: { column: SortKey }) => {
-    if (sortKey !== column) {
-      return <ArrowUpDownIcon className="size-3.5 text-muted-foreground/50" />;
-    }
-    return sortDir === "asc" ? (
-      <ArrowUpIcon className="size-3.5 text-primary" />
-    ) : (
-      <ArrowDownIcon className="size-3.5 text-primary" />
-    );
-  };
-
   return (
     <Card className="border border-base-200">
       <CardHeader className="pb-4">
@@ -267,7 +253,7 @@ export function ProjectCostsTable({ data }: ProjectCostsTableProps) {
                     className="-ml-3 h-8 font-medium"
                   >
                     Project
-                    <SortIndicator column="name" />
+                    <SortIndicator column="name" activeColumn={sortKey} direction={sortDir} />
                   </Button>
                 </TableHead>
                 <TableHead className="text-center">Status</TableHead>
@@ -279,7 +265,7 @@ export function ProjectCostsTable({ data }: ProjectCostsTableProps) {
                     className="-mr-3 h-8 font-medium"
                   >
                     Budget
-                    <SortIndicator column="budget" />
+                    <SortIndicator column="budget" activeColumn={sortKey} direction={sortDir} />
                   </Button>
                 </TableHead>
                 <TableHead className="text-right">
@@ -290,7 +276,7 @@ export function ProjectCostsTable({ data }: ProjectCostsTableProps) {
                     className="-mr-3 h-8 font-medium"
                   >
                     Actual
-                    <SortIndicator column="actual" />
+                    <SortIndicator column="actual" activeColumn={sortKey} direction={sortDir} />
                   </Button>
                 </TableHead>
                 <TableHead className="text-right">
@@ -301,7 +287,7 @@ export function ProjectCostsTable({ data }: ProjectCostsTableProps) {
                     className="-mr-3 h-8 font-medium"
                   >
                     Variance
-                    <SortIndicator column="variance" />
+                    <SortIndicator column="variance" activeColumn={sortKey} direction={sortDir} />
                   </Button>
                 </TableHead>
                 <TableHead className="w-[60px] pr-6"></TableHead>

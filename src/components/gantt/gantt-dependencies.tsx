@@ -294,4 +294,3 @@ export function GanttDependencies({
   );
 }
 
-export default GanttDependencies;

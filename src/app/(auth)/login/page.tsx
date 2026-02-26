@@ -3,6 +3,7 @@
 import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -84,7 +85,7 @@ function LoginForm() {
       <GlassCard className="w-full border-base-200/80 shadow-sm">
         <CardHeader className="space-y-4 pb-2">
           <div className="flex items-center gap-3">
-            <img src="/icons/icon-192x192.png" alt="Formula Contract" className="h-11 w-11 rounded-xl" />
+            <Image src="/icons/icon-192x192.png" alt="Formula Contract" width={44} height={44} className="h-11 w-11 rounded-xl" />
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Formula Contract

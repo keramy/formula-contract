@@ -147,6 +147,8 @@ const getActivityDescription = (action: string): string => {
   return activityDescriptions[action] || action.replace(/_/g, " ");
 };
 
+const EMPTY_ACTIVITIES: Activity[] = [];
+
 interface ProjectOverviewProps {
   projectId: string;
   projectUrlId: string;
@@ -181,7 +183,7 @@ export function ProjectOverview({
   milestones,
   snaggingItems,
   assignments,
-  recentActivities = [],
+  recentActivities = EMPTY_ACTIVITIES,
   canEdit,
   isClient,
 }: ProjectOverviewProps) {

@@ -82,6 +82,7 @@ export const MaterialCard = memo(function MaterialCard({
                 src={firstImage}
                 alt={material.name}
                 fill
+                sizes="(max-width: 768px) 100vw, 200px"
                 className="object-cover"
               />
               {images.length > 1 && (
