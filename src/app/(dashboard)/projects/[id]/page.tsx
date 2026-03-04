@@ -16,6 +16,7 @@ import { ProjectDetailHeader } from "./project-detail-header";
 import { ProjectOverview } from "./project-overview";
 import { getProjectAssignments } from "@/lib/actions/project-assignments";
 import { getProjectReports } from "@/lib/actions/reports";
+import { getProjectAreas } from "@/lib/actions/project-areas";
 import { DownloadTemplateButton, ExcelImport, ExcelExport, ScopeItemAddButton } from "@/components/scope-items";
 import { ActivityFeed } from "@/components/activity-log/activity-feed";
 import { isUUID } from "@/lib/slug";
@@ -69,6 +70,7 @@ interface ScopeItem {
   notes: string | null;
   images: string[] | null;
   parent_id: string | null; // References parent item when created via split
+  area_id: string | null;
 }
 
 interface Drawing {
@@ -206,6 +208,7 @@ export default async function ProjectDetailPage({
     reportsResult,
     assignmentsResult,
     activitiesResult,
+    areasResult,
   ] = await Promise.all([
     // 1. Project with Client (includes slug for URL generation)
     (async () => {
@@ -228,7 +231,7 @@ export default async function ProjectDetailPage({
       const start = performance.now();
       const result = await supabase
         .from("scope_items")
-        .select("id, item_code, name, description, width, depth, height, item_path, status, quantity, unit, initial_unit_cost, initial_total_cost, actual_unit_cost, actual_total_cost, unit_sales_price, total_sales_price, production_percentage, is_shipped, is_installation_started, is_installed, notes, images, created_at, parent_id")
+        .select("id, item_code, name, description, width, depth, height, item_path, status, quantity, unit, initial_unit_cost, initial_total_cost, actual_unit_cost, actual_total_cost, unit_sales_price, total_sales_price, production_percentage, is_shipped, is_installation_started, is_installed, notes, images, created_at, parent_id, area_id")
         .eq("project_id", projectId)
         .eq("is_deleted", false)
         .order("created_at", { ascending: true });
@@ -326,6 +329,13 @@ export default async function ProjectDetailPage({
       console.log(`  📝 Recent Activities: ${(performance.now() - start).toFixed(0)}ms`);
       return { data: activitiesWithUsers };
     })(),
+    // 9. Project Areas
+    (async () => {
+      const start = performance.now();
+      const result = await getProjectAreas(projectId);
+      console.log(`  📍 Project Areas: ${(performance.now() - start).toFixed(0)}ms`);
+      return result;
+    })(),
   ]);
   console.log(`  ⏱️ Parallel queries total: ${(performance.now() - parallelStart).toFixed(0)}ms`);
   console.log(`📊 [PROFILE] Project Detail Total: ${(performance.now() - pageStart).toFixed(0)}ms\n`);
@@ -390,6 +400,10 @@ export default async function ProjectDetailPage({
   // Extract milestones
   const milestones = (milestonesResult.data || []) as Milestone[];
 
+
+  // Extract project areas and build lookup map
+  const areas = areasResult;
+  const areaMap = new Map(areas.map((a) => [a.id, { area_code: a.area_code, name: a.name, floor: a.floor }]));
 
   // Reports, assignments, and activities are already extracted from Promise.all
   const reports = reportsResult;
@@ -520,7 +534,15 @@ export default async function ProjectDetailPage({
               )}
               <div className="shrink-0">
                 <ExcelExport
-                  items={scopeItems}
+                  items={scopeItems.map((item) => {
+                    const area = item.area_id ? areaMap.get(item.area_id) : null;
+                    return {
+                      ...item,
+                      floor: area?.floor ?? null,
+                      area_name: area?.name ?? null,
+                      area_code: area?.area_code ?? null,
+                    };
+                  })}
                   projectCode={project.project_code}
                   projectName={project.name}
                   compact
@@ -535,6 +557,12 @@ export default async function ProjectDetailPage({
               id: m.id,
               material_code: m.material_code,
               name: m.name,
+            }))}
+            areas={areas.map((a) => ({
+              id: a.id,
+              area_code: a.area_code,
+              name: a.name,
+              floor: a.floor,
             }))}
             currency={project.currency}
             isClient={isClient}

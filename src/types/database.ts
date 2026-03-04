@@ -125,6 +125,487 @@ export type Database = {
         }
         Relationships: []
       }
+      crm_activities: {
+        Row: {
+          activity_date: string
+          activity_type: string
+          architecture_firm_id: string | null
+          brand_id: string | null
+          contact_id: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_deleted: boolean | null
+          next_action: string | null
+          next_action_date: string | null
+          opportunity_id: string | null
+          outcome: string | null
+          title: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          activity_date?: string
+          activity_type: string
+          architecture_firm_id?: string | null
+          brand_id?: string | null
+          contact_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_deleted?: boolean | null
+          next_action?: string | null
+          next_action_date?: string | null
+          opportunity_id?: string | null
+          outcome?: string | null
+          title: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          activity_date?: string
+          activity_type?: string
+          architecture_firm_id?: string | null
+          brand_id?: string | null
+          contact_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_deleted?: boolean | null
+          next_action?: string | null
+          next_action_date?: string | null
+          opportunity_id?: string | null
+          outcome?: string | null
+          title?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_activities_architecture_firm_id_fkey"
+            columns: ["architecture_firm_id"]
+            isOneToOne: false
+            referencedRelation: "crm_architecture_firms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_activities_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "crm_brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_activities_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "v_crm_brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_activities_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_activities_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "crm_opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_activities_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "v_crm_opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_activities_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "client_team_view"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "crm_activities_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_activities_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "v_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_architecture_firms: {
+        Row: {
+          connection_notes: string | null
+          connection_strength: string | null
+          created_at: string | null
+          firm_code: string
+          id: string
+          is_deleted: boolean | null
+          key_clients: string | null
+          location: string | null
+          name: string
+          notes: string | null
+          priority: string | null
+          specialty: string | null
+          updated_at: string | null
+          vendor_application_date: string | null
+          vendor_list_status: string | null
+          website: string | null
+        }
+        Insert: {
+          connection_notes?: string | null
+          connection_strength?: string | null
+          created_at?: string | null
+          firm_code: string
+          id?: string
+          is_deleted?: boolean | null
+          key_clients?: string | null
+          location?: string | null
+          name: string
+          notes?: string | null
+          priority?: string | null
+          specialty?: string | null
+          updated_at?: string | null
+          vendor_application_date?: string | null
+          vendor_list_status?: string | null
+          website?: string | null
+        }
+        Update: {
+          connection_notes?: string | null
+          connection_strength?: string | null
+          created_at?: string | null
+          firm_code?: string
+          id?: string
+          is_deleted?: boolean | null
+          key_clients?: string | null
+          location?: string | null
+          name?: string
+          notes?: string | null
+          priority?: string | null
+          specialty?: string | null
+          updated_at?: string | null
+          vendor_application_date?: string | null
+          vendor_list_status?: string | null
+          website?: string | null
+        }
+        Relationships: []
+      }
+      crm_brand_firm_links: {
+        Row: {
+          architecture_firm_id: string
+          brand_id: string
+          id: string
+          notes: string | null
+          relationship_type: string | null
+        }
+        Insert: {
+          architecture_firm_id: string
+          brand_id: string
+          id?: string
+          notes?: string | null
+          relationship_type?: string | null
+        }
+        Update: {
+          architecture_firm_id?: string
+          brand_id?: string
+          id?: string
+          notes?: string | null
+          relationship_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_brand_firm_links_architecture_firm_id_fkey"
+            columns: ["architecture_firm_id"]
+            isOneToOne: false
+            referencedRelation: "crm_architecture_firms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_brand_firm_links_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "crm_brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_brand_firm_links_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "v_crm_brands"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_brands: {
+        Row: {
+          annual_revenue: string | null
+          brand_code: string
+          cd_changed_recently: boolean | null
+          created_at: string | null
+          creative_director: string | null
+          expansion_rate: string | null
+          headquarters: string | null
+          id: string
+          is_deleted: boolean | null
+          name: string
+          notes: string | null
+          parent_group: string | null
+          priority: string | null
+          segment: string | null
+          store_count: number | null
+          tier: string
+          updated_at: string | null
+          website: string | null
+        }
+        Insert: {
+          annual_revenue?: string | null
+          brand_code: string
+          cd_changed_recently?: boolean | null
+          created_at?: string | null
+          creative_director?: string | null
+          expansion_rate?: string | null
+          headquarters?: string | null
+          id?: string
+          is_deleted?: boolean | null
+          name: string
+          notes?: string | null
+          parent_group?: string | null
+          priority?: string | null
+          segment?: string | null
+          store_count?: number | null
+          tier: string
+          updated_at?: string | null
+          website?: string | null
+        }
+        Update: {
+          annual_revenue?: string | null
+          brand_code?: string
+          cd_changed_recently?: boolean | null
+          created_at?: string | null
+          creative_director?: string | null
+          expansion_rate?: string | null
+          headquarters?: string | null
+          id?: string
+          is_deleted?: boolean | null
+          name?: string
+          notes?: string | null
+          parent_group?: string | null
+          priority?: string | null
+          segment?: string | null
+          store_count?: number | null
+          tier?: string
+          updated_at?: string | null
+          website?: string | null
+        }
+        Relationships: []
+      }
+      crm_contacts: {
+        Row: {
+          architecture_firm_id: string | null
+          brand_id: string | null
+          company: string | null
+          contact_code: string
+          created_at: string | null
+          email: string | null
+          first_name: string
+          id: string
+          is_deleted: boolean | null
+          last_interaction_date: string | null
+          last_name: string
+          linkedin_url: string | null
+          notes: string | null
+          phone: string | null
+          relationship_status: string | null
+          source: string | null
+          title: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          architecture_firm_id?: string | null
+          brand_id?: string | null
+          company?: string | null
+          contact_code: string
+          created_at?: string | null
+          email?: string | null
+          first_name: string
+          id?: string
+          is_deleted?: boolean | null
+          last_interaction_date?: string | null
+          last_name: string
+          linkedin_url?: string | null
+          notes?: string | null
+          phone?: string | null
+          relationship_status?: string | null
+          source?: string | null
+          title?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          architecture_firm_id?: string | null
+          brand_id?: string | null
+          company?: string | null
+          contact_code?: string
+          created_at?: string | null
+          email?: string | null
+          first_name?: string
+          id?: string
+          is_deleted?: boolean | null
+          last_interaction_date?: string | null
+          last_name?: string
+          linkedin_url?: string | null
+          notes?: string | null
+          phone?: string | null
+          relationship_status?: string | null
+          source?: string | null
+          title?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_contacts_architecture_firm_id_fkey"
+            columns: ["architecture_firm_id"]
+            isOneToOne: false
+            referencedRelation: "crm_architecture_firms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_contacts_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "crm_brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_contacts_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "v_crm_brands"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_opportunities: {
+        Row: {
+          architecture_firm_id: string | null
+          assigned_to: string | null
+          brand_id: string | null
+          created_at: string | null
+          currency: string | null
+          description: string | null
+          estimated_value: number | null
+          expected_close_date: string | null
+          id: string
+          is_deleted: boolean | null
+          loss_reason: string | null
+          notes: string | null
+          opportunity_code: string
+          priority: string | null
+          probability: number | null
+          source: string | null
+          stage: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          architecture_firm_id?: string | null
+          assigned_to?: string | null
+          brand_id?: string | null
+          created_at?: string | null
+          currency?: string | null
+          description?: string | null
+          estimated_value?: number | null
+          expected_close_date?: string | null
+          id?: string
+          is_deleted?: boolean | null
+          loss_reason?: string | null
+          notes?: string | null
+          opportunity_code: string
+          priority?: string | null
+          probability?: number | null
+          source?: string | null
+          stage?: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          architecture_firm_id?: string | null
+          assigned_to?: string | null
+          brand_id?: string | null
+          created_at?: string | null
+          currency?: string | null
+          description?: string | null
+          estimated_value?: number | null
+          expected_close_date?: string | null
+          id?: string
+          is_deleted?: boolean | null
+          loss_reason?: string | null
+          notes?: string | null
+          opportunity_code?: string
+          priority?: string | null
+          probability?: number | null
+          source?: string | null
+          stage?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_opportunities_architecture_firm_id_fkey"
+            columns: ["architecture_firm_id"]
+            isOneToOne: false
+            referencedRelation: "crm_architecture_firms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_opportunities_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "client_team_view"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "crm_opportunities_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_opportunities_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "v_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_opportunities_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "crm_brands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_opportunities_brand_id_fkey"
+            columns: ["brand_id"]
+            isOneToOne: false
+            referencedRelation: "v_crm_brands"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       drafts: {
         Row: {
           created_at: string | null
@@ -233,6 +714,13 @@ export type Database = {
             columns: ["drawing_id"]
             isOneToOne: false
             referencedRelation: "drawings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drawing_revisions_drawing_id_fkey"
+            columns: ["drawing_id"]
+            isOneToOne: false
+            referencedRelation: "v_drawings"
             referencedColumns: ["id"]
           },
           {
@@ -350,6 +838,13 @@ export type Database = {
             columns: ["item_id"]
             isOneToOne: true
             referencedRelation: "scope_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drawings_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: true
+            referencedRelation: "v_scope_items"
             referencedColumns: ["id"]
           },
           {
@@ -517,6 +1012,13 @@ export type Database = {
             referencedRelation: "scope_items"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "gantt_item_scope_items_scope_item_id_fkey"
+            columns: ["scope_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_scope_items"
+            referencedColumns: ["id"]
+          },
         ]
       }
       gantt_items: {
@@ -657,6 +1159,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "item_materials_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_scope_items"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "item_materials_material_id_fkey"
             columns: ["material_id"]
             isOneToOne: false
@@ -668,6 +1177,13 @@ export type Database = {
             columns: ["material_id"]
             isOneToOne: false
             referencedRelation: "materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "item_materials_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "v_materials"
             referencedColumns: ["id"]
           },
         ]
@@ -887,6 +1403,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "notifications_drawing_id_fkey"
+            columns: ["drawing_id"]
+            isOneToOne: false
+            referencedRelation: "v_drawings"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "notifications_item_id_fkey"
             columns: ["item_id"]
             isOneToOne: false
@@ -901,6 +1424,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "notifications_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_scope_items"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "notifications_material_id_fkey"
             columns: ["material_id"]
             isOneToOne: false
@@ -912,6 +1442,13 @@ export type Database = {
             columns: ["material_id"]
             isOneToOne: false
             referencedRelation: "materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "v_materials"
             referencedColumns: ["id"]
           },
           {
@@ -1455,10 +1992,55 @@ export type Database = {
           },
         ]
       }
+      project_areas: {
+        Row: {
+          id: string
+          project_id: string
+          floor: string
+          name: string
+          area_code: string
+          sort_order: number | null
+          is_deleted: boolean | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          floor: string
+          name: string
+          area_code: string
+          sort_order?: number | null
+          is_deleted?: boolean | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          floor?: string
+          name?: string
+          area_code?: string
+          sort_order?: number | null
+          is_deleted?: boolean | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_areas_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       scope_items: {
         Row: {
           actual_total_cost: number | null
           actual_unit_cost: number | null
+          area_id: string | null
           created_at: string | null
           depth: number | null
           description: string | null
@@ -1497,6 +2079,7 @@ export type Database = {
         Insert: {
           actual_total_cost?: number | null
           actual_unit_cost?: number | null
+          area_id?: string | null
           created_at?: string | null
           depth?: number | null
           description?: string | null
@@ -1535,6 +2118,7 @@ export type Database = {
         Update: {
           actual_total_cost?: number | null
           actual_unit_cost?: number | null
+          area_id?: string | null
           created_at?: string | null
           depth?: number | null
           description?: string | null
@@ -1586,6 +2170,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "scope_items_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "v_scope_items"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "scope_items_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
@@ -1597,6 +2188,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scope_items_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "project_areas"
             referencedColumns: ["id"]
           },
         ]
@@ -1702,6 +2300,13 @@ export type Database = {
             columns: ["item_id"]
             isOneToOne: false
             referencedRelation: "scope_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "snagging_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_scope_items"
             referencedColumns: ["id"]
           },
           {
@@ -1816,6 +2421,13 @@ export type Database = {
             referencedRelation: "drawings"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "drawing_revisions_drawing_id_fkey"
+            columns: ["drawing_id"]
+            isOneToOne: false
+            referencedRelation: "v_drawings"
+            referencedColumns: ["id"]
+          },
         ]
       }
       client_drawings_view: {
@@ -1862,6 +2474,13 @@ export type Database = {
             columns: ["item_id"]
             isOneToOne: true
             referencedRelation: "scope_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drawings_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: true
+            referencedRelation: "v_scope_items"
             referencedColumns: ["id"]
           },
         ]
@@ -2140,6 +2759,139 @@ export type Database = {
         }
         Relationships: []
       }
+      v_crm_activities: {
+        Row: {
+          activity_date: string | null
+          activity_type: string | null
+          brand_name: string | null
+          contact_name: string | null
+          created_at: string | null
+          firm_name: string | null
+          id: string | null
+          next_action: string | null
+          next_action_date: string | null
+          opportunity_title: string | null
+          outcome: string | null
+          title: string | null
+          user_name: string | null
+        }
+        Relationships: []
+      }
+      v_crm_brands: {
+        Row: {
+          brand_code: string | null
+          cd_changed_recently: boolean | null
+          created_at: string | null
+          expansion_rate: string | null
+          headquarters: string | null
+          id: string | null
+          latest_activity_date: string | null
+          name: string | null
+          opportunity_count: number | null
+          parent_group: string | null
+          priority: string | null
+          segment: string | null
+          store_count: number | null
+          tier: string | null
+        }
+        Relationships: []
+      }
+      v_crm_opportunities: {
+        Row: {
+          assigned_to: string | null
+          assigned_to_name: string | null
+          brand_code: string | null
+          brand_name: string | null
+          created_at: string | null
+          currency: string | null
+          estimated_value: number | null
+          expected_close_date: string | null
+          firm_code: string | null
+          firm_name: string | null
+          id: string | null
+          loss_reason: string | null
+          opportunity_code: string | null
+          priority: string | null
+          probability: number | null
+          source: string | null
+          stage: string | null
+          title: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_opportunities_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "client_team_view"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "crm_opportunities_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_opportunities_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "v_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_drawings: {
+        Row: {
+          client_comments_preview: string | null
+          client_response_at: string | null
+          created_at: string | null
+          current_revision: string | null
+          id: string | null
+          item_code: string | null
+          item_name: string | null
+          pm_override: boolean | null
+          project_code: string | null
+          project_name: string | null
+          revision_count: number | null
+          sent_to_client_at: string | null
+          status: Database["public"]["Enums"]["drawing_status"] | null
+          updated_at: string | null
+        }
+        Relationships: []
+      }
+      v_materials: {
+        Row: {
+          created_at: string | null
+          id: string | null
+          is_deleted: boolean | null
+          linked_items: number | null
+          material_code: string | null
+          name: string | null
+          project_code: string | null
+          project_name: string | null
+          specification_preview: string | null
+          status: Database["public"]["Enums"]["material_status"] | null
+          supplier: string | null
+          updated_at: string | null
+        }
+        Relationships: []
+      }
+      v_milestones: {
+        Row: {
+          alert_days_before: number | null
+          completed_at: string | null
+          created_at: string | null
+          due_date: string | null
+          id: string | null
+          is_completed: boolean | null
+          milestone_code: string | null
+          name: string | null
+          project_code: string | null
+          project_name: string | null
+        }
+        Relationships: []
+      }
       v_notifications: {
         Row: {
           created_at: string | null
@@ -2207,6 +2959,50 @@ export type Database = {
         }
         Relationships: []
       }
+      v_scope_items: {
+        Row: {
+          actual_total_cost: number | null
+          actual_unit_cost: number | null
+          client_name: string | null
+          created_at: string | null
+          id: string | null
+          initial_total_cost: number | null
+          is_deleted: boolean | null
+          is_installed: boolean | null
+          is_shipped: boolean | null
+          item_code: string | null
+          item_path: Database["public"]["Enums"]["item_path"] | null
+          name: string | null
+          procurement_status:
+            | Database["public"]["Enums"]["procurement_status"]
+            | null
+          production_percentage: number | null
+          project_code: string | null
+          project_name: string | null
+          quantity: number | null
+          status: Database["public"]["Enums"]["item_status"] | null
+          unit: string | null
+          updated_at: string | null
+        }
+        Relationships: []
+      }
+      v_snagging: {
+        Row: {
+          created_at: string | null
+          created_by_name: string | null
+          description_preview: string | null
+          id: string | null
+          is_resolved: boolean | null
+          item_code: string | null
+          item_name: string | null
+          project_code: string | null
+          project_name: string | null
+          resolution_notes: string | null
+          resolved_at: string | null
+          resolved_by_name: string | null
+        }
+        Relationships: []
+      }
       v_users: {
         Row: {
           assigned_projects: number | null
@@ -2251,6 +3047,10 @@ export type Database = {
       generate_entity_code: { Args: { p_entity_type: string }; Returns: string }
       generate_report_code: { Args: { p_project_id: string }; Returns: string }
       generate_slug: { Args: { input_text: string }; Returns: string }
+      get_item_project_id: {
+        Args: { scope_item_uuid: string }
+        Returns: string
+      }
       get_next_project_code: { Args: never; Returns: string }
       get_user_role: {
         Args: never
@@ -2506,3 +3306,6 @@ export type ScopeItemUpdate = TablesUpdate<"scope_items">;
 export type DrawingInsert = TablesInsert<"drawings">;
 export type DrawingUpdate = TablesUpdate<"drawings">;
 export type DrawingRevisionInsert = TablesInsert<"drawing_revisions">;
+export type ProjectAreaRow = Tables<"project_areas">;
+export type ProjectAreaInsert = TablesInsert<"project_areas">;
+export type ProjectAreaUpdate = TablesUpdate<"project_areas">;

@@ -9,6 +9,7 @@ const routePermissions: Record<string, string[]> = {
   "/clients": ["admin", "pm"],
   "/users": ["admin"],
   "/reports": ["admin", "pm", "management", "client"], // Clients see their project reports
+  "/crm": ["admin", "management"],
   "/settings": ["admin"],
   "/profile": ["admin", "pm", "production", "procurement", "management", "client"], // All users can access their profile
 };

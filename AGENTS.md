@@ -2,11 +2,130 @@
 
 ## Current Status
 Last updated by: Claude Code
-Timestamp: 2026-02-26
+Timestamp: 2026-03-02
 
 ---
 
-## Active Task: Test Writing (Parallel Agents)
+## Completed: Project Areas Feature (Mar 2, 2026)
+Agent: Claude Code
+Status: **DONE — Build passes, 509 tests pass. Migration 051 NOT yet applied to Supabase.**
+
+### What was done
+
+**New feature: Project Areas** — spatial organization for scope items (Floor → Area → Scope Items). Areas have user-defined area codes (e.g., "MB" for Master Bedroom), grouped by floor.
+
+#### Database (Migration 051 — NOT YET APPLIED)
+- `supabase/migrations/051_project_areas.sql` — New `project_areas` table, `area_id` FK on `scope_items`, RLS policies, indexes, admin view `v_project_areas`
+
+#### Server Actions (NEW)
+- `src/lib/actions/project-areas.ts` — CRUD: `getProjectAreas`, `createProjectArea`, `updateProjectArea`, `deleteProjectArea`, `bulkGetOrCreateAreas` (batch upsert for Excel import)
+
+#### Excel Template + Import
+- `src/lib/excel-template.ts` — Added 3 new columns (`floor`, `area_name`, `area_code`) to template, parser, and export
+- `src/components/scope-items/excel-import.tsx` — Auto-creates areas during import via `bulkGetOrCreateAreas`, preview shows area badges
+
+#### UI Components
+- `src/components/scope-items/scope-item-sheet.tsx` — Area dropdown (grouped by floor) in the form
+- `src/components/scope-items/scope-item-card.tsx` — Area code badge on cards
+- `src/components/scope-items/scope-items-filter-bar.tsx` — Area filter dropdown + `applyFilters` logic
+
+#### Data Flow (Page + Table)
+- `src/app/(dashboard)/projects/[id]/page.tsx` — Fetches areas in parallel Promise.all, passes to table + export
+- `src/app/(dashboard)/projects/[id]/scope-items-table.tsx` — Area lookup map, passes area_code to cards + rows + filter bar
+
+#### Types
+- `src/types/database.ts` — Added `project_areas` table types + `area_id` on `scope_items`
+- `src/lib/activity-log/constants.ts` — Added 3 area action constants
+
+### Files created (2)
+1. `supabase/migrations/051_project_areas.sql`
+2. `src/lib/actions/project-areas.ts`
+
+### Files modified (8)
+1. `src/types/database.ts`
+2. `src/lib/activity-log/constants.ts`
+3. `src/lib/excel-template.ts`
+4. `src/components/scope-items/excel-import.tsx`
+5. `src/components/scope-items/scope-item-sheet.tsx`
+6. `src/components/scope-items/scope-item-card.tsx`
+7. `src/components/scope-items/scope-items-filter-bar.tsx`
+8. `src/app/(dashboard)/projects/[id]/page.tsx`
+9. `src/app/(dashboard)/projects/[id]/scope-items-table.tsx`
+
+### Build & Test Status
+- `npm run build` — **PASSES** (zero errors)
+- `npm run test` — **509 tests pass** (zero regressions)
+
+### What remains
+- **Apply migration 051** to Supabase (`lsuiaqrpkhejeavsrsqc`)
+- **Update CLAUDE.md** — Add migration 051 note, gotcha for area feature
+- Visual QA: test Excel import with area columns, test area dropdown in form, test area filter
+- Optional: add a dedicated "Areas Management" section to the project detail page for CRUD
+
+---
+
+## Completed: CRM UI Polish (Mar 2, 2026)
+Agent: Claude Code
+Status: **DONE — Build passes, 509 tests pass, CLAUDE.md updated.**
+
+### What was done (purely visual/CSS — no logic changes, no new files)
+
+**Batch 1: Page headers → AppHeader integration (6 files)**
+- Replaced inline `<h1>` headers + back buttons with `usePageHeader()` + `setContent()` in all 6 CRM pages
+- CRM dashboard, brands, firms, contacts, activities, pipeline — all now render in the shared AppHeader bar
+- Action buttons (New Brand, Log Activity, etc.) moved to AppHeader `actions` slot
+- Replaced `<Loader2Icon>` spinners with `<Skeleton>` loading states (table skeletons for list pages, timeline skeletons for activities, progress bar skeletons for dashboard)
+- KPI `"..."` text replaced with `<Skeleton className="h-7 w-10 inline-block" />`
+- `space-y-4` → `space-y-5`, filter toolbars → `flex flex-col sm:flex-row gap-3`
+
+**Batch 2: Kanban & Pipeline polish**
+- `kanban.tsx`: `bg-base-50/50` → `bg-base-50/70`, `p-2` → `p-2.5`, column header border-b added, card hover → `hover:border-primary/20 transition-all`
+- `pipeline-board.tsx`: `<Separator />` → subtle `<div className="h-px bg-base-200/60" />`, value text `font-semibold`, priority badge `py-0.5`, mobile `rounded-xl` + hover treatment
+
+**Batch 3: Detail pages (brands/[id] + firms/[id])**
+- DetailRow labels: `text-sm font-medium` → `text-xs font-medium uppercase tracking-wide` (stronger hierarchy)
+- DetailRow padding: `py-2` → `py-2.5`
+- All section card headers now have `GradientIcon` before `CardTitle`
+- `font-bold` → `font-semibold` in page titles
+- List items: `p-2` → `p-3`, hover → `hover:bg-primary/5 border border-transparent hover:border-primary/20 transition-all`
+- Empty states: centered with icon + `py-8`
+- VendorStepper connector: `w-6` → `w-8`
+
+**Batch 4: Activities timeline polish**
+- Timeline dots added: `<div className="absolute -left-[29px] top-4 size-3 rounded-full border-2 border-base-200 bg-card" />`
+- Timeline container: `pl-4 space-y-3 border-border` → `pl-6 space-y-4 border-base-200`
+- DateHeader: CalendarIcon `text-muted-foreground` → `text-primary`, `py-2` → `py-3`
+- ActivityCard: `hover="subtle"` → `hover="primary"`
+- Outcome section: `border-t pt-2` → `border-t border-base-100 pt-2.5`
+
+### Files modified (9 total)
+1. `src/app/(dashboard)/crm/crm-dashboard.tsx` — AppHeader, Skeleton KPIs, hover polish
+2. `src/app/(dashboard)/crm/brands/brands-table.tsx` — AppHeader, table skeleton
+3. `src/app/(dashboard)/crm/firms/firms-table.tsx` — AppHeader, table skeleton
+4. `src/app/(dashboard)/crm/contacts/contacts-table.tsx` — AppHeader, table skeleton
+5. `src/app/(dashboard)/crm/activities/activities-timeline.tsx` — AppHeader, timeline skeleton, dots, hover
+6. `src/app/(dashboard)/crm/pipeline/pipeline-board.tsx` — AppHeader, card/mobile polish
+7. `src/components/ui/kanban.tsx` — bg, padding, border, hover
+8. `src/app/(dashboard)/crm/brands/[id]/page.tsx` — DetailRow, GradientIcon headers, hover, empty states
+9. `src/app/(dashboard)/crm/firms/[id]/page.tsx` — DetailRow, GradientIcon headers, hover, empty states
+
+### Build & Test status
+- `npm run build` — **PASSES** (zero errors, all CRM routes visible)
+- `npm run test` — **509 tests pass** (zero regressions)
+- `CLAUDE.md` — Updated Current Status section
+
+### What remains
+- Nothing — task complete. Ready for visual QA if desired.
+
+---
+
+## Previous: CRM Module (Feb 27, 2026)
+
+Full CRM module implemented — see "CRM Module Implementation" entry below for details.
+
+---
+
+## Previous Task: Test Writing (Parallel Agents)
 
 ### Shared Rules (BOTH agents must follow)
 - **Mock setup file: `src/test/setup.ts` — DO NOT MODIFY.** Both agents depend on it. If you need a different mock shape, create a local mock within your test file using `vi.mock()`.
@@ -554,11 +673,58 @@ Files changed (14 total):
 
 ---
 
+### CRM Module Implementation (Feb 27, 2026)
+Agent: Claude Code
+
+**Full Sales CRM module added — 6 database tables, 2 migrations, ~25 new files, 8 new routes.**
+
+#### Database (Applied to Supabase)
+- `supabase/migrations/049_crm_module.sql` — 6 tables (crm_brands, crm_architecture_firms, crm_contacts, crm_opportunities, crm_activities, crm_brand_firm_links), sequences, auto-code triggers (BRD/ARCH/CON/OPP), RLS policies, indexes, 3 admin views (v_crm_brands, v_crm_opportunities, v_crm_activities)
+- `supabase/migrations/050_crm_seed_data.sql` — 37 brands, 12 architecture firms, 18 brand-firm links, 5 opportunities
+
+#### Infrastructure
+- `src/lib/compose-refs.ts` — Re-created ref-merging utility (deleted in React Doctor cleanup)
+- `src/components/ui/kanban.tsx` — Re-created kanban board UI primitive using @dnd-kit
+
+#### Application Logic
+- `src/types/crm.ts` — All CRM types, enums, extended types (CrmBrandWithStats, CrmOpportunityWithRelations, etc.), constants arrays
+- `src/lib/validations/crm.ts` — Zod schemas for all entity forms (5 schemas, 7 enum schemas). Uses `z.input<>` for FormData types (not `z.infer<>`) to work with `zodResolver` + `.default()` fields
+- `src/lib/actions/crm.ts` — ~20 server actions with `requireCrmAccess()` auth helper. Insert calls use `as any` for auto-code fields (trigger fills them). Includes: CRUD for brands/firms/contacts/opportunities, pipeline grouping, activities timeline, dashboard stats
+- `src/lib/react-query/crm.ts` — Query key factory + hooks with optimistic updates (pipeline drag, brand delete), toast notifications, staleTime: 60s
+- `src/lib/activity-log/constants.ts` — Added 12 CRM action constants
+
+#### Pages & UI
+- `src/components/app-sidebar.tsx` — CRM nav item (TargetIcon, amber, admin/pm/management)
+- `src/app/(dashboard)/crm/page.tsx` + `crm-dashboard.tsx` — Dashboard with 4 KPIs, pipeline summary, upcoming actions
+- `src/app/(dashboard)/crm/brands/` — Table + sheet + detail page (with related opportunities/activities)
+- `src/app/(dashboard)/crm/firms/` — Table + sheet + detail page (with linked brands)
+- `src/app/(dashboard)/crm/pipeline/` — Kanban board (desktop) + collapsible list (mobile), drag-and-drop stage changes
+- `src/app/(dashboard)/crm/contacts/` — Table + sheet
+- `src/app/(dashboard)/crm/activities/` — Timeline grouped by date + log dialog
+
+#### Type Regeneration
+- `src/types/database.ts` — Regenerated from Supabase to include CRM tables. Convenience type aliases (ClientInsert, ProjectUpdate, etc.) manually re-appended.
+
+#### Build & Tests
+- `npm run build` — 0 errors, all 8 CRM routes visible
+- `npm run test` — 289/289 tests pass (no regressions)
+- Security advisor — No CRM-related warnings (only pre-existing: clients, materials, notifications, scope_items, snagging)
+
+#### Key Patterns / Gotchas
+- Auto-code trigger fields (brand_code, firm_code, etc.) need `as any` on insert since TypeScript types require them but DB triggers fill them
+- `z.input<>` not `z.infer<>` for form data types when schema uses `.default()`
+- `composeRefs` must accept `T | null` parameter since React refs pass `null` on unmount
+- CRM access: admin (full), pm (read + write), management (read-only), others (no access)
+
+---
+
 ## Applied Migrations & Warnings
 - **Migration 045 applied**: `045_gantt_rewrite.sql` has been executed on Supabase — Gantt data is live
 - **Migration 046 applied**: `046_client_drawing_approval_rls.sql` has been applied to Supabase (client drawing approval RLS + SECURITY DEFINER helper)
 - **Migration 047 applied**: `047_admin_views_scope_drawings_materials.sql` has been applied to Supabase (5 admin views with security_invoker)
 - **Migration 048 applied**: `048_fix_pm_assignment_privilege_escalation.sql` — PMs can only manage assignments for projects they're already assigned to
+- **Migration 049 applied**: `049_crm_module.sql` — 6 CRM tables, sequences, auto-code triggers, RLS policies, indexes, 3 admin views
+- **Migration 050 applied**: `050_crm_seed_data.sql` — 37 brands, 12 firms, 18 links, 5 opportunities (verified: BRD-001..BRD-037, ARCH-001..ARCH-012, OPP-001..OPP-005)
 - ~~**Reports PDF upload path broken**~~ — **FIXED** (Feb 10, 2026): Changed storage path from `pdfs/${fileName}` to `${projectId}/${reportId}/${fileName}` in `uploadReportPdf()`. Also added `projectId` parameter to function signature and updated both callers (`report-creation-modal.tsx`, `reports-table.tsx`). Debug console.logs removed from both callers.
 - **Do not modify `src/test/setup.ts`** during parallel test writing — both agents depend on it
 - **Gantt sidebar test fixed**: Pre-existing test mismatch was already corrected by Codex agent — all 289 tests pass

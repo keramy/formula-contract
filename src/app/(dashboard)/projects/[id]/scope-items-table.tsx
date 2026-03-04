@@ -3,6 +3,7 @@
 import { useState, useTransition, useEffect, useCallback, useMemo, memo, useReducer } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { bulkUpdateScopeItems, bulkAssignMaterials, splitScopeItem, deleteScopeItem, type ScopeItemField } from "@/lib/actions/scope-items";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -75,6 +76,7 @@ import {
   EyeOffIcon,
   PlusIcon,
   WrenchIcon,
+  ImageIcon,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { GlassCard, EmptyState, StatusBadge } from "@/components/ui/ui-helpers";
@@ -138,6 +140,14 @@ interface ScopeItem {
   is_installed: boolean;
   images: string[] | null;
   parent_id: string | null; // References parent item when created via split
+  area_id: string | null;
+}
+
+interface AreaOption {
+  id: string;
+  area_code: string;
+  name: string;
+  floor: string;
 }
 
 // Extended interface for hierarchical display
@@ -160,6 +170,7 @@ interface ScopeItemsTableProps {
   projectId: string;
   items: ScopeItem[];
   materials: Material[];
+  areas?: AreaOption[];
   currency?: string;
   isClient?: boolean; // Hide sensitive cost data from clients
   userRole?: string; // User role for permission checks
@@ -235,8 +246,12 @@ interface ColumnConfig {
 // Users can expand via "Columns" toggle for full detail
 const COLUMNS: ColumnConfig[] = [
   { id: "row", label: "#", defaultVisible: false },
+  { id: "image", label: "Image", defaultVisible: true },
   { id: "code", label: "Code", defaultVisible: true },
   { id: "name", label: "Name", defaultVisible: true },
+  { id: "floor", label: "Floor", defaultVisible: true },
+  { id: "area_code", label: "Area Code", defaultVisible: true },
+  { id: "area_name", label: "Area Name", defaultVisible: true },
   { id: "path", label: "Path", defaultVisible: true },
   { id: "status", label: "Status", defaultVisible: true },
   { id: "quantity", label: "Qty", defaultVisible: true },
@@ -345,11 +360,13 @@ interface ScopeItemRowProps {
   projectId: string;
   isColumnVisible: (columnId: string) => boolean;
   formatCurrency: (value: number | null) => string;
+  areaMap: Map<string, AreaOption>;
   onToggleSelect: (id: string) => void;
   onOpenSplitDialog: (item: ScopeItem) => void;
   onOpenDeleteDialog: (item: HierarchicalScopeItem) => void;
   onEditItem: (item: HierarchicalScopeItem) => void;
   onViewItem: (item: HierarchicalScopeItem) => void;
+  onImageClick: (url: string) => void;
 }
 
 const ScopeItemRow = memo(function ScopeItemRow({
@@ -358,12 +375,15 @@ const ScopeItemRow = memo(function ScopeItemRow({
   projectId,
   isColumnVisible,
   formatCurrency,
+  areaMap,
   onToggleSelect,
   onOpenSplitDialog,
   onOpenDeleteDialog,
   onEditItem,
   onViewItem,
+  onImageClick,
 }: ScopeItemRowProps) {
+  const firstImage = item.images?.[0] ?? null;
 
   return (
     <TableRow
@@ -385,6 +405,30 @@ const ScopeItemRow = memo(function ScopeItemRow({
             </span>
           ) : (
             item.displayRowNumber
+          )}
+        </TableCell>
+      )}
+      {isColumnVisible("image") && (
+        <TableCell className="py-1">
+          {firstImage ? (
+            <button
+              onClick={() => onImageClick(firstImage)}
+              className="shrink-0 rounded-md overflow-hidden border border-base-200 hover:border-primary/40 transition-colors cursor-pointer"
+            >
+              <Image
+                src={firstImage}
+                alt={item.name}
+                width={40}
+                height={40}
+                unoptimized
+                sizes="40px"
+                className="size-10 object-cover"
+              />
+            </button>
+          ) : (
+            <div className="size-10 rounded-md border border-dashed border-base-200 flex items-center justify-center bg-base-50">
+              <ImageIcon className="size-3.5 text-base-300" />
+            </div>
           )}
         </TableCell>
       )}
@@ -410,6 +454,27 @@ const ScopeItemRow = memo(function ScopeItemRow({
               </span>
             )}
           </div>
+        </TableCell>
+      )}
+      {isColumnVisible("floor") && (
+        <TableCell className="text-sm text-muted-foreground">
+          {item.area_id && areaMap.get(item.area_id)?.floor || <span className="text-base-300">—</span>}
+        </TableCell>
+      )}
+      {isColumnVisible("area_code") && (
+        <TableCell>
+          {item.area_id && areaMap.get(item.area_id) ? (
+            <Badge variant="outline" className="font-mono text-xs">
+              {areaMap.get(item.area_id)!.area_code}
+            </Badge>
+          ) : (
+            <span className="text-sm text-base-300">—</span>
+          )}
+        </TableCell>
+      )}
+      {isColumnVisible("area_name") && (
+        <TableCell className="text-sm">
+          {item.area_id && areaMap.get(item.area_id)?.name || <span className="text-base-300">—</span>}
         </TableCell>
       )}
       {isColumnVisible("path") && (
@@ -784,7 +849,9 @@ function organizeHierarchically(items: ScopeItem[]): HierarchicalScopeItem[] {
   return result;
 }
 
-export function ScopeItemsTable({ projectId, items, materials, currency = "TRY", isClient = false, userRole = "pm" }: ScopeItemsTableProps) {
+const EMPTY_AREAS: AreaOption[] = [];
+
+export function ScopeItemsTable({ projectId, items, materials, areas = EMPTY_AREAS, currency = "TRY", isClient = false, userRole = "pm" }: ScopeItemsTableProps) {
   const { isMobile } = useBreakpoint();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -797,9 +864,15 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
   // Filter state for scope items
   const [filters, setFilters] = useState<ScopeItemsFilters>(defaultFilters);
 
+  // Area lookup map for resolving area_id → area_code
+  const areaMap = useMemo(() => new Map(areas.map((a) => [a.id, a])), [areas]);
+
   // Sheet state (merged view + edit)
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+
+  // Image lightbox state
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   // Load column visibility from localStorage on mount
   useEffect(() => {
@@ -890,7 +963,7 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
   // Before: Recalculated on every render
   // After:  Only recalculated when items or filters change
   // ============================================================================
-  const filteredItems = useMemo(() => applyFilters(items, filters), [items, filters]);
+  const filteredItems = useMemo(() => applyFilters(items, filters, areas), [items, filters, areas]);
   const hierarchicalItems = useMemo(() => organizeHierarchically(filteredItems), [filteredItems]);
 
   // ============================================================================
@@ -1273,6 +1346,7 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
         onFiltersChange={setFilters}
         totalCount={items.length}
         filteredCount={filteredItems.length}
+        areas={areas}
         renderExtraAction={isMobile ? undefined : renderColumnsControl}
       />
 
@@ -1417,8 +1491,12 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
                       />
                     </TableHead>
                     {isColumnVisible("row") && <TableHead className="w-[40px] text-center">#</TableHead>}
+                    {isColumnVisible("image") && <TableHead className="w-[50px]">Image</TableHead>}
                     {isColumnVisible("code") && <TableHead>Code</TableHead>}
                     {isColumnVisible("name") && <TableHead>Name</TableHead>}
+                    {isColumnVisible("floor") && <TableHead>Floor</TableHead>}
+                    {isColumnVisible("area_code") && <TableHead>Area Code</TableHead>}
+                    {isColumnVisible("area_name") && <TableHead>Area Name</TableHead>}
                     {isColumnVisible("path") && <TableHead>Path</TableHead>}
                     {isColumnVisible("status") && <TableHead>Status</TableHead>}
                     {isColumnVisible("quantity") && <TableHead className="text-right">Qty</TableHead>}
@@ -1484,11 +1562,13 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
                       projectId={projectId}
                       isColumnVisible={isColumnVisible}
                       formatCurrency={formatCurrency}
+                      areaMap={areaMap}
                       onToggleSelect={toggleSelect}
                       onOpenSplitDialog={openSplitDialog}
                       onOpenDeleteDialog={openDeleteDialog}
                       onEditItem={openItemSheet}
                       onViewItem={openItemSheet}
+                      onImageClick={setLightboxUrl}
                     />
                   ))}
                 </TableBody>
@@ -1499,7 +1579,7 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
         renderCard={(item) => (
           <ScopeItemCard
             key={item.id}
-            item={item}
+            item={{ ...item, area_code: item.area_id ? areaMap.get(item.area_id)?.area_code ?? null : null }}
             isSelected={selectedIds.has(item.id)}
             isClient={isClient}
             formatCurrency={formatCurrency}
@@ -1508,6 +1588,7 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
             onEdit={openItemSheet}
             onSplit={openSplitDialog}
             onDelete={openDeleteDialog}
+            onImageClick={setLightboxUrl}
           />
         )}
       />
@@ -1727,6 +1808,28 @@ export function ScopeItemsTable({ projectId, items, materials, currency = "TRY",
           userRole={userRole as "admin" | "pm" | "production" | "procurement" | "management" | "client"}
         />
       )}
+
+      {/* Image Lightbox Dialog */}
+      <Dialog open={!!lightboxUrl} onOpenChange={(open) => !open && setLightboxUrl(null)}>
+        <DialogContent className="max-w-3xl p-2">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Image Preview</DialogTitle>
+            <DialogDescription>Full-size scope item image</DialogDescription>
+          </DialogHeader>
+          {lightboxUrl && (
+            <div className="relative w-full aspect-square max-h-[80vh]">
+              <Image
+                src={lightboxUrl}
+                alt="Scope item image"
+                fill
+                unoptimized
+                sizes="(max-width: 768px) 100vw, 768px"
+                className="object-contain rounded-md"
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

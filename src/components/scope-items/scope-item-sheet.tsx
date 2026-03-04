@@ -41,8 +41,10 @@ import {
   CheckCircleIcon,
   DownloadIcon,
   FileTextIcon,
+  MapPinIcon,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { getProjectAreas, type ProjectArea } from "@/lib/actions/project-areas";
 import { ScopeItemImageUpload } from "@/components/scope-items/scope-item-image-upload";
 import { InstallationStatusEditor } from "@/components/scope-items/installation-status-editor";
 import { InstallationStartedEditor } from "@/components/scope-items/installation-started-editor";
@@ -170,6 +172,9 @@ export function ScopeItemSheet({
   // Clients can only view, never edit
   const isViewOnly = isClient;
 
+  // Project areas for dropdown
+  const [areas, setAreas] = useState<ProjectArea[]>([]);
+
   // Form state
   const [formData, setFormData] = useState({
     item_code: "",
@@ -183,6 +188,7 @@ export function ScopeItemSheet({
     item_path: "production",
     status: "pending",
     notes: "",
+    area_id: "",
   });
   // Store original initial costs (read-only after creation)
   const [initialCostLocked, setInitialCostLocked] = useState({
@@ -203,12 +209,15 @@ export function ScopeItemSheet({
   const [drawing, setDrawing] = useState<Drawing | null>(null);
   const [materials, setMaterials] = useState<Material[]>([]);
 
-  // Fetch item data when editing
+  // Fetch areas and item data when sheet opens
   useEffect(() => {
-    if (open && itemId) {
-      fetchItemData(itemId);
-    } else if (open && !itemId) {
-      resetForm();
+    if (open) {
+      getProjectAreas(projectId).then(setAreas);
+      if (itemId) {
+        fetchItemData(itemId);
+      } else {
+        resetForm();
+      }
     }
   }, [open, itemId]);
 
@@ -225,6 +234,7 @@ export function ScopeItemSheet({
       item_path: "production",
       status: "pending",
       notes: "",
+      area_id: "",
     });
     setInitialCostLocked({ unit_cost: null, total_cost: null });
     setImages([]);
@@ -254,7 +264,8 @@ export function ScopeItemSheet({
             initial_unit_cost, initial_total_cost, actual_unit_cost, actual_total_cost,
             unit_sales_price, total_sales_price, item_path, status,
             notes, images, production_percentage, is_shipped, shipped_at,
-            is_installation_started, installation_started_at, is_installed, installed_at
+            is_installation_started, installation_started_at, is_installed, installed_at,
+            area_id
           `)
           .eq("id", id)
           .single(),
@@ -272,7 +283,7 @@ export function ScopeItemSheet({
       if (itemResult.error) throw itemResult.error;
 
       if (itemResult.data) {
-        const item = itemResult.data as ScopeItemData;
+        const item = itemResult.data as ScopeItemData & { area_id?: string | null };
         setFormData({
           item_code: item.item_code || "",
           name: item.name || "",
@@ -285,6 +296,7 @@ export function ScopeItemSheet({
           item_path: item.item_path || "production",
           status: item.status || "pending",
           notes: item.notes || "",
+          area_id: item.area_id || "",
         });
         // Lock initial costs - they're read-only after creation
         setInitialCostLocked({
@@ -383,6 +395,7 @@ export function ScopeItemSheet({
             status: formData.status as ItemStatus,
             notes: formData.notes.trim() || null,
             images: images.length > 0 ? images : null,
+            area_id: formData.area_id || null,
           };
 
           const { error } = await supabase
@@ -412,6 +425,7 @@ export function ScopeItemSheet({
             status: formData.status as ItemStatus,
             notes: formData.notes.trim() || null,
             images: images.length > 0 ? images : null,
+            area_id: formData.area_id || null,
           };
 
           const { error } = await supabase.from("scope_items").insert(insertData);
@@ -571,6 +585,52 @@ export function ScopeItemSheet({
                   </Select>
                 </div>
               </div>
+
+              {/* Area Assignment */}
+              {areas.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium flex items-center gap-1.5">
+                    <MapPinIcon className="size-3.5 text-muted-foreground" />
+                    Area
+                  </Label>
+                  <Select
+                    value={formData.area_id || "none"}
+                    onValueChange={(value) => handleChange("area_id", value === "none" ? "" : value)}
+                    disabled={isViewOnly}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="No area assigned" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">
+                        <span className="text-muted-foreground">No area</span>
+                      </SelectItem>
+                      {(() => {
+                        // Group areas by floor
+                        const floorGroups = new Map<string, typeof areas>();
+                        for (const area of areas) {
+                          const group = floorGroups.get(area.floor) ?? [];
+                          group.push(area);
+                          floorGroups.set(area.floor, group);
+                        }
+                        return Array.from(floorGroups.entries()).map(([floor, floorAreas]) => (
+                          <div key={floor}>
+                            <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                              {floor}
+                            </div>
+                            {floorAreas.map((area) => (
+                              <SelectItem key={area.id} value={area.id}>
+                                <span className="font-mono text-xs text-muted-foreground mr-1.5">{area.area_code}</span>
+                                {area.name}
+                              </SelectItem>
+                            ))}
+                          </div>
+                        ));
+                      })()}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               {/* Unit & Quantity */}
               <div className="grid grid-cols-2 gap-4">

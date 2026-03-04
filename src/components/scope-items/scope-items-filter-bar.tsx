@@ -27,6 +27,7 @@ import {
   TruckIcon,
   WrenchIcon,
   CheckCircle2Icon,
+  MapPinIcon,
 } from "lucide-react";
 
 // ============================================================================
@@ -52,6 +53,8 @@ export interface ScopeItemsFilters {
   status: ItemStatus[];
   path: ItemPath;
   delivery: DeliveryFilter;
+  floor: string; // "all" or a floor name
+  area: string; // "all" or an area_id
 }
 
 export const defaultFilters: ScopeItemsFilters = {
@@ -59,6 +62,8 @@ export const defaultFilters: ScopeItemsFilters = {
   status: [],
   path: "all",
   delivery: "all",
+  floor: "all",
+  area: "all",
 };
 
 // ============================================================================
@@ -94,11 +99,19 @@ const deliveryOptions: { value: DeliveryFilter; label: string; icon: React.React
 // FILTER BAR COMPONENT
 // ============================================================================
 
+export interface AreaOption {
+  id: string;
+  area_code: string;
+  name: string;
+  floor: string;
+}
+
 interface ScopeItemsFilterBarProps {
   filters: ScopeItemsFilters;
   onFiltersChange: (filters: ScopeItemsFilters) => void;
   totalCount: number;
   filteredCount: number;
+  areas?: AreaOption[];
   renderExtraAction?: () => React.ReactNode;
   className?: string;
 }
@@ -121,6 +134,7 @@ export function ScopeItemsFilterBar({
   onFiltersChange,
   totalCount,
   filteredCount,
+  areas,
   renderExtraAction,
   className,
 }: ScopeItemsFilterBarProps) {
@@ -141,6 +155,8 @@ export function ScopeItemsFilterBar({
     if (filters.status.length > 0) count++;
     if (filters.path !== "all") count++;
     if (filters.delivery !== "all") count++;
+    if (filters.floor !== "all") count++;
+    if (filters.area !== "all") count++;
     return count;
   }, [filters]);
 
@@ -304,6 +320,61 @@ export function ScopeItemsFilterBar({
                   ))}
                 </div>
               </div>
+
+              {areas && areas.length > 0 && (
+                <>
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-medium">Floor</h4>
+                    <div className="grid grid-cols-1 gap-2">
+                      <Button
+                        variant={draftFilters.floor === "all" ? "default" : "outline"}
+                        size="sm"
+                        className="justify-start gap-2 h-10"
+                        onClick={() => updateDraftFilter("floor", "all")}
+                      >
+                        All Floors
+                      </Button>
+                      {[...new Set(areas.map((a) => a.floor))].map((floor) => (
+                        <Button
+                          key={floor}
+                          variant={draftFilters.floor === floor ? "default" : "outline"}
+                          size="sm"
+                          className="justify-start gap-2 h-10"
+                          onClick={() => updateDraftFilter("floor", floor)}
+                        >
+                          {floor}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-medium">Area</h4>
+                    <div className="grid grid-cols-1 gap-2">
+                      <Button
+                        variant={draftFilters.area === "all" ? "default" : "outline"}
+                        size="sm"
+                        className="justify-start gap-2 h-10"
+                        onClick={() => updateDraftFilter("area", "all")}
+                      >
+                        All Areas
+                      </Button>
+                      {areas.map((area) => (
+                        <Button
+                          key={area.id}
+                          variant={draftFilters.area === area.id ? "default" : "outline"}
+                          size="sm"
+                          className="justify-start gap-2 h-10"
+                          onClick={() => updateDraftFilter("area", area.id)}
+                        >
+                          <span className="font-mono text-xs">{area.area_code}</span>
+                          {area.name}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="sticky bottom-0 mt-6 flex items-center gap-2 bg-background pt-3">
@@ -461,6 +532,87 @@ export function ScopeItemsFilterBar({
           </DropdownMenuContent>
         </DropdownMenu>
 
+        {/* Floor filter dropdown */}
+        {areas && areas.length > 0 && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className={cn(
+                  "h-9 gap-2",
+                  filters.floor !== "all" && "border-primary/50 bg-primary/5"
+                )}
+              >
+                {filters.floor === "all" ? "Floor" : filters.floor}
+                <ChevronDownIcon className="h-3 w-3 opacity-60" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-[180px]">
+              <DropdownMenuItem
+                onClick={() => updateFilter("floor", "all")}
+                className={cn(filters.floor === "all" && "bg-primary/10")}
+              >
+                All Floors
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {[...new Set(areas.map((a) => a.floor))].map((floor) => (
+                <DropdownMenuItem
+                  key={floor}
+                  onClick={() => updateFilter("floor", floor)}
+                  className={cn(filters.floor === floor && "bg-primary/10")}
+                >
+                  {floor}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+
+        {/* Area filter dropdown */}
+        {areas && areas.length > 0 && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className={cn(
+                  "h-9 gap-2",
+                  filters.area !== "all" && "border-primary/50 bg-primary/5"
+                )}
+              >
+                <MapPinIcon className="h-4 w-4" />
+                {filters.area === "all"
+                  ? "Area"
+                  : areas.find(a => a.id === filters.area)?.area_code || "Area"}
+                <ChevronDownIcon className="h-3 w-3 opacity-60" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-[200px]">
+              <DropdownMenuItem
+                onClick={() => updateFilter("area", "all")}
+                className={cn(filters.area === "all" && "bg-primary/10")}
+              >
+                All Areas
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {areas.map((area) => (
+                <DropdownMenuItem
+                  key={area.id}
+                  onClick={() => updateFilter("area", area.id)}
+                  className={cn(
+                    "gap-2",
+                    filters.area === area.id && "bg-primary/10"
+                  )}
+                >
+                  <span className="font-mono text-xs text-muted-foreground">{area.area_code}</span>
+                  {area.name}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+
         {renderExtraAction && renderExtraAction()}
 
         {/* Clear all filters */}
@@ -541,6 +693,29 @@ export function ScopeItemsFilterBar({
               <XIcon className="h-3 w-3 ml-1" />
             </Badge>
           )}
+
+          {filters.floor !== "all" && (
+            <Badge
+              variant="secondary"
+              className="gap-1 cursor-pointer hover:bg-base-200"
+              onClick={() => updateFilter("floor", "all")}
+            >
+              {filters.floor}
+              <XIcon className="h-3 w-3 ml-1" />
+            </Badge>
+          )}
+
+          {filters.area !== "all" && areas && (
+            <Badge
+              variant="secondary"
+              className="gap-1 cursor-pointer hover:bg-base-200"
+              onClick={() => updateFilter("area", "all")}
+            >
+              <MapPinIcon className="h-3 w-3" />
+              {areas.find((a) => a.id === filters.area)?.area_code || "Area"}
+              <XIcon className="h-3 w-3 ml-1" />
+            </Badge>
+          )}
         </div>
       )}
     </div>
@@ -559,10 +734,12 @@ interface ScopeItemForFiltering {
   is_shipped: boolean;
   is_installation_started: boolean;
   is_installed: boolean;
+  area_id: string | null;
 }
 
 /**
  * Applies filters to an array of scope items.
+ * Pass `areas` when using floor/area filters so the function can resolve area_id → floor.
  * Used in conjunction with ScopeItemsFilterBar.
  *
  * @example
@@ -570,8 +747,14 @@ interface ScopeItemForFiltering {
  */
 export function applyFilters<T extends ScopeItemForFiltering>(
   items: T[],
-  filters: ScopeItemsFilters
+  filters: ScopeItemsFilters,
+  areas?: AreaOption[]
 ): T[] {
+  // Build area_id → floor lookup for floor filtering
+  const areaFloorMap = areas
+    ? new Map(areas.map((a) => [a.id, a.floor]))
+    : new Map<string, string>();
+
   return items.filter((item) => {
     // Search filter (case-insensitive)
     if (filters.search) {
@@ -588,6 +771,17 @@ export function applyFilters<T extends ScopeItemForFiltering>(
 
     // Status filter (any of selected statuses)
     if (filters.status.length > 0 && !filters.status.includes(item.status as ItemStatus)) {
+      return false;
+    }
+
+    // Floor filter
+    if (filters.floor !== "all") {
+      const itemFloor = item.area_id ? areaFloorMap.get(item.area_id) : null;
+      if (itemFloor !== filters.floor) return false;
+    }
+
+    // Area filter
+    if (filters.area !== "all" && item.area_id !== filters.area) {
       return false;
     }
 

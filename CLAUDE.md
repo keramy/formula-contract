@@ -82,11 +82,13 @@ docs/                 # Extended documentation (see "Documentation Map" below)
 
 ## Database Schema
 
-19 tables total. See `docs/DATABASE.md` for full field definitions.
+25 tables total. See `docs/DATABASE.md` for full field definitions.
 
 **Core:** `users`, `clients`, `projects`, `scope_items`, `drawings`, `drawing_revisions`, `materials`, `reports`, `report_lines`, `project_timelines`, `timeline_dependencies`
 
 **Supporting:** `project_assignments`, `item_materials`, `milestones`, `snagging`, `notifications`, `activity_log`, `drafts`, `report_shares`
+
+**CRM (Sales):** `crm_brands`, `crm_architecture_firms`, `crm_contacts`, `crm_opportunities`, `crm_activities`, `crm_brand_firm_links`
 
 ### Admin Views (for Supabase Studio browsing)
 Instead of browsing raw tables with UUID foreign keys, use these `v_*` views to see human-readable project/item context:
@@ -104,6 +106,9 @@ Instead of browsing raw tables with UUID foreign keys, use these `v_*` views to 
 | `v_project_assignments` | Assignments + names | `project_code`, `employee_code`, `user_role` |
 | `v_clients` | Clients + project count | `client_code`, `company_name`, `project_count` |
 | `v_users` | Users + assignment count | `employee_code`, `role`, `assigned_projects` |
+| `v_crm_brands` | Brands + opportunity/activity counts | `brand_code`, `name`, `tier`, `opportunity_count` |
+| `v_crm_opportunities` | Opportunities + brand/firm/user names | `opportunity_code`, `brand_name`, `firm_name`, `stage` |
+| `v_crm_activities` | Activities + all relation names | `activity_type`, `brand_name`, `firm_name`, `contact_name` |
 
 ### Key Enums
 ```
@@ -226,6 +231,8 @@ scope-items/{project_id}/{item_id}/image_1.jpg
 13. **Timeline migration 045 applied** - `045_gantt_rewrite.sql` has been run on Supabase
     **Admin views migration 047 applied** - `047_admin_views_scope_drawings_materials.sql` has been run on Supabase
     **PM assignment RLS fix migration 048** - `048_fix_pm_assignment_privilege_escalation.sql` — PMs can only manage assignments for projects they're already assigned to
+    **CRM module migration 049 applied** - `049_crm_module.sql` — 6 tables, sequences, auto-code triggers, RLS, indexes, 3 admin views
+    **CRM seed data migration 050 applied** - `050_crm_seed_data.sql` — 37 brands, 12 firms, 18 links, 5 opportunities
 14. **Adjacent panel alignment** - Both header wrappers must set explicit `height` + `box-border`
 15. **Storage paths MUST start with `{projectId}/`** - Migration 040 enforces this via RLS
 16. **Use `useBreakpoint()` not `useIsMobile()`** - Old hook deprecated, use `use-media-query.ts`
@@ -233,6 +240,9 @@ scope-items/{project_id}/{item_id}/image_1.jpg
 18. **Views need `security_invoker`** - Always use `DROP VIEW + CREATE VIEW WITH (security_invoker = true)`, not `CREATE OR REPLACE VIEW` (defaults to SECURITY DEFINER, bypasses RLS)
 19. **Browse `v_*` views, not raw tables** - In Supabase Studio, use `v_scope_items` instead of `scope_items` to see `project_code`/`project_name` next to each record
 20. **PM override uses server action** - `overrideDrawingApproval()` in `lib/actions/drawings.ts` enforces reason validation server-side; never bypass with inline Supabase calls
+27. **CRM auto-code inserts need `as any`** - `brand_code`, `firm_code`, `contact_code`, `opportunity_code` are NOT NULL without DEFAULT (trigger fills them), so TypeScript types require them on insert. Use `as any` on the insert payload.
+28. **CRM form types use `z.input<>` not `z.infer<>`** - When a Zod schema uses `.default()`, `z.infer` marks the field as required (output) but `zodResolver` works with the input type where defaults are optional. All CRM `FormData` types use `z.input<typeof schema>`.
+29. **CRM access roles** - admin = read/write, management = read-only, others (including pm) = no access. Server actions use `requireCrmAccess(["admin"])` for writes, default `["admin", "management"]` for reads.
 
 ### React Code Health (React Doctor score: 92/100)
 21. **Never define components inside other components** - Nested components get recreated every render, destroying state and killing performance. Extract to module scope or a separate file with explicit props.
@@ -276,10 +286,12 @@ npm run version:major   # 1.0.0 → 2.0.0 (breaking changes)
 
 ---
 
-## Current Status (Feb 2026)
+## Current Status (Mar 2026)
 
 ### Recently Completed
+- CRM Module (Feb 27, 2026): Full sales CRM — 6 tables, 37 brands, 12 firms, pipeline kanban, contacts, activities timeline. Routes: `/crm/*` for admin/pm/management.
 - React Doctor code health audit: score improved from 76 → 92/100 (deleted 47 dead files, fixed 6 errors, 460 warnings reduced)
+- CRM UI Polish (Mar 2, 2026): Migrated all 6 CRM pages to `usePageHeader()` AppHeader pattern, replaced `<Loader2Icon>` spinners with `<Skeleton>` loading states, added timeline dots, polished kanban cards/columns, improved detail page typography with `GradientIcon` section headers. 9 files modified, zero new files.
 
 ### In Progress
 - Gantt chart UI polish (migration 045 applied, data is live)

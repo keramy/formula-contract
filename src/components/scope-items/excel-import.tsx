@@ -28,6 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { UploadIcon, FileSpreadsheetIcon, AlertTriangleIcon, CheckCircleIcon, XCircleIcon, RefreshCwIcon, GitMergeIcon } from "lucide-react";
 import { parseScopeItemsExcel, type ParseResult, type ParsedScopeItem } from "@/lib/excel-template";
 import { clearProjectScopeItems } from "@/lib/actions/scope-items";
+import { bulkGetOrCreateAreas } from "@/lib/actions/project-areas";
 import { logActivity } from "@/lib/activity-log/actions";
 import { ACTIVITY_ACTIONS } from "@/lib/activity-log/constants";
 import type { ScopeItemInsert } from "@/types/database";
@@ -138,6 +139,29 @@ export function ExcelImport({ projectId, projectCode, compact = false }: ExcelIm
         results.deleted = clearResult.data?.deletedCount || existingItemsCount;
       }
 
+      // Bulk get-or-create areas from parsed items
+      let areaCodeToId = new Map<string, string>();
+      const uniqueAreas = new Map<string, { area_code: string; area_name: string; floor: string }>();
+      for (const item of parseResult.items) {
+        if (item.area_code) {
+          const code = item.area_code.toUpperCase();
+          if (!uniqueAreas.has(code)) {
+            uniqueAreas.set(code, {
+              area_code: code,
+              area_name: item.area_name || code, // fallback to code as name
+              floor: item.floor || "Unspecified",
+            });
+          }
+        }
+      }
+
+      if (uniqueAreas.size > 0) {
+        const areasResult = await bulkGetOrCreateAreas(projectId, Array.from(uniqueAreas.values()));
+        if (areasResult.success && areasResult.data) {
+          areaCodeToId = areasResult.data;
+        }
+      }
+
       // Import items one by one with upsert logic
       for (const item of parseResult.items) {
         try {
@@ -150,9 +174,14 @@ export function ExcelImport({ projectId, projectCode, compact = false }: ExcelIm
             .eq("is_deleted", false)
             .single();
 
+          // Resolve area_id from the code map
+          const resolvedAreaId = item.area_code
+            ? areaCodeToId.get(item.area_code.toUpperCase()) ?? null
+            : null;
+
           if (existing) {
             // UPDATE existing item - preserve initial costs (locked baseline), path, status
-            // Only update: name, description, unit, quantity, sales prices
+            // Only update: name, description, unit, quantity, sales prices, area_id
             // NOTE: initial_unit_cost and initial_total_cost are NEVER updated
             const { error: updateError } = await supabase
               .from("scope_items")
@@ -165,6 +194,8 @@ export function ExcelImport({ projectId, projectCode, compact = false }: ExcelIm
                 unit_sales_price: item.unit_sales_price,
                 total_sales_price: item.unit_sales_price ? item.unit_sales_price * item.quantity : null,
                 notes: item.notes,
+                // Update area assignment if provided
+                ...(resolvedAreaId !== null ? { area_id: resolvedAreaId } : {}),
               })
               .eq("id", existing.id);
 
@@ -194,6 +225,8 @@ export function ExcelImport({ projectId, projectCode, compact = false }: ExcelIm
               item_path: item.item_path,
               status: item.status,
               notes: item.notes,
+              // Area assignment
+              area_id: resolvedAreaId,
             };
 
             const { error: insertError } = await supabase
@@ -444,6 +477,7 @@ export function ExcelImport({ projectId, projectCode, compact = false }: ExcelIm
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-[60px]">Area</TableHead>
                       <TableHead className="w-[100px]">Code</TableHead>
                       <TableHead>Name</TableHead>
                       <TableHead className="w-[60px]">Qty</TableHead>
@@ -455,6 +489,15 @@ export function ExcelImport({ projectId, projectCode, compact = false }: ExcelIm
                   <TableBody>
                     {parseResult.items.map((item, i) => (
                       <TableRow key={i}>
+                        <TableCell>
+                          {item.area_code ? (
+                            <Badge variant="outline" className="text-[10px] font-mono">
+                              {item.area_code}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
                         <TableCell className="font-mono text-sm">{item.item_code}</TableCell>
                         <TableCell className="max-w-[150px] truncate">{item.name}</TableCell>
                         <TableCell>{item.quantity}</TableCell>

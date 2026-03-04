@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -15,6 +16,7 @@ import { GlassCard } from "@/components/ui/ui-helpers";
 import {
   CheckCircle2Icon,
   FactoryIcon,
+  ImageIcon,
   MoreHorizontalIcon,
   PackageIcon,
   PencilIcon,
@@ -25,7 +27,7 @@ import {
   WrenchIcon,
 } from "lucide-react";
 
-interface ScopeItemCardData {
+export interface ScopeItemCardData {
   id: string;
   item_code: string;
   name: string;
@@ -40,6 +42,8 @@ interface ScopeItemCardData {
   is_installed: boolean;
   isChild: boolean;
   displayRowNumber: string;
+  area_code?: string | null;
+  images?: string[] | null;
 }
 
 interface ScopeItemCardProps<T extends ScopeItemCardData> {
@@ -52,6 +56,7 @@ interface ScopeItemCardProps<T extends ScopeItemCardData> {
   onEdit: (item: T) => void;
   onSplit: (item: T) => void;
   onDelete: (item: T) => void;
+  onImageClick?: (url: string) => void;
 }
 
 const statusLabels: Record<string, string> = {
@@ -94,8 +99,10 @@ export function ScopeItemCard<T extends ScopeItemCardData>({
   onEdit,
   onSplit,
   onDelete,
+  onImageClick,
 }: ScopeItemCardProps<T>) {
   const progress = getCombinedProgress(item);
+  const firstImage = item.images?.[0] ?? null;
 
   return (
     <GlassCard className="p-2.5 space-y-2">
@@ -103,11 +110,36 @@ export function ScopeItemCard<T extends ScopeItemCardData>({
         {!isClient && (
           <Checkbox checked={isSelected} onCheckedChange={() => onToggleSelect(item.id)} className="mt-0.5" />
         )}
+        {/* Thumbnail */}
+        {firstImage ? (
+          <button
+            onClick={() => onImageClick?.(firstImage)}
+            className="shrink-0 rounded-md overflow-hidden border border-base-200 hover:border-primary/40 transition-colors cursor-pointer"
+          >
+            <Image
+              src={firstImage}
+              alt={item.name}
+              width={48}
+              height={48}
+              unoptimized
+              className="size-12 object-cover"
+            />
+          </button>
+        ) : (
+          <div className="shrink-0 size-12 rounded-md border border-dashed border-base-200 flex items-center justify-center bg-base-50">
+            <ImageIcon className="size-4 text-base-300" />
+          </div>
+        )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 min-w-0">
             <p className="font-mono text-[11px] text-muted-foreground leading-none shrink-0">
               {item.isChild ? `↳ ${item.displayRowNumber}` : item.item_code}
             </p>
+            {item.area_code && (
+              <Badge variant="outline" className="h-4 px-1 text-[9px] font-mono text-muted-foreground shrink-0">
+                {item.area_code}
+              </Badge>
+            )}
             <Badge
               variant="secondary"
               className={`h-4 px-1.5 text-[10px] font-medium ${statusColors[item.status] || "bg-gray-100 text-gray-800"}`}

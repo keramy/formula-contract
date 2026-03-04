@@ -14,6 +14,9 @@ async function getXLSX() {
 type XLSXModule = typeof import("xlsx");
 
 export const SCOPE_ITEMS_COLUMNS = [
+  "floor",
+  "area_name",
+  "area_code",
   "item_code",
   "name",
   "description",
@@ -27,17 +30,23 @@ export const SCOPE_ITEMS_COLUMNS = [
 export type ScopeItemColumn = (typeof SCOPE_ITEMS_COLUMNS)[number];
 
 export const SCOPE_ITEMS_EXAMPLE_ROW: Record<ScopeItemColumn, string> = {
-  item_code: "ITEM-001",
-  name: "Reception Desk",
-  description: "Main entrance reception desk with storage",
+  floor: "Floor 1",
+  area_name: "Master Bedroom",
+  area_code: "MB",
+  item_code: "MB-001",
+  name: "Wardrobe",
+  description: "Built-in wardrobe with sliding doors",
   unit: "pcs",
   quantity: "1",
   initial_unit_cost: "3500",
   unit_sales_price: "5000",
-  notes: "Include cable management",
+  notes: "Include internal LED lighting",
 };
 
 export const SCOPE_ITEMS_HEADER_DESCRIPTIONS: Record<ScopeItemColumn, string> = {
+  floor: "Floor name (e.g., Floor 1, Ground Floor). Optional.",
+  area_name: "Room/area name (e.g., Master Bedroom, Kitchen). Optional.",
+  area_code: "Short area code (e.g., MB, KT). Optional — lookup key for area assignment.",
   item_code: "Unique item identifier (e.g., ITEM-001)",
   name: "Item name (required)",
   description: "Optional description",
@@ -72,6 +81,10 @@ export interface ParsedScopeItem {
   item_path: (typeof VALID_ITEM_PATHS)[number];
   status: (typeof VALID_STATUSES)[number];
   notes: string | null;
+  // Area fields (optional — for linking to project areas)
+  floor: string | null;
+  area_name: string | null;
+  area_code: string | null;
 }
 
 export interface ParseResult {
@@ -97,6 +110,9 @@ export async function generateScopeItemsExcel() {
 
   // Set column widths
   dataSheet["!cols"] = [
+    { wch: 15 }, // floor
+    { wch: 20 }, // area_name
+    { wch: 12 }, // area_code
     { wch: 15 }, // item_code
     { wch: 25 }, // name
     { wch: 40 }, // description
@@ -114,6 +130,9 @@ export async function generateScopeItemsExcel() {
     ["Scope Items Import Template - Instructions"],
     [""],
     ["Column", "Description", "Required", "Valid Values"],
+    ["floor", "Floor name for area grouping", "No", "Any text (e.g., Floor 1, Ground Floor)"],
+    ["area_name", "Room/area name", "No", "Any text (e.g., Master Bedroom, Kitchen)"],
+    ["area_code", "Short area code (lookup key)", "No", "Short text (e.g., MB, KT, LR)"],
     ["item_code", "Unique identifier for the item", "Yes", "Any text (e.g., ITEM-001)"],
     ["name", "Name of the item", "Yes", "Any text"],
     ["description", "Detailed description", "No", "Any text"],
@@ -122,6 +141,19 @@ export async function generateScopeItemsExcel() {
     ["initial_unit_cost", "Budgeted cost per unit (set once)", "No", "Number (e.g., 3500)"],
     ["unit_sales_price", "Sale price per unit to client", "No", "Number (e.g., 5000)"],
     ["notes", "Additional notes", "No", "Any text"],
+    [""],
+    ["AREA COLUMNS:"],
+    ["- If area_code is provided, the item will be linked to that area"],
+    ["- If the area doesn't exist, it will be auto-created using floor + area_name + area_code"],
+    ["- area_name is recommended when area_code is provided (for auto-creation)"],
+    ["- Multiple items can share the same area_code to group them together"],
+    [""],
+    ["Example:"],
+    ["floor", "area_name", "area_code", "item_code", "name"],
+    ["Floor 1", "Master Bedroom", "MB", "MB-001", "Wardrobe"],
+    ["Floor 1", "Master Bedroom", "MB", "MB-002", "Nightstand"],
+    ["Floor 1", "Kitchen", "KT", "KT-001", "Island"],
+    ["Floor 2", "Bedroom 2", "BD2", "BD2-001", "Desk"],
     [""],
     ["IMPORTANT:"],
     ["- item_code and name are required fields"],
@@ -134,10 +166,11 @@ export async function generateScopeItemsExcel() {
   ];
   const instructionSheet = XLSX.utils.aoa_to_sheet(instructionRows);
   instructionSheet["!cols"] = [
-    { wch: 15 },
+    { wch: 18 },
     { wch: 40 },
-    { wch: 10 },
-    { wch: 60 },
+    { wch: 12 },
+    { wch: 40 },
+    { wch: 30 },
   ];
   XLSX.utils.book_append_sheet(workbook, instructionSheet, "Instructions");
 
@@ -220,6 +253,19 @@ export async function parseScopeItemsExcel(file: ArrayBuffer): Promise<ParseResu
       }
       seenItemCodes.set(itemCode, rowNum);
 
+      // Parse area fields (optional)
+      const areaCode = row.area_code ? String(row.area_code).trim().toUpperCase() : null;
+      const areaName = row.area_name ? String(row.area_name).trim() : null;
+      const floor = row.floor ? String(row.floor).trim() : null;
+
+      // Warn if area_code is provided without area_name (needed for auto-creation)
+      if (areaCode && !areaName) {
+        warnings.push({
+          row: rowNum,
+          message: `area_code "${areaCode}" provided without area_name — area will be created with code as name if it doesn't exist`,
+        });
+      }
+
       // Parse and validate each field
       const item: ParsedScopeItem = {
         item_code: itemCode,
@@ -232,6 +278,9 @@ export async function parseScopeItemsExcel(file: ArrayBuffer): Promise<ParseResu
         item_path: parseItemPath(row.item_path, rowNum, warnings),
         status: parseStatus(row.status, rowNum, warnings),
         notes: row.notes ? String(row.notes).trim() : null,
+        floor,
+        area_name: areaName,
+        area_code: areaCode,
       };
 
       // Validate item_code length
@@ -394,9 +443,16 @@ export interface ExportScopeItem {
   status: string;
   production_percentage: number;
   notes: string | null;
+  // Area fields (resolved from joined data)
+  floor: string | null;
+  area_name: string | null;
+  area_code: string | null;
 }
 
 const EXPORT_COLUMNS = [
+  "floor",
+  "area_name",
+  "area_code",
   "item_code",
   "name",
   "description",
@@ -415,6 +471,9 @@ const EXPORT_COLUMNS = [
 ];
 
 const EXPORT_HEADERS = [
+  "Floor",
+  "Area Name",
+  "Area Code",
   "Item Code",
   "Name",
   "Description",
@@ -455,6 +514,9 @@ export async function exportScopeItemsExcel(
 
   // Set column widths
   dataSheet["!cols"] = [
+    { wch: 15 }, // floor
+    { wch: 20 }, // area_name
+    { wch: 12 }, // area_code
     { wch: 15 }, // item_code
     { wch: 30 }, // name
     { wch: 40 }, // description
