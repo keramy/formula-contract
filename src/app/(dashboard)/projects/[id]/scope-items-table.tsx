@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useEffect, useCallback, useMemo, memo, useReducer } from "react";
+import { useState, useTransition, useEffect, useCallback, useMemo, memo, useReducer, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -269,6 +269,31 @@ const COLUMNS: ColumnConfig[] = [
 ];
 
 const STORAGE_KEY = "scope-items-visible-columns";
+const COL_WIDTHS_STORAGE_KEY = "scope-items-col-widths";
+
+// Default column widths in pixels
+const DEFAULT_COL_WIDTHS: Record<string, number> = {
+  _checkbox: 40,
+  row: 50,
+  image: 56,
+  code: 120,
+  name: 220,
+  floor: 100,
+  area_code: 100,
+  area_name: 140,
+  path: 90,
+  status: 130,
+  quantity: 80,
+  initial_unit_cost: 100,
+  initial_total_cost: 110,
+  actual_unit_cost: 100,
+  actual_total_cost: 110,
+  unit_sales_price: 100,
+  total_sales_price: 110,
+  progress: 110,
+  installed: 80,
+  _actions: 50,
+};
 
 // Get default visible columns
 const getDefaultVisibleColumns = (): Set<string> => {
@@ -353,6 +378,43 @@ const initialDialogState: DialogState = {
 // PERFORMANCE: Memoized table row component
 // Prevents re-rendering of all rows when only one row changes
 // ============================================================================
+
+// ============================================================================
+// Resizable column header — drag the right edge to resize
+// ============================================================================
+function ResizableHead({
+  columnId,
+  width,
+  onResizeStart,
+  children,
+  className,
+  ...props
+}: {
+  columnId: string;
+  width: number;
+  onResizeStart: (columnId: string, startX: number) => void;
+  children: React.ReactNode;
+  className?: string;
+} & Omit<React.ComponentProps<"th">, "style" | "children" | "className">) {
+  return (
+    <TableHead
+      data-resize-col={columnId}
+      className={`relative select-none ${className || ""}`}
+      style={{ width }}
+      {...props}
+    >
+      {children}
+      <div
+        onMouseDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onResizeStart(columnId, e.clientX);
+        }}
+        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize opacity-0 hover:opacity-100 bg-primary/40 z-10 transition-opacity"
+      />
+    </TableHead>
+  );
+}
 
 interface ScopeItemRowProps {
   item: HierarchicalScopeItem;
@@ -867,6 +929,55 @@ export function ScopeItemsTable({ projectId, items, materials, areas = EMPTY_ARE
   // Area lookup map for resolving area_id → area_code
   const areaMap = useMemo(() => new Map(areas.map((a) => [a.id, a])), [areas]);
 
+  // Column resize state
+  const [colWidths, setColWidths] = useState<Record<string, number>>({});
+  const colWidthsRef = useRef(colWidths);
+  colWidthsRef.current = colWidths;
+
+  const getColWidth = useCallback((id: string) => {
+    return colWidthsRef.current[id] || DEFAULT_COL_WIDTHS[id] || 100;
+  }, []);
+
+  const handleResizeStart = useCallback((columnId: string, startX: number) => {
+    const startWidth = colWidthsRef.current[columnId] || DEFAULT_COL_WIDTHS[columnId] || 100;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const newWidth = Math.max(50, startWidth + (e.clientX - startX));
+      setColWidths(prev => ({ ...prev, [columnId]: newWidth }));
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      setColWidths(prev => {
+        try { localStorage.setItem(COL_WIDTHS_STORAGE_KEY, JSON.stringify(prev)); } catch {}
+        return prev;
+      });
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, []);
+
+  // Total table width = sum of visible column widths
+  const tableWidth = useMemo(() => {
+    const getW = (id: string) => colWidths[id] || DEFAULT_COL_WIDTHS[id] || 100;
+    let total = DEFAULT_COL_WIDTHS._checkbox + DEFAULT_COL_WIDTHS._actions;
+    for (const col of COLUMNS) {
+      if (visibleColumns.has(col.id)) total += getW(col.id);
+    }
+    return total;
+  }, [colWidths, visibleColumns]);
+
+  const resetColWidths = useCallback(() => {
+    setColWidths({});
+    try { localStorage.removeItem(COL_WIDTHS_STORAGE_KEY); } catch {}
+  }, []);
+
   // Sheet state (merged view + edit)
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -874,7 +985,7 @@ export function ScopeItemsTable({ projectId, items, materials, areas = EMPTY_ARE
   // Image lightbox state
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
-  // Load column visibility from localStorage on mount
+  // Load column visibility and widths from localStorage on mount
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -885,6 +996,10 @@ export function ScopeItemsTable({ projectId, items, materials, areas = EMPTY_ARE
     } catch {
       // If localStorage fails, use defaults
     }
+    try {
+      const savedWidths = localStorage.getItem(COL_WIDTHS_STORAGE_KEY);
+      if (savedWidths) setColWidths(JSON.parse(savedWidths));
+    } catch {}
   }, []);
 
   // ============================================================================
@@ -1253,9 +1368,14 @@ export function ScopeItemsTable({ projectId, items, materials, areas = EMPTY_ARE
               </label>
             ))}
           </div>
-          <p className="text-xs text-muted-foreground">
-            Code and Name are always visible
-          </p>
+          <div className="flex items-center justify-between pt-1 border-t border-base-200">
+            <p className="text-xs text-muted-foreground">
+              Code and Name are always visible
+            </p>
+            <Button variant="ghost" size="sm" className="h-6 text-[10px] px-1.5" onClick={resetColWidths}>
+              Reset Widths
+            </Button>
+          </div>
         </div>
       </PopoverContent>
     </Popover>
@@ -1476,10 +1596,10 @@ export function ScopeItemsTable({ projectId, items, materials, areas = EMPTY_ARE
         tableView={(
           <GlassCard className="py-0">
             <div className="overflow-x-auto">
-              <Table>
+              <Table style={{ tableLayout: "fixed", width: tableWidth }} className="[&_td]:overflow-hidden [&_td]:text-ellipsis [&_th]:overflow-hidden">
                 <TableHeader>
                   <TableRow className="hover:bg-transparent border-b border-gray-100">
-                    <TableHead className="w-[40px] py-4">
+                    <TableHead className="w-[40px] py-4" style={{ width: DEFAULT_COL_WIDTHS._checkbox }}>
                       <Checkbox
                         checked={isAllSelected}
                         ref={(el) => {
@@ -1490,67 +1610,67 @@ export function ScopeItemsTable({ projectId, items, materials, areas = EMPTY_ARE
                         onCheckedChange={toggleSelectAll}
                       />
                     </TableHead>
-                    {isColumnVisible("row") && <TableHead className="w-[40px] text-center">#</TableHead>}
-                    {isColumnVisible("image") && <TableHead className="w-[50px]">Image</TableHead>}
-                    {isColumnVisible("code") && <TableHead>Code</TableHead>}
-                    {isColumnVisible("name") && <TableHead>Name</TableHead>}
-                    {isColumnVisible("floor") && <TableHead>Floor</TableHead>}
-                    {isColumnVisible("area_code") && <TableHead>Area Code</TableHead>}
-                    {isColumnVisible("area_name") && <TableHead>Area Name</TableHead>}
-                    {isColumnVisible("path") && <TableHead>Path</TableHead>}
-                    {isColumnVisible("status") && <TableHead>Status</TableHead>}
-                    {isColumnVisible("quantity") && <TableHead className="text-right">Qty</TableHead>}
+                    {isColumnVisible("row") && <ResizableHead columnId="row" width={getColWidth("row")} onResizeStart={handleResizeStart} className="text-center">#</ResizableHead>}
+                    {isColumnVisible("image") && <ResizableHead columnId="image" width={getColWidth("image")} onResizeStart={handleResizeStart}>Image</ResizableHead>}
+                    {isColumnVisible("code") && <ResizableHead columnId="code" width={getColWidth("code")} onResizeStart={handleResizeStart}>Code</ResizableHead>}
+                    {isColumnVisible("name") && <ResizableHead columnId="name" width={getColWidth("name")} onResizeStart={handleResizeStart}>Name</ResizableHead>}
+                    {isColumnVisible("floor") && <ResizableHead columnId="floor" width={getColWidth("floor")} onResizeStart={handleResizeStart}>Floor</ResizableHead>}
+                    {isColumnVisible("area_code") && <ResizableHead columnId="area_code" width={getColWidth("area_code")} onResizeStart={handleResizeStart}>Area Code</ResizableHead>}
+                    {isColumnVisible("area_name") && <ResizableHead columnId="area_name" width={getColWidth("area_name")} onResizeStart={handleResizeStart}>Area Name</ResizableHead>}
+                    {isColumnVisible("path") && <ResizableHead columnId="path" width={getColWidth("path")} onResizeStart={handleResizeStart}>Path</ResizableHead>}
+                    {isColumnVisible("status") && <ResizableHead columnId="status" width={getColWidth("status")} onResizeStart={handleResizeStart}>Status</ResizableHead>}
+                    {isColumnVisible("quantity") && <ResizableHead columnId="quantity" width={getColWidth("quantity")} onResizeStart={handleResizeStart} className="text-right">Qty</ResizableHead>}
                     {isColumnVisible("initial_unit_cost") && (
-                      <TableHead className="text-right text-blue-600">
+                      <ResizableHead columnId="initial_unit_cost" width={getColWidth("initial_unit_cost")} onResizeStart={handleResizeStart} className="text-right text-blue-600">
                         <Tooltip>
                           <TooltipTrigger className="cursor-help underline decoration-dotted underline-offset-2">Init Unit</TooltipTrigger>
                           <TooltipContent>Initial/Budget Unit Cost</TooltipContent>
                         </Tooltip>
-                      </TableHead>
+                      </ResizableHead>
                     )}
                     {isColumnVisible("initial_total_cost") && (
-                      <TableHead className="text-right text-blue-600">
+                      <ResizableHead columnId="initial_total_cost" width={getColWidth("initial_total_cost")} onResizeStart={handleResizeStart} className="text-right text-blue-600">
                         <Tooltip>
                           <TooltipTrigger className="cursor-help underline decoration-dotted underline-offset-2">Init Total</TooltipTrigger>
                           <TooltipContent>Initial/Budget Total Cost (locked)</TooltipContent>
                         </Tooltip>
-                      </TableHead>
+                      </ResizableHead>
                     )}
                     {isColumnVisible("actual_unit_cost") && (
-                      <TableHead className="text-right text-amber-600">
+                      <ResizableHead columnId="actual_unit_cost" width={getColWidth("actual_unit_cost")} onResizeStart={handleResizeStart} className="text-right text-amber-600">
                         <Tooltip>
                           <TooltipTrigger className="cursor-help underline decoration-dotted underline-offset-2">Act Unit</TooltipTrigger>
                           <TooltipContent>Actual Unit Cost (real cost per item)</TooltipContent>
                         </Tooltip>
-                      </TableHead>
+                      </ResizableHead>
                     )}
                     {isColumnVisible("actual_total_cost") && (
-                      <TableHead className="text-right text-amber-600">
+                      <ResizableHead columnId="actual_total_cost" width={getColWidth("actual_total_cost")} onResizeStart={handleResizeStart} className="text-right text-amber-600">
                         <Tooltip>
                           <TooltipTrigger className="cursor-help underline decoration-dotted underline-offset-2">Act Total</TooltipTrigger>
                           <TooltipContent>Actual Total Cost (real cost)</TooltipContent>
                         </Tooltip>
-                      </TableHead>
+                      </ResizableHead>
                     )}
                     {isColumnVisible("unit_sales_price") && (
-                      <TableHead className="text-right text-green-600">
+                      <ResizableHead columnId="unit_sales_price" width={getColWidth("unit_sales_price")} onResizeStart={handleResizeStart} className="text-right text-green-600">
                         <Tooltip>
                           <TooltipTrigger className="cursor-help underline decoration-dotted underline-offset-2">Sale Unit</TooltipTrigger>
                           <TooltipContent>Selling Price per Unit</TooltipContent>
                         </Tooltip>
-                      </TableHead>
+                      </ResizableHead>
                     )}
                     {isColumnVisible("total_sales_price") && (
-                      <TableHead className="text-right text-green-600">
+                      <ResizableHead columnId="total_sales_price" width={getColWidth("total_sales_price")} onResizeStart={handleResizeStart} className="text-right text-green-600">
                         <Tooltip>
                           <TooltipTrigger className="cursor-help underline decoration-dotted underline-offset-2">Sale Total</TooltipTrigger>
                           <TooltipContent>Total Selling Price (unit × qty)</TooltipContent>
                         </Tooltip>
-                      </TableHead>
+                      </ResizableHead>
                     )}
-                    {isColumnVisible("progress") && <TableHead className="w-[100px]">Progress</TableHead>}
-                    {isColumnVisible("installed") && <TableHead className="text-center">Installed</TableHead>}
-                    <TableHead className="w-[50px]"></TableHead>
+                    {isColumnVisible("progress") && <ResizableHead columnId="progress" width={getColWidth("progress")} onResizeStart={handleResizeStart}>Progress</ResizableHead>}
+                    {isColumnVisible("installed") && <ResizableHead columnId="installed" width={getColWidth("installed")} onResizeStart={handleResizeStart} className="text-center">Installed</ResizableHead>}
+                    <TableHead style={{ width: DEFAULT_COL_WIDTHS._actions }}></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
