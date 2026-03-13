@@ -31,6 +31,8 @@ function LoginForm() {
       setError("Your account has been deactivated. Please contact an administrator.");
     } else if (errorParam === "auth_callback_error") {
       setError("Authentication failed. Please try again.");
+    } else if (errorParam === "auth_link_expired") {
+      setError("Your password reset link has expired. Please request a new one.");
     }
   }, [searchParams]);
 
