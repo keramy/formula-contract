@@ -26,7 +26,7 @@ export default function ForgotPasswordPage() {
     setIsLoading(true);
 
     try {
-      const redirectUrl = `${window.location.origin}/auth/callback?next=/reset-password`;
+      const redirectUrl = `${window.location.origin}/auth/confirm`;
       const result = await requestPasswordResetAction(email, redirectUrl);
 
       if (!result.success) {

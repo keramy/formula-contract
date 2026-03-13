@@ -75,13 +75,13 @@ export async function updateSession(request: NextRequest) {
                      pathname.startsWith("/reset-password") ||
                      pathname.startsWith("/setup-password") ||
                      pathname.startsWith("/change-password");
-  const isAuthCallback = pathname.startsWith("/auth/callback");
+  const isAuthRoute = pathname.startsWith("/auth/callback") || pathname.startsWith("/auth/confirm");
   const isPublicPage = pathname === "/";
   const isSetupPassword = pathname.startsWith("/setup-password");
   const isChangePassword = pathname.startsWith("/change-password");
 
-  // Allow auth callback to pass through
-  if (isAuthCallback) {
+  // Allow auth callback/confirm routes to pass through
+  if (isAuthRoute) {
     return supabaseResponse;
   }
 
