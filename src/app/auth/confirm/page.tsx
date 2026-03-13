@@ -3,52 +3,85 @@
 /**
  * Auth Confirm Page (Client-Side)
  *
- * Handles Supabase auth redirects that use hash fragments (#access_token=xxx).
- * This is needed because:
- * - Supabase password recovery uses the implicit flow by default
- * - Implicit flow puts tokens in the URL hash fragment
- * - Hash fragments are browser-only (never sent to the server)
- * - So a server-side Route Handler can't process them
+ * Handles Supabase auth redirects from email links (password reset, invites, etc.)
  *
- * This client-side page extracts tokens from the hash and establishes the session.
+ * With custom SMTP, Supabase email links go through its /verify endpoint, which
+ * redirects here with auth tokens. This page handles BOTH delivery methods:
+ *
+ * 1. PKCE flow: tokens arrive as ?code=xxx query parameter
+ * 2. Implicit flow: tokens arrive as #access_token=xxx hash fragment
+ *
+ * A server-side Route Handler can't see hash fragments, and a client-side page
+ * can exchange PKCE codes too — so this single client page covers both cases.
  */
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Spinner } from "@/components/ui/spinner";
+import { Suspense } from "react";
 
-export default function AuthConfirmPage() {
+function AuthConfirmContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
+    let handled = false;
 
-    // Supabase client library automatically picks up hash fragment tokens
-    // via onAuthStateChange when the page loads
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event) => {
-        if (event === "PASSWORD_RECOVERY") {
-          // User came from a password reset link — redirect to reset-password page
+    async function handleAuth() {
+      // Case 1: PKCE flow — code arrives as a query parameter
+      const code = searchParams.get("code");
+      if (code) {
+        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+        if (exchangeError) {
+          console.error("Code exchange error:", exchangeError);
+          setError("Authentication link is invalid or has expired. Please try again.");
+          return;
+        }
+        // Check what type of auth event this was
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          handled = true;
+          // For password recovery, the user's aud will be "authenticated"
+          // and the recovery flow was just completed
           router.push("/reset-password");
-        } else if (event === "SIGNED_IN") {
-          // Generic sign-in (invite, magic link, etc.)
-          router.push("/dashboard");
+          return;
         }
       }
-    );
 
-    // Fallback: if no auth event fires within 5 seconds, something went wrong
-    const timeout = setTimeout(() => {
-      setError("Authentication link may have expired. Please try again.");
-    }, 5000);
+      // Case 2: Implicit flow — tokens arrive as hash fragment
+      // The Supabase client automatically detects hash fragments on page load
+      // and fires onAuthStateChange events
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        (event) => {
+          if (handled) return;
+          handled = true;
 
-    return () => {
-      subscription.unsubscribe();
-      clearTimeout(timeout);
-    };
-  }, [router]);
+          if (event === "PASSWORD_RECOVERY") {
+            router.push("/reset-password");
+          } else if (event === "SIGNED_IN") {
+            router.push("/dashboard");
+          }
+        }
+      );
+
+      // Fallback: if nothing happens within 5 seconds, show error
+      const timeout = setTimeout(() => {
+        if (!handled) {
+          setError("Authentication link may have expired. Please try again.");
+        }
+      }, 5000);
+
+      return () => {
+        subscription.unsubscribe();
+        clearTimeout(timeout);
+      };
+    }
+
+    handleAuth();
+  }, [router, searchParams]);
 
   if (error) {
     return (
@@ -66,5 +99,18 @@ export default function AuthConfirmPage() {
       <Spinner className="size-8" />
       <p className="text-muted-foreground text-sm">Verifying your link...</p>
     </div>
+  );
+}
+
+export default function AuthConfirmPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center gap-4 min-h-[50vh]">
+        <Spinner className="size-8" />
+        <p className="text-muted-foreground text-sm">Loading...</p>
+      </div>
+    }>
+      <AuthConfirmContent />
+    </Suspense>
   );
 }
