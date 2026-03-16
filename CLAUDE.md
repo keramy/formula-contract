@@ -1,6 +1,6 @@
 # Formula Contract - Project Intelligence
 
-> **Last Updated:** February 26, 2026
+> **Last Updated:** March 13, 2026
 > **Version:** 1.1.0
 > **Supabase Project:** `lsuiaqrpkhejeavsrsqc` (contract-eu, eu-central-1)
 
@@ -243,6 +243,8 @@ scope-items/{project_id}/{item_id}/image_1.jpg
 27. **CRM auto-code inserts need `as any`** - `brand_code`, `firm_code`, `contact_code`, `opportunity_code` are NOT NULL without DEFAULT (trigger fills them), so TypeScript types require them on insert. Use `as any` on the insert payload.
 28. **CRM form types use `z.input<>` not `z.infer<>`** - When a Zod schema uses `.default()`, `z.infer` marks the field as required (output) but `zodResolver` works with the input type where defaults are optional. All CRM `FormData` types use `z.input<typeof schema>`.
 29. **CRM access roles** - admin = read/write, management = read-only, others (including pm) = no access. Server actions use `requireCrmAccess(["admin"])` for writes, default `["admin", "management"]` for reads.
+30. **Supabase email templates must use `token_hash` not `ConfirmationURL`** - Custom SMTP (Resend) email templates must link to `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=recovery&next=/reset-password`. Never use `{{ .ConfirmationURL }}` — it routes through Supabase's `/verify` which uses hash fragments that server-side handlers can't read.
+31. **Auth callback handles both `code` and `token_hash`** - `/auth/callback/route.ts` supports PKCE code exchange AND token_hash OTP verification. `/auth/confirm/route.ts` is a secondary handler for the confirm path.
 
 ### React Code Health (React Doctor score: 92/100)
 21. **Never define components inside other components** - Nested components get recreated every render, destroying state and killing performance. Extract to module scope or a separate file with explicit props.
@@ -289,6 +291,7 @@ npm run version:major   # 1.0.0 → 2.0.0 (breaking changes)
 ## Current Status (Mar 2026)
 
 ### Recently Completed
+- Password Reset Flow Fix (Mar 13, 2026): Configured Resend as custom SMTP for Supabase Auth emails. Fixed password reset flow by using `token_hash` pattern in email templates instead of `{{ .ConfirmationURL }}`. Added `/auth/confirm/route.ts` server-side handler. Branded email template matching existing design system.
 - CRM Module (Feb 27, 2026): Full sales CRM — 6 tables, 37 brands, 12 firms, pipeline kanban, contacts, activities timeline. Routes: `/crm/*` for admin/pm/management.
 - React Doctor code health audit: score improved from 76 → 92/100 (deleted 47 dead files, fixed 6 errors, 460 warnings reduced)
 - CRM UI Polish (Mar 2, 2026): Migrated all 6 CRM pages to `usePageHeader()` AppHeader pattern, replaced `<Loader2Icon>` spinners with `<Skeleton>` loading states, added timeline dots, polished kanban cards/columns, improved detail page typography with `GradientIcon` section headers. 9 files modified, zero new files.
