@@ -2,7 +2,97 @@
 
 ## Current Status
 Last updated by: Claude Code
-Timestamp: 2026-03-02
+Timestamp: 2026-03-23
+
+---
+
+## Complete: Payments Module (AP/AR) — Mar 17-23, 2026
+Agent: Claude Code
+Status: **DONE — All features built. Migrations 052-055 applied. 698 tests passing. React Doctor 100/100.**
+
+### What was built
+
+**Payments Module** — company-wide accounts payable + receivable tracking under `/payments`. Independent from project budgets (`/finance` preserved separately). Whitelist-based access via `finance_access` table.
+
+#### Database (Applied to Supabase)
+- `supabase/migrations/052_finance_module.sql` — 8 tables, helper functions, sequences, triggers, RLS, indexes, views, seeds
+- `supabase/migrations/053_finance_installments.sql` — installment plan support
+- `supabase/migrations/054_finance_vat.sql` — vat_rate + vat_amount columns on invoices
+- `supabase/migrations/055_finance_project_link.sql` — project_id FK on invoices
+- Storage bucket: `finance-documents` (public)
+
+#### Infrastructure
+- `src/types/finance.ts` — All types, FinanceInstallment, VAT_RATES constant, project on extended type
+- `src/lib/validations/finance.ts` — Zod schemas with conditional due_date (.refine), vat_rate, project_id
+- `src/lib/actions/finance.ts` — All server actions (@ts-nocheck): CRUD, payments, approvals, installments, approvers, VAT calc, project linking, dashboard stats, aging, cash flow, document upload, getProjectsForFinance
+- `src/lib/actions/finance-budget.ts` — Old project budget functions (preserved)
+- `src/lib/react-query/finance.ts` — All hooks including useProjectsForFinance(), useApprovers()
+
+#### UI Pages (28+ files under src/app/(dashboard)/payments/)
+- `layout.tsx` + `payments-tab-bar.tsx` — Tab navigation (Dashboard, Invoices, Receivables, Suppliers, Recurring, Access)
+- **Dashboard** — Compact KPI cards, cash flow chart with custom tooltip + empty state, aging reports
+- **Access** — Admin whitelist manager (add/remove users, toggle can_approve)
+- **Suppliers** — Table + mobile cards + create/edit sheet
+- **Invoices** — Table with multi-select + inline selection actions, create/edit sheet with:
+  - Inline "+ New Supplier" creation from dropdown
+  - Installment plan toggle with dynamic rows + sum validation
+  - Single approver dropdown (conditional)
+  - File attachment at creation
+  - Unsaved changes protection (confirmation dialog)
+- **Invoice Detail** — Payments section, approval workflow, documents, summary sidebar with IBAN copy + progress bar
+- **Receivables** — Table, sheet (inline useClients hook), detail with incoming payments
+- **Recurring** — Table with active toggle, "Process Now" button, create/edit sheet
+
+#### Modified Files
+- `src/components/app-sidebar.tsx` — Added "Payments" nav entry with BanknoteIcon
+- `src/app/(dashboard)/finance/page.tsx` — Import changed from `finance.ts` to `finance-budget.ts`
+
+### Bugs Fixed During Testing
+- `getAvailableUsers()` used `is_deleted` but `users` table uses `is_active`
+- Hydration error: `<Skeleton>` (div) inside `<p>` tags
+- Invoice `due_date` validation blocked form submit when installments enabled
+- v_finance_suppliers view had ungrouped column error in SQL
+- Radix Select inside Dialog z-index issue — replaced with native `<select>` for payment method
+
+### UI Polish (Mar 21)
+- Invoice table: spreadsheet-style cell borders, zebra striping, fixed column widths (tableLayout: fixed)
+- Due date: single line `10.04.2026 · 20 days left` with color-coded urgency
+- Paid column: amount on top + thin progress bar with percentage below
+- KPI cards: compact, no CardContent wrapper, padding on GlassCard directly
+- Cash flow chart: CartesianGrid, custom tooltip with net calc, empty state
+- Quick links removed (redundant with tab bar), "New Invoice" removed from dashboard header
+- Preview drawer redesign: colored header, 3-column amount grid, installments list, bank details card
+- Unsaved changes protection on invoice form (block outside click, confirmation dialog)
+- Inline "+ New Supplier" creation from supplier dropdown
+- VAT dropdown with live subtotal/VAT/total calculation
+- Project linking dropdown with "General expense" default
+- Installment percentage mode toggle (₺/%) with auto-calculation
+- Payment notes displayed in payment history
+- IBAN validation: Turkish only (TR, 26 chars, auto-strips spaces)
+- dd.mm.yyyy date format throughout
+
+### Session 3 (Mar 23): Tests + Notifications + Polish
+- **Tests**: 128 validation tests + 61 server action tests (including 13 notification tests) — 698 total, all passing
+- **Notification system**: PDF generator (jsPDF, grouped by supplier), 2 email templates (React Email), Resend individual sends with PDF attachment, cron route
+- **Send Summary dialog**: timeframe picker (this week, next 2 weeks, this month, all outstanding)
+- **Notify Team dialog**: multi-select invoices + note field
+- **Bulk approve**: select multiple awaiting_approval invoices → "Approve (N)" button
+- **Status badges**: simplified labels with hover tooltips (Ready to Pay, Needs Approval, Partially Paid) via InvoiceStatusBadge component
+- **Document indicator**: paperclip icon on invoice rows — 1 doc = direct open, 2+ = preview drawer
+- **Real-time IBAN validation**: `mode: "onChange"` on supplier form
+- **PDF polish**: company header, supplier numbering, Bank/IBAN always shown with "—" for missing, human-readable status labels
+
+### What remains (nice-to-haves)
+- Apply same polish to receivables (VAT, project linking, preview drawer, status badges)
+- Remove @ts-nocheck after regenerating Supabase types
+- Sequential approval (deferred — plan saved in memory)
+- pg_cron setup in Supabase (enable extensions + schedule job)
+
+### Build & Test Status
+- `npx tsc --noEmit` — **0 errors**
+- `npx vitest run` — **698 tests passing**
+- `npx react-doctor . --score` — **100/100**
+- Migrations 052-055 — **Applied to Supabase**
 
 ---
 

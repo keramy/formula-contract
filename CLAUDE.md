@@ -259,6 +259,18 @@ scope-items/{project_id}/{item_id}/image_1.jpg
 - Pentest artifacts go in `shannon_auditfiles/` — excluded from tsconfig, do NOT commit
 - After fixing pentest findings: create migration + server action (never UI-only validation for security)
 
+### Payments Module
+32. **Payments routes are `/payments/*` not `/finance/*`** — Old `/finance` page (project budgets) preserved separately at `finance-budget.ts`
+33. **Whitelist access, not role-based** — `finance_access` table controls who sees the module. `has_finance_access()` SQL function for RLS. Admin manages whitelist at `/payments/access`
+34. **`@ts-nocheck` on `finance.ts`** — Remove after applying migrations and running `npx supabase gen types typescript`
+35. **`users` table uses `is_active` not `is_deleted`** — Other tables use `is_deleted` but users table is different
+36. **Native `<select>` in Dialogs** — Radix Select dropdown doesn't work inside Dialog (z-index portal issue). Use native HTML `<select>` instead
+37. **IBAN validation Turkish only** — 26 chars starting with TR, auto-strips spaces. In `supplierSchema` Zod validation
+38. **Invoice `total_amount` is VAT-exclusive** — `vat_rate` and `vat_amount` stored separately. VAT calculated on form, saved on creation
+39. **Installment percentages are UI-only** — DB stores real amounts. Conversion happens in `onSubmit` before server action call
+40. **`exceljs` for Excel export** — Server-side generation, base64 transfer to client, download via temporary `<a>` tag
+41. **Migrations 052-055 applied** — `052_finance_module.sql` (8 tables), `053_finance_installments.sql`, `054_finance_vat.sql`, `055_finance_project_link.sql`
+
 ### Git on Windows
 - CRLF warnings are normal (`LF will be replaced by CRLF`) - safe to ignore
 - Always use `-u` flag on first push: `git push -u origin branch-name`
@@ -291,9 +303,10 @@ npm run version:major   # 1.0.0 → 2.0.0 (breaking changes)
 ## Current Status (Mar 2026)
 
 ### Recently Completed
+- Payments Module (Mar 17-23, 2026): Full AP/AR payment tracking under `/payments`. 8 DB tables (migrations 052-055), whitelist-based access. Invoices with VAT/installments/project linking/approval, receivables, suppliers with real-time IBAN validation. Notification system: 3 methods (auto weekly digest via pg_cron, manual summary with timeframe picker, urgent multi-select notify) — all with PDF attachment via Resend. Excel export (3 types). Preview drawer with documents. Simplified status badges with hover tooltips (Ready to Pay, Needs Approval, etc.). Paperclip indicator for document attachments. Spreadsheet-style tables. 698 tests (128 validation + 61 server action). React Doctor 100/100.
 - Password Reset Flow Fix (Mar 13, 2026): Configured Resend as custom SMTP for Supabase Auth emails. Fixed password reset flow by using `token_hash` pattern in email templates instead of `{{ .ConfirmationURL }}`. Added `/auth/confirm/route.ts` server-side handler. Branded email template matching existing design system.
 - CRM Module (Feb 27, 2026): Full sales CRM — 6 tables, 37 brands, 12 firms, pipeline kanban, contacts, activities timeline. Routes: `/crm/*` for admin/pm/management.
-- React Doctor code health audit: score improved from 76 → 92/100 (deleted 47 dead files, fixed 6 errors, 460 warnings reduced)
+- React Doctor code health audit: score improved from 76 → 92 → 100/100
 - CRM UI Polish (Mar 2, 2026): Migrated all 6 CRM pages to `usePageHeader()` AppHeader pattern, replaced `<Loader2Icon>` spinners with `<Skeleton>` loading states, added timeline dots, polished kanban cards/columns, improved detail page typography with `GradientIcon` section headers. 9 files modified, zero new files.
 
 ### In Progress
@@ -301,6 +314,7 @@ npm run version:major   # 1.0.0 → 2.0.0 (breaking changes)
 - Mobile optimization (responsive data views done, Gantt tablet enabled, remaining: full E2E testing)
 
 ### Planned
+- Payments: sequential multi-step approval (plan in memory, deferred)
 - Global capacity view (cross-project phase workload overview)
 - Command menu (Cmd+K)
 - PDF Executive Summary generation

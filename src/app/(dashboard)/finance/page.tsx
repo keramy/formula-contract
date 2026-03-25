@@ -5,7 +5,7 @@ import {
   getBudgetTrend,
   getBudgetBreakdown,
   getProjectCosts,
-} from "@/lib/actions/finance";
+} from "@/lib/actions/finance-budget";
 import { KPICards } from "@/components/finance/kpi-cards";
 import { BudgetTrendChart } from "@/components/finance/budget-trend-chart";
 import { BudgetBreakdown } from "@/components/finance/budget-breakdown";

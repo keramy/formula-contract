@@ -10,19 +10,12 @@ import { createClient } from "@/lib/supabase/server";
 export async function getNextProjectCode(): Promise<string> {
   const supabase = await createClient();
 
-  // Use the database function to preview next project code
-  const { data, error } = await supabase.rpc("preview_next_project_code");
-
-  if (!error && data) {
-    return data as string;
-  }
-
-  // Fallback: query max numeric code and add 1
-  console.warn("RPC fallback: querying max project code");
+  // Query ALL projects (including soft-deleted) to find the true max code.
+  // This avoids the sequence desync issue where manually-entered codes
+  // don't advance the PostgreSQL sequence.
   const { data: projects } = await supabase
     .from("projects")
-    .select("project_code")
-    .eq("is_deleted", false);
+    .select("project_code");
 
   if (projects && projects.length > 0) {
     let maxCode = 2600;
@@ -36,5 +29,11 @@ export async function getNextProjectCode(): Promise<string> {
     return String(maxCode + 1);
   }
 
-  return "2605"; // Default based on current data
+  // Fallback: try the database sequence
+  const { data, error } = await supabase.rpc("preview_next_project_code");
+  if (!error && data) {
+    return data as string;
+  }
+
+  return "2605";
 }

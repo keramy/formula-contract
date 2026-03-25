@@ -13,6 +13,7 @@ import {
   SettingsIcon,
   WalletIcon,
   TargetIcon,
+  BanknoteIcon,
 } from "lucide-react";
 import { getVersionDisplay } from "@/lib/version";
 
@@ -46,6 +47,7 @@ const routePermissions: Record<string, string[]> = {
   "/clients": ["admin", "pm"],
   "/crm": ["admin", "management"],
   "/finance": ["admin", "management"],
+  "/payments": ["admin", "management"],
   "/users": ["admin"],
   "/reports": ["admin", "pm", "management", "client"], // Clients see their project reports
   "/settings": ["admin"],
@@ -58,6 +60,7 @@ const navItemColors: Record<string, string> = {
   "/clients": "slate",
   "/crm": "amber",
   "/finance": "teal",
+  "/payments": "amber",
   "/users": "coral",
   "/reports": "amber",
   "/settings": "gray",
@@ -88,6 +91,11 @@ const mainNavItems = [
     title: "Finance",
     href: "/finance",
     icon: WalletIcon,
+  },
+  {
+    title: "Payments",
+    href: "/payments",
+    icon: BanknoteIcon,
   },
 ];
 

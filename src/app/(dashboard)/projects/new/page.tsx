@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getUserProfileFromJWT } from "@/lib/supabase/server";
 import { ProjectWizard } from "./project-wizard";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,8 @@ import { ArrowLeftIcon } from "lucide-react";
 
 export default async function NewProjectPage() {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const profile = user ? await getUserProfileFromJWT(user, supabase) : null;
 
   // Fetch clients and users in parallel
   const [{ data: clients }, { data: users }] = await Promise.all([
@@ -36,7 +38,7 @@ export default async function NewProjectPage() {
       </div>
 
       {/* Multi-Step Wizard */}
-      <ProjectWizard clients={clients || []} users={users || []} />
+      <ProjectWizard clients={clients || []} users={users || []} userRole={profile?.role || "pm"} />
     </div>
   );
 }

@@ -36,6 +36,7 @@ import {
   PlusIcon,
 } from "lucide-react";
 import { sanitizeText } from "@/lib/sanitize";
+import { assignUserToProject } from "@/lib/actions/project-assignments";
 import type { ProjectStatus, Currency, ProjectInsert } from "@/types/database";
 
 interface Client {
@@ -53,6 +54,7 @@ interface User {
 interface ProjectWizardProps {
   clients: Client[];
   users: User[];
+  userRole: string;
 }
 
 const STEPS = [
@@ -62,7 +64,8 @@ const STEPS = [
   { title: "Review", description: "Confirm and create" },
 ];
 
-export function ProjectWizard({ clients, users }: ProjectWizardProps) {
+export function ProjectWizard({ clients, users, userRole }: ProjectWizardProps) {
+  const isAdmin = userRole === "admin";
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -172,23 +175,22 @@ export function ProjectWizard({ clients, users }: ProjectWizardProps) {
         .select("id")
         .single();
 
-      if (projectError) throw projectError;
-
-      // Assign team members
-      if (selectedUserIds.length > 0) {
-        const assignments = selectedUserIds.map((userId) => ({
-          project_id: newProject.id,
-          user_id: userId,
-        }));
-
-        const { error: assignmentError } = await supabase
-          .from("project_assignments")
-          .insert(assignments);
-
-        if (assignmentError) {
-          console.error("Failed to assign team members:", assignmentError);
-          // Don't throw - project was created successfully
+      if (projectError) {
+        if (projectError.code === "23505") {
+          throw new Error(`Project code "${formData.project_code}" already exists. Please use a different code.`);
         }
+        throw projectError;
+      }
+
+      // Assign team members (uses server action — sends email + notification)
+      if (selectedUserIds.length > 0) {
+        await Promise.all(
+          selectedUserIds.map((userId) =>
+            assignUserToProject(newProject.id, userId).catch((err) =>
+              console.error(`Failed to assign user ${userId}:`, err)
+            )
+          )
+        );
       }
 
       toast.success("Project created successfully!");
@@ -246,11 +248,14 @@ export function ProjectWizard({ clients, users }: ProjectWizardProps) {
                     value={formData.project_code}
                     onChange={(e) => handleChange("project_code", e.target.value)}
                     required
-                    disabled={isLoadingCode}
+                    disabled={isLoadingCode || !isAdmin}
+                    readOnly={!isAdmin}
                     className="font-mono"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Sequential number assigned automatically. You can modify if needed.
+                    {isAdmin
+                      ? "Sequential number assigned automatically. Admin can modify if needed."
+                      : "Sequential number assigned automatically."}
                   </p>
                 </div>
                 <div className="space-y-2">
