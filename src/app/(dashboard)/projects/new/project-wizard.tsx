@@ -109,6 +109,7 @@ export function ProjectWizard({ clients, users, userRole }: ProjectWizardProps) 
 
   // Team assignment
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [teamSearch, setTeamSearch] = useState("");
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -207,6 +208,14 @@ export function ProjectWizard({ clients, users, userRole }: ProjectWizardProps) 
   const assignableUsers = users.filter((u) =>
     ["admin", "pm", "production", "procurement", "management"].includes(u.role)
   );
+
+  const filteredAssignableUsers = teamSearch
+    ? assignableUsers.filter((u) =>
+        u.name.toLowerCase().includes(teamSearch.toLowerCase()) ||
+        u.email.toLowerCase().includes(teamSearch.toLowerCase()) ||
+        u.role.toLowerCase().includes(teamSearch.toLowerCase())
+      )
+    : assignableUsers;
 
   return (
     <FormWizard totalSteps={4}>
@@ -464,28 +473,40 @@ export function ProjectWizard({ clients, users, userRole }: ProjectWizardProps) 
                 </div>
               </div>
 
-              <div className="space-y-3">
-                {assignableUsers.length === 0 ? (
+              {/* Search */}
+              <div className="relative">
+                <Input
+                  placeholder="Search team members..."
+                  value={teamSearch}
+                  onChange={(e) => setTeamSearch(e.target.value)}
+                  className="pl-9"
+                />
+                <UsersIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+              </div>
+
+              {/* User list — scrollable */}
+              <div className="max-h-[400px] overflow-y-auto space-y-2 rounded-lg border p-2">
+                {filteredAssignableUsers.length === 0 ? (
                   <p className="text-muted-foreground text-sm py-4 text-center">
-                    No team members available to assign
+                    {assignableUsers.length === 0 ? "No team members available" : "No results found"}
                   </p>
                 ) : (
-                  assignableUsers.map((user) => (
+                  filteredAssignableUsers.map((user) => (
                     <label
                       key={user.id}
-                      className="flex items-center gap-3 p-3 rounded-lg border bg-white hover:bg-gray-50 cursor-pointer transition-colors"
+                      className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
                     >
                       <Checkbox
                         checked={selectedUserIds.includes(user.id)}
                         onCheckedChange={() => toggleUserSelection(user.id)}
                       />
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm">{user.name}</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs text-muted-foreground truncate">
                           {user.email}
                         </p>
                       </div>
-                      <Badge variant="secondary" className="text-xs capitalize">
+                      <Badge variant="secondary" className="text-xs capitalize shrink-0">
                         {user.role}
                       </Badge>
                     </label>

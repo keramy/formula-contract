@@ -95,41 +95,146 @@ export interface ParseResult {
 }
 
 /**
- * Generate an Excel template file for scope items
+ * Generate a styled Excel template file for scope items using exceljs
  */
 export async function generateScopeItemsExcel() {
-  const XLSX = await getXLSX();
-  // Create workbook
-  const workbook = XLSX.utils.book_new();
+  const ExcelJS = await import("exceljs");
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "Formula Contract";
+  workbook.created = new Date();
 
-  // Data sheet with headers only (no example row)
-  const dataRows = [
-    [...SCOPE_ITEMS_COLUMNS],
+  // ── Scope Items Sheet ──
+  const sheet = workbook.addWorksheet("Scope Items", {
+    views: [{ state: "frozen", ySplit: 1 }],
+  });
+
+  const HEADER_LABELS: Record<ScopeItemColumn, string> = {
+    floor: "Floor",
+    area_name: "Area Name",
+    area_code: "Area Code",
+    item_code: "Item Code *",
+    name: "Name *",
+    description: "Description",
+    unit: "Unit",
+    quantity: "Qty",
+    initial_unit_cost: "Budget Unit Cost",
+    unit_sales_price: "Sales Unit Price",
+    notes: "Notes",
+  };
+
+  sheet.columns = [
+    { key: "floor", width: 15 },
+    { key: "area_name", width: 20 },
+    { key: "area_code", width: 12 },
+    { key: "item_code", width: 15 },
+    { key: "name", width: 28 },
+    { key: "description", width: 35 },
+    { key: "unit", width: 8 },
+    { key: "quantity", width: 10 },
+    { key: "initial_unit_cost", width: 16 },
+    { key: "unit_sales_price", width: 16 },
+    { key: "notes", width: 30 },
   ];
-  const dataSheet = XLSX.utils.aoa_to_sheet(dataRows);
 
-  // Set column widths
-  dataSheet["!cols"] = [
-    { wch: 15 }, // floor
-    { wch: 20 }, // area_name
-    { wch: 12 }, // area_code
-    { wch: 15 }, // item_code
-    { wch: 25 }, // name
-    { wch: 40 }, // description
-    { wch: 8 },  // unit
-    { wch: 10 }, // quantity
-    { wch: 12 }, // unit_cost
-    { wch: 15 }, // unit_sales_price
-    { wch: 30 }, // notes
+  // Row 1 — Raw column keys (used by parser, styled as header)
+  const headerRow = sheet.addRow([...SCOPE_ITEMS_COLUMNS]);
+  headerRow.height = 28;
+  headerRow.eachCell((cell, colNumber) => {
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1A2B3C" } };
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 10 };
+    cell.alignment = { vertical: "middle", horizontal: "center" };
+    cell.border = { bottom: { style: "thin", color: { argb: "FF1A2B3C" } } };
+    // Add comment with human-readable label + description
+    const col = SCOPE_ITEMS_COLUMNS[colNumber - 1];
+    if (col) {
+      cell.note = {
+        texts: [
+          { font: { bold: true, size: 9 }, text: HEADER_LABELS[col] + "\n" },
+          { font: { size: 8, color: { argb: "FF666666" } }, text: SCOPE_ITEMS_HEADER_DESCRIPTIONS[col] },
+        ],
+      };
+    }
+  });
+
+  // Row 2 — Example row (gray text, user should delete before importing)
+  const exampleRow = sheet.addRow(SCOPE_ITEMS_COLUMNS.map((col) => SCOPE_ITEMS_EXAMPLE_ROW[col]));
+  exampleRow.eachCell((cell) => {
+    cell.font = { size: 10, color: { argb: "FFAAAAAA" }, italic: true };
+    cell.alignment = { vertical: "middle" };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFAFAFA" } };
+    cell.border = { bottom: { style: "thin", color: { argb: "FFE5E7EB" } } };
+  });
+
+  // Add empty rows for user data (with subtle borders)
+  for (let i = 0; i < 48; i++) {
+    const row = sheet.addRow([]);
+    row.eachCell({ includeEmpty: true }, (cell) => {
+      cell.border = {
+        bottom: { style: "hair", color: { argb: "FFF0F0F0" } },
+      };
+    });
+    // Apply borders to all cells in the row
+    for (let col = 1; col <= SCOPE_ITEMS_COLUMNS.length; col++) {
+      const cell = row.getCell(col);
+      cell.border = {
+        bottom: { style: "hair", color: { argb: "FFF0F0F0" } },
+        right: { style: "hair", color: { argb: "FFF0F0F0" } },
+      };
+    }
+  }
+
+  // Highlight required columns (item_code + name) with a subtle left border
+  for (let row = 3; row <= 50; row++) {
+    sheet.getCell(row, 4).border = {
+      ...sheet.getCell(row, 4).border,
+      left: { style: "thin", color: { argb: "FF3B82F6" } },
+    };
+    sheet.getCell(row, 5).border = {
+      ...sheet.getCell(row, 5).border,
+      left: { style: "thin", color: { argb: "FF3B82F6" } },
+    };
+  }
+
+  // Data validation for unit column
+  for (let row = 3; row <= 50; row++) {
+    sheet.getCell(row, 7).dataValidation = {
+      type: "list",
+      allowBlank: true,
+      formulae: ['"pcs,set,m,m2,lot"'],
+      showErrorMessage: true,
+      errorTitle: "Invalid unit",
+      error: "Please select: pcs, set, m, m2, or lot",
+    };
+  }
+
+  // ── Instructions Sheet ──
+  const instrSheet = workbook.addWorksheet("Instructions");
+
+  instrSheet.columns = [
+    { key: "a", width: 18 },
+    { key: "b", width: 35 },
+    { key: "c", width: 12 },
+    { key: "d", width: 40 },
   ];
 
-  XLSX.utils.book_append_sheet(workbook, dataSheet, "Scope Items");
+  // Title
+  const titleRow = instrSheet.addRow(["Formula Contract — Scope Items Import Template"]);
+  titleRow.getCell(1).font = { bold: true, size: 14, color: { argb: "FF1A2B3C" } };
+  titleRow.height = 24;
 
-  // Instructions sheet
-  const instructionRows = [
-    ["Scope Items Import Template - Instructions"],
-    [""],
-    ["Column", "Description", "Required", "Valid Values"],
+  instrSheet.addRow([]);
+
+  // Column reference header
+  const refHeaderRow = instrSheet.addRow(["Column", "Description", "Required", "Valid Values"]);
+  refHeaderRow.eachCell((cell) => {
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1A2B3C" } };
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 10 };
+    cell.alignment = { vertical: "middle" };
+  });
+  refHeaderRow.height = 24;
+
+  // Column descriptions
+  const columns: [string, string, string, string][] = [
     ["floor", "Floor name for area grouping", "No", "Any text (e.g., Floor 1, Ground Floor)"],
     ["area_name", "Room/area name", "No", "Any text (e.g., Master Bedroom, Kitchen)"],
     ["area_code", "Short area code (lookup key)", "No", "Short text (e.g., MB, KT, LR)"],
@@ -137,54 +242,70 @@ export async function generateScopeItemsExcel() {
     ["name", "Name of the item", "Yes", "Any text"],
     ["description", "Detailed description", "No", "Any text"],
     ["unit", "Unit of measurement", "No", "pcs, set, m, m2, lot (default: pcs)"],
-    ["quantity", "Quantity (supports decimals)", "No", "Number, e.g., 1, 4.8, 12,5 (default: 1)"],
+    ["quantity", "Quantity (supports decimals)", "No", "Number (default: 1)"],
     ["initial_unit_cost", "Budgeted cost per unit (set once)", "No", "Number (e.g., 3500)"],
     ["unit_sales_price", "Sale price per unit to client", "No", "Number (e.g., 5000)"],
     ["notes", "Additional notes", "No", "Any text"],
-    [""],
-    ["AREA COLUMNS:"],
-    ["- If area_code is provided, the item will be linked to that area"],
-    ["- If the area doesn't exist, it will be auto-created using floor + area_name + area_code"],
-    ["- area_name is recommended when area_code is provided (for auto-creation)"],
-    ["- Multiple items can share the same area_code to group them together"],
-    [""],
-    ["Example:"],
-    ["floor", "area_name", "area_code", "item_code", "name"],
-    ["Floor 1", "Master Bedroom", "MB", "MB-001", "Wardrobe"],
-    ["Floor 1", "Master Bedroom", "MB", "MB-002", "Nightstand"],
-    ["Floor 1", "Kitchen", "KT", "KT-001", "Island"],
-    ["Floor 2", "Bedroom 2", "BD2", "BD2-001", "Desk"],
-    [""],
-    ["IMPORTANT:"],
-    ["- item_code and name are required fields"],
-    ["- Each item_code must be UNIQUE - duplicates will be skipped with a warning"],
-    ["- First row must be the header row"],
-    ["- Save as .xlsx format"],
-    ["- Initial total cost is auto-calculated: initial_unit_cost × quantity"],
-    ["- Actual cost can be entered later through the app"],
-    ["- Item path and status can be set after import"],
   ];
-  const instructionSheet = XLSX.utils.aoa_to_sheet(instructionRows);
-  instructionSheet["!cols"] = [
-    { wch: 18 },
-    { wch: 40 },
-    { wch: 12 },
-    { wch: 40 },
-    { wch: 30 },
+
+  columns.forEach(([col, desc, req, valid], idx) => {
+    const row = instrSheet.addRow([col, desc, req, valid]);
+    row.getCell(1).font = { bold: true, size: 10, name: "Consolas" };
+    if (req === "Yes") {
+      row.getCell(3).font = { bold: true, color: { argb: "FFDC2626" }, size: 10 };
+    }
+    if (idx % 2 === 1) {
+      row.eachCell((cell) => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF9FAFB" } };
+      });
+    }
+    row.eachCell((cell) => {
+      cell.border = { bottom: { style: "thin", color: { argb: "FFE5E7EB" } } };
+    });
+  });
+
+  instrSheet.addRow([]);
+
+  // Important notes
+  const notesTitle = instrSheet.addRow(["Important Notes"]);
+  notesTitle.getCell(1).font = { bold: true, size: 11 };
+
+  const notes = [
+    "item_code and name are required fields",
+    "Each item_code must be UNIQUE — duplicates will be skipped",
+    "First row must be the header row (do not delete it)",
+    "Delete the example row (row 3) before importing",
+    "Save as .xlsx format",
+    "Initial total cost = initial_unit_cost × quantity (auto-calculated)",
+    "Item path and status can be set after import in the app",
   ];
-  XLSX.utils.book_append_sheet(workbook, instructionSheet, "Instructions");
+
+  notes.forEach((note) => {
+    const row = instrSheet.addRow([`• ${note}`]);
+    row.getCell(1).font = { size: 9, color: { argb: "FF555555" } };
+  });
 
   return workbook;
 }
 
 /**
- * Download the Excel template
+ * Download the styled Excel template
  */
 export async function downloadScopeItemsTemplate(projectCode: string = "PROJECT"): Promise<void> {
-  const XLSX = await getXLSX();
   const workbook = await generateScopeItemsExcel();
-  const filename = `${projectCode}_scope_items_template.xlsx`;
-  XLSX.writeFile(workbook, filename);
+  const buffer = await workbook.xlsx.writeBuffer();
+
+  const blob = new Blob([buffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${projectCode}_scope_items_template.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 /**
@@ -227,6 +348,13 @@ export async function parseScopeItemsExcel(file: ArrayBuffer): Promise<ParseResu
 
       // Skip empty rows
       if (!row.item_code && !row.name) {
+        return;
+      }
+
+      // Skip the example row from the template (gray italic sample data)
+      const itemCodeStr = String(row.item_code || "").trim();
+      if (itemCodeStr === SCOPE_ITEMS_EXAMPLE_ROW.item_code && String(row.name || "").trim() === SCOPE_ITEMS_EXAMPLE_ROW.name) {
+        warnings.push({ row: rowNum, message: "Skipped example row from template" });
         return;
       }
 

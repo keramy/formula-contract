@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { GlassCard, GradientIcon, StatusBadge, GradientAvatar, EmptyState } from "@/components/ui/ui-helpers";
 import {
   Dialog,
@@ -72,8 +73,17 @@ export function TeamOverview({ projectId, assignments, canManageTeam }: TeamOver
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
+  const [memberSearch, setMemberSearch] = useState("");
   const [userToRemove, setUserToRemove] = useState<User | null>(null);
   const [availableUsers, setAvailableUsers] = useState<User[]>([]);
+
+  const filteredAvailableUsers = memberSearch
+    ? availableUsers.filter((u) =>
+        u.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
+        u.email.toLowerCase().includes(memberSearch.toLowerCase()) ||
+        u.role.toLowerCase().includes(memberSearch.toLowerCase())
+      )
+    : availableUsers;
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -211,7 +221,7 @@ export function TeamOverview({ projectId, assignments, canManageTeam }: TeamOver
                 Add Member
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="sm:max-w-lg">
               <DialogHeader>
                 <DialogTitle>Add Team Member</DialogTitle>
                 <DialogDescription>
@@ -239,6 +249,16 @@ export function TeamOverview({ projectId, assignments, canManageTeam }: TeamOver
                       </Button>
                     )}
                   </div>
+
+                  {/* Search */}
+                  {availableUsers.length > 5 && (
+                    <Input
+                      placeholder="Search by name, email or role..."
+                      value={memberSearch}
+                      onChange={(e) => setMemberSearch(e.target.value)}
+                    />
+                  )}
+
                   {loadingUsers ? (
                     <div className="flex items-center gap-2 p-3 text-muted-foreground">
                       <Spinner className="size-4" />
@@ -249,9 +269,9 @@ export function TeamOverview({ projectId, assignments, canManageTeam }: TeamOver
                       All users are already assigned to this project.
                     </p>
                   ) : (
-                    <ScrollArea className="h-[200px] border rounded-md p-2">
+                    <ScrollArea className="h-[360px] border rounded-md p-2">
                       <div className="space-y-1">
-                        {availableUsers.map((user) => {
+                        {filteredAvailableUsers.map((user) => {
                           const config = roleConfig[user.role] || { variant: "default" as StatusVariant, label: user.role };
                           return (
                             <label
@@ -273,6 +293,9 @@ export function TeamOverview({ projectId, assignments, canManageTeam }: TeamOver
                             </label>
                           );
                         })}
+                        {filteredAvailableUsers.length === 0 && (
+                          <p className="text-sm text-muted-foreground p-3 text-center">No results found</p>
+                        )}
                       </div>
                     </ScrollArea>
                   )}

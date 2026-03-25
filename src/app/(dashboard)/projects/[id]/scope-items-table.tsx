@@ -1333,7 +1333,7 @@ export function ScopeItemsTable({ projectId, items, materials, areas = EMPTY_ARE
           </Badge>
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-56 p-3">
+      <PopoverContent align="end" className="w-56 p-3" side="bottom" avoidCollisions={true} sideOffset={4}>
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h4 className="font-medium text-sm">Visible Columns</h4>
@@ -1346,7 +1346,7 @@ export function ScopeItemsTable({ projectId, items, materials, areas = EMPTY_ARE
               Reset
             </Button>
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1 max-h-[350px] overflow-y-auto">
             {COLUMNS
               .filter(column => !isClient || !clientHiddenColumns.has(column.id))
               .map((column) => (
@@ -1596,7 +1596,7 @@ export function ScopeItemsTable({ projectId, items, materials, areas = EMPTY_ARE
         tableView={(
           <GlassCard className="py-0">
             <div className="overflow-x-auto">
-              <Table style={{ tableLayout: "fixed", width: tableWidth }} className="[&_td]:overflow-hidden [&_td]:text-ellipsis [&_th]:overflow-hidden">
+              <Table style={{ tableLayout: "fixed", minWidth: tableWidth, width: "100%" }} className="[&_td]:overflow-hidden [&_td]:text-ellipsis [&_th]:overflow-hidden">
                 <TableHeader>
                   <TableRow className="hover:bg-transparent border-b border-gray-100">
                     <TableHead className="w-[40px] py-4" style={{ width: DEFAULT_COL_WIDTHS._checkbox }}>
