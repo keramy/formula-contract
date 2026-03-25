@@ -1,6 +1,3 @@
-// @ts-nocheck
-// TODO: Remove @ts-nocheck after applying migration 052 and regenerating Supabase types.
-// Finance tables (finance_access, finance_suppliers, etc.) are not yet in database.ts.
 "use server";
 
 /**
@@ -43,24 +40,19 @@ export interface ActionResult<T = void> {
   error?: string;
 }
 
-// Finance tables are added by migration 052 but not yet in generated database.ts types.
-// Use this helper to bypass Supabase client type checking for finance tables.
-// After applying migration 052 and regenerating types, these casts can be removed.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnySupabaseClient = any;
 
 // ============================================================================
 // Auth Helpers
 // ============================================================================
 
 async function requireFinanceAccess(requireApproval = false) {
-  const supabase: AnySupabaseClient = await createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return { error: "Not authenticated" as const, supabase: null as AnySupabaseClient, user: null };
+    return { error: "Not authenticated" as const, supabase: null, user: null };
   }
 
   const { data: access } = await supabase
@@ -70,13 +62,13 @@ async function requireFinanceAccess(requireApproval = false) {
     .single();
 
   if (!access) {
-    return { error: "Not authorized" as const, supabase: null as AnySupabaseClient, user: null };
+    return { error: "Not authorized" as const, supabase: null, user: null };
   }
 
   if (requireApproval && !access.can_approve) {
     return {
       error: "Approval permission required" as const,
-      supabase: null as AnySupabaseClient,
+      supabase: null,
       user: null,
     };
   }
@@ -85,19 +77,19 @@ async function requireFinanceAccess(requireApproval = false) {
 }
 
 async function requireAdmin() {
-  const supabase: AnySupabaseClient = await createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user)
     return {
       error: "Not authenticated" as const,
-      supabase: null as AnySupabaseClient,
+      supabase: null,
       user: null,
     };
   const role = await getUserRoleFromJWT(user, supabase);
   if (role !== "admin")
-    return { error: "Admin required" as const, supabase: null as AnySupabaseClient, user: null };
+    return { error: "Admin required" as const, supabase: null, user: null };
   return { error: null, supabase, user };
 }
 
@@ -172,7 +164,7 @@ export async function getAvailableUsers(): Promise<
 // ============================================================================
 
 export async function checkFinanceAccess(): Promise<boolean> {
-  const supabase: AnySupabaseClient = await createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -598,11 +590,11 @@ export async function getInvoices(
       .select("invoice_id, file_url")
       .in("invoice_id", invoiceIds);
 
-    (docs || []).forEach((d: { invoice_id: string; file_url: string }) => {
-      if (!docCountMap[d.invoice_id]) {
+    (docs || []).forEach((d: { invoice_id: string | null; file_url: string }) => {
+      if (d.invoice_id && !docCountMap[d.invoice_id]) {
         docCountMap[d.invoice_id] = { count: 0, first_url: d.file_url };
       }
-      docCountMap[d.invoice_id].count += 1;
+      if (d.invoice_id) docCountMap[d.invoice_id].count += 1;
     });
   }
 
@@ -981,27 +973,47 @@ export async function getReceivables(
   if (dbError) return { success: false, error: dbError.message };
 
   const recIds = receivables?.map((r) => r.id) || [];
-  const paymentMap: Record<string, { total_received: number; payment_count: number }> = {};
+  const paymentMap: Record<string, { total_received: number; payment_count: number; last_payment_date: string | null }> = {};
 
   if (recIds.length > 0) {
     const { data: payments } = await supabase!
       .from("finance_payments")
-      .select("receivable_id, amount")
+      .select("receivable_id, amount, payment_date")
       .in("receivable_id", recIds)
       .eq("is_deleted", false);
 
     payments?.forEach((p) => {
       if (!paymentMap[p.receivable_id!]) {
-        paymentMap[p.receivable_id!] = { total_received: 0, payment_count: 0 };
+        paymentMap[p.receivable_id!] = { total_received: 0, payment_count: 0, last_payment_date: null };
       }
       paymentMap[p.receivable_id!].total_received += Number(p.amount);
       paymentMap[p.receivable_id!].payment_count += 1;
+      if (!paymentMap[p.receivable_id!].last_payment_date || p.payment_date > paymentMap[p.receivable_id!].last_payment_date!) {
+        paymentMap[p.receivable_id!].last_payment_date = p.payment_date;
+      }
+    });
+  }
+
+  // Document counts
+  const docCountMap: Record<string, { count: number; first_url: string | null }> = {};
+  if (recIds.length > 0) {
+    const { data: docs } = await supabase!
+      .from("finance_documents")
+      .select("receivable_id, file_url")
+      .in("receivable_id", recIds);
+
+    (docs || []).forEach((d: { receivable_id: string | null; file_url: string }) => {
+      if (d.receivable_id && !docCountMap[d.receivable_id]) {
+        docCountMap[d.receivable_id] = { count: 0, first_url: d.file_url };
+      }
+      if (d.receivable_id) docCountMap[d.receivable_id].count += 1;
     });
   }
 
   const today = new Date().toISOString().split("T")[0];
   const result = (receivables || []).map((rec) => {
-    const pm = paymentMap[rec.id] || { total_received: 0, payment_count: 0 };
+    const pm = paymentMap[rec.id] || { total_received: 0, payment_count: 0, last_payment_date: null };
+    const dc = docCountMap[rec.id] || { count: 0, first_url: null };
     const daysOverdue =
       rec.due_date < today && !["received", "cancelled"].includes(rec.status)
         ? Math.floor(
@@ -1016,6 +1028,9 @@ export async function getReceivables(
       remaining: Number(rec.total_amount) - pm.total_received,
       payment_count: pm.payment_count,
       days_overdue: daysOverdue,
+      last_payment_date: pm.last_payment_date,
+      document_count: dc.count,
+      first_document_url: dc.first_url,
     };
   }) as FinanceReceivableWithDetails[];
 
@@ -1622,16 +1637,14 @@ export async function uploadFinanceDocument(
       .getPublicUrl(fileName);
 
     if (urlData?.publicUrl) {
-      const docData: Record<string, unknown> = {
+      await supabase!.from("finance_documents").insert({
         file_name: file.name,
         file_url: urlData.publicUrl,
         file_size: buffer.length,
         uploaded_by: user!.id,
-      };
-      if (entityType === "invoice") docData.invoice_id = entityId;
-      else docData.receivable_id = entityId;
-
-      await supabase!.from("finance_documents").insert(docData);
+        invoice_id: entityType === "invoice" ? entityId : null,
+        receivable_id: entityType === "receivable" ? entityId : null,
+      });
       uploadedUrls.push(urlData.publicUrl);
     }
   }
@@ -1912,7 +1925,7 @@ function formatDateShort(dateStr: string): string {
 }
 
 export async function sendWeeklyDigestEmails(): Promise<ActionResult<{ sent: number }>> {
-  const supabase: AnySupabaseClient = await createClient();
+  const supabase = await createClient();
 
   // Get all whitelisted users with email
   const { data: accessList } = await supabase
@@ -1950,7 +1963,8 @@ export async function sendWeeklyDigestEmails(): Promise<ActionResult<{ sent: num
       .in("invoice_id", invoiceIds)
       .eq("is_deleted", false);
 
-    (payments || []).forEach((p: { invoice_id: string; amount: number; payment_date: string }) => {
+    (payments || []).forEach((p: { invoice_id: string | null; amount: number; payment_date: string }) => {
+      if (!p.invoice_id) return;
       if (!paymentMap[p.invoice_id]) paymentMap[p.invoice_id] = { total_paid: 0, last_date: null };
       paymentMap[p.invoice_id].total_paid += Number(p.amount);
       if (!paymentMap[p.invoice_id].last_date || p.payment_date > paymentMap[p.invoice_id].last_date!) {
@@ -2062,7 +2076,7 @@ export async function sendWeeklyDigestEmails(): Promise<ActionResult<{ sent: num
         attachments: [{
           filename: pdfFilename,
           content: pdfBuffer,
-          content_type: "application/pdf",
+          contentType: "application/pdf",
         }],
       });
     }
@@ -2100,7 +2114,7 @@ export async function sendManualSummary(options: {
   includeIncoming: boolean;
   note?: string;
 }): Promise<ActionResult<{ sent: number }>> {
-  const supabase: AnySupabaseClient = await createClient();
+  const supabase = await createClient();
 
   // Get whitelisted users
   const { data: accessList } = await supabase
@@ -2185,7 +2199,8 @@ export async function sendManualSummary(options: {
   }
 
   // Merge and deduplicate
-  const allInvoices = [...(filteredInvoices || [])];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const allInvoices: any[] = [...(filteredInvoices || [])];
   const existingIds = new Set(allInvoices.map((i: { id: string }) => i.id));
   (overdueInvoices || []).forEach((inv: { id: string }) => {
     if (!existingIds.has(inv.id)) allInvoices.push(inv);
@@ -2201,7 +2216,8 @@ export async function sendManualSummary(options: {
       .in("invoice_id", invoiceIds)
       .eq("is_deleted", false);
 
-    (payments || []).forEach((p: { invoice_id: string; amount: number; payment_date: string }) => {
+    (payments || []).forEach((p: { invoice_id: string | null; amount: number; payment_date: string }) => {
+      if (!p.invoice_id) return;
       if (!paymentMap[p.invoice_id]) paymentMap[p.invoice_id] = { total_paid: 0, last_date: null };
       paymentMap[p.invoice_id].total_paid += Number(p.amount);
       if (!paymentMap[p.invoice_id].last_date || p.payment_date > paymentMap[p.invoice_id].last_date!) {
@@ -2323,7 +2339,7 @@ export async function sendManualSummary(options: {
         attachments: [{
           filename: pdfFilename,
           content: pdfBuffer,
-          content_type: "application/pdf",
+          contentType: "application/pdf",
         }],
       });
     }
@@ -2480,7 +2496,7 @@ export async function notifyTeamUrgent(
         attachments: [{
           filename: urgentFilename,
           content: pdfBuffer,
-          content_type: "application/pdf",
+          contentType: "application/pdf",
         }],
       });
     }
@@ -2646,6 +2662,58 @@ export async function exportPaymentScheduleToExcel(): Promise<ActionResult<strin
 // ============================================================================
 // Helpers
 // ============================================================================
+
+// ============================================================================
+// Cron Schedule Management
+// ============================================================================
+
+export async function getDigestSchedule(): Promise<ActionResult<{ day: number; hour: number } | null>> {
+  const { error, supabase } = await requireAdmin();
+  if (error) return { success: false, error };
+
+  const { data, error: dbError } = await supabase
+    .rpc("get_cron_schedule", { job_name: "finance-weekly-digest" });
+
+  if (dbError) {
+    // If the function doesn't exist or cron not set up, return null
+    return { success: true, data: null };
+  }
+
+  if (!data) return { success: true, data: null };
+
+  // Parse cron expression "0 14 * * 2" → { hour: 14, day: 2 }
+  const parts = (data as string).split(" ");
+  if (parts.length >= 5) {
+    return {
+      success: true,
+      data: { hour: parseInt(parts[1]) || 8, day: parseInt(parts[4]) || 1 },
+    };
+  }
+
+  return { success: true, data: null };
+}
+
+export async function updateDigestSchedule(
+  day: number,
+  hourUtc: number
+): Promise<ActionResult> {
+  const { error, supabase } = await requireAdmin();
+  if (error) return { success: false, error };
+
+  const cronExpr = `0 ${hourUtc} * * ${day}`;
+
+  // Try to update existing job, or create new one
+  const { error: dbError } = await supabase.rpc("update_cron_schedule", {
+    job_name: "finance-weekly-digest",
+    new_schedule: cronExpr,
+  });
+
+  if (dbError) {
+    return { success: false, error: "Failed to update schedule. Make sure pg_cron is enabled." };
+  }
+
+  return { success: true };
+}
 
 function getStartOfWeek(): string {
   const now = new Date();

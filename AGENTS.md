@@ -2,7 +2,24 @@
 
 ## Current Status
 Last updated by: Claude Code
-Timestamp: 2026-03-23
+Timestamp: 2026-03-25
+
+---
+
+## Receivables Table Polish — Mar 25, 2026
+Agent: Claude Code
+Status: **DONE**
+
+### What changed
+- `src/app/(dashboard)/payments/receivables/receivables-table.tsx` — Polished to match invoices table:
+  - Replaced inline `Badge` + `STATUS_BADGE_MAP` with `ReceivableStatusBadge` component (tooltip-enabled)
+  - Added `last_payment_date` display below progress bar in Received column
+  - Added paperclip document indicator column (width 40px) — single doc links directly, multi-doc links to detail page
+  - Added row click navigation to detail page
+  - Matched search bar styling (smaller icon, `h-9`, `sm:max-w-44`)
+  - Matched filter bar gap (`gap-2` not `gap-3`)
+  - Updated `minWidth` to 820 and `colSpan` to 8
+  - Removed unused `Badge` import, `ReceivableStatus` import, `STATUS_BADGE_MAP` constant, `getStatusLabel` function
 
 ---
 

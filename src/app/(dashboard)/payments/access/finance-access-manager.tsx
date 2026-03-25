@@ -30,6 +30,7 @@ import {
   UserPlusIcon,
   TrashIcon,
   BanknoteIcon,
+  ClockIcon,
 } from "lucide-react";
 import {
   useFinanceAccessList,
@@ -37,6 +38,8 @@ import {
   useGrantFinanceAccess,
   useRevokeFinanceAccess,
   useUpdateFinanceApproval,
+  useDigestSchedule,
+  useUpdateDigestSchedule,
 } from "@/lib/react-query/finance";
 import type { FinanceAccessWithUser } from "@/types/finance";
 
@@ -49,6 +52,20 @@ export function FinanceAccessManager() {
 
   const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [revokeTarget, setRevokeTarget] = useState<FinanceAccessWithUser | null>(null);
+
+  // Cron schedule
+  const { data: schedule, isLoading: isLoadingSchedule } = useDigestSchedule();
+  const updateSchedule = useUpdateDigestSchedule();
+  const [scheduleDay, setScheduleDay] = useState<number>(1);
+  const [scheduleHour, setScheduleHour] = useState<number>(8);
+
+  // Sync schedule state when data loads
+  useEffect(() => {
+    if (schedule) {
+      setScheduleDay(schedule.day);
+      setScheduleHour(schedule.hour);
+    }
+  }, [schedule]);
 
   const { setContent } = usePageHeader();
   useEffect(() => {
@@ -208,6 +225,68 @@ export function FinanceAccessManager() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+        </CardContent>
+      </GlassCard>
+
+      {/* Auto Weekly Digest Schedule */}
+      <GlassCard>
+        <CardHeader className="pb-2 pt-4 px-4">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <GradientIcon icon={<ClockIcon className="size-3.5" />} color="blue" size="xs" />
+            Auto Weekly Digest
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-4 pb-4">
+          {isLoadingSchedule ? (
+            <Skeleton className="h-10 w-full" />
+          ) : !schedule ? (
+            <p className="text-sm text-muted-foreground">
+              Weekly digest not configured. Set up pg_cron in Supabase to enable.
+            </p>
+          ) : (
+            <div className="flex flex-col sm:flex-row items-start sm:items-end gap-3">
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Day</label>
+                <select
+                  className="flex h-9 w-full sm:w-36 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  value={scheduleDay}
+                  onChange={(e) => setScheduleDay(Number(e.target.value))}
+                >
+                  <option value={1}>Monday</option>
+                  <option value={2}>Tuesday</option>
+                  <option value={3}>Wednesday</option>
+                  <option value={4}>Thursday</option>
+                  <option value={5}>Friday</option>
+                  <option value={6}>Saturday</option>
+                  <option value={0}>Sunday</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Time (Turkey)</label>
+                <select
+                  className="flex h-9 w-full sm:w-32 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  value={scheduleHour + 3}
+                  onChange={(e) => setScheduleHour(Number(e.target.value) - 3)}
+                >
+                  {Array.from({ length: 24 }, (_, i) => (
+                    <option key={i} value={i}>
+                      {String(i).padStart(2, "0")}:00
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => updateSchedule.mutate({ day: scheduleDay, hourUtc: scheduleHour })}
+                disabled={updateSchedule.isPending || (schedule.day === scheduleDay && schedule.hour === scheduleHour)}
+              >
+                {updateSchedule.isPending ? "Saving..." : "Save Schedule"}
+              </Button>
+              <p className="text-[11px] text-muted-foreground sm:pb-1">
+                Currently: {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][schedule.day]} {String(schedule.hour + 3).padStart(2, "0")}:00 Turkey
+              </p>
             </div>
           )}
         </CardContent>

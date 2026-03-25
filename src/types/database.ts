@@ -891,6 +891,673 @@ export type Database = {
           },
         ]
       }
+      finance_access: {
+        Row: {
+          can_approve: boolean | null
+          created_at: string | null
+          granted_by: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          can_approve?: boolean | null
+          created_at?: string | null
+          granted_by?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          can_approve?: boolean | null
+          created_at?: string | null
+          granted_by?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_access_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "client_team_view"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "finance_access_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_access_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "v_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_access_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "client_team_view"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "finance_access_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_access_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "v_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_categories: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          id: string
+          is_deleted: boolean | null
+          name: string
+          type: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          id?: string
+          is_deleted?: boolean | null
+          name: string
+          type: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          id?: string
+          is_deleted?: boolean | null
+          name?: string
+          type?: string
+        }
+        Relationships: []
+      }
+      finance_documents: {
+        Row: {
+          created_at: string | null
+          file_name: string
+          file_size: number | null
+          file_url: string
+          id: string
+          invoice_id: string | null
+          receivable_id: string | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          file_name: string
+          file_size?: number | null
+          file_url: string
+          id?: string
+          invoice_id?: string | null
+          receivable_id?: string | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          file_name?: string
+          file_size?: number | null
+          file_url?: string
+          id?: string
+          invoice_id?: string | null
+          receivable_id?: string | null
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_documents_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "finance_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_documents_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "v_finance_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_documents_receivable_id_fkey"
+            columns: ["receivable_id"]
+            isOneToOne: false
+            referencedRelation: "finance_receivables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_documents_receivable_id_fkey"
+            columns: ["receivable_id"]
+            isOneToOne: false
+            referencedRelation: "v_finance_receivables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_documents_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "client_team_view"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "finance_documents_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_documents_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "v_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_invoice_installments: {
+        Row: {
+          amount: number
+          created_at: string | null
+          due_date: string
+          id: string
+          installment_number: number
+          invoice_id: string
+          is_deleted: boolean | null
+          status: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          due_date: string
+          id?: string
+          installment_number: number
+          invoice_id: string
+          is_deleted?: boolean | null
+          status?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          due_date?: string
+          id?: string
+          installment_number?: number
+          invoice_id?: string
+          is_deleted?: boolean | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_invoice_installments_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "finance_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_invoice_installments_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "v_finance_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_invoices: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          category_id: string | null
+          created_at: string | null
+          currency: string
+          description: string | null
+          due_date: string
+          has_installments: boolean | null
+          id: string
+          invoice_code: string
+          invoice_date: string
+          invoice_number: string | null
+          is_deleted: boolean | null
+          notes: string | null
+          project_id: string | null
+          rejection_reason: string | null
+          requires_approval: boolean | null
+          status: string
+          supplier_id: string
+          total_amount: number
+          updated_at: string | null
+          vat_amount: number | null
+          vat_rate: number | null
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          category_id?: string | null
+          created_at?: string | null
+          currency?: string
+          description?: string | null
+          due_date: string
+          has_installments?: boolean | null
+          id?: string
+          invoice_code: string
+          invoice_date: string
+          invoice_number?: string | null
+          is_deleted?: boolean | null
+          notes?: string | null
+          project_id?: string | null
+          rejection_reason?: string | null
+          requires_approval?: boolean | null
+          status?: string
+          supplier_id: string
+          total_amount: number
+          updated_at?: string | null
+          vat_amount?: number | null
+          vat_rate?: number | null
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          category_id?: string | null
+          created_at?: string | null
+          currency?: string
+          description?: string | null
+          due_date?: string
+          has_installments?: boolean | null
+          id?: string
+          invoice_code?: string
+          invoice_date?: string
+          invoice_number?: string | null
+          is_deleted?: boolean | null
+          notes?: string | null
+          project_id?: string | null
+          rejection_reason?: string | null
+          requires_approval?: boolean | null
+          status?: string
+          supplier_id?: string
+          total_amount?: number
+          updated_at?: string | null
+          vat_amount?: number | null
+          vat_rate?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_invoices_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "client_team_view"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "finance_invoices_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_invoices_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "v_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_invoices_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "finance_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_invoices_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "client_projects_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_invoices_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_invoices_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "finance_suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_invoices_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "v_finance_suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_payments: {
+        Row: {
+          amount: number
+          created_at: string | null
+          currency: string
+          direction: string
+          id: string
+          invoice_id: string | null
+          is_deleted: boolean | null
+          notes: string | null
+          payment_code: string
+          payment_date: string
+          payment_method: string | null
+          receivable_id: string | null
+          recorded_by: string | null
+          reference_number: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          currency?: string
+          direction: string
+          id?: string
+          invoice_id?: string | null
+          is_deleted?: boolean | null
+          notes?: string | null
+          payment_code: string
+          payment_date: string
+          payment_method?: string | null
+          receivable_id?: string | null
+          recorded_by?: string | null
+          reference_number?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          currency?: string
+          direction?: string
+          id?: string
+          invoice_id?: string | null
+          is_deleted?: boolean | null
+          notes?: string | null
+          payment_code?: string
+          payment_date?: string
+          payment_method?: string | null
+          receivable_id?: string | null
+          recorded_by?: string | null
+          reference_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_payments_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "finance_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_payments_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "v_finance_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_payments_receivable_id_fkey"
+            columns: ["receivable_id"]
+            isOneToOne: false
+            referencedRelation: "finance_receivables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_payments_receivable_id_fkey"
+            columns: ["receivable_id"]
+            isOneToOne: false
+            referencedRelation: "v_finance_receivables"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_payments_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "client_team_view"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "finance_payments_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_payments_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "v_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_receivables: {
+        Row: {
+          category_id: string | null
+          client_id: string
+          created_at: string | null
+          currency: string
+          description: string | null
+          due_date: string
+          id: string
+          is_deleted: boolean | null
+          issue_date: string
+          notes: string | null
+          receivable_code: string
+          reference_number: string | null
+          status: string
+          total_amount: number
+          updated_at: string | null
+        }
+        Insert: {
+          category_id?: string | null
+          client_id: string
+          created_at?: string | null
+          currency?: string
+          description?: string | null
+          due_date: string
+          id?: string
+          is_deleted?: boolean | null
+          issue_date: string
+          notes?: string | null
+          receivable_code: string
+          reference_number?: string | null
+          status?: string
+          total_amount: number
+          updated_at?: string | null
+        }
+        Update: {
+          category_id?: string | null
+          client_id?: string
+          created_at?: string | null
+          currency?: string
+          description?: string | null
+          due_date?: string
+          id?: string
+          is_deleted?: boolean | null
+          issue_date?: string
+          notes?: string | null
+          receivable_code?: string
+          reference_number?: string | null
+          status?: string
+          total_amount?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_receivables_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "finance_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_receivables_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_receivables_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_recurring_templates: {
+        Row: {
+          amount: number
+          category_id: string | null
+          created_at: string | null
+          currency: string
+          day_of_month: number
+          description: string
+          frequency: string
+          id: string
+          is_active: boolean | null
+          is_deleted: boolean | null
+          next_due_date: string
+          requires_approval: boolean | null
+          supplier_id: string
+          template_code: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount: number
+          category_id?: string | null
+          created_at?: string | null
+          currency?: string
+          day_of_month: number
+          description: string
+          frequency: string
+          id?: string
+          is_active?: boolean | null
+          is_deleted?: boolean | null
+          next_due_date: string
+          requires_approval?: boolean | null
+          supplier_id: string
+          template_code: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          category_id?: string | null
+          created_at?: string | null
+          currency?: string
+          day_of_month?: number
+          description?: string
+          frequency?: string
+          id?: string
+          is_active?: boolean | null
+          is_deleted?: boolean | null
+          next_due_date?: string
+          requires_approval?: boolean | null
+          supplier_id?: string
+          template_code?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_recurring_templates_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "finance_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_recurring_templates_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "finance_suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_recurring_templates_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "v_finance_suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_suppliers: {
+        Row: {
+          address: string | null
+          bank_name: string | null
+          category: string | null
+          contact_person: string | null
+          created_at: string | null
+          email: string | null
+          iban: string | null
+          id: string
+          is_deleted: boolean | null
+          name: string
+          notes: string | null
+          phone: string | null
+          supplier_code: string
+          tax_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          bank_name?: string | null
+          category?: string | null
+          contact_person?: string | null
+          created_at?: string | null
+          email?: string | null
+          iban?: string | null
+          id?: string
+          is_deleted?: boolean | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          supplier_code: string
+          tax_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          bank_name?: string | null
+          category?: string | null
+          contact_person?: string | null
+          created_at?: string | null
+          email?: string | null
+          iban?: string | null
+          id?: string
+          is_deleted?: boolean | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          supplier_code?: string
+          tax_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       gantt_dependencies: {
         Row: {
           created_at: string | null
@@ -1509,6 +2176,57 @@ export type Database = {
           },
         ]
       }
+      project_areas: {
+        Row: {
+          area_code: string
+          created_at: string | null
+          floor: string
+          id: string
+          is_deleted: boolean | null
+          name: string
+          project_id: string
+          sort_order: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          area_code: string
+          created_at?: string | null
+          floor: string
+          id?: string
+          is_deleted?: boolean | null
+          name: string
+          project_id: string
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          area_code?: string
+          created_at?: string | null
+          floor?: string
+          id?: string
+          is_deleted?: boolean | null
+          name?: string
+          project_id?: string
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_areas_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "client_projects_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_areas_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_assignments: {
         Row: {
           assigned_at: string | null
@@ -1992,50 +2710,6 @@ export type Database = {
           },
         ]
       }
-      project_areas: {
-        Row: {
-          id: string
-          project_id: string
-          floor: string
-          name: string
-          area_code: string
-          sort_order: number | null
-          is_deleted: boolean | null
-          created_at: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          id?: string
-          project_id: string
-          floor: string
-          name: string
-          area_code: string
-          sort_order?: number | null
-          is_deleted?: boolean | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          id?: string
-          project_id?: string
-          floor?: string
-          name?: string
-          area_code?: string
-          sort_order?: number | null
-          is_deleted?: boolean | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "project_areas_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       scope_items: {
         Row: {
           actual_total_cost: number | null
@@ -2156,6 +2830,20 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "scope_items_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "project_areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scope_items_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "v_project_areas"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "scope_items_parent_id_fkey"
             columns: ["parent_id"]
             isOneToOne: false
@@ -2188,13 +2876,6 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "scope_items_area_id_fkey"
-            columns: ["area_id"]
-            isOneToOne: false
-            referencedRelation: "project_areas"
             referencedColumns: ["id"]
           },
         ]
@@ -2860,6 +3541,87 @@ export type Database = {
         }
         Relationships: []
       }
+      v_finance_invoices: {
+        Row: {
+          category_name: string | null
+          created_at: string | null
+          currency: string | null
+          days_overdue: number | null
+          description: string | null
+          due_date: string | null
+          id: string | null
+          invoice_code: string | null
+          invoice_date: string | null
+          invoice_number: string | null
+          payment_count: number | null
+          remaining: number | null
+          requires_approval: boolean | null
+          status: string | null
+          supplier_code: string | null
+          supplier_name: string | null
+          total_amount: number | null
+          total_paid: number | null
+        }
+        Relationships: []
+      }
+      v_finance_payments: {
+        Row: {
+          amount: number | null
+          client_name: string | null
+          created_at: string | null
+          currency: string | null
+          direction: string | null
+          id: string | null
+          invoice_code: string | null
+          payment_code: string | null
+          payment_date: string | null
+          payment_method: string | null
+          receivable_code: string | null
+          recorded_by_name: string | null
+          reference_number: string | null
+          supplier_name: string | null
+        }
+        Relationships: []
+      }
+      v_finance_receivables: {
+        Row: {
+          category_name: string | null
+          client_code: string | null
+          client_name: string | null
+          created_at: string | null
+          currency: string | null
+          days_overdue: number | null
+          description: string | null
+          due_date: string | null
+          id: string | null
+          issue_date: string | null
+          payment_count: number | null
+          receivable_code: string | null
+          reference_number: string | null
+          remaining: number | null
+          status: string | null
+          total_amount: number | null
+          total_received: number | null
+        }
+        Relationships: []
+      }
+      v_finance_suppliers: {
+        Row: {
+          bank_name: string | null
+          category: string | null
+          contact_person: string | null
+          created_at: string | null
+          email: string | null
+          iban: string | null
+          id: string | null
+          invoice_count: number | null
+          name: string | null
+          phone: string | null
+          supplier_code: string | null
+          total_outstanding: number | null
+        }
+        Relationships: []
+      }
       v_materials: {
         Row: {
           created_at: string | null
@@ -2908,6 +3670,38 @@ export type Database = {
           user_name: string | null
         }
         Relationships: []
+      }
+      v_project_areas: {
+        Row: {
+          area_code: string | null
+          area_name: string | null
+          created_at: string | null
+          floor: string | null
+          id: string | null
+          is_deleted: boolean | null
+          project_code: string | null
+          project_id: string | null
+          project_name: string | null
+          scope_item_count: number | null
+          sort_order: number | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_areas_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "client_projects_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_areas_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       v_project_assignments: {
         Row: {
@@ -3044,9 +3838,11 @@ export type Database = {
       }
     }
     Functions: {
+      can_approve_finance: { Args: never; Returns: boolean }
       generate_entity_code: { Args: { p_entity_type: string }; Returns: string }
       generate_report_code: { Args: { p_project_id: string }; Returns: string }
       generate_slug: { Args: { input_text: string }; Returns: string }
+      get_cron_schedule: { Args: { job_name: string }; Returns: string }
       get_item_project_id: {
         Args: { scope_item_uuid: string }
         Returns: string
@@ -3060,6 +3856,7 @@ export type Database = {
         Args: { p_entity_type: string; p_year: number }
         Returns: string
       }
+      has_finance_access: { Args: never; Returns: boolean }
       is_assigned_to_project: {
         Args: { project_uuid: string }
         Returns: boolean
@@ -3070,6 +3867,10 @@ export type Database = {
       }
       preview_next_project_code: { Args: never; Returns: string }
       storage_project_id: { Args: { object_name: string }; Returns: string }
+      update_cron_schedule: {
+        Args: { job_name: string; new_schedule: string }
+        Returns: undefined
+      }
     }
     Enums: {
       currency: "TRY" | "USD" | "EUR"
@@ -3283,11 +4084,11 @@ export const Constants = {
   },
 } as const
 
+
 // ============================================================================
 // Convenience Type Aliases
 // ============================================================================
 
-// Enum aliases
 export type ProjectStatus = Enums<"project_status">;
 export type Currency = Enums<"currency">;
 export type DrawingStatus = Enums<"drawing_status">;
@@ -3295,8 +4096,6 @@ export type ProcurementStatus = Enums<"procurement_status">;
 export type ItemPath = Enums<"item_path">;
 export type ItemStatus = Enums<"item_status">;
 export type UserRole = Enums<"user_role">;
-
-// Table Insert/Update aliases
 export type ClientInsert = TablesInsert<"clients">;
 export type ClientUpdate = TablesUpdate<"clients">;
 export type ProjectInsert = TablesInsert<"projects">;

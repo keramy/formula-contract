@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -28,28 +27,23 @@ import {
   PlusIcon,
   SearchIcon,
   DownloadIcon,
+  PaperclipIcon,
 } from "lucide-react";
 import { useBreakpoint } from "@/hooks/use-media-query";
 import { useReceivables, useCategories, useExportReceivables } from "@/lib/react-query/finance";
 import { RECEIVABLE_STATUSES } from "@/types/finance";
-import type { ReceivableFilters, FinanceReceivableWithDetails, ReceivableStatus } from "@/types/finance";
+import type { ReceivableFilters, FinanceReceivableWithDetails } from "@/types/finance";
 import { formatCurrency } from "@/lib/utils";
 import { ReceivableSheet } from "./receivable-sheet";
+import { ReceivableStatusBadge } from "../receivable-status-badge";
 import { cn } from "@/lib/utils";
-
-const STATUS_BADGE_MAP: Record<ReceivableStatus, { variant: string; className: string }> = {
-  pending: { variant: "secondary", className: "" },
-  partially_received: { variant: "outline", className: "border-orange-300 text-orange-700 bg-orange-50" },
-  received: { variant: "outline", className: "border-teal-300 text-teal-700 bg-teal-50" },
-  overdue: { variant: "destructive", className: "" },
-  cancelled: { variant: "secondary", className: "opacity-60" },
-};
 
 export function ReceivablesTable() {
   const [filters, setFilters] = useState<ReceivableFilters>({});
   const [search, setSearch] = useState("");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingReceivable, setEditingReceivable] = useState<FinanceReceivableWithDetails | null>(null);
+  const [previewId, setPreviewId] = useState<string | null>(null);
 
   const { data: receivables, isLoading } = useReceivables(filters);
   const { data: categories } = useCategories();
@@ -109,9 +103,6 @@ export function ReceivablesTable() {
     });
   };
 
-  const getStatusLabel = (status: string) =>
-    RECEIVABLE_STATUSES.find((s) => s.value === status)?.label || status;
-
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
     return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
@@ -159,12 +150,12 @@ export function ReceivablesTable() {
   return (
     <div className="p-4 md:p-6 space-y-5">
       {/* Filter Bar */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex flex-col sm:flex-row gap-2">
         <Select
           value={filters.status || "all"}
           onValueChange={(v) => handleFilterChange("status", v)}
         >
-          <SelectTrigger className="w-full sm:w-40">
+          <SelectTrigger className="w-full sm:w-36">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -179,7 +170,7 @@ export function ReceivablesTable() {
           value={filters.category_id || "all"}
           onValueChange={(v) => handleFilterChange("category_id", v)}
         >
-          <SelectTrigger className="w-full sm:w-40">
+          <SelectTrigger className="w-full sm:w-36">
             <SelectValue placeholder="Category" />
           </SelectTrigger>
           <SelectContent>
@@ -192,13 +183,14 @@ export function ReceivablesTable() {
           </SelectContent>
         </Select>
 
-        <div className="relative flex-1">
-          <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+        {/* Search */}
+        <div className="relative flex-1 min-w-0 sm:max-w-44">
+          <SearchIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
           <Input
-            placeholder="Search receivables..."
+            placeholder="Search..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
+            className="pl-8 h-9"
           />
         </div>
       </div>
@@ -211,7 +203,6 @@ export function ReceivablesTable() {
           ) : (
             filtered.map((rec) => {
               const client = rec.client as { company_name: string; client_code: string } | null;
-              const statusStyle = STATUS_BADGE_MAP[rec.status as ReceivableStatus] || STATUS_BADGE_MAP.pending;
               return (
                 <Link key={rec.id} href={`/payments/receivables/${rec.id}`}>
                   <GlassCard
@@ -234,9 +225,7 @@ export function ReceivablesTable() {
                           </p>
                         )}
                       </div>
-                      <Badge className={cn("shrink-0 text-xs", statusStyle.className)}>
-                        {getStatusLabel(rec.status)}
-                      </Badge>
+                      <ReceivableStatusBadge receivable={rec} className="shrink-0" />
                     </div>
                     <div className="flex items-center justify-between mt-3 text-xs">
                       <span className="font-medium tabular-nums">
@@ -266,7 +255,7 @@ export function ReceivablesTable() {
         <GlassCard className="py-0 overflow-hidden">
           <div className="overflow-x-auto">
           <Table
-            style={{ tableLayout: "fixed", minWidth: 780 }}
+            style={{ tableLayout: "fixed", minWidth: 820 }}
             className="[&_th]:border-r [&_th]:border-base-200 [&_th:last-child]:border-r-0 [&_td]:border-r [&_td]:border-base-200 [&_td:last-child]:border-r-0 [&_td]:align-middle"
           >
             <TableHeader>
@@ -278,19 +267,19 @@ export function ReceivablesTable() {
                 <TableHead className="py-2.5 text-xs font-semibold text-muted-foreground" style={{ width: 120 }}>Received</TableHead>
                 <TableHead className="py-2.5 text-xs font-semibold text-muted-foreground text-center" style={{ width: 95 }}>Status</TableHead>
                 <TableHead className="py-2.5 text-xs font-semibold text-muted-foreground text-right" style={{ width: 110 }}>Remaining</TableHead>
+                <TableHead className="py-2.5" style={{ width: 40 }} />
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     No receivables found.
                   </TableCell>
                 </TableRow>
               ) : (
                 filtered.map((rec, idx) => {
                   const client = rec.client as { company_name: string; client_code: string } | null;
-                  const statusStyle = STATUS_BADGE_MAP[rec.status as ReceivableStatus] || STATUS_BADGE_MAP.pending;
                   const dueInfo = formatDueInfo(rec);
                   const receivedPercent = rec.total_amount > 0
                     ? Math.min(100, Math.round((rec.total_received / rec.total_amount) * 100))
@@ -303,16 +292,21 @@ export function ReceivablesTable() {
                         idx % 2 === 1 ? "bg-base-50/50" : "bg-white",
                         rec.days_overdue > 0 && "!bg-rose-50/40"
                       )}
+                      onClick={() => {
+                        window.location.href = `/payments/receivables/${rec.id}`;
+                      }}
                     >
-                      <TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         <Link href={`/payments/receivables/${rec.id}`} className="font-mono text-xs hover:underline text-primary">
                           {rec.receivable_code}
                         </Link>
                       </TableCell>
                       <TableCell>
-                        <div className="font-medium text-sm">{client?.company_name || "—"}</div>
+                        <div className="font-medium text-sm truncate">{client?.company_name || "—"}</div>
                         {rec.reference_number && (
-                          <div className="text-xs text-muted-foreground">#{rec.reference_number}</div>
+                          <div className="text-[11px] text-muted-foreground truncate">
+                            #{rec.reference_number}
+                          </div>
                         )}
                       </TableCell>
                       <TableCell>
@@ -353,11 +347,14 @@ export function ReceivablesTable() {
                             {receivedPercent}%
                           </span>
                         </div>
+                        {rec.last_payment_date && (
+                          <div className="text-[10px] text-muted-foreground mt-0.5">
+                            Last: {formatDate(rec.last_payment_date)}
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell className="text-center">
-                        <Badge className={cn("text-[11px] px-2 py-0.5", statusStyle.className)}>
-                          {getStatusLabel(rec.status)}
-                        </Badge>
+                        <ReceivableStatusBadge receivable={rec} />
                       </TableCell>
                       <TableCell className="text-right">
                         <span className={cn(
@@ -366,6 +363,30 @@ export function ReceivablesTable() {
                         )}>
                           {formatCurrency(rec.remaining, rec.currency)}
                         </span>
+                      </TableCell>
+                      <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                        {rec.document_count > 0 && (
+                          rec.document_count === 1 && rec.first_document_url ? (
+                            <a
+                              href={rec.first_document_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-0.5 text-muted-foreground hover:text-primary transition-colors"
+                              title="View document"
+                            >
+                              <PaperclipIcon className="size-3.5" />
+                            </a>
+                          ) : (
+                            <Link
+                              href={`/payments/receivables/${rec.id}`}
+                              className="inline-flex items-center gap-0.5 text-muted-foreground hover:text-primary transition-colors"
+                              title={`${rec.document_count} documents`}
+                            >
+                              <PaperclipIcon className="size-3.5" />
+                              <span className="text-[10px]">{rec.document_count}</span>
+                            </Link>
+                          )
+                        )}
                       </TableCell>
                     </TableRow>
                   );

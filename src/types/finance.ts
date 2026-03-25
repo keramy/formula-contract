@@ -208,6 +208,9 @@ export interface FinanceReceivableWithDetails extends FinanceReceivable {
   remaining: number;
   payment_count: number;
   days_overdue: number;
+  last_payment_date: string | null;
+  document_count: number;
+  first_document_url: string | null;
   documents?: FinanceDocument[];
   payments?: FinancePayment[];
 }

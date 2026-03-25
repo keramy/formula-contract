@@ -56,6 +56,9 @@ import {
   // Documents
   uploadFinanceDocument,
   deleteFinanceDocument,
+  // Cron
+  getDigestSchedule,
+  updateDigestSchedule,
   // Notifications
   sendManualSummary,
   notifyTeamUrgent,
@@ -715,6 +718,37 @@ export function useDeleteFinanceDocument() {
       queryClient.invalidateQueries({ queryKey: financeKeys.invoices() });
       queryClient.invalidateQueries({ queryKey: financeKeys.receivables() });
       toast.success("Document deleted");
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+}
+
+// ============================================================================
+// Cron Schedule Hooks
+// ============================================================================
+
+export function useDigestSchedule() {
+  return useQuery({
+    queryKey: [...financeKeys.all, "digestSchedule"] as const,
+    queryFn: async () => {
+      const result = await getDigestSchedule();
+      if (!result.success) throw new Error(result.error || "Failed to fetch schedule");
+      return result.data;
+    },
+    staleTime: STALE_TIME,
+  });
+}
+
+export function useUpdateDigestSchedule() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ day, hourUtc }: { day: number; hourUtc: number }) => {
+      const result = await updateDigestSchedule(day, hourUtc);
+      if (!result.success) throw new Error(result.error || "Failed to update schedule");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...financeKeys.all, "digestSchedule"] });
+      toast.success("Digest schedule updated");
     },
     onError: (error: Error) => toast.error(error.message),
   });
