@@ -1,4 +1,5 @@
-import { createClient, getUserProfileFromJWT } from "@/lib/supabase/server";
+import { getRequestContext, getUserProfileFromJWT } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { GlassCard, GradientIcon, StatusBadge } from "@/components/ui/ui-helpers";
@@ -49,19 +50,15 @@ export default async function DashboardPage() {
   const pageStart = performance.now();
   console.log("\n📊 [PROFILE] Dashboard Data Fetch Starting...");
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const ctx = await getRequestContext();
+  if (!ctx) redirect("/login");
+
+  const { supabase, user, role: userRole } = ctx;
 
   // Get user profile from JWT metadata
-  let userId = user?.id || "";
-  let userName = "User";
-  let userRole = "pm";
-
-  if (user) {
-    const profile = await getUserProfileFromJWT(user, supabase);
-    userName = profile.name;
-    userRole = profile.role;
-  }
+  const userId = user.id;
+  const profile = await getUserProfileFromJWT(user, supabase);
+  const userName = profile.name;
 
   const isClient = userRole === "client";
   const canSeeAllProjects = ["admin", "management"].includes(userRole);
@@ -97,7 +94,7 @@ export default async function DashboardPage() {
   } else if (isOperationalRole) {
     // PM/Production/Procurement: Only assigned projects
     const myStats = await safe(
-      getMyDashboardStats(assignedProjectIds),
+      getMyDashboardStats(assignedProjectIds, ctx),
       { projectCounts: { total: 0, tender: 0, active: 0, on_hold: 0, completed: 0, cancelled: 0, not_awarded: 0 }, recentProjects: [] }
     );
     projectCounts = myStats.projectCounts;
@@ -132,33 +129,33 @@ export default async function DashboardPage() {
   ] = await Promise.all([
     // My Tasks - PM and Admin only
     (userRole === "pm" || canSeeAllProjects)
-      ? safe(getMyTasks(userRole === "pm" ? assignedProjectIds : undefined), emptyTasks)
+      ? safe(getMyTasks(userRole === "pm" ? assignedProjectIds : undefined, ctx), emptyTasks)
       : Promise.resolve(emptyTasks),
     // At-Risk Projects - admin/management/pm
     (canSeeAllProjects || userRole === "pm")
-      ? safe(getAtRiskProjects(userRole === "pm" ? assignedProjectIds : undefined), [])
+      ? safe(getAtRiskProjects(userRole === "pm" ? assignedProjectIds : undefined, ctx), [])
       : Promise.resolve([]),
     // Pending Approvals - Client only
-    isClient ? safe(getPendingApprovals(userId), []) : Promise.resolve([]),
+    isClient ? safe(getPendingApprovals(userId, ctx), []) : Promise.resolve([]),
     // Client Project Progress - Client only
-    isClient ? safe(getClientProjectProgress(userId), []) : Promise.resolve([]),
+    isClient ? safe(getClientProjectProgress(userId, ctx), []) : Promise.resolve([]),
     // Upcoming Milestones - non-client users
     !isClient
-      ? safe(getDashboardMilestones(userRole === "pm" ? assignedProjectIds : undefined), [])
+      ? safe(getDashboardMilestones(userRole === "pm" ? assignedProjectIds : undefined, ctx), [])
       : Promise.resolve([]),
     // Production Queue - Production role
-    isProduction ? safe(getProductionQueue(), emptyProductionQueue) : Promise.resolve(emptyProductionQueue),
+    isProduction ? safe(getProductionQueue(ctx), emptyProductionQueue) : Promise.resolve(emptyProductionQueue),
     // Procurement Queue - Procurement role
-    isProcurement ? safe(getProcurementQueue(), emptyProcurementQueue) : Promise.resolve(emptyProcurementQueue),
+    isProcurement ? safe(getProcurementQueue(ctx), emptyProcurementQueue) : Promise.resolve(emptyProcurementQueue),
     // Financial Overview - Admin/Management only
-    canSeeAllProjects ? safe(getFinancialOverview(), emptyFinancial) : Promise.resolve(emptyFinancial),
+    canSeeAllProjects ? safe(getFinancialOverview(ctx), emptyFinancial) : Promise.resolve(emptyFinancial),
     // This Week Summary - Admin/Management/PM
     (canSeeAllProjects || userRole === "pm")
-      ? safe(getThisWeekSummary(userRole === "pm" ? assignedProjectIds : undefined), emptyThisWeek)
+      ? safe(getThisWeekSummary(userRole === "pm" ? assignedProjectIds : undefined, ctx), emptyThisWeek)
       : Promise.resolve(emptyThisWeek),
     // Projects by Status Chart - Admin/Management only
     canSeeAllProjects
-      ? safe(getProjectsByStatus(), emptyProjectsStatus)
+      ? safe(getProjectsByStatus(ctx), emptyProjectsStatus)
       : Promise.resolve(emptyProjectsStatus),
   ]);
 

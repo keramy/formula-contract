@@ -10,7 +10,7 @@
  * - Email and in-app notifications
  */
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, type RequestContext } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { logActivity } from "@/lib/activity-log/actions";
 import { ACTIVITY_ACTIONS } from "@/lib/activity-log/constants";
@@ -52,8 +52,8 @@ export interface ActionResult {
 /**
  * Get all users assigned to a project
  */
-export async function getProjectAssignments(projectId: string): Promise<ProjectAssignment[]> {
-  const supabase = await createClient();
+export async function getProjectAssignments(projectId: string, ctx?: RequestContext): Promise<ProjectAssignment[]> {
+  const supabase = ctx?.supabase ?? await createClient();
 
   // OPTIMIZED: Single query with nested user select (was 2 queries)
   // Using explicit FK reference to avoid "more than one relationship" error
@@ -92,8 +92,8 @@ export async function getProjectAssignments(projectId: string): Promise<ProjectA
 /**
  * Get users who are not yet assigned to a project
  */
-export async function getAvailableUsers(projectId: string): Promise<AvailableUser[]> {
-  const supabase = await createClient();
+export async function getAvailableUsers(projectId: string, ctx?: RequestContext): Promise<AvailableUser[]> {
+  const supabase = ctx?.supabase ?? await createClient();
 
   // Fetch assignments and all users in PARALLEL, then filter client-side
   const [assignmentsResult, usersResult] = await Promise.all([
@@ -132,12 +132,13 @@ export async function getAvailableUsers(projectId: string): Promise<AvailableUse
  */
 export async function assignUserToProject(
   projectId: string,
-  userId: string
+  userId: string,
+  ctx?: RequestContext
 ): Promise<ActionResult> {
-  const supabase = await createClient();
+  const supabase = ctx?.supabase ?? await createClient();
 
   // Get current user for assigned_by
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
   if (!user) {
     return { success: false, error: "Not authenticated" };
   }
@@ -229,9 +230,10 @@ export async function assignUserToProject(
  */
 export async function removeUserFromProject(
   projectId: string,
-  userId: string
+  userId: string,
+  ctx?: RequestContext
 ): Promise<ActionResult> {
-  const supabase = await createClient();
+  const supabase = ctx?.supabase ?? await createClient();
 
   // Get user details for logging
   const { data: removedUser } = await supabase

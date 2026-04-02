@@ -9,7 +9,7 @@
  * - Email notifications via Resend batch API
  */
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, type RequestContext } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { logActivity } from "@/lib/activity-log/actions";
 import { ACTIVITY_ACTIONS } from "@/lib/activity-log/constants";
@@ -53,8 +53,8 @@ export interface ActionResult<T = void> {
 // Get Milestones for a project
 // ============================================================================
 
-export async function getMilestones(projectId: string): Promise<Milestone[]> {
-  const supabase = await createClient();
+export async function getMilestones(projectId: string, ctx?: RequestContext): Promise<Milestone[]> {
+  const supabase = ctx?.supabase ?? await createClient();
   const { data, error } = await supabase
     .from("milestones")
     .select("id, project_id, name, description, due_date, is_completed, completed_at, alert_days_before")
@@ -73,11 +73,12 @@ export async function getMilestones(projectId: string): Promise<Milestone[]> {
 // ============================================================================
 
 export async function createMilestone(
-  input: MilestoneInput
+  input: MilestoneInput,
+  ctx?: RequestContext
 ): Promise<ActionResult<Milestone>> {
-  const supabase = await createClient();
+  const supabase = ctx?.supabase ?? await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
   if (!user) {
     return { success: false, error: "Not authenticated" };
   }
@@ -143,11 +144,12 @@ export async function createMilestone(
 
 export async function updateMilestone(
   milestoneId: string,
-  input: Partial<MilestoneInput>
+  input: Partial<MilestoneInput>,
+  ctx?: RequestContext
 ): Promise<ActionResult<Milestone>> {
-  const supabase = await createClient();
+  const supabase = ctx?.supabase ?? await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
   if (!user) {
     return { success: false, error: "Not authenticated" };
   }
@@ -202,11 +204,12 @@ export async function updateMilestone(
 
 export async function completeMilestone(
   milestoneId: string,
-  isCompleted: boolean = true
+  isCompleted: boolean = true,
+  ctx?: RequestContext
 ): Promise<ActionResult> {
-  const supabase = await createClient();
+  const supabase = ctx?.supabase ?? await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
   if (!user) {
     return { success: false, error: "Not authenticated" };
   }
@@ -278,11 +281,12 @@ export async function completeMilestone(
 // ============================================================================
 
 export async function deleteMilestone(
-  milestoneId: string
+  milestoneId: string,
+  ctx?: RequestContext
 ): Promise<ActionResult> {
-  const supabase = await createClient();
+  const supabase = ctx?.supabase ?? await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
   if (!user) {
     return { success: false, error: "Not authenticated" };
   }
@@ -329,10 +333,10 @@ export async function deleteMilestone(
 export async function getUpcomingMilestones(options?: {
   limit?: number;
   projectId?: string;
-}): Promise<Milestone[]> {
-  const supabase = await createClient();
+}, ctx?: RequestContext): Promise<Milestone[]> {
+  const supabase = ctx?.supabase ?? await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
   if (!user) return [];
 
   let query = supabase
@@ -370,10 +374,10 @@ export async function getUpcomingMilestones(options?: {
 
 export async function getOverdueMilestones(options?: {
   projectId?: string;
-}): Promise<Milestone[]> {
-  const supabase = await createClient();
+}, ctx?: RequestContext): Promise<Milestone[]> {
+  const supabase = ctx?.supabase ?? await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
   if (!user) return [];
 
   const today = new Date().toISOString().split("T")[0];

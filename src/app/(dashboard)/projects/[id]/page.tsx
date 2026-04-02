@@ -1,6 +1,6 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
-import { createClient, getUserRoleFromJWT } from "@/lib/supabase/server";
+import { getRequestContext } from "@/lib/supabase/server";
 import { TabsContent } from "@/components/ui/tabs";
 import { ProjectTabs } from "./project-tabs";
 import { ScopeItemsTable } from "./scope-items-table";
@@ -143,21 +143,15 @@ export default async function ProjectDetailPage({
 
   const pageStart = performance.now();
   const { id } = await params;
-  const supabase = await createClient();
 
   console.log("\n📊 [PROFILE] Project Detail Data Fetch Starting...");
 
-  // OPTIMIZED: Get user and role in single auth call
+  // OPTIMIZED: Resolve auth context once, pass to all helpers
   const authStart = performance.now();
-  const { data: { user } } = await supabase.auth.getUser();
-  console.log(`  🔐 auth.getUser: ${(performance.now() - authStart).toFixed(0)}ms`);
-
-  if (!user) {
-    notFound();
-  }
-
-  // PERFORMANCE: Get user role from JWT metadata (avoids ~3s DB query!)
-  const userRole = await getUserRoleFromJWT(user, supabase);
+  const ctx = await getRequestContext();
+  if (!ctx) redirect("/login");
+  const { supabase, user, role: userRole } = ctx;
+  console.log(`  🔐 getRequestContext: ${(performance.now() - authStart).toFixed(0)}ms`);
 
   // Determine if the parameter is a UUID or slug
   const isIdUUID = isUUID(id);
@@ -281,7 +275,7 @@ export default async function ProjectDetailPage({
     // 6. Assignments
     (async () => {
       const start = performance.now();
-      const result = await getProjectAssignments(projectId);
+      const result = await getProjectAssignments(projectId, ctx);
       console.log(`  👥 Assignments: ${(performance.now() - start).toFixed(0)}ms`);
       return result;
     })(),

@@ -8,7 +8,7 @@
  * including email notifications and activity logging.
  */
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, type RequestContext } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { logActivity } from "@/lib/activity-log/actions";
 import { ACTIVITY_ACTIONS } from "@/lib/activity-log/constants";
@@ -35,14 +35,13 @@ interface SendDrawingsResult {
  */
 export async function sendDrawingsToClient(
   projectId: string,
-  drawingIds: string[]
+  drawingIds: string[],
+  ctx?: RequestContext
 ): Promise<SendDrawingsResult> {
-  const supabase = await createClient();
+  const supabase = ctx?.supabase ?? await createClient();
 
   // 1. Auth check
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
   if (!user) {
     return { success: false, sentCount: 0, emailsSent: 0, emailsFailed: 0, error: "Not authenticated" };
   }
@@ -250,14 +249,13 @@ export async function overrideDrawingApproval(
   scopeItemId: string,
   projectId: string,
   itemCode: string,
-  currentRevision: string
+  currentRevision: string,
+  ctx?: RequestContext
 ): Promise<OverrideResult> {
-  const supabase = await createClient();
+  const supabase = ctx?.supabase ?? await createClient();
 
   // 1. Auth check
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
   if (!user) {
     return { success: false, error: "Not authenticated" };
   }

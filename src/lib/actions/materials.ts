@@ -12,7 +12,7 @@
  */
 
 import { revalidatePath } from "next/cache";
-import { createClient, createServiceRoleClient, getUserRoleFromJWT } from "@/lib/supabase/server";
+import { createClient, createServiceRoleClient, getUserRoleFromJWT, type RequestContext } from "@/lib/supabase/server";
 import { sanitizeText } from "@/lib/sanitize";
 import { logActivity } from "@/lib/activity-log/actions";
 
@@ -72,13 +72,14 @@ export interface MaterialWithAssignments extends Material {
  * Get all materials for a project
  */
 export async function getMaterials(
-  projectId: string
+  projectId: string,
+  ctx?: RequestContext
 ): Promise<ActionResult<MaterialWithAssignments[]>> {
   try {
-    const supabase = await createClient();
+    const supabase = ctx?.supabase ?? await createClient();
 
     // Check authentication
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
     if (!user) {
       return { success: false, error: "Not authenticated" };
     }
@@ -119,13 +120,14 @@ export async function getMaterials(
  * Get a single material by ID
  */
 export async function getMaterial(
-  materialId: string
+  materialId: string,
+  ctx?: RequestContext
 ): Promise<ActionResult<MaterialWithAssignments>> {
   try {
-    const supabase = await createClient();
+    const supabase = ctx?.supabase ?? await createClient();
 
     // Check authentication
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
     if (!user) {
       return { success: false, error: "Not authenticated" };
     }
@@ -172,13 +174,14 @@ export async function getMaterial(
 export async function createMaterial(
   projectId: string,
   input: MaterialInput,
-  assignedItemIds?: string[]
+  assignedItemIds?: string[],
+  ctx?: RequestContext
 ): Promise<ActionResult<{ id: string }>> {
   try {
-    const supabase = await createClient();
+    const supabase = ctx?.supabase ?? await createClient();
 
     // Check authentication
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
     if (!user) {
       return { success: false, error: "Not authenticated" };
     }
@@ -248,13 +251,14 @@ export async function updateMaterial(
   materialId: string,
   projectId: string,
   input: MaterialInput,
-  assignedItemIds?: string[]
+  assignedItemIds?: string[],
+  ctx?: RequestContext
 ): Promise<ActionResult> {
   try {
-    const supabase = await createClient();
+    const supabase = ctx?.supabase ?? await createClient();
 
     // Check authentication
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
     if (!user) {
       return { success: false, error: "Not authenticated" };
     }
@@ -328,13 +332,14 @@ export async function updateMaterial(
  */
 export async function deleteMaterial(
   materialId: string,
-  projectId: string
+  projectId: string,
+  ctx?: RequestContext
 ): Promise<ActionResult> {
   try {
-    const supabase = await createClient();
+    const supabase = ctx?.supabase ?? await createClient();
 
     // Check authentication
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
     if (!user) {
       return { success: false, error: "Not authenticated" };
     }
@@ -396,13 +401,14 @@ export async function updateItemMaterialAssignments(
   scopeItemId: string,
   projectId: string,
   currentMaterialIds: string[],
-  selectedMaterialIds: string[]
+  selectedMaterialIds: string[],
+  ctx?: RequestContext
 ): Promise<ActionResult> {
   try {
-    const supabase = await createClient();
+    const supabase = ctx?.supabase ?? await createClient();
 
     // Check authentication
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
     if (!user) {
       return { success: false, error: "Not authenticated" };
     }
@@ -471,13 +477,14 @@ export async function updateItemMaterialAssignments(
 export async function removeItemMaterial(
   scopeItemId: string,
   materialId: string,
-  projectId: string
+  projectId: string,
+  ctx?: RequestContext
 ): Promise<ActionResult> {
   try {
-    const supabase = await createClient();
+    const supabase = ctx?.supabase ?? await createClient();
 
     // Check authentication
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
     if (!user) {
       return { success: false, error: "Not authenticated" };
     }
@@ -528,13 +535,14 @@ export async function removeItemMaterial(
  */
 export async function bulkImportMaterials(
   projectId: string,
-  materials: BulkMaterialImportItem[]
+  materials: BulkMaterialImportItem[],
+  ctx?: RequestContext
 ): Promise<ActionResult<{ inserted: number; updated: number }>> {
   try {
-    const supabase = await createClient();
+    const supabase = ctx?.supabase ?? await createClient();
 
     // Check authentication
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
     if (!user) {
       return { success: false, error: "Not authenticated" };
     }
@@ -676,13 +684,14 @@ export async function bulkImportMaterials(
 export async function updateMaterialStatus(
   materialId: string,
   projectId: string,
-  status: "pending" | "approved" | "rejected"
+  status: "pending" | "approved" | "rejected",
+  ctx?: RequestContext
 ): Promise<ActionResult> {
   try {
-    const supabase = await createClient();
+    const supabase = ctx?.supabase ?? await createClient();
 
     // Check authentication
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
     if (!user) {
       return { success: false, error: "Not authenticated" };
     }
@@ -724,13 +733,14 @@ export async function updateMaterialStatus(
  */
 export async function uploadMaterialImages(
   projectId: string,
-  files: { name: string; type: string; data: string }[] // base64 data
+  files: { name: string; type: string; data: string }[], // base64 data
+  ctx?: RequestContext
 ): Promise<ActionResult<string[]>> {
   try {
-    const supabase = await createClient();
+    const supabase = ctx?.supabase ?? await createClient();
 
     // Check authentication
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
     if (!user) {
       return { success: false, error: "Not authenticated" };
     }

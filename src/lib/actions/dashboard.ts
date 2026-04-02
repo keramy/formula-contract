@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, type RequestContext } from "@/lib/supabase/server";
 
 /** Throw if a Supabase query returned an error so the page-level safe() wrapper can catch it. */
 function throwOnError(
@@ -79,8 +79,8 @@ export interface DashboardStats {
  * Get dashboard stats filtered by assigned project IDs
  * Used for PM, Production, Procurement roles who only see their projects
  */
-export async function getMyDashboardStats(assignedProjectIds: string[]): Promise<DashboardStats> {
-  const supabase = await createClient();
+export async function getMyDashboardStats(assignedProjectIds: string[], ctx?: RequestContext): Promise<DashboardStats> {
+  const supabase = ctx?.supabase ?? await createClient();
 
   if (assignedProjectIds.length === 0) {
     return {
@@ -149,8 +149,8 @@ export async function getMyDashboardStats(assignedProjectIds: string[]): Promise
  * Shows what needs attention right now
  * @param projectIds - Optional filter for specific projects (used by PM role)
  */
-export async function getMyTasks(projectIds?: string[]): Promise<TaskSummary> {
-  const supabase = await createClient();
+export async function getMyTasks(projectIds?: string[], ctx?: RequestContext): Promise<TaskSummary> {
+  const supabase = ctx?.supabase ?? await createClient();
   const now = new Date().toISOString();
 
   // If filtering by projects and no projects assigned, return zeros
@@ -248,8 +248,8 @@ export async function getMyTasks(projectIds?: string[]): Promise<TaskSummary> {
  * Used for PM/Admin dashboards to prioritize attention
  * @param projectIds - Optional filter for specific projects (used by PM role)
  */
-export async function getAtRiskProjects(projectIds?: string[]): Promise<AtRiskProject[]> {
-  const supabase = await createClient();
+export async function getAtRiskProjects(projectIds?: string[], ctx?: RequestContext): Promise<AtRiskProject[]> {
+  const supabase = ctx?.supabase ?? await createClient();
   const now = new Date().toISOString();
 
   // If filtering by projects and no projects assigned, return empty
@@ -381,8 +381,8 @@ export async function getAtRiskProjects(projectIds?: string[]): Promise<AtRiskPr
  * Get pending approvals for client dashboard
  * Shows drawings/materials awaiting client response
  */
-export async function getPendingApprovals(userId: string): Promise<PendingApproval[]> {
-  const supabase = await createClient();
+export async function getPendingApprovals(userId: string, ctx?: RequestContext): Promise<PendingApproval[]> {
+  const supabase = ctx?.supabase ?? await createClient();
 
   // Get projects assigned to this user (client)
   const assignmentsResult = await supabase
@@ -496,8 +496,8 @@ export async function getPendingApprovals(userId: string): Promise<PendingApprov
  * Get project progress for client dashboard
  * Shows simplified view of client's assigned projects
  */
-export async function getClientProjectProgress(userId: string): Promise<ClientProjectProgress[]> {
-  const supabase = await createClient();
+export async function getClientProjectProgress(userId: string, ctx?: RequestContext): Promise<ClientProjectProgress[]> {
+  const supabase = ctx?.supabase ?? await createClient();
 
   // Get projects assigned to this user
   const assignmentsResult = await supabase
@@ -632,8 +632,8 @@ export interface ProductionQueueSummary {
   totalPendingInstall: number;
 }
 
-export async function getProductionQueue(): Promise<ProductionQueueSummary> {
-  const supabase = await createClient();
+export async function getProductionQueue(ctx?: RequestContext): Promise<ProductionQueueSummary> {
+  const supabase = ctx?.supabase ?? await createClient();
 
   // Get scope items that are in production path
   const itemsResult = await supabase
@@ -724,8 +724,8 @@ export interface ProcurementQueueSummary {
   totalPendingApproval: number;
 }
 
-export async function getProcurementQueue(): Promise<ProcurementQueueSummary> {
-  const supabase = await createClient();
+export async function getProcurementQueue(ctx?: RequestContext): Promise<ProcurementQueueSummary> {
+  const supabase = ctx?.supabase ?? await createClient();
 
   // Get scope items that are in procurement path
   const itemsResult = await supabase
@@ -843,8 +843,8 @@ export interface FinancialOverview {
   projectCount: number;
 }
 
-export async function getFinancialOverview(): Promise<FinancialOverview> {
-  const supabase = await createClient();
+export async function getFinancialOverview(ctx?: RequestContext): Promise<FinancialOverview> {
+  const supabase = ctx?.supabase ?? await createClient();
 
   const financialResult = await supabase
     .from("projects")
@@ -893,8 +893,8 @@ export interface ThisWeekSummary {
  * Get this week's activity summary
  * @param projectIds - Optional filter for specific projects (used by PM role)
  */
-export async function getThisWeekSummary(projectIds?: string[]): Promise<ThisWeekSummary> {
-  const supabase = await createClient();
+export async function getThisWeekSummary(projectIds?: string[], ctx?: RequestContext): Promise<ThisWeekSummary> {
+  const supabase = ctx?.supabase ?? await createClient();
 
   // If filtering by projects and no projects assigned, return zeros
   if (projectIds && projectIds.length === 0) {
@@ -990,8 +990,8 @@ export interface ProjectsByStatus {
   total: number;
 }
 
-export async function getProjectsByStatus(): Promise<ProjectsByStatus> {
-  const supabase = await createClient();
+export async function getProjectsByStatus(ctx?: RequestContext): Promise<ProjectsByStatus> {
+  const supabase = ctx?.supabase ?? await createClient();
 
   const statusResult = await supabase
     .from("projects")
@@ -1024,10 +1024,10 @@ export async function getProjectsByStatus(): Promise<ProjectsByStatus> {
  * Get dashboard milestones
  * @param projectIds - Optional filter for specific projects (used by PM role)
  */
-export async function getDashboardMilestones(projectIds?: string[]): Promise<DashboardMilestone[]> {
-  const supabase = await createClient();
+export async function getDashboardMilestones(projectIds?: string[], ctx?: RequestContext): Promise<DashboardMilestone[]> {
+  const supabase = ctx?.supabase ?? await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
   if (!user) return [];
 
   // If filtering by projects and no projects assigned, return empty

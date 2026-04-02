@@ -116,6 +116,28 @@ export async function getUserProfileFromJWT(
 }
 
 /**
+ * Request context — resolved once per server request, passed to helpers.
+ * Eliminates redundant createClient() + auth.getUser() calls.
+ */
+export interface RequestContext {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  user: User;
+  role: string;
+}
+
+/**
+ * Resolve auth context once per request.
+ * Pass the returned context to server action helpers to avoid redundant auth calls.
+ */
+export async function getRequestContext(): Promise<RequestContext | null> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const role = await getUserRoleFromJWT(user, supabase);
+  return { supabase, user, role };
+}
+
+/**
  * Creates a Supabase service role client for server-side operations.
  * This client bypasses RLS and doesn't use cookies - SAFE for use inside unstable_cache.
  *

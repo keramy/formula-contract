@@ -11,7 +11,7 @@
  * - Email notifications on publish
  */
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, type RequestContext } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { logActivity } from "@/lib/activity-log/actions";
 import { ACTIVITY_ACTIONS } from "@/lib/activity-log/constants";
@@ -73,8 +73,8 @@ export interface ActionResult<T = void> {
 /**
  * Debug function to see who would receive report notifications
  */
-export async function debugReportNotificationRecipients(projectId: string, publisherId: string) {
-  const supabase = await createClient();
+export async function debugReportNotificationRecipients(projectId: string, publisherId: string, ctx?: RequestContext) {
+  const supabase = ctx?.supabase ?? await createClient();
 
   // Get all assignments
   const { data: assignments } = await supabase
@@ -264,10 +264,10 @@ async function sendReportPublishedNotification(
  * Get all reports for a project
  * OPTIMIZED: Reduced from 5 queries to 2 queries using nested selects
  */
-export async function getProjectReports(projectId: string): Promise<Report[]> {
-  const supabase = await createClient();
+export async function getProjectReports(projectId: string, ctx?: RequestContext): Promise<Report[]> {
+  const supabase = ctx?.supabase ?? await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
   if (!user) return [];
 
   // Check user role
@@ -348,10 +348,10 @@ export async function getProjectReports(projectId: string): Promise<Report[]> {
 /**
  * Get a single report with lines
  */
-export async function getReportDetail(reportId: string): Promise<Report | null> {
-  const supabase = await createClient();
+export async function getReportDetail(reportId: string, ctx?: RequestContext): Promise<Report | null> {
+  const supabase = ctx?.supabase ?? await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
   if (!user) return null;
 
   // Fetch report and lines in PARALLEL
@@ -395,11 +395,12 @@ export async function getReportDetail(reportId: string): Promise<Report | null> 
  * Get all users for sharing picker (project team members)
  */
 export async function getProjectTeamMembers(
-  projectId: string
+  projectId: string,
+  ctx?: RequestContext
 ): Promise<Array<{ id: string; name: string; email: string; role: string }>> {
-  const supabase = await createClient();
+  const supabase = ctx?.supabase ?? await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
   if (!user) return [];
 
   // Get project team members from project_assignments
@@ -461,11 +462,12 @@ export async function getProjectTeamMembers(
  */
 export async function createReport(
   projectId: string,
-  reportType: string = "progress"
+  reportType: string = "progress",
+  ctx?: RequestContext
 ): Promise<ActionResult<{ reportId: string }>> {
-  const supabase = await createClient();
+  const supabase = ctx?.supabase ?? await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
   if (!user) return { success: false, error: "Not authenticated" };
 
   const { data, error } = await supabase
@@ -508,11 +510,12 @@ export async function updateReport(
     report_type?: string;
     share_with_client?: boolean;
     share_internal?: boolean;
-  }
+  },
+  ctx?: RequestContext
 ): Promise<ActionResult> {
-  const supabase = await createClient();
+  const supabase = ctx?.supabase ?? await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
   if (!user) return { success: false, error: "Not authenticated" };
 
   // Get project ID for revalidation
@@ -546,10 +549,10 @@ export async function updateReport(
 /**
  * Delete a report
  */
-export async function deleteReport(reportId: string): Promise<ActionResult> {
-  const supabase = await createClient();
+export async function deleteReport(reportId: string, ctx?: RequestContext): Promise<ActionResult> {
+  const supabase = ctx?.supabase ?? await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
   if (!user) return { success: false, error: "Not authenticated" };
 
   // Get project ID for revalidation
@@ -593,11 +596,12 @@ export async function uploadReportPdf(
   pdfBase64: string,
   projectId: string,
   projectCode: string,
-  reportType: string
+  reportType: string,
+  ctx?: RequestContext
 ): Promise<{ success: boolean; url?: string; error?: string }> {
-  const supabase = await createClient();
+  const supabase = ctx?.supabase ?? await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
   if (!user) return { success: false, error: "Not authenticated" };
 
   // Convert base64 to blob
@@ -646,11 +650,12 @@ export async function uploadReportPdf(
 export async function publishReport(
   reportId: string,
   includeClients: boolean = false,
-  pdfUrl?: string
+  pdfUrl?: string,
+  ctx?: RequestContext
 ): Promise<ActionResult> {
-  const supabase = await createClient();
+  const supabase = ctx?.supabase ?? await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
   if (!user) return { success: false, error: "Not authenticated" };
 
   // Get report details including project info for notifications
@@ -726,10 +731,10 @@ export async function publishReport(
 /**
  * Unpublish a report
  */
-export async function unpublishReport(reportId: string): Promise<ActionResult> {
-  const supabase = await createClient();
+export async function unpublishReport(reportId: string, ctx?: RequestContext): Promise<ActionResult> {
+  const supabase = ctx?.supabase ?? await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
   if (!user) return { success: false, error: "Not authenticated" };
 
   // Get project ID for revalidation
@@ -772,11 +777,12 @@ export async function addReportLine(
     title: string;
     description?: string;
     photos?: string[];
-  }
+  },
+  ctx?: RequestContext
 ): Promise<ActionResult<{ lineId: string }>> {
-  const supabase = await createClient();
+  const supabase = ctx?.supabase ?? await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
   if (!user) return { success: false, error: "Not authenticated" };
 
   // Get the current max line_order
@@ -835,11 +841,12 @@ export async function updateReportLine(
     title?: string;
     description?: string;
     photos?: string[];
-  }
+  },
+  ctx?: RequestContext
 ): Promise<ActionResult> {
-  const supabase = await createClient();
+  const supabase = ctx?.supabase ?? await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
   if (!user) return { success: false, error: "Not authenticated" };
 
   // Sanitize user inputs
@@ -870,10 +877,10 @@ export async function updateReportLine(
 /**
  * Delete a report line
  */
-export async function deleteReportLine(lineId: string): Promise<ActionResult> {
-  const supabase = await createClient();
+export async function deleteReportLine(lineId: string, ctx?: RequestContext): Promise<ActionResult> {
+  const supabase = ctx?.supabase ?? await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
   if (!user) return { success: false, error: "Not authenticated" };
 
   const { error } = await supabase
@@ -894,11 +901,12 @@ export async function deleteReportLine(lineId: string): Promise<ActionResult> {
  */
 export async function reorderReportLines(
   reportId: string,
-  lineIds: string[]
+  lineIds: string[],
+  ctx?: RequestContext
 ): Promise<ActionResult> {
-  const supabase = await createClient();
+  const supabase = ctx?.supabase ?? await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
   if (!user) return { success: false, error: "Not authenticated" };
 
   // PERF: Batch updates in groups of 5 instead of N concurrent writes.
@@ -950,11 +958,12 @@ export async function reorderReportLines(
 export async function uploadReportPhoto(
   projectId: string,
   reportId: string,
-  file: File
+  file: File,
+  ctx?: RequestContext
 ): Promise<ActionResult<{ url: string }>> {
-  const supabase = await createClient();
+  const supabase = ctx?.supabase ?? await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
   if (!user) return { success: false, error: "Not authenticated" };
 
   const fileExt = file.name.split(".").pop();
@@ -982,11 +991,12 @@ export async function uploadReportPhoto(
  */
 export async function updateReportShares(
   reportId: string,
-  userIds: string[]
+  userIds: string[],
+  ctx?: RequestContext
 ): Promise<ActionResult> {
-  const supabase = await createClient();
+  const supabase = ctx?.supabase ?? await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
   if (!user) return { success: false, error: "Not authenticated" };
 
   // Get project ID for revalidation
@@ -1052,11 +1062,12 @@ export interface ReportActivity {
 export async function logReportActivity(
   reportId: string,
   action: "viewed" | "downloaded",
-  metadata?: { ip_address?: string; user_agent?: string }
+  metadata?: { ip_address?: string; user_agent?: string },
+  ctx?: RequestContext
 ): Promise<ActionResult> {
-  const supabase = await createClient();
+  const supabase = ctx?.supabase ?? await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
   if (!user) {
     return { success: false, error: "Not authenticated" };
   }
@@ -1082,11 +1093,12 @@ export async function logReportActivity(
  */
 export async function getReportActivity(
   reportId: string,
-  limit = 50
+  limit = 50,
+  ctx?: RequestContext
 ): Promise<ReportActivity[]> {
-  const supabase = await createClient();
+  const supabase = ctx?.supabase ?? await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
   if (!user) return [];
 
   const { data, error } = await supabase
@@ -1116,16 +1128,16 @@ export async function getReportActivity(
  * Get activity summary for a report (Admin only)
  * Returns view count, download count, unique viewers, last viewed
  */
-export async function getReportActivitySummary(reportId: string): Promise<{
+export async function getReportActivitySummary(reportId: string, ctx?: RequestContext): Promise<{
   viewCount: number;
   downloadCount: number;
   uniqueViewers: number;
   lastViewed: string | null;
   lastViewedBy: string | null;
 } | null> {
-  const supabase = await createClient();
+  const supabase = ctx?.supabase ?? await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
   if (!user) return null;
 
   // Get all activity for this report

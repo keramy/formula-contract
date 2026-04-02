@@ -12,7 +12,7 @@
  */
 
 import { revalidatePath } from "next/cache";
-import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
+import { createClient, createServiceRoleClient, type RequestContext } from "@/lib/supabase/server";
 import { logActivity } from "@/lib/activity-log/actions";
 
 // ============================================================================
@@ -91,13 +91,14 @@ export interface ScopeItemWithMaterials extends ScopeItem {
  * Get all scope items for a project
  */
 export async function getScopeItems(
-  projectId: string
+  projectId: string,
+  ctx?: RequestContext
 ): Promise<ActionResult<ScopeItem[]>> {
   try {
-    const supabase = await createClient();
+    const supabase = ctx?.supabase ?? await createClient();
 
     // Check authentication
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
     if (!user) {
       return { success: false, error: "Not authenticated" };
     }
@@ -125,13 +126,14 @@ export async function getScopeItems(
  * Get a single scope item by ID with materials
  */
 export async function getScopeItem(
-  itemId: string
+  itemId: string,
+  ctx?: RequestContext
 ): Promise<ActionResult<ScopeItemWithMaterials>> {
   try {
-    const supabase = await createClient();
+    const supabase = ctx?.supabase ?? await createClient();
 
     // Check authentication
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
     if (!user) {
       return { success: false, error: "Not authenticated" };
     }
@@ -197,13 +199,14 @@ export async function bulkUpdateScopeItems(
   projectId: string,
   itemIds: string[],
   field: ScopeItemField,
-  value: unknown
+  value: unknown,
+  ctx?: RequestContext
 ): Promise<ActionResult> {
   try {
-    const supabase = await createClient();
+    const supabase = ctx?.supabase ?? await createClient();
 
     // Check authentication
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
     if (!user) {
       return { success: false, error: "Not authenticated" };
     }
@@ -287,13 +290,14 @@ export async function bulkUpdateScopeItems(
 export async function bulkAssignMaterials(
   projectId: string,
   itemIds: string[],
-  materialIds: string[]
+  materialIds: string[],
+  ctx?: RequestContext
 ): Promise<ActionResult<{ assigned: number }>> {
   try {
-    const supabase = await createClient();
+    const supabase = ctx?.supabase ?? await createClient();
 
     // Check authentication
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
     if (!user) {
       return { success: false, error: "Not authenticated" };
     }
@@ -364,13 +368,14 @@ export async function updateScopeItemField(
   projectId: string,
   itemId: string,
   field: ScopeItemField,
-  value: unknown
+  value: unknown,
+  ctx?: RequestContext
 ): Promise<ActionResult> {
   try {
-    const supabase = await createClient();
+    const supabase = ctx?.supabase ?? await createClient();
 
     // Check authentication
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
     if (!user) {
       return { success: false, error: "Not authenticated" };
     }
@@ -457,13 +462,14 @@ export async function updateShippedStatus(
   projectId: string,
   itemId: string,
   isShipped: boolean,
-  shippedAt?: string
+  shippedAt?: string,
+  ctx?: RequestContext
 ): Promise<ActionResult> {
   try {
-    const supabase = await createClient();
+    const supabase = ctx?.supabase ?? await createClient();
 
     // Check authentication
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
     if (!user) {
       return { success: false, error: "Not authenticated" };
     }
@@ -513,13 +519,14 @@ export async function updateInstallationStartedStatus(
   projectId: string,
   itemId: string,
   isStarted: boolean,
-  startedAt?: string
+  startedAt?: string,
+  ctx?: RequestContext
 ): Promise<ActionResult> {
   try {
-    const supabase = await createClient();
+    const supabase = ctx?.supabase ?? await createClient();
 
     // Check authentication
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
     if (!user) {
       return { success: false, error: "Not authenticated" };
     }
@@ -568,13 +575,14 @@ export async function updateInstallationStartedStatus(
 export async function updateInstallationStatus(
   projectId: string,
   itemId: string,
-  isInstalled: boolean
+  isInstalled: boolean,
+  ctx?: RequestContext
 ): Promise<ActionResult> {
   try {
-    const supabase = await createClient();
+    const supabase = ctx?.supabase ?? await createClient();
 
     // Check authentication
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
     if (!user) {
       return { success: false, error: "Not authenticated" };
     }
@@ -623,13 +631,14 @@ export async function updateInstallationStatus(
  */
 export async function deleteScopeItem(
   projectId: string,
-  itemId: string
+  itemId: string,
+  ctx?: RequestContext
 ): Promise<ActionResult> {
   try {
-    const supabase = await createClient();
+    const supabase = ctx?.supabase ?? await createClient();
 
     // Check authentication
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
     if (!user) {
       return { success: false, error: "Not authenticated" };
     }
@@ -684,13 +693,14 @@ export async function deleteScopeItem(
  * Used by Excel import "Replace" mode
  */
 export async function clearProjectScopeItems(
-  projectId: string
+  projectId: string,
+  ctx?: RequestContext
 ): Promise<ActionResult<{ deletedCount: number }>> {
   try {
-    const supabase = await createClient();
+    const supabase = ctx?.supabase ?? await createClient();
 
     // Check authentication
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
     if (!user) {
       return { success: false, error: "Not authenticated" };
     }
@@ -774,15 +784,16 @@ export interface SplitItemParams {
  * Original item remains unchanged
  */
 export async function splitScopeItem(
-  params: SplitItemParams
+  params: SplitItemParams,
+  ctx?: RequestContext
 ): Promise<ActionResult<{ newItemId: string; newItemCode: string }>> {
   const { itemId, projectId, targetPath, newQuantity, newName } = params;
 
   try {
-    const supabase = await createClient();
+    const supabase = ctx?.supabase ?? await createClient();
 
     // Check authentication
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
     if (!user) {
       return { success: false, error: "Not authenticated" };
     }
@@ -914,13 +925,14 @@ export async function splitScopeItem(
  * Get the parent item for a child scope item
  */
 export async function getParentItem(
-  itemId: string
+  itemId: string,
+  ctx?: RequestContext
 ): Promise<ActionResult<{ id: string; item_code: string; name: string } | null>> {
   try {
-    const supabase = await createClient();
+    const supabase = ctx?.supabase ?? await createClient();
 
     // Check authentication
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
     if (!user) {
       return { success: false, error: "Not authenticated" };
     }
@@ -959,13 +971,14 @@ export async function getParentItem(
  * Get all child items for a parent scope item
  */
 export async function getChildItems(
-  parentId: string
+  parentId: string,
+  ctx?: RequestContext
 ): Promise<ActionResult<Array<{ id: string; item_code: string; name: string; item_path: string; status: string }>>> {
   try {
-    const supabase = await createClient();
+    const supabase = ctx?.supabase ?? await createClient();
 
     // Check authentication
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
     if (!user) {
       return { success: false, error: "Not authenticated" };
     }
@@ -999,13 +1012,14 @@ export async function getChildItems(
  * - For items WITHOUT children: The item's own (unit_cost × quantity)
  */
 export async function getActualTotalCost(
-  itemId: string
+  itemId: string,
+  ctx?: RequestContext
 ): Promise<ActionResult<{ actualCost: number; hasChildren: boolean }>> {
   try {
-    const supabase = await createClient();
+    const supabase = ctx?.supabase ?? await createClient();
 
     // Check authentication
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
     if (!user) {
       return { success: false, error: "Not authenticated" };
     }
@@ -1060,13 +1074,14 @@ export async function getActualTotalCost(
  * Returns all items with their actual costs (aggregated for parents)
  */
 export async function getScopeItemsWithCosts(
-  projectId: string
+  projectId: string,
+  ctx?: RequestContext
 ): Promise<ActionResult<Array<ScopeItem & { actual_total_cost: number; has_children: boolean }>>> {
   try {
-    const supabase = await createClient();
+    const supabase = ctx?.supabase ?? await createClient();
 
     // Check authentication
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = ctx?.user ?? (await supabase.auth.getUser()).data.user;
     if (!user) {
       return { success: false, error: "Not authenticated" };
     }
