@@ -302,28 +302,33 @@ export async function bulkAssignMaterials(
       return { success: false, error: "No items or materials selected" };
     }
 
-    let assignedCount = 0;
+    // PERF: Single query to find existing assignments, then one batch insert.
+    // Before: M×N individual SELECT + INSERT queries (10×10 = 100 writes).
+    // After: 1 SELECT + 1 INSERT (2 queries total).
+    const { data: existing } = await supabase
+      .from("item_materials")
+      .select("item_id, material_id")
+      .in("item_id", itemIds)
+      .in("material_id", materialIds);
 
-    // Create assignments for all combinations
+    const existingSet = new Set(
+      (existing || []).map((e) => `${e.item_id}:${e.material_id}`)
+    );
+
+    const newAssignments: { item_id: string; material_id: string }[] = [];
     for (const itemId of itemIds) {
       for (const materialId of materialIds) {
-        // Check if assignment exists
-        const { data: existing } = await supabase
-          .from("item_materials")
-          .select("id")
-          .eq("item_id", itemId)
-          .eq("material_id", materialId)
-          .single();
-
-        if (!existing) {
-          const { error } = await supabase
-            .from("item_materials")
-            .insert({ item_id: itemId, material_id: materialId });
-
-          if (!error) {
-            assignedCount++;
-          }
+        if (!existingSet.has(`${itemId}:${materialId}`)) {
+          newAssignments.push({ item_id: itemId, material_id: materialId });
         }
+      }
+    }
+
+    let assignedCount = 0;
+    if (newAssignments.length > 0) {
+      const { error } = await supabase.from("item_materials").insert(newAssignments);
+      if (!error) {
+        assignedCount = newAssignments.length;
       }
     }
 

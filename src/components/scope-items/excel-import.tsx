@@ -162,89 +162,96 @@ export function ExcelImport({ projectId, projectCode, compact = false }: ExcelIm
         }
       }
 
-      // Import items one by one with upsert logic
+      // PERF: Batch import instead of 2N sequential queries.
+      // Before: 100 items = 100 SELECTs + 100 INSERTs/UPDATEs = 200 DB roundtrips.
+      // After: 1 SELECT + batched INSERTs (groups of 20) + batched UPDATEs (groups of 5).
+
+      // Step 1: Single query to find ALL existing items by item_code
+      const itemCodes = parseResult.items.map((i) => i.item_code);
+      const { data: existingItems } = await supabase
+        .from("scope_items")
+        .select("id, item_code")
+        .eq("project_id", projectId)
+        .eq("is_deleted", false)
+        .in("item_code", itemCodes);
+
+      const existingMap = new Map(
+        (existingItems || []).map((e) => [e.item_code, e.id])
+      );
+
+      // Step 2: Separate into insert and update groups
+      const toInsert: ScopeItemInsert[] = [];
+      const toUpdate: { id: string; data: Record<string, unknown>; item_code: string }[] = [];
+
       for (const item of parseResult.items) {
-        try {
-          // Check if item with same item_code exists in this project
-          const { data: existing } = await supabase
-            .from("scope_items")
-            .select("id")
-            .eq("project_id", projectId)
-            .eq("item_code", item.item_code)
-            .eq("is_deleted", false)
-            .single();
+        const resolvedAreaId = item.area_code
+          ? areaCodeToId.get(item.area_code.toUpperCase()) ?? null
+          : null;
 
-          // Resolve area_id from the code map
-          const resolvedAreaId = item.area_code
-            ? areaCodeToId.get(item.area_code.toUpperCase()) ?? null
-            : null;
-
-          if (existing) {
-            // UPDATE existing item - preserve initial costs (locked baseline), path, status
-            // Only update: name, description, unit, quantity, sales prices, area_id
-            // NOTE: initial_unit_cost and initial_total_cost are NEVER updated
-            const { error: updateError } = await supabase
-              .from("scope_items")
-              .update({
-                name: item.name,
-                description: item.description,
-                unit: item.unit,
-                quantity: item.quantity,
-                // Update sales price and recalculate total
-                unit_sales_price: item.unit_sales_price,
-                total_sales_price: item.unit_sales_price ? item.unit_sales_price * item.quantity : null,
-                notes: item.notes,
-                // Update area assignment if provided
-                ...(resolvedAreaId !== null ? { area_id: resolvedAreaId } : {}),
-              })
-              .eq("id", existing.id);
-
-            if (updateError) {
-              results.failed++;
-              results.errors.push(`${item.item_code}: ${updateError.message}`);
-            } else {
-              results.updated++;
-            }
-          } else {
-            // INSERT new item with calculated totals
-            // Set initial costs (locked baseline) - actual costs entered manually later
-            const scopeItem: ScopeItemInsert = {
-              project_id: projectId,
-              item_code: item.item_code,
+        const existingId = existingMap.get(item.item_code);
+        if (existingId) {
+          toUpdate.push({
+            id: existingId,
+            item_code: item.item_code,
+            data: {
               name: item.name,
               description: item.description,
               unit: item.unit,
               quantity: item.quantity,
-              // Initial cost (budgeted, set once, never changes)
-              initial_unit_cost: item.initial_unit_cost,
-              initial_total_cost: item.initial_unit_cost ? item.initial_unit_cost * item.quantity : null,
-              // Sales price
               unit_sales_price: item.unit_sales_price,
               total_sales_price: item.unit_sales_price ? item.unit_sales_price * item.quantity : null,
-              // Actual cost is NOT set during import - entered manually later
-              item_path: item.item_path,
-              status: item.status,
               notes: item.notes,
-              // Area assignment
-              area_id: resolvedAreaId,
-            };
+              ...(resolvedAreaId !== null ? { area_id: resolvedAreaId } : {}),
+            },
+          });
+        } else {
+          toInsert.push({
+            project_id: projectId,
+            item_code: item.item_code,
+            name: item.name,
+            description: item.description,
+            unit: item.unit,
+            quantity: item.quantity,
+            initial_unit_cost: item.initial_unit_cost,
+            initial_total_cost: item.initial_unit_cost ? item.initial_unit_cost * item.quantity : null,
+            unit_sales_price: item.unit_sales_price,
+            total_sales_price: item.unit_sales_price ? item.unit_sales_price * item.quantity : null,
+            item_path: item.item_path,
+            status: item.status,
+            notes: item.notes,
+            area_id: resolvedAreaId,
+          });
+        }
+      }
 
-            const { error: insertError } = await supabase
-              .from("scope_items")
-              .insert(scopeItem);
+      // Step 3: Batch INSERT new items (groups of 20)
+      const INSERT_BATCH = 20;
+      for (let i = 0; i < toInsert.length; i += INSERT_BATCH) {
+        const batch = toInsert.slice(i, i + INSERT_BATCH);
+        const { error } = await supabase.from("scope_items").insert(batch);
+        if (error) {
+          results.failed += batch.length;
+          results.errors.push(`Batch insert failed: ${error.message}`);
+        } else {
+          results.inserted += batch.length;
+        }
+      }
 
-            if (insertError) {
-              results.failed++;
-              results.errors.push(`${item.item_code}: ${insertError.message}`);
-            } else {
-              results.inserted++;
-            }
+      // Step 4: Batch UPDATE existing items (groups of 5, individual updates needed)
+      const UPDATE_BATCH = 5;
+      for (let i = 0; i < toUpdate.length; i += UPDATE_BATCH) {
+        const batch = toUpdate.slice(i, i + UPDATE_BATCH);
+        const updates = batch.map((item) =>
+          supabase.from("scope_items").update(item.data).eq("id", item.id)
+        );
+        const updateResults = await Promise.all(updates);
+        for (let j = 0; j < updateResults.length; j++) {
+          if (updateResults[j].error) {
+            results.failed++;
+            results.errors.push(`${batch[j].item_code}: ${updateResults[j].error!.message}`);
+          } else {
+            results.updated++;
           }
-        } catch (err) {
-          results.failed++;
-          results.errors.push(
-            `${item.item_code}: ${err instanceof Error ? err.message : "Unknown error"}`
-          );
         }
       }
 

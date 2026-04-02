@@ -901,17 +901,25 @@ export async function reorderReportLines(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { success: false, error: "Not authenticated" };
 
-  // Update each line with its new order
-  const updates = lineIds.map((id, index) =>
-    supabase
-      .from("report_lines")
-      .update({ line_order: index + 1 })
-      .eq("id", id)
-      .eq("report_id", reportId)
-  );
-
-  const results = await Promise.all(updates);
-  const hasError = results.some(r => r.error);
+  // PERF: Batch updates in groups of 5 instead of N concurrent writes.
+  // Prevents IO budget depletion on large reports.
+  const BATCH_SIZE = 5;
+  let hasError = false;
+  for (let i = 0; i < lineIds.length; i += BATCH_SIZE) {
+    const batch = lineIds.slice(i, i + BATCH_SIZE);
+    const updates = batch.map((id, idx) =>
+      supabase
+        .from("report_lines")
+        .update({ line_order: i + idx + 1 })
+        .eq("id", id)
+        .eq("report_id", reportId)
+    );
+    const results = await Promise.all(updates);
+    if (results.some(r => r.error)) {
+      hasError = true;
+      break;
+    }
+  }
 
   if (hasError) {
     console.error("Error reordering report lines");

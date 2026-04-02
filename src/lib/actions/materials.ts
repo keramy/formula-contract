@@ -623,8 +623,8 @@ export async function bulkImportMaterials(
 
     // STEP 6: Parallel updates for existing materials (much faster than sequential)
     if (toUpdate.length > 0) {
-      // Process updates in parallel batches of 10 to avoid overwhelming the database
-      const BATCH_SIZE = 10;
+      // Process updates in parallel batches of 5 to avoid IO budget depletion
+      const BATCH_SIZE = 5;
       const updateBatches: Array<typeof toUpdate> = [];
 
       for (let i = 0; i < toUpdate.length; i += BATCH_SIZE) {
