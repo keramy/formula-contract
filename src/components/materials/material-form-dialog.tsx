@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { materialKeys } from "@/lib/react-query/materials";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -54,6 +56,7 @@ export function MaterialFormDialog({
   editMaterial,
 }: MaterialFormDialogProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -165,7 +168,7 @@ export function MaterialFormDialog({
 
       if (result.success) {
         handleClose();
-        router.refresh();
+        queryClient.invalidateQueries({ queryKey: materialKeys.list(projectId) });
         toast.success(isEditing ? "Material updated" : "Material created");
       } else {
         toast.error(result.error || "Failed to save material");

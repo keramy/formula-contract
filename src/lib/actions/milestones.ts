@@ -10,7 +10,6 @@
  */
 
 import { createClient, type RequestContext } from "@/lib/supabase/server";
-import { revalidatePath } from "next/cache";
 import { logActivity } from "@/lib/activity-log/actions";
 import { ACTIVITY_ACTIONS } from "@/lib/activity-log/constants";
 import { Resend } from "resend";
@@ -134,7 +133,7 @@ export async function createMilestone(
     }
   );
 
-  revalidatePath(`/projects/${input.project_id}`);
+  // Client-side invalidation via React Query
   return { success: true, data: milestone };
 }
 
@@ -194,7 +193,7 @@ export async function updateMilestone(
     },
   });
 
-  revalidatePath(`/projects/${existing.project_id}`);
+  // Client-side invalidation via React Query
   return { success: true, data: milestone };
 }
 
@@ -272,7 +271,7 @@ export async function completeMilestone(
     ]).catch(err => console.error("Background task error:", err));
   }
 
-  revalidatePath(`/projects/${milestone.project_id}`);
+  // Client-side invalidation via React Query
   return { success: true };
 }
 
@@ -322,7 +321,7 @@ export async function deleteMilestone(
     details: { name: milestone.name },
   });
 
-  revalidatePath(`/projects/${milestone.project_id}`);
+  // Client-side invalidation via React Query
   return { success: true };
 }
 

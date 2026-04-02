@@ -9,7 +9,6 @@
  */
 
 import { createClient, type RequestContext } from "@/lib/supabase/server";
-import { revalidatePath } from "next/cache";
 import { logActivity } from "@/lib/activity-log/actions";
 import { ACTIVITY_ACTIONS } from "@/lib/activity-log/constants";
 import { Resend } from "resend";
@@ -212,8 +211,7 @@ export async function sendDrawingsToClient(
     },
   });
 
-  // 9. Revalidate
-  revalidatePath(`/projects/${projectId}`);
+  // 9. Client-side invalidation via React Query
 
   return {
     success: true,
@@ -303,8 +301,7 @@ export async function overrideDrawingApproval(
     },
   });
 
-  // 6. Revalidate
-  revalidatePath(`/projects/${projectId}`);
+  // 6. Client-side invalidation via React Query
 
   return { success: true };
 }

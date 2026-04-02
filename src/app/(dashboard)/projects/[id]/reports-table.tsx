@@ -2,6 +2,8 @@
 
 import React, { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { projectTabKeys } from "@/lib/react-query/project-tabs";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -122,6 +124,7 @@ export function ReportsTable({
   onEditReport,
 }: ReportsTableProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [sortField, setSortField] = useState<SortField>("created_at");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [isLoading, setIsLoading] = useState(false);
@@ -182,7 +185,7 @@ export function ReportsTable({
     setDeleteDialogOpen(false);
     setDeleteReportId(null);
     setIsLoading(false);
-    router.refresh();
+    queryClient.invalidateQueries({ queryKey: projectTabKeys.reports(projectId) });
   };
 
   const handlePublishToggle = async (report: Report) => {
@@ -237,7 +240,7 @@ export function ReportsTable({
     }
 
     setIsLoading(false);
-    router.refresh();
+    queryClient.invalidateQueries({ queryKey: projectTabKeys.reports(projectId) });
   };
 
   const handleDownloadPdf = async (report: Report) => {

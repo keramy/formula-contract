@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { projectTabKeys } from "@/lib/react-query/project-tabs";
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -77,6 +79,7 @@ export function TeamOverview({ projectId, assignments: propAssignments, canManag
     return <div className="space-y-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-48 w-full" /></div>;
   }
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
@@ -165,7 +168,7 @@ export function TeamOverview({ projectId, assignments: propAssignments, canManag
     if (successCount > 0) {
       setAddDialogOpen(false);
       setSelectedUserIds(new Set());
-      router.refresh();
+      queryClient.invalidateQueries({ queryKey: projectTabKeys.assignments(projectId) });
     }
 
     setIsLoading(false);
@@ -188,7 +191,7 @@ export function TeamOverview({ projectId, assignments: propAssignments, canManag
     setRemoveDialogOpen(false);
     setUserToRemove(null);
     setIsLoading(false);
-    router.refresh();
+    queryClient.invalidateQueries({ queryKey: projectTabKeys.assignments(projectId) });
   };
 
   const openRemoveDialog = (user: User) => {

@@ -2,6 +2,9 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { projectTabKeys } from "@/lib/react-query/project-tabs";
+import { scopeItemKeys } from "@/lib/react-query/scope-items";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,6 +60,7 @@ function getNextRevision(current: string | null): string {
 
 export function DrawingUpload({ projectId, scopeItemId, currentRevision, hasDrawing, drawingStatus }: DrawingUploadProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cadFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -229,7 +233,8 @@ export function DrawingUpload({ projectId, scopeItemId, currentRevision, hasDraw
       setCadFile(null);
       setNotes("");
       setIsOpen(false);
-      router.refresh();
+      queryClient.invalidateQueries({ queryKey: projectTabKeys.drawings(projectId) });
+      queryClient.invalidateQueries({ queryKey: scopeItemKeys.list(projectId) });
     } catch (err) {
       console.error("Upload error:", err);
       setError(err instanceof Error ? err.message : "Failed to upload drawing");

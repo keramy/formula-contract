@@ -11,7 +11,6 @@
  * - Security (no client-side Supabase access)
  */
 
-import { revalidatePath } from "next/cache";
 import { createClient, createServiceRoleClient, type RequestContext } from "@/lib/supabase/server";
 import { logActivity } from "@/lib/activity-log/actions";
 
@@ -275,7 +274,7 @@ export async function bulkUpdateScopeItems(
       },
     });
 
-    revalidatePath(`/projects/${projectId}`);
+    // Client-side invalidation via React Query
 
     return { success: true };
   } catch (error) {
@@ -348,7 +347,7 @@ export async function bulkAssignMaterials(
       },
     });
 
-    revalidatePath(`/projects/${projectId}`);
+    // Client-side invalidation via React Query
 
     return { success: true, data: { assigned: assignedCount } };
   } catch (error) {
@@ -430,7 +429,7 @@ export async function updateScopeItemField(
       details: { field, value },
     });
 
-    revalidatePath(`/projects/${projectId}`);
+    // Client-side invalidation via React Query
 
     return { success: true };
   } catch (error) {
@@ -503,7 +502,7 @@ export async function updateShippedStatus(
       entityId: itemId,
     });
 
-    revalidatePath(`/projects/${projectId}`);
+    // Client-side invalidation via React Query
 
     return { success: true };
   } catch (error) {
@@ -560,7 +559,7 @@ export async function updateInstallationStartedStatus(
       entityId: itemId,
     });
 
-    revalidatePath(`/projects/${projectId}`);
+    // Client-side invalidation via React Query
 
     return { success: true };
   } catch (error) {
@@ -616,7 +615,7 @@ export async function updateInstallationStatus(
       entityId: itemId,
     });
 
-    revalidatePath(`/projects/${projectId}`);
+    // Client-side invalidation via React Query
 
     return { success: true };
   } catch (error) {
@@ -679,7 +678,7 @@ export async function deleteScopeItem(
       details: { item_code: item.item_code, name: item.name },
     });
 
-    revalidatePath(`/projects/${projectId}`);
+    // Client-side invalidation via React Query
 
     return { success: true };
   } catch (error) {
@@ -908,7 +907,7 @@ export async function splitScopeItem(
       },
     });
 
-    revalidatePath(`/projects/${projectId}`);
+    // Client-side invalidation via React Query
 
     return { success: true, data: { newItemId: newItem.id, newItemCode } };
   } catch (error) {

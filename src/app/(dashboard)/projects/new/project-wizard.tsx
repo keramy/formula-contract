@@ -196,7 +196,6 @@ export function ProjectWizard({ clients, users, userRole }: ProjectWizardProps) 
 
       toast.success("Project created successfully!");
       router.push(`/projects/${newProject.id}`);
-      router.refresh();
     } catch (err) {
       console.error("Project creation error:", err);
       setError(err instanceof Error ? err.message : "An error occurred");

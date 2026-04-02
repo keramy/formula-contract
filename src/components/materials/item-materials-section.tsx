@@ -2,6 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { materialKeys } from "@/lib/react-query/materials";
+import { scopeItemKeys } from "@/lib/react-query/scope-items";
 import Image from "next/image";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -65,6 +68,7 @@ export function ItemMaterialsSection({
   availableMaterials,
 }: ItemMaterialsSectionProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [isPending, startTransition] = useTransition();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
@@ -97,7 +101,8 @@ export function ItemMaterialsSection({
 
       if (result.success) {
         setDialogOpen(false);
-        router.refresh();
+        queryClient.invalidateQueries({ queryKey: materialKeys.list(projectId) });
+        queryClient.invalidateQueries({ queryKey: scopeItemKeys.list(projectId) });
         toast.success("Material assignments updated");
       } else {
         toast.error(result.error || "Failed to update assignments");
@@ -110,7 +115,8 @@ export function ItemMaterialsSection({
       const result = await removeItemMaterial(scopeItemId, materialId, projectId);
 
       if (result.success) {
-        router.refresh();
+        queryClient.invalidateQueries({ queryKey: materialKeys.list(projectId) });
+        queryClient.invalidateQueries({ queryKey: scopeItemKeys.list(projectId) });
         toast.success("Material removed");
       } else {
         toast.error(result.error || "Failed to remove material");

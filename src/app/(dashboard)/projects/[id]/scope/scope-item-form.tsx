@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { scopeItemKeys } from "@/lib/react-query/scope-items";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -223,7 +225,6 @@ export function ScopeItemForm({ projectId, projectCurrency = "TRY", initialData 
       }
 
       router.push(`/projects/${projectId}`);
-      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
       setIsLoading(false);

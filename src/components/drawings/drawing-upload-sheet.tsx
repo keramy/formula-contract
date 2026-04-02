@@ -2,6 +2,9 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { projectTabKeys } from "@/lib/react-query/project-tabs";
+import { scopeItemKeys } from "@/lib/react-query/scope-items";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,6 +70,7 @@ export function DrawingUploadSheet({
   onSuccess,
 }: DrawingUploadSheetProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cadFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -257,7 +261,8 @@ export function DrawingUploadSheet({
       // Reset form and close sheet
       handleReset();
       onOpenChange(false);
-      router.refresh();
+      queryClient.invalidateQueries({ queryKey: projectTabKeys.drawings(projectId) });
+      queryClient.invalidateQueries({ queryKey: scopeItemKeys.list(projectId) });
       onSuccess?.();
     } catch (err) {
       console.error("Upload error:", err);

@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { materialKeys } from "@/lib/react-query/materials";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -33,6 +35,7 @@ export function MaterialApproval({
   onOpenChange,
 }: MaterialApprovalProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
   const [comments, setComments] = useState("");
 
@@ -62,7 +65,7 @@ export function MaterialApproval({
       if (error) throw error;
 
       handleClose();
-      router.refresh();
+      queryClient.invalidateQueries({ queryKey: materialKeys.all });
     } catch (error) {
       console.error("Failed to update material status:", error);
     } finally {

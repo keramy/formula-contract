@@ -2,6 +2,8 @@
 
 import { useState, useTransition, useEffect, useCallback, useMemo, memo, useReducer, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { scopeItemKeys } from "@/lib/react-query/scope-items";
 import Link from "next/link";
 import Image from "next/image";
 import { bulkUpdateScopeItems, bulkAssignMaterials, splitScopeItem, deleteScopeItem, type ScopeItemField } from "@/lib/actions/scope-items";
@@ -916,6 +918,7 @@ const EMPTY_AREAS: AreaOption[] = [];
 export function ScopeItemsTable({ projectId, items, materials, areas = EMPTY_AREAS, currency = "TRY", isClient = false, userRole = "pm" }: ScopeItemsTableProps) {
   const { isMobile } = useBreakpoint();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [isPending, startTransition] = useTransition();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -1155,13 +1158,13 @@ export function ScopeItemsTable({ projectId, items, materials, areas = EMPTY_ARE
 
       if (result.success) {
         setSelectedIds(new Set());
-        router.refresh();
+        queryClient.invalidateQueries({ queryKey: scopeItemKeys.list(projectId) });
         toast.success(`Updated ${ids.length} item${ids.length > 1 ? "s" : ""}`);
       } else {
         toast.error(result.error || "Failed to update items");
       }
     });
-  }, [selectedIds, projectId, router]);
+  }, [selectedIds, projectId, queryClient]);
 
   const toggleMaterialSelection = useCallback((materialId: string) => {
     dispatch({ type: "TOGGLE_MATERIAL", materialId });
@@ -1179,13 +1182,13 @@ export function ScopeItemsTable({ projectId, items, materials, areas = EMPTY_ARE
       if (result.success && result.data) {
         setSelectedIds(new Set());
         dispatch({ type: "CLOSE_DIALOG" });
-        router.refresh();
+        queryClient.invalidateQueries({ queryKey: scopeItemKeys.list(projectId) });
         toast.success(`Assigned ${result.data.assigned} material-item combination${result.data.assigned !== 1 ? "s" : ""}`);
       } else {
         toast.error(result.error || "Failed to assign materials");
       }
     });
-  }, [selectedIds, selectedMaterialIds, projectId, router]);
+  }, [selectedIds, selectedMaterialIds, projectId, queryClient]);
 
   // Open split dialog for an item - now dispatches to reducer
   const openSplitDialog = useCallback((item: ScopeItem) => {
@@ -1229,13 +1232,13 @@ export function ScopeItemsTable({ projectId, items, materials, areas = EMPTY_ARE
 
       if (result.success) {
         dispatch({ type: "CLOSE_DIALOG" });
-        router.refresh();
+        queryClient.invalidateQueries({ queryKey: scopeItemKeys.list(projectId) });
         toast.success(`Item split successfully! New ${splitTargetPath} item created.`);
       } else {
         toast.error(result.error || "Failed to split item");
       }
     });
-  }, [itemToSplit, splitQuantity, splitName, projectId, splitTargetPath, router]);
+  }, [itemToSplit, splitQuantity, splitName, projectId, splitTargetPath, queryClient]);
 
   // Handle delete item
   const handleDelete = useCallback(() => {
@@ -1246,13 +1249,13 @@ export function ScopeItemsTable({ projectId, items, materials, areas = EMPTY_ARE
 
       if (result.success) {
         dispatch({ type: "CLOSE_DIALOG" });
-        router.refresh();
+        queryClient.invalidateQueries({ queryKey: scopeItemKeys.list(projectId) });
         toast.success(`"${itemToDelete.name}" deleted successfully`);
       } else {
         toast.error(result.error || "Failed to delete item");
       }
     });
-  }, [itemToDelete, projectId, router]);
+  }, [itemToDelete, projectId, queryClient]);
 
   // ============================================================================
   // PERFORMANCE: Memoize summary statistics

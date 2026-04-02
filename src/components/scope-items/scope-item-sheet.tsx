@@ -3,6 +3,8 @@
 import { useState, useEffect, useTransition } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { scopeItemKeys } from "@/lib/react-query/scope-items";
 import {
   Sheet,
   SheetContent,
@@ -166,6 +168,7 @@ export function ScopeItemSheet({
   userRole = "pm",
 }: ScopeItemSheetProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [isPending, startTransition] = useTransition();
   const [isLoading, setIsLoading] = useState(false);
   const isEditing = !!itemId;
@@ -435,7 +438,7 @@ export function ScopeItemSheet({
         }
 
         onOpenChange(false);
-        router.refresh();
+        queryClient.invalidateQueries({ queryKey: scopeItemKeys.list(projectId) });
         onSuccess?.();
       } catch (error) {
         console.error("Error saving scope item:", error);

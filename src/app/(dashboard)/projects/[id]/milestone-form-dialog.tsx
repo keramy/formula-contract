@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { projectTabKeys } from "@/lib/react-query/project-tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,6 +52,7 @@ export function MilestoneFormDialog({
   editItem,
 }: MilestoneFormDialogProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
 
   // Form state
@@ -109,7 +112,7 @@ export function MilestoneFormDialog({
 
       toast.success(isEditing ? "Milestone updated" : "Milestone created");
       handleClose();
-      router.refresh();
+      queryClient.invalidateQueries({ queryKey: projectTabKeys.milestones(projectId) });
     } catch (error) {
       console.error("Failed to save milestone:", error);
       toast.error("Failed to save milestone");

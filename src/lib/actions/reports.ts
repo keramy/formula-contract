@@ -12,7 +12,6 @@
  */
 
 import { createClient, type RequestContext } from "@/lib/supabase/server";
-import { revalidatePath } from "next/cache";
 import { logActivity } from "@/lib/activity-log/actions";
 import { ACTIVITY_ACTIONS } from "@/lib/activity-log/constants";
 import { sanitizeText, sanitizeHTML } from "@/lib/sanitize";
@@ -497,7 +496,7 @@ export async function createReport(
     details: { report_type: reportType },
   });
 
-  revalidatePath(`/projects/${projectId}`);
+  // Client-side invalidation via React Query
   return { success: true, data: { reportId: data.id } };
 }
 
@@ -540,7 +539,7 @@ export async function updateReport(
   }
 
   if (report?.project_id) {
-    revalidatePath(`/projects/${report.project_id}`);
+    // Client-side invalidation via React Query
   }
 
   return { success: true };
@@ -573,7 +572,7 @@ export async function deleteReport(reportId: string, ctx?: RequestContext): Prom
   }
 
   if (report?.project_id) {
-    revalidatePath(`/projects/${report.project_id}`);
+    // Client-side invalidation via React Query
   }
 
   return { success: true };
@@ -702,7 +701,7 @@ export async function publishReport(
       entityId: reportId,
       projectId: report.project_id,
     });
-    revalidatePath(`/projects/${report.project_id}`);
+    // Client-side invalidation via React Query
 
     // Send in-app + email notifications to all project team members
     if (project) {
@@ -758,7 +757,7 @@ export async function unpublishReport(reportId: string, ctx?: RequestContext): P
   }
 
   if (report?.project_id) {
-    revalidatePath(`/projects/${report.project_id}`);
+    // Client-side invalidation via React Query
   }
 
   return { success: true };
@@ -826,7 +825,7 @@ export async function addReportLine(
     .single();
 
   if (report?.project_id) {
-    revalidatePath(`/projects/${report.project_id}`);
+    // Client-side invalidation via React Query
   }
 
   return { success: true, data: { lineId: newLine.id } };
@@ -942,7 +941,7 @@ export async function reorderReportLines(
     .single();
 
   if (report?.project_id) {
-    revalidatePath(`/projects/${report.project_id}`);
+    // Client-side invalidation via React Query
   }
 
   return { success: true };
@@ -1035,7 +1034,7 @@ export async function updateReportShares(
   }
 
   if (report?.project_id) {
-    revalidatePath(`/projects/${report.project_id}`);
+    // Client-side invalidation via React Query
   }
 
   return { success: true };

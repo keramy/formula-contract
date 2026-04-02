@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { projectTabKeys } from "@/lib/react-query/project-tabs";
+import { scopeItemKeys } from "@/lib/react-query/scope-items";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ResponsiveDataView } from "@/components/ui/responsive-data-view";
@@ -91,6 +94,12 @@ export function DrawingsOverview({ projectId, productionItems, drawings: propDra
     return <div className="space-y-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-48 w-full" /></div>;
   }
   const router = useRouter();
+  const queryClient = useQueryClient();
+
+  const invalidateDrawingCaches = () => {
+    queryClient.invalidateQueries({ queryKey: projectTabKeys.drawings(projectId) });
+    queryClient.invalidateQueries({ queryKey: scopeItemKeys.list(projectId) });
+  };
 
   // Sheet states
   const [uploadSheetOpen, setUploadSheetOpen] = useState(false);
@@ -169,7 +178,7 @@ export function DrawingsOverview({ projectId, productionItems, drawings: propDra
       if (result.success) {
         toast.success(`${result.sentCount} drawing${result.sentCount !== 1 ? "s" : ""} sent to client`);
         setBulkSendDialogOpen(false);
-        router.refresh();
+        invalidateDrawingCaches();
       } else {
         toast.error(result.error || "Failed to send drawings");
       }
@@ -453,7 +462,7 @@ export function DrawingsOverview({ projectId, productionItems, drawings: propDra
         open={uploadSheetOpen}
         onOpenChange={setUploadSheetOpen}
         preselectedItemId={preselectedItemId}
-        onSuccess={() => router.refresh()}
+        onSuccess={() => invalidateDrawingCaches()}
       />
 
       {/* View Item Sheet */}
@@ -464,8 +473,8 @@ export function DrawingsOverview({ projectId, productionItems, drawings: propDra
         onOpenChange={(open) => {
           setViewSheetOpen(open);
           if (!open) {
-            // Refresh data when sheet closes (e.g., after approval action)
-            router.refresh();
+            // Invalidate data when sheet closes (e.g., after approval action)
+            invalidateDrawingCaches();
           }
         }}
         itemId={viewItemId}

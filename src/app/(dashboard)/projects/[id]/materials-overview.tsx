@@ -2,6 +2,8 @@
 
 import { useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { materialKeys } from "@/lib/react-query/materials";
 import dynamic from "next/dynamic";
 import { deleteMaterial } from "@/lib/actions/materials";
 import { toast } from "sonner";
@@ -102,6 +104,7 @@ export function MaterialsOverview({
   const canApproveMaterials = ["admin", "pm", "client"].includes(userRole);
   const isClient = userRole === "client";
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
 
   // Dialog states
@@ -154,7 +157,7 @@ export function MaterialsOverview({
 
       if (result.success) {
         toast.success("Material deleted");
-        router.refresh();
+        queryClient.invalidateQueries({ queryKey: materialKeys.list(projectId) });
       } else {
         toast.error(result.error || "Failed to delete material");
         console.error("Delete material error:", result.error);

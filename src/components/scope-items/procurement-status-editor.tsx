@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { scopeItemKeys } from "@/lib/react-query/scope-items";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -61,6 +63,7 @@ export function ProcurementStatusEditor({
   readOnly = false,
 }: ProcurementStatusEditorProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [status, setStatus] = useState<ProcurementStatus | null>(currentStatus);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -86,7 +89,7 @@ export function ProcurementStatusEditor({
       if (updateError) throw updateError;
 
       setStatus(newStatus);
-      router.refresh();
+      queryClient.invalidateQueries({ queryKey: scopeItemKeys.all });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update status");
     } finally {

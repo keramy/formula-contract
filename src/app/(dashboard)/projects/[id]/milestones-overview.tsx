@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { projectTabKeys } from "@/lib/react-query/project-tabs";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -66,6 +68,7 @@ export function MilestonesOverview({
   const milestones = (propMilestones ?? fetchedMilestones ?? []) as Milestone[];
 
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   if (hookLoading && !propMilestones) {
     return <div className="space-y-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-48 w-full" /></div>;
@@ -116,7 +119,7 @@ export function MilestonesOverview({
       }
 
       toast.success("Milestone deleted");
-      router.refresh();
+      queryClient.invalidateQueries({ queryKey: projectTabKeys.milestones(projectId) });
     } catch (error) {
       console.error("Failed to delete milestone:", error);
       toast.error("Failed to delete milestone");
@@ -140,7 +143,7 @@ export function MilestonesOverview({
       }
 
       toast.success(isCompleting ? "Milestone completed! 🎉" : "Milestone reopened");
-      router.refresh();
+      queryClient.invalidateQueries({ queryKey: projectTabKeys.milestones(projectId) });
     } catch (error) {
       console.error("Failed to update milestone:", error);
       toast.error("Failed to update milestone");

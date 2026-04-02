@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { scopeItemKeys } from "@/lib/react-query/scope-items";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -45,6 +47,7 @@ type ImportStep = "upload" | "preview" | "importing" | "complete";
 
 export function ExcelImport({ projectId, projectCode, compact = false }: ExcelImportProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isOpen, setIsOpen] = useState(false);
@@ -292,9 +295,9 @@ export function ExcelImport({ projectId, projectCode, compact = false }: ExcelIm
       if (fileInputRef.current) fileInputRef.current.value = "";
     }, 200);
 
-    // Refresh page if items were imported, updated, or deleted
+    // Invalidate scope items cache if items were imported, updated, or deleted
     if (importResults && (importResults.inserted > 0 || importResults.updated > 0 || importResults.deleted > 0)) {
-      router.refresh();
+      queryClient.invalidateQueries({ queryKey: scopeItemKeys.list(projectId) });
     }
   };
 

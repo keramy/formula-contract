@@ -11,7 +11,6 @@
  * - Security (no client-side Supabase access)
  */
 
-import { revalidatePath } from "next/cache";
 import { createClient, createServiceRoleClient, getUserRoleFromJWT, type RequestContext } from "@/lib/supabase/server";
 import { sanitizeText } from "@/lib/sanitize";
 import { logActivity } from "@/lib/activity-log/actions";
@@ -235,7 +234,7 @@ export async function createMaterial(
       details: { material_code: sanitizedInput.material_code, name: sanitizedInput.name },
     });
 
-    revalidatePath(`/projects/${projectId}`);
+    // Client-side invalidation via React Query
 
     return { success: true, data: { id: newMaterial.id } };
   } catch (error) {
@@ -317,7 +316,7 @@ export async function updateMaterial(
       details: { material_code: sanitizedInput.material_code, name: sanitizedInput.name },
     });
 
-    revalidatePath(`/projects/${projectId}`);
+    // Client-side invalidation via React Query
 
     return { success: true };
   } catch (error) {
@@ -380,7 +379,7 @@ export async function deleteMaterial(
       });
     }
 
-    revalidatePath(`/projects/${projectId}`);
+    // Client-side invalidation via React Query
 
     return { success: true };
   } catch (error) {
@@ -462,7 +461,7 @@ export async function updateItemMaterialAssignments(
       });
     }
 
-    revalidatePath(`/projects/${projectId}`);
+    // Client-side invalidation via React Query
 
     return { success: true };
   } catch (error) {
@@ -508,7 +507,7 @@ export async function removeItemMaterial(
       details: { material_id: materialId },
     });
 
-    revalidatePath(`/projects/${projectId}`);
+    // Client-side invalidation via React Query
 
     return { success: true };
   } catch (error) {
@@ -665,7 +664,7 @@ export async function bulkImportMaterials(
       details: { inserted: results.inserted, updated: results.updated },
     });
 
-    revalidatePath(`/projects/${projectId}`);
+    // Client-side invalidation via React Query
 
     return { success: true, data: results };
   } catch (error) {
@@ -714,7 +713,7 @@ export async function updateMaterialStatus(
       details: { status },
     });
 
-    revalidatePath(`/projects/${projectId}`);
+    // Client-side invalidation via React Query
 
     return { success: true };
   } catch (error) {

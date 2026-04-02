@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { projectTabKeys } from "@/lib/react-query/project-tabs";
 import { format, isPast, differenceInDays } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardAction } from "@/components/ui/card";
@@ -109,6 +111,7 @@ export function MilestoneCards({
   showProjectBadge = false,
 }: MilestoneCardsProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [formDialogOpen, setFormDialogOpen] = useState(false);
@@ -155,7 +158,7 @@ export function MilestoneCards({
       }
 
       toast.success("Milestone deleted");
-      router.refresh();
+      queryClient.invalidateQueries({ queryKey: projectTabKeys.milestones(projectId) });
     } catch (error) {
       console.error("Failed to delete milestone:", error);
       toast.error("Failed to delete milestone");
@@ -179,7 +182,7 @@ export function MilestoneCards({
       }
 
       toast.success(isCompleting ? "Milestone completed!" : "Milestone reopened");
-      router.refresh();
+      queryClient.invalidateQueries({ queryKey: projectTabKeys.milestones(projectId) });
     } catch (error) {
       console.error("Failed to update milestone:", error);
       toast.error("Failed to update milestone");

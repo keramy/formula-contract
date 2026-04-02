@@ -13,6 +13,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { projectTabKeys } from "@/lib/react-query/project-tabs";
 import {
   DndContext,
   closestCenter,
@@ -84,6 +86,7 @@ export function ReportCreationModal({
   onOpenChange,
 }: ReportCreationModalProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   // Report metadata state
   const [reportType, setReportType] = useState<ReportTypeValue>("daily");
@@ -311,9 +314,9 @@ export function ReportCreationModal({
         }
       }
 
-      // Close modal and refresh
+      // Close modal and invalidate reports cache
       handleOpenChange(false);
-      router.refresh();
+      queryClient.invalidateQueries({ queryKey: projectTabKeys.reports(projectId) });
     } catch (err) {
       console.error("Error saving report:", err);
       setError(err instanceof Error ? err.message : "Failed to save report");

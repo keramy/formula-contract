@@ -2,6 +2,8 @@
 
 import { useState, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { materialKeys } from "@/lib/react-query/materials";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import {
@@ -33,6 +35,7 @@ export function MaterialsExcelImport({
   className,
 }: MaterialsExcelImportProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -80,7 +83,7 @@ export function MaterialsExcelImport({
 
       if (result.success && result.data) {
         setImportResult(result.data);
-        router.refresh();
+        queryClient.invalidateQueries({ queryKey: materialKeys.list(projectId) });
         toast.success(`Imported ${result.data.inserted} new, updated ${result.data.updated} materials`);
       } else {
         toast.error(result.error || "Failed to import materials");

@@ -2,6 +2,9 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { projectTabKeys } from "@/lib/react-query/project-tabs";
+import { scopeItemKeys } from "@/lib/react-query/scope-items";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -70,8 +73,17 @@ export function DrawingApproval({
   const canSendToClient = ["admin", "pm"].includes(userRole);
   const canOverride = ["admin", "pm"].includes(userRole);
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Helper to invalidate drawing-related caches
+  const invalidateDrawingCaches = () => {
+    if (projectId) {
+      queryClient.invalidateQueries({ queryKey: projectTabKeys.drawings(projectId) });
+      queryClient.invalidateQueries({ queryKey: scopeItemKeys.list(projectId) });
+    }
+  };
 
   // Send to client dialog
   const [isSendDialogOpen, setIsSendDialogOpen] = useState(false);
@@ -111,7 +123,7 @@ export function DrawingApproval({
         setIsSendDialogOpen(false);
         toast.success("Drawing sent to client for approval");
         onStatusChange?.("awaiting_approval");
-        router.refresh();
+        invalidateDrawingCaches();
       } else {
         toast.error(result.error || "Failed to send to client");
         setError(result.error || "Failed to send to client");
@@ -231,7 +243,7 @@ export function DrawingApproval({
       const statusLabel = approvalType === "rejected" ? "Drawing rejected" : "Drawing approved";
       toast.success(statusLabel);
       onStatusChange?.(newItemStatus);
-      router.refresh();
+      invalidateDrawingCaches();
     } catch (err) {
       toast.error("Failed to record approval");
       setError(err instanceof Error ? err.message : "Failed to record approval");
@@ -267,7 +279,7 @@ export function DrawingApproval({
         setOverrideReason("");
         toast.success("Drawing approved via PM override");
         onStatusChange?.("approved");
-        router.refresh();
+        invalidateDrawingCaches();
       } else {
         toast.error(result.error || "Failed to override");
         setError(result.error || "Failed to override");
@@ -355,7 +367,7 @@ export function DrawingApproval({
       setNotRequiredReason("");
       toast.success("Drawing marked as not required");
       onStatusChange?.("approved");
-      router.refresh();
+      invalidateDrawingCaches();
     } catch (err) {
       toast.error("Failed to mark as not required");
       setError(err instanceof Error ? err.message : "Failed to mark as not required");
@@ -500,7 +512,7 @@ export function DrawingApproval({
       if (drawingStatus === "sent_to_client" || drawingStatus === "rejected") {
         onStatusChange?.("in_design");
       }
-      router.refresh();
+      invalidateDrawingCaches();
     } catch (err) {
       toast.error("Failed to replace file");
       setError(err instanceof Error ? err.message : "Failed to replace file");
