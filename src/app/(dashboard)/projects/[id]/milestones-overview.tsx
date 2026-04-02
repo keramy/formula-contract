@@ -36,6 +36,8 @@ import {
 } from "lucide-react";
 import { format, isPast, differenceInDays } from "date-fns";
 import { MilestoneFormDialog } from "./milestone-form-dialog";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useProjectMilestones } from "@/lib/react-query/project-tabs";
 import { MilestoneCards } from "@/components/milestones/milestone-cards";
 
 interface Milestone {
@@ -51,16 +53,23 @@ interface Milestone {
 
 interface MilestonesOverviewProps {
   projectId: string;
-  milestones: Milestone[];
+  milestones?: Milestone[];
 }
 
 type ViewMode = "cards" | "timeline";
 
 export function MilestonesOverview({
   projectId,
-  milestones,
+  milestones: propMilestones,
 }: MilestonesOverviewProps) {
+  const { data: fetchedMilestones, isLoading: hookLoading } = useProjectMilestones(projectId);
+  const milestones = (propMilestones ?? fetchedMilestones ?? []) as Milestone[];
+
   const router = useRouter();
+
+  if (hookLoading && !propMilestones) {
+    return <div className="space-y-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-48 w-full" /></div>;
+  }
   const [isLoading, setIsLoading] = useState(false);
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [editItem, setEditItem] = useState<Milestone | null>(null);

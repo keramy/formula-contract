@@ -18,6 +18,13 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
+  useProjectMilestones,
+  useProjectSnagging,
+  useProjectAssignments,
+  useProjectDrawings,
+} from "@/lib/react-query/project-tabs";
+import { useMaterials } from "@/lib/react-query/materials";
+import {
   BuildingIcon,
   CalendarIcon,
   BanknoteIcon,
@@ -163,11 +170,11 @@ interface ProjectOverviewProps {
     client: ProjectClient | null;
   };
   scopeItems: ScopeItem[];
-  drawings: Drawing[];
-  materials: Material[];
-  milestones: Milestone[];
-  snaggingItems: Snagging[];
-  assignments: Assignment[];
+  drawings?: Drawing[];
+  materials?: Material[];
+  milestones?: Milestone[];
+  snaggingItems?: Snagging[];
+  assignments?: Assignment[];
   recentActivities?: Activity[];
   canEdit: boolean;
   isClient: boolean;
@@ -178,15 +185,31 @@ export function ProjectOverview({
   projectUrlId,
   project,
   scopeItems,
-  drawings,
-  materials,
-  milestones,
-  snaggingItems,
-  assignments,
+  drawings: propDrawings,
+  materials: propMaterials,
+  milestones: propMilestones,
+  snaggingItems: propSnagging,
+  assignments: propAssignments,
   recentActivities = EMPTY_ACTIVITIES,
   canEdit,
   isClient,
 }: ProjectOverviewProps) {
+  // Self-fetch deferred data via React Query when props not provided
+  const { data: fetchedMilestones } = useProjectMilestones(projectId);
+  const { data: fetchedSnagging } = useProjectSnagging(projectId);
+  const { data: fetchedAssignments } = useProjectAssignments(projectId);
+  const { data: fetchedDrawings } = useProjectDrawings(projectId);
+  const { data: fetchedMaterialsRaw } = useMaterials(projectId);
+
+  const milestones = (propMilestones ?? fetchedMilestones ?? []) as Milestone[];
+  const snaggingItems = (propSnagging ?? fetchedSnagging ?? []) as Snagging[];
+  const assignments = (propAssignments ?? fetchedAssignments ?? []) as Assignment[];
+  const drawings = (propDrawings ?? fetchedDrawings ?? []) as Drawing[];
+  const materials: Material[] = propMaterials ?? (fetchedMaterialsRaw || []).map((m) => ({
+    id: m.id,
+    name: m.name,
+    status: m.status,
+  }));
   // ============================================================================
   // CALCULATIONS
   // ============================================================================

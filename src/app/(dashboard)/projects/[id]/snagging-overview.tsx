@@ -26,6 +26,8 @@ import {
   BugIcon,
 } from "lucide-react";
 import { format } from "date-fns";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useProjectSnagging } from "@/lib/react-query/project-tabs";
 import { SnaggingFormDialog } from "./snagging-form-dialog";
 
 interface ScopeItem {
@@ -60,7 +62,7 @@ interface Snagging {
 
 interface SnaggingOverviewProps {
   projectId: string;
-  snaggingItems: Snagging[];
+  snaggingItems?: Snagging[];
   scopeItems: ScopeItem[];
 }
 
@@ -68,9 +70,15 @@ type FilterType = "all" | "open" | "resolved";
 
 export function SnaggingOverview({
   projectId,
-  snaggingItems,
+  snaggingItems: propItems,
   scopeItems,
 }: SnaggingOverviewProps) {
+  const { data: fetchedItems, isLoading: hookLoading } = useProjectSnagging(projectId);
+  const snaggingItems = (propItems ?? fetchedItems ?? []) as Snagging[];
+
+  if (hookLoading && !propItems) {
+    return <div className="space-y-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-48 w-full" /></div>;
+  }
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [formDialogOpen, setFormDialogOpen] = useState(false);

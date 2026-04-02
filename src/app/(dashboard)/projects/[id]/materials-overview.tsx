@@ -46,6 +46,8 @@ const MaterialSheet = dynamic(
     ssr: false,
   }
 );
+import { Skeleton } from "@/components/ui/skeleton";
+import { useMaterials } from "@/lib/react-query/materials";
 import { MaterialsExcelImport, MaterialsExcelExport, MaterialsTemplateButton } from "@/components/materials";
 
 interface ScopeItem {
@@ -62,7 +64,7 @@ interface MaterialsOverviewProps {
   projectId: string;
   projectCode: string;
   projectName: string;
-  materials: MaterialWithAssignments[];
+  materials?: MaterialWithAssignments[];
   scopeItems: ScopeItem[];
   userRole?: string;
 }
@@ -71,10 +73,30 @@ export function MaterialsOverview({
   projectId,
   projectCode,
   projectName,
-  materials,
+  materials: propMaterials,
   scopeItems,
   userRole = "pm",
 }: MaterialsOverviewProps) {
+  // Self-fetch via React Query when prop not provided
+  const { data: fetchedRaw, isLoading: hookLoading } = useMaterials(projectId);
+  const materials: MaterialWithAssignments[] = propMaterials ?? (fetchedRaw || []).map((m) => {
+    const itemIds = (m.item_materials || []).map((im) => im.item_id);
+    return {
+      id: m.id,
+      material_code: m.material_code,
+      name: m.name,
+      specification: m.specification,
+      supplier: m.supplier,
+      images: m.images,
+      status: m.status,
+      assignedItemsCount: itemIds.length,
+      assignedItemIds: itemIds,
+    };
+  });
+
+  if (hookLoading && !propMaterials) {
+    return <div className="space-y-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-48 w-full" /></div>;
+  }
   // Role-based permissions
   const canManageMaterials = ["admin", "pm"].includes(userRole);
   const canApproveMaterials = ["admin", "pm", "client"].includes(userRole);

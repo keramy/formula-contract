@@ -14,9 +14,9 @@ import { FinancialsOverview } from "./financials-overview";
 import { TimelineOverview } from "./timeline-overview";
 import { ProjectDetailHeader } from "./project-detail-header";
 import { ProjectOverview } from "./project-overview";
-import { getProjectAssignments } from "@/lib/actions/project-assignments";
-// PERF: Reports and areas removed from server fetch — loaded via React Query when tab is activated
-// This saves ~6s of DB roundtrips on every page load (each helper creates its own client + auth call)
+// PERF: Only project + scope items fetched server-side. All other data (materials, drawings,
+// snagging, milestones, assignments, reports, areas, activities) lazy-loaded via React Query
+// when their tab is activated. This reduces page load from 6 parallel queries to 2.
 import { DownloadTemplateButton, ExcelImport, ExcelExport, ScopeItemAddButton } from "@/components/scope-items";
 import { ActivityFeed } from "@/components/activity-log/activity-feed";
 import { isUUID } from "@/lib/slug";
@@ -71,64 +71,6 @@ interface ScopeItem {
   images: string[] | null;
   parent_id: string | null; // References parent item when created via split
   area_id: string | null;
-}
-
-interface Drawing {
-  id: string;
-  item_id: string;
-  status: string;
-  current_revision: string | null;
-  sent_to_client_at: string | null;
-}
-
-interface Material {
-  id: string;
-  material_code: string;
-  name: string;
-  specification: string | null;
-  supplier: string | null;
-  images: string[] | null;
-  status: string;
-}
-
-interface ItemMaterial {
-  material_id: string;
-  item_id: string;
-}
-
-interface Snagging {
-  id: string;
-  project_id: string;
-  item_id: string | null;
-  description: string;
-  photos: string[] | null;
-  is_resolved: boolean;
-  resolved_at: string | null;
-  resolved_by: string | null;
-  resolution_notes: string | null;
-  created_by: string | null;
-  created_at: string;
-  item: {
-    item_code: string;
-    name: string;
-  } | null;
-  creator: {
-    name: string;
-  } | null;
-  resolver: {
-    name: string;
-  } | null;
-}
-
-interface Milestone {
-  id: string;
-  project_id: string;
-  name: string;
-  description: string | null;
-  due_date: string;
-  is_completed: boolean;
-  completed_at: string | null;
-  alert_days_before: number | null;
 }
 
 // Status colors/labels are now handled by ProjectDetailHeader component
@@ -191,17 +133,13 @@ export default async function ProjectDetailPage({
   const canImportExcel = ["admin", "pm"].includes(userRole);
   const isClient = userRole === "client";
 
-  // OPTIMIZED: Reduced from 9 parallel queries to 6.
-  // Reports, Activities, and Areas are now lazy-loaded via React Query when their tab is activated.
-  // Each removed query saved ~3s because helper functions create their own Supabase client + auth call.
+  // OPTIMIZED: Only 2 server-side queries (project + scope items).
+  // Materials, drawings, snagging, milestones, assignments, reports, areas, activities
+  // are all lazy-loaded via React Query when their tab is activated.
   const parallelStart = performance.now();
   const [
     projectResult,
     scopeItemsResult,
-    materialsResult,
-    snaggingResult,
-    milestonesResult,
-    assignmentsResult,
   ] = await Promise.all([
     // 1. Project with Client (includes slug for URL generation)
     (async () => {
@@ -229,56 +167,6 @@ export default async function ProjectDetailPage({
       console.log(`  📋 Scope Items: ${(performance.now() - start).toFixed(0)}ms`);
       return result;
     })(),
-    // 3. Materials with Item Materials
-    (async () => {
-      const start = performance.now();
-      const result = await supabase
-        .from("materials")
-        .select(`
-          id, material_code, name, specification, supplier, images, status,
-          item_materials(item_id, material_id)
-        `)
-        .eq("project_id", projectId)
-        .eq("is_deleted", false)
-        .order("material_code");
-      console.log(`  📦 Materials: ${(performance.now() - start).toFixed(0)}ms`);
-      return result;
-    })(),
-    // 4. Snagging with Joins
-    (async () => {
-      const start = performance.now();
-      const result = await supabase
-        .from("snagging")
-        .select(`
-          id, project_id, item_id, description, photos, is_resolved,
-          resolved_at, resolved_by, resolution_notes, created_by, created_at,
-          item:scope_items!snagging_item_id_fkey(item_code, name),
-          creator:users!snagging_created_by_fkey(name),
-          resolver:users!snagging_resolved_by_fkey(name)
-        `)
-        .eq("project_id", projectId)
-        .order("created_at", { ascending: false });
-      console.log(`  🔧 Snagging: ${(performance.now() - start).toFixed(0)}ms`);
-      return result;
-    })(),
-    // 5. Milestones
-    (async () => {
-      const start = performance.now();
-      const result = await supabase
-        .from("milestones")
-        .select("id, project_id, name, description, due_date, is_completed, completed_at, alert_days_before")
-        .eq("project_id", projectId)
-        .order("due_date");
-      console.log(`  🎯 Milestones: ${(performance.now() - start).toFixed(0)}ms`);
-      return result;
-    })(),
-    // 6. Assignments
-    (async () => {
-      const start = performance.now();
-      const result = await getProjectAssignments(projectId, ctx);
-      console.log(`  👥 Assignments: ${(performance.now() - start).toFixed(0)}ms`);
-      return result;
-    })(),
   ]);
   console.log(`  ⏱️ Parallel queries total: ${(performance.now() - parallelStart).toFixed(0)}ms`);
   console.log(`📊 [PROFILE] Project Detail Total: ${(performance.now() - pageStart).toFixed(0)}ms\n`);
@@ -295,57 +183,6 @@ export default async function ProjectDetailPage({
   // Extract scope items
   const scopeItems = (scopeItemsResult.data || []) as ScopeItem[];
 
-  // Get production item IDs and fetch drawings if needed
-  const productionItemIds = scopeItems
-    .filter((item) => item.item_path === "production")
-    .map((item) => item.id);
-
-  let drawings: Drawing[] = [];
-  if (productionItemIds.length > 0) {
-    const { data: drawingsData } = await supabase
-      .from("drawings")
-      .select("id, item_id, status, current_revision, sent_to_client_at")
-      .in("item_id", productionItemIds);
-    drawings = (drawingsData || []) as Drawing[];
-  }
-
-  // Process materials with their item assignments (now in single query)
-  const materialsWithAssignments = ((materialsResult.data || []) as any[]).map((material) => {
-    const itemMaterialsData = material.item_materials || [];
-    return {
-      id: material.id,
-      material_code: material.material_code,
-      name: material.name,
-      specification: material.specification,
-      supplier: material.supplier,
-      images: material.images,
-      status: material.status,
-      assignedItemsCount: itemMaterialsData.length,
-      assignedItemIds: itemMaterialsData.map((im: ItemMaterial) => im.item_id),
-    };
-  });
-
-  // For the ScopeItemsTable we need plain materials without assignments
-  const materials = ((materialsResult.data || []) as any[]).map((m) => ({
-    id: m.id,
-    material_code: m.material_code,
-    name: m.name,
-    specification: m.specification,
-    supplier: m.supplier,
-    images: m.images,
-    status: m.status,
-  })) as Material[];
-
-  // Extract snagging data
-  const snaggingItems = (snaggingResult.data || []) as unknown as Snagging[];
-  const openSnaggingCount = snaggingItems.filter((s) => !s.is_resolved).length;
-
-  // Extract milestones
-  const milestones = (milestonesResult.data || []) as Milestone[];
-
-
-  // PERF: Areas, reports, activities are now lazy-loaded via React Query in their respective tabs
-  const assignments = assignmentsResult;
   const canManageTeam = ["admin", "pm"].includes(userRole);
 
   const currencySymbols: Record<string, string> = { TRY: "₺", USD: "$", EUR: "€" };
@@ -362,10 +199,6 @@ export default async function ProjectDetailPage({
   // Calculate totals
   const totalValue = scopeItems.reduce((sum, item) => sum + (item.total_sales_price || 0), 0);
   const productionItems = scopeItems.filter((item) => item.item_path === "production");
-  const procurementItems = scopeItems.filter((item) => item.item_path === "procurement");
-
-  // Count drawings with "uploaded" status (ready to send to client)
-  const drawingsReadyCount = drawings.filter((d) => d.status === "uploaded").length;
 
   return (
     <div className="px-4 md:px-6 pt-2 pb-6 flex flex-col min-h-full">
@@ -378,17 +211,13 @@ export default async function ProjectDetailPage({
       />
 
       {/* Tabs - responsive with "More" dropdown on mobile */}
+      {/* Badge counts for deferred data default to 0; they'll appear when tabs self-fetch */}
       <ProjectTabs
         scopeItemsCount={scopeItems.length}
-        openSnaggingCount={openSnaggingCount}
-        milestonesCount={milestones.length}
-        incompleteMilestonesCount={milestones.filter(m => !m.is_completed).length}
-        assignmentsCount={assignments.length}
-        drawingsReadyCount={drawingsReadyCount}
         isClient={isClient}
       >
 
-        {/* Overview Tab */}
+        {/* Overview Tab — deferred data (milestones, snagging, etc.) self-fetches via React Query */}
         <TabsContent value="overview">
           <ProjectOverview
             projectId={projectId}
@@ -413,25 +242,6 @@ export default async function ProjectDetailPage({
               is_installed: item.is_installed,
               total_sales_price: item.total_sales_price,
             }))}
-            drawings={drawings.map((d) => {
-              const item = scopeItems.find((i) => i.id === d.item_id);
-              return {
-                ...d,
-                item_code: item?.item_code,
-              };
-            })}
-            materials={materials.map((m) => ({
-              id: m.id,
-              name: m.name,
-              status: m.status,
-            }))}
-            milestones={milestones}
-            snaggingItems={snaggingItems.map((s) => ({
-              id: s.id,
-              is_resolved: s.is_resolved,
-              description: s.description,
-            }))}
-            assignments={assignments}
             canEdit={canEdit}
             isClient={isClient}
           />
@@ -485,11 +295,7 @@ export default async function ProjectDetailPage({
           <ScopeItemsTable
             projectId={projectId}
             items={scopeItems}
-            materials={materials.map((m) => ({
-              id: m.id,
-              material_code: m.material_code,
-              name: m.name,
-            }))}
+            materials={[]}
             areas={[]}
             currency={project.currency}
             isClient={isClient}
@@ -497,7 +303,7 @@ export default async function ProjectDetailPage({
           />
         </TabsContent>
 
-        {/* Drawings Tab */}
+        {/* Drawings Tab — self-fetches drawings via React Query */}
         <TabsContent value="drawings">
           <DrawingsOverview
             projectId={projectId}
@@ -506,19 +312,17 @@ export default async function ProjectDetailPage({
               item_code: item.item_code,
               name: item.name,
             }))}
-            drawings={drawings}
             projectCurrency={project.currency}
             isClient={isClient}
           />
         </TabsContent>
 
-        {/* Materials Tab */}
+        {/* Materials Tab — self-fetches via React Query */}
         <TabsContent value="materials">
           <MaterialsOverview
             projectId={projectId}
             projectCode={project.project_code}
             projectName={project.name}
-            materials={materialsWithAssignments}
             scopeItems={scopeItems.map((item) => ({
               id: item.id,
               item_code: item.item_code,
@@ -528,11 +332,10 @@ export default async function ProjectDetailPage({
           />
         </TabsContent>
 
-        {/* Snagging Tab */}
+        {/* Snagging Tab — self-fetches via React Query */}
         <TabsContent value="snagging">
           <SnaggingOverview
             projectId={projectId}
-            snaggingItems={snaggingItems}
             scopeItems={scopeItems.map((item) => ({
               id: item.id,
               item_code: item.item_code,
@@ -541,13 +344,11 @@ export default async function ProjectDetailPage({
           />
         </TabsContent>
 
-        {/* Milestones Tab */}
-        {/* Milestones Tab - hidden from clients */}
+        {/* Milestones Tab - hidden from clients, self-fetches via React Query */}
         {!isClient && (
           <TabsContent value="milestones">
             <MilestonesOverview
               projectId={projectId}
-              milestones={milestones}
             />
           </TabsContent>
         )}
@@ -596,11 +397,10 @@ export default async function ProjectDetailPage({
           />
         </TabsContent>
 
-        {/* Team Tab */}
+        {/* Team Tab — self-fetches assignments via React Query */}
         <TabsContent value="team">
           <TeamOverview
             projectId={projectId}
-            assignments={assignments}
             canManageTeam={canManageTeam}
           />
         </TabsContent>

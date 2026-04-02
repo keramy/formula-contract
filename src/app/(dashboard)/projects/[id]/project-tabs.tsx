@@ -37,11 +37,11 @@ import {
 interface ProjectTabsProps {
   children: React.ReactNode;
   scopeItemsCount: number;
-  openSnaggingCount: number;
-  milestonesCount: number;
-  incompleteMilestonesCount: number;
+  openSnaggingCount?: number;
+  milestonesCount?: number;
+  incompleteMilestonesCount?: number;
   reportsCount?: number;
-  assignmentsCount: number;
+  assignmentsCount?: number;
   drawingsReadyCount?: number;
   isClient: boolean;
 }
@@ -60,12 +60,12 @@ const EXTRA_TABS = [
 export function ProjectTabs({
   children,
   scopeItemsCount,
-  openSnaggingCount,
-  milestonesCount,
-  incompleteMilestonesCount,
+  openSnaggingCount = 0,
+  milestonesCount = 0,
+  incompleteMilestonesCount = 0,
   reportsCount = 0,
-  assignmentsCount,
-  drawingsReadyCount,
+  assignmentsCount = 0,
+  drawingsReadyCount = 0,
   isClient,
 }: ProjectTabsProps) {
   const searchParams = useSearchParams();

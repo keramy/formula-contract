@@ -34,6 +34,8 @@ import {
   TrashIcon,
   UserIcon,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useProjectAssignments } from "@/lib/react-query/project-tabs";
 import { assignUserToProject, removeUserFromProject, getAvailableUsers } from "@/lib/actions/project-assignments";
 
 interface User {
@@ -52,7 +54,7 @@ interface Assignment {
 
 interface TeamOverviewProps {
   projectId: string;
-  assignments: Assignment[];
+  assignments?: Assignment[];
   canManageTeam: boolean;
 }
 
@@ -67,7 +69,13 @@ const roleConfig: Record<string, { variant: StatusVariant; label: string }> = {
   client: { variant: "success", label: "Client" },
 };
 
-export function TeamOverview({ projectId, assignments, canManageTeam }: TeamOverviewProps) {
+export function TeamOverview({ projectId, assignments: propAssignments, canManageTeam }: TeamOverviewProps) {
+  const { data: fetchedAssignments, isLoading: hookLoading } = useProjectAssignments(projectId);
+  const assignments = (propAssignments ?? fetchedAssignments ?? []) as Assignment[];
+
+  if (hookLoading && !propAssignments) {
+    return <div className="space-y-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-48 w-full" /></div>;
+  }
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);

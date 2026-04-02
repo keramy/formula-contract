@@ -92,6 +92,18 @@ export function useProjectSnagging(projectId: string) {
   });
 }
 
+/** Drawings for a project's production items */
+export function useProjectDrawings(projectId: string) {
+  return useQuery({
+    queryKey: projectTabKeys.drawings(projectId),
+    queryFn: async () => {
+      const { getProjectDrawings } = await import("@/lib/actions/drawings");
+      return getProjectDrawings(projectId);
+    },
+    staleTime: 60_000,
+  });
+}
+
 /** Recent activities for a project (last 5) */
 export function useProjectActivities(projectId: string) {
   return useQuery({

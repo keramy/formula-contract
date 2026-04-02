@@ -308,3 +308,33 @@ export async function overrideDrawingApproval(
 
   return { success: true };
 }
+
+// ============================================================================
+// Read-only query for lazy loading
+// ============================================================================
+
+/**
+ * Get all drawings for a project's production scope items.
+ * Used by the drawings tab and overview for lazy loading.
+ */
+export async function getProjectDrawings(projectId: string, ctx?: RequestContext) {
+  const supabase = ctx?.supabase ?? await createClient();
+
+  // Get production scope item IDs for this project
+  const { data: items } = await supabase
+    .from("scope_items")
+    .select("id")
+    .eq("project_id", projectId)
+    .eq("is_deleted", false)
+    .eq("item_path", "production");
+
+  const itemIds = (items || []).map((i: { id: string }) => i.id);
+  if (itemIds.length === 0) return [];
+
+  const { data } = await supabase
+    .from("drawings")
+    .select("id, item_id, status, current_revision, sent_to_client_at")
+    .in("item_id", itemIds);
+
+  return data || [];
+}

@@ -46,6 +46,8 @@ import { DrawingUploadSheet } from "@/components/drawings/drawing-upload-sheet";
 import { ScopeItemSheet } from "@/components/scope-items/scope-item-sheet";
 import { sendDrawingsToClient } from "@/lib/actions/drawings";
 import { toast } from "sonner";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useProjectDrawings } from "@/lib/react-query/project-tabs";
 
 interface Drawing {
   id: string;
@@ -64,7 +66,7 @@ interface ProductionItem {
 interface DrawingsOverviewProps {
   projectId: string;
   productionItems: ProductionItem[];
-  drawings: Drawing[];
+  drawings?: Drawing[];
   projectCurrency?: string;
   isClient?: boolean;
 }
@@ -81,7 +83,13 @@ const statusConfig: Record<string, { variant: StatusVariant; label: string }> = 
   not_required: { variant: "default", label: "Not Required" },
 };
 
-export function DrawingsOverview({ projectId, productionItems, drawings, projectCurrency = "TRY", isClient = false }: DrawingsOverviewProps) {
+export function DrawingsOverview({ projectId, productionItems, drawings: propDrawings, projectCurrency = "TRY", isClient = false }: DrawingsOverviewProps) {
+  const { data: fetchedDrawings, isLoading: hookLoading } = useProjectDrawings(projectId);
+  const drawings = (propDrawings ?? fetchedDrawings ?? []) as Drawing[];
+
+  if (hookLoading && !propDrawings) {
+    return <div className="space-y-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-48 w-full" /></div>;
+  }
   const router = useRouter();
 
   // Sheet states
