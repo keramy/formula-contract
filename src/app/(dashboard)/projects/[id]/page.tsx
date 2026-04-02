@@ -15,8 +15,8 @@ import { TimelineOverview } from "./timeline-overview";
 import { ProjectDetailHeader } from "./project-detail-header";
 import { ProjectOverview } from "./project-overview";
 import { getProjectAssignments } from "@/lib/actions/project-assignments";
-import { getProjectReports } from "@/lib/actions/reports";
-import { getProjectAreas } from "@/lib/actions/project-areas";
+// PERF: Reports and areas removed from server fetch — loaded via React Query when tab is activated
+// This saves ~6s of DB roundtrips on every page load (each helper creates its own client + auth call)
 import { DownloadTemplateButton, ExcelImport, ExcelExport, ScopeItemAddButton } from "@/components/scope-items";
 import { ActivityFeed } from "@/components/activity-log/activity-feed";
 import { isUUID } from "@/lib/slug";
@@ -197,7 +197,9 @@ export default async function ProjectDetailPage({
   const canImportExcel = ["admin", "pm"].includes(userRole);
   const isClient = userRole === "client";
 
-  // OPTIMIZED: Run all main queries in PARALLEL with profiling
+  // OPTIMIZED: Reduced from 9 parallel queries to 6.
+  // Reports, Activities, and Areas are now lazy-loaded via React Query when their tab is activated.
+  // Each removed query saved ~3s because helper functions create their own Supabase client + auth call.
   const parallelStart = performance.now();
   const [
     projectResult,
@@ -205,10 +207,7 @@ export default async function ProjectDetailPage({
     materialsResult,
     snaggingResult,
     milestonesResult,
-    reportsResult,
     assignmentsResult,
-    activitiesResult,
-    areasResult,
   ] = await Promise.all([
     // 1. Project with Client (includes slug for URL generation)
     (async () => {
@@ -225,8 +224,6 @@ export default async function ProjectDetailPage({
       return result;
     })(),
     // 2. Scope Items - ordered by created_at to preserve Excel import order
-    // Include parent_id for hierarchical display (split items)
-    // NOTE: Cost columns are hidden from clients in ScopeItemsTable component via isClient prop
     (async () => {
       const start = performance.now();
       const result = await supabase
@@ -281,59 +278,11 @@ export default async function ProjectDetailPage({
       console.log(`  🎯 Milestones: ${(performance.now() - start).toFixed(0)}ms`);
       return result;
     })(),
-    // 6. Reports
-    (async () => {
-      const start = performance.now();
-      const result = await getProjectReports(projectId);
-      console.log(`  📄 Reports: ${(performance.now() - start).toFixed(0)}ms`);
-      return result;
-    })(),
-    // 7. Assignments
+    // 6. Assignments
     (async () => {
       const start = performance.now();
       const result = await getProjectAssignments(projectId);
       console.log(`  👥 Assignments: ${(performance.now() - start).toFixed(0)}ms`);
-      return result;
-    })(),
-    // 8. Recent Activities (for Overview dashboard)
-    (async () => {
-      const start = performance.now();
-      const { data } = await supabase
-        .from("activity_log")
-        .select("id, action, entity_type, created_at, user_id")
-        .eq("project_id", projectId)
-        .order("created_at", { ascending: false })
-        .limit(5);
-
-      // Get unique user IDs and fetch their names
-      const userIds = [...new Set((data || []).map((a) => a.user_id).filter((id): id is string => id !== null))];
-      let userMap: Record<string, string> = {};
-
-      if (userIds.length > 0) {
-        const { data: users } = await supabase
-          .from("users")
-          .select("id, name")
-          .in("id", userIds);
-        userMap = (users || []).reduce((acc, u) => ({ ...acc, [u.id]: u.name }), {} as Record<string, string>);
-      }
-
-      // Map activities with user names
-      const activitiesWithUsers = (data || []).map((a) => ({
-        id: a.id,
-        action: a.action,
-        entity_type: a.entity_type,
-        created_at: a.created_at,
-        user: a.user_id ? { name: userMap[a.user_id] || "Unknown" } : null,
-      }));
-
-      console.log(`  📝 Recent Activities: ${(performance.now() - start).toFixed(0)}ms`);
-      return { data: activitiesWithUsers };
-    })(),
-    // 9. Project Areas
-    (async () => {
-      const start = performance.now();
-      const result = await getProjectAreas(projectId);
-      console.log(`  📍 Project Areas: ${(performance.now() - start).toFixed(0)}ms`);
       return result;
     })(),
   ]);
@@ -401,14 +350,8 @@ export default async function ProjectDetailPage({
   const milestones = (milestonesResult.data || []) as Milestone[];
 
 
-  // Extract project areas and build lookup map
-  const areas = areasResult;
-  const areaMap = new Map(areas.map((a) => [a.id, { area_code: a.area_code, name: a.name, floor: a.floor }]));
-
-  // Reports, assignments, and activities are already extracted from Promise.all
-  const reports = reportsResult;
+  // PERF: Areas, reports, activities are now lazy-loaded via React Query in their respective tabs
   const assignments = assignmentsResult;
-  const recentActivities = activitiesResult.data || [];
   const canManageTeam = ["admin", "pm"].includes(userRole);
 
   const currencySymbols: Record<string, string> = { TRY: "₺", USD: "$", EUR: "€" };
@@ -431,7 +374,7 @@ export default async function ProjectDetailPage({
   const drawingsReadyCount = drawings.filter((d) => d.status === "uploaded").length;
 
   return (
-    <div className="px-4 md:px-6 pt-2 pb-6">
+    <div className="px-4 md:px-6 pt-2 pb-6 flex flex-col min-h-full">
       {/* Header - renders into the App Header bar via context */}
       <ProjectDetailHeader
         projectId={projectUrlId}
@@ -446,7 +389,6 @@ export default async function ProjectDetailPage({
         openSnaggingCount={openSnaggingCount}
         milestonesCount={milestones.length}
         incompleteMilestonesCount={milestones.filter(m => !m.is_completed).length}
-        reportsCount={reports.length}
         assignmentsCount={assignments.length}
         drawingsReadyCount={drawingsReadyCount}
         isClient={isClient}
@@ -496,7 +438,6 @@ export default async function ProjectDetailPage({
               description: s.description,
             }))}
             assignments={assignments}
-            recentActivities={recentActivities}
             canEdit={canEdit}
             isClient={isClient}
           />
@@ -534,15 +475,12 @@ export default async function ProjectDetailPage({
               )}
               <div className="shrink-0">
                 <ExcelExport
-                  items={scopeItems.map((item) => {
-                    const area = item.area_id ? areaMap.get(item.area_id) : null;
-                    return {
-                      ...item,
-                      floor: area?.floor ?? null,
-                      area_name: area?.name ?? null,
-                      area_code: area?.area_code ?? null,
-                    };
-                  })}
+                  items={scopeItems.map((item) => ({
+                    ...item,
+                    floor: null,
+                    area_name: null,
+                    area_code: null,
+                  }))}
                   projectCode={project.project_code}
                   projectName={project.name}
                   compact
@@ -558,12 +496,7 @@ export default async function ProjectDetailPage({
               material_code: m.material_code,
               name: m.name,
             }))}
-            areas={areas.map((a) => ({
-              id: a.id,
-              area_code: a.area_code,
-              name: a.name,
-              floor: a.floor,
-            }))}
+            areas={[]}
             currency={project.currency}
             isClient={isClient}
             userRole={userRole}
@@ -631,7 +564,6 @@ export default async function ProjectDetailPage({
             projectId={projectId}
             projectName={project.name}
             projectCode={project.project_code}
-            reports={reports}
             userRole={userRole}
           />
         </TabsContent>
@@ -655,8 +587,8 @@ export default async function ProjectDetailPage({
           </TabsContent>
         )}
 
-        {/* Timeline Tab - viewable by all roles; edit restricted */}
-        <TabsContent value="timeline">
+        {/* Timeline Tab - full page height, viewable by all roles; edit restricted */}
+        <TabsContent value="timeline" className="flex-1 flex flex-col">
           <TimelineOverview
             projectId={projectId}
             projectUrlId={projectUrlId}

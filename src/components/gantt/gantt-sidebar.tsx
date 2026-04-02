@@ -3,324 +3,317 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import {
+  type GanttRow,
   type GanttItem,
-  type WeekendSettings,
-  DEFAULT_WEEKEND_SETTINGS,
-} from "./types";
+  type Priority,
+  resolveItemColor,
+  formatDuration,
+  SIDEBAR_WIDTH,
+  ROW_HEIGHT,
+  CATEGORY_HEIGHT,
+  HEADER_HEIGHT,
+  totalRowsHeight,
+} from "./gantt-types";
+import { GanttContextMenu } from "./gantt-context-menu";
+import { ChevronRightIcon, GripVerticalIcon } from "lucide-react";
 import {
   DndContext,
   closestCenter,
   PointerSensor,
   useSensor,
   useSensors,
+  type DragEndEvent,
 } from "@dnd-kit/core";
 import {
   SortableContext,
   verticalListSortingStrategy,
+  useSortable,
 } from "@dnd-kit/sortable";
-import type { GanttViewMode } from "./types";
-import { SortableRow } from "./sortable-row";
+import { CSS } from "@dnd-kit/utilities";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 
 // ============================================================================
-// GANTT SIDEBAR - Left panel showing item names with hierarchy and drag support
+// GANTT SIDEBAR — Left panel using ganttRows for absolute positioning
+// Figma: colored dots, hierarchy, chevrons, Task Name + Duration columns
 // ============================================================================
 
-// Default column widths
-const DEFAULT_COLUMN_WIDTHS = {
-  rowNum: 28,
-  name: 200,
-  start: 64,
-  end: 64,
-  days: 56,
-};
-
-// Per-column width constraints
-const COLUMN_CONSTRAINTS = {
-  rowNum: { min: 24, max: 60 },
-  name: { min: 140, max: 460 },
-  start: { min: 56, max: 140 },
-  end: { min: 56, max: 140 },
-  days: { min: 40, max: 100 },
-};
-
-// Resize handle component (module-scoped to avoid re-creation)
-function ResizeHandle({
-  column,
-  resizingColumn,
-  onResizeStart,
-}: {
-  column: string;
-  resizingColumn: string | null;
-  onResizeStart: (e: React.MouseEvent, column: string) => void;
-}) {
-  return (
-    <div
-      className={cn(
-        "absolute -right-[3px] top-0 bottom-0 w-[7px] cursor-col-resize z-10 group/resize",
-        "flex items-center justify-center"
-      )}
-      onMouseDown={(e) => onResizeStart(e, column)}
-    >
-      <div
-        className={cn(
-          "w-[3px] h-full transition-colors",
-          resizingColumn === column
-            ? "bg-primary"
-            : "bg-transparent group-hover/resize:bg-primary/50"
-        )}
-      />
-    </div>
-  );
-}
-
-export interface GanttSidebarProps {
-  items: GanttItem[];
-  rowHeight: number;
-  headerHeight: number;
-  viewMode?: GanttViewMode;
-  selectedIds?: Set<string>;
-  collapsedIds?: Set<string>;
-  weekendSettings?: WeekendSettings;
-  onItemClick?: (item: GanttItem, event: React.MouseEvent) => void;
-  onItemDoubleClick?: (item: GanttItem) => void;
-  onToggleCollapse?: (itemId: string) => void;
-  onReorderItems?: (itemIds: string[]) => void;
+interface GanttSidebarProps {
+  rows: GanttRow[];
+  selectedIds: Set<string>;
+  onToggleCollapse: (id: string) => void;
+  onSelectItem: (id: string, e: React.MouseEvent) => void;
+  onDoubleClickItem: (item: GanttItem) => void;
+  onReorder?: (itemIds: string[]) => void;
+  scrollTop: number;
+  // Context menu callbacks
+  onEditItem?: (item: GanttItem) => void;
+  onDeleteItem?: (item: GanttItem) => void;
+  onAddSubtask?: (parentId: string) => void;
+  onConvertToMilestone?: (item: GanttItem) => void;
+  onSetPriority?: (item: GanttItem, priority: Priority) => void;
+  onToggleCriticalPath?: (item: GanttItem) => void;
   className?: string;
 }
 
 export function GanttSidebar({
-  items,
-  rowHeight,
-  headerHeight,
-  viewMode = "week",
-  selectedIds = new Set(),
-  collapsedIds = new Set(),
-  weekendSettings = DEFAULT_WEEKEND_SETTINGS,
-  onItemClick,
-  onItemDoubleClick,
+  rows,
+  selectedIds,
   onToggleCollapse,
-  onReorderItems,
+  onSelectItem,
+  onDoubleClickItem,
+  onReorder,
+  scrollTop,
+  onEditItem,
+  onDeleteItem,
+  onAddSubtask,
+  onConvertToMilestone,
+  onSetPriority,
+  onToggleCriticalPath,
   className,
 }: GanttSidebarProps) {
-  // DnD sensors
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+  );
 
-  // Column resize state
-  const [columnWidths, setColumnWidths] = React.useState({
-    rowNum: DEFAULT_COLUMN_WIDTHS.rowNum,
-    name: DEFAULT_COLUMN_WIDTHS.name,
-    start: DEFAULT_COLUMN_WIDTHS.start,
-    end: DEFAULT_COLUMN_WIDTHS.end,
-    days: DEFAULT_COLUMN_WIDTHS.days,
-  });
+  const handleDragEnd = React.useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over || active.id === over.id || !onReorder) return;
 
-  // Auto-calculate sidebar width from column widths
-  const sidebarWidth = columnWidths.rowNum + columnWidths.name + columnWidths.start + columnWidths.end + columnWidths.days;
+      const ids = rows.map((r) => r.id);
+      const oldIndex = ids.indexOf(active.id as string);
+      const newIndex = ids.indexOf(over.id as string);
+      if (oldIndex === -1 || newIndex === -1) return;
 
-  const [resizingColumn, setResizingColumn] = React.useState<string | null>(null);
-  const resizeStartX = React.useRef<number>(0);
-  const resizeStartWidth = React.useRef<number>(0);
+      const reordered = [...ids];
+      const [moved] = reordered.splice(oldIndex, 1);
+      reordered.splice(newIndex, 0, moved);
+      onReorder(reordered);
+    },
+    [rows, onReorder]
+  );
 
-  // Ref for safe closure access during resize
-  const columnWidthsRef = React.useRef(columnWidths);
-  React.useEffect(() => {
-    columnWidthsRef.current = columnWidths;
-  }, [columnWidths]);
-
-  // Column resize handlers
-  const handleColumnResizeStart = React.useCallback((e: React.MouseEvent, column: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setResizingColumn(column);
-    resizeStartX.current = e.clientX;
-    resizeStartWidth.current = columnWidthsRef.current[column as keyof typeof columnWidthsRef.current];
-  }, []);
-
-  React.useEffect(() => {
-    if (!resizingColumn) return;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      const constraints = COLUMN_CONSTRAINTS[resizingColumn as keyof typeof COLUMN_CONSTRAINTS];
-      const deltaX = e.clientX - resizeStartX.current;
-      const newWidth = Math.min(
-        constraints.max,
-        Math.max(constraints.min, resizeStartWidth.current + deltaX)
-      );
-      setColumnWidths(prev => ({
-        ...prev,
-        [resizingColumn]: newWidth,
-      }));
-    };
-
-    const handleMouseUp = () => {
-      setResizingColumn(null);
-    };
-
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
-
-    return () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [resizingColumn]);
-
-  // Build a map of item ID to children count for collapse indicator
-  const childrenMap = React.useMemo(() => {
-    const map = new Map<string, number>();
-    items.forEach((item) => {
-      if (item.parentId) {
-        map.set(item.parentId, (map.get(item.parentId) || 0) + 1);
-      }
-    });
-    return map;
-  }, [items]);
-
-  // Filter visible items (hide children of collapsed parents)
-  const visibleItems = React.useMemo(() => {
-    if (collapsedIds.size === 0) return items;
-
-    const hiddenParentIds = new Set<string>();
-
-    const collectHiddenIds = (parentId: string) => {
-      items.forEach((item) => {
-        if (item.parentId === parentId) {
-          hiddenParentIds.add(item.id);
-          collectHiddenIds(item.id);
-        }
-      });
-    };
-
-    collapsedIds.forEach((id) => collectHiddenIds(id));
-
-    return items.filter((item) => !hiddenParentIds.has(item.id));
-  }, [items, collapsedIds]);
-
-  // Stable row number map: item ID → original 1-based index in full list
-  const originalIndexMap = React.useMemo(() => {
-    return new Map(items.map((item, i) => [item.id, i + 1]));
-  }, [items]);
-
-  // Reorder within the same parent (tasks only)
-  const reorderSubtree = React.useCallback((activeId: string, overId: string) => {
-    if (activeId === overId) return;
-
-    const activeParent = items.find((i) => i.id === activeId)?.parentId || null;
-    const overItem = items.find((i) => i.id === overId);
-    const overParent = overItem?.parentId || null;
-    if (activeParent !== overParent && overId !== activeParent) return;
-
-    const siblings = items.filter(
-      (i) => i.isEditable && i.type === "task" && i.parentId === activeParent
-    );
-    const siblingIds = siblings.map((i) => i.id);
-    if (!siblingIds.includes(activeId) || !siblingIds.includes(overId)) return;
-
-    const nextOrder = siblingIds.filter((id) => id !== activeId);
-    const insertIndex = overId === activeParent ? 0 : Math.max(0, nextOrder.indexOf(overId));
-    nextOrder.splice(insertIndex, 0, activeId);
-
-    onReorderItems?.(nextOrder);
-  }, [items, onReorderItems]);
+  const contentHeight = totalRowsHeight(rows);
 
   return (
     <div
-      className={cn(
-        "border-r border-base-200 bg-white shrink-0 flex flex-col overflow-hidden",
-        resizingColumn && "select-none",
-        className
-      )}
-      style={{ width: sidebarWidth }}
+      className={cn("relative shrink-0 border-r bg-background overflow-hidden", className)}
+      style={{ width: SIDEBAR_WIDTH }}
     >
-      {/* Header with column titles */}
+      {/* Column headers — height MUST match timeline header exactly */}
       <div
-        className="border-b border-base-300 bg-base-50 shrink-0"
-        style={{ height: headerHeight }}
+        className="flex items-center border-b px-4 text-[11px] font-semibold text-muted-foreground bg-muted/30 box-border"
+        style={{ height: HEADER_HEIGHT }}
       >
-        <div
-          className="flex items-center px-2 text-[11px] font-semibold text-foreground/70 uppercase tracking-wider h-full"
-        >
-          <div
-            className="shrink-0 text-center relative border-r border-base-300"
-            style={{ width: columnWidths.rowNum }}
-          >
-            #
-            <ResizeHandle column="rowNum" resizingColumn={resizingColumn} onResizeStart={handleColumnResizeStart} />
-          </div>
-
-          <div
-            className="shrink-0 pl-1 min-w-0 relative border-r border-base-300"
-            style={{ width: columnWidths.name }}
-          >
-            Name
-            <ResizeHandle column="name" resizingColumn={resizingColumn} onResizeStart={handleColumnResizeStart} />
-          </div>
-
-          <div
-            className="shrink-0 text-center relative border-r border-base-300"
-            style={{ width: columnWidths.start }}
-          >
-            Begin
-            <ResizeHandle column="start" resizingColumn={resizingColumn} onResizeStart={handleColumnResizeStart} />
-          </div>
-
-          <div
-            className="shrink-0 text-center relative border-r border-base-300"
-            style={{ width: columnWidths.end }}
-          >
-            End
-            <ResizeHandle column="end" resizingColumn={resizingColumn} onResizeStart={handleColumnResizeStart} />
-          </div>
-
-          <div
-            className="shrink-0 text-center relative"
-            style={{ width: columnWidths.days }}
-          >
-            Days
-            <ResizeHandle column="days" resizingColumn={resizingColumn} onResizeStart={handleColumnResizeStart} />
-          </div>
-        </div>
+        <span className="flex-1">Task Name</span>
+        <span className="w-16 text-right">Duration</span>
       </div>
 
-      {/* Items list — vertical scroll only */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden">
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={({ active, over }) => {
-            if (!active?.id || !over?.id) return;
-            reorderSubtree(String(active.id), String(over.id));
+      {/* Scrollable row area — offset by scrollTop to sync with timeline */}
+      <div className="overflow-hidden" style={{ position: "relative" }}>
+        <div
+          style={{
+            height: contentHeight,
+            position: "relative",
+            transform: `translateY(-${scrollTop}px)`,
           }}
         >
-          <SortableContext items={visibleItems.map((item) => item.id)} strategy={verticalListSortingStrategy}>
-            {visibleItems.map((item, index) => (
-              <SortableRow
-                key={item.id}
-                item={item}
-                index={index}
-                originalIndex={originalIndexMap.get(item.id) ?? index + 1}
-                rowHeight={rowHeight}
-                columnWidths={columnWidths}
-                childrenMap={childrenMap}
-                collapsedIds={collapsedIds}
-                selectedIds={selectedIds}
-                weekendSettings={weekendSettings}
-                onItemClick={onItemClick}
-                onItemDoubleClick={onItemDoubleClick}
-                onToggleCollapse={onToggleCollapse}
-              />
-            ))}
-          </SortableContext>
-        </DndContext>
-
-        {/* Empty state */}
-        {visibleItems.length === 0 && (
-          <div className="flex items-center justify-center h-20 text-sm text-muted-foreground">
-            No timeline items
-          </div>
-        )}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            modifiers={[restrictToVerticalAxis]}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={rows.map((r) => r.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              {rows.map((row) => (
+                <GanttContextMenu
+                  key={row.id}
+                  item={row.item}
+                  onEdit={onEditItem}
+                  onDelete={onDeleteItem}
+                  onAddSubtask={onAddSubtask}
+                  onConvertToMilestone={onConvertToMilestone}
+                  onSetPriority={onSetPriority}
+                  onToggleCriticalPath={onToggleCriticalPath}
+                >
+                  <SidebarRow
+                    row={row}
+                    isSelected={selectedIds.has(row.id)}
+                    onToggleCollapse={onToggleCollapse}
+                    onSelect={onSelectItem}
+                    onDoubleClick={onDoubleClickItem}
+                  />
+                </GanttContextMenu>
+              ))}
+            </SortableContext>
+          </DndContext>
+        </div>
       </div>
     </div>
   );
 }
 
+// ---------------------------------------------------------------------------
+// Sidebar Row — absolutely positioned via row.y
+// ---------------------------------------------------------------------------
+
+function SidebarRow({
+  row,
+  isSelected,
+  onToggleCollapse,
+  onSelect,
+  onDoubleClick,
+}: {
+  row: GanttRow;
+  isSelected: boolean;
+  onToggleCollapse: (id: string) => void;
+  onSelect: (id: string, e: React.MouseEvent) => void;
+  onDoubleClick: (item: GanttItem) => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: row.id });
+
+  const { item, depth, hasChildren, isCollapsed, phaseColor, type } = row;
+  const isPhase = type === "phase";
+  const isMilestone = type === "milestone";
+  const indent = depth * 20;
+
+  const style: React.CSSProperties = {
+    position: "absolute",
+    top: row.y,
+    left: 0,
+    right: 0,
+    height: row.height,
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      role="row"
+      tabIndex={0}
+      className={cn(
+        "flex items-center gap-1.5 px-4 border-b border-border/50 cursor-pointer select-none group relative",
+        isSelected ? "bg-primary/10" : row.rowIndex % 2 === 0 ? "bg-background" : "bg-muted/20",
+        isDragging && "opacity-50 z-50",
+        isPhase ? "font-semibold" : "text-[11px]",
+      )}
+      onClick={(e) => onSelect(row.id, e)}
+      onDoubleClick={() => onDoubleClick(item)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") onDoubleClick(item);
+      }}
+    >
+      {/* Selected accent bar — 3px left edge */}
+      {isSelected && (
+        <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-primary rounded-r-sm" />
+      )}
+
+      {/* Phase: collapse chevron */}
+      {isPhase && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleCollapse(row.id);
+          }}
+          className="shrink-0 text-muted-foreground/60 text-[8px] w-4 text-center"
+        >
+          {isCollapsed ? "▶" : "▼"}
+        </button>
+      )}
+
+      {/* Task/milestone: fixed-width prefix area (drag handle + indent + chevron/spacer) */}
+      {!isPhase && (
+        <>
+          {/* Drag handle — always 14px wide, visible on hover */}
+          <div
+            {...listeners}
+            className="shrink-0 w-3.5 opacity-0 group-hover:opacity-40 cursor-grab active:cursor-grabbing"
+          >
+            <GripVerticalIcon className="size-3" />
+          </div>
+
+          {/* Indent spacer */}
+          {indent > 0 && <div style={{ width: indent }} className="shrink-0" />}
+
+          {/* Chevron or spacer — SAME fixed width (14px) */}
+          {hasChildren ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleCollapse(row.id);
+              }}
+              className="shrink-0 w-3.5 flex items-center justify-center rounded hover:bg-muted"
+            >
+              <ChevronRightIcon
+                className={cn(
+                  "size-3 transition-transform text-muted-foreground",
+                  !isCollapsed && "rotate-90"
+                )}
+              />
+            </button>
+          ) : (
+            <div className="w-3.5 shrink-0" />
+          )}
+        </>
+      )}
+
+      {/* Color dot / diamond — progressive opacity by depth */}
+      {isMilestone ? (
+        <div
+          className="size-2.5 rotate-45 shrink-0"
+          style={{
+            backgroundColor: phaseColor,
+            opacity: depth === 0 ? 1 : depth === 1 ? 0.45 : 0.3,
+          }}
+        />
+      ) : depth >= 2 && !isPhase ? (
+        // Grandchild+ : dashed border ring, no fill
+        <span
+          className="shrink-0 rounded-full size-2.5 border border-dashed bg-transparent"
+          style={{ borderColor: phaseColor, opacity: depth > 2 ? 0.5 : 0.7 }}
+        />
+      ) : (
+        <span
+          className="shrink-0 rounded-full size-2.5"
+          style={{
+            backgroundColor: phaseColor,
+            opacity: isPhase ? 1 : depth === 1 ? 0.45 : 1,
+          }}
+        />
+      )}
+
+      {/* Name */}
+      <span
+        className={cn(
+          "flex-1 truncate",
+          isPhase ? "text-xs text-foreground" : "text-foreground/80"
+        )}
+      >
+        {item.name}
+      </span>
+
+      {/* Duration */}
+      <span
+        className={cn(
+          "w-16 text-right text-[11px] tabular-nums shrink-0",
+          isPhase ? "font-semibold text-green-600" : "text-muted-foreground"
+        )}
+      >
+        {formatDuration(item)}
+      </span>
+    </div>
+  );
+}

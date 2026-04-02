@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { ReportsTable } from "./reports-table";
 import { type Report } from "@/lib/actions/reports";
+import { useProjectReports } from "@/lib/react-query/project-tabs";
 
 // OPTIMIZED: Lazy load heavy modal components (900+ lines each)
 // These are only loaded when the user actually opens them
@@ -44,7 +45,7 @@ interface ReportsOverviewProps {
   projectId: string;
   projectName: string;
   projectCode: string;
-  reports: Report[];
+  reports?: Report[];
   userRole?: string;
 }
 
@@ -52,9 +53,12 @@ export function ReportsOverview({
   projectId,
   projectName,
   projectCode,
-  reports,
+  reports: reportsProp,
   userRole = "pm",
 }: ReportsOverviewProps) {
+  // PERF: Lazy-load reports via React Query if not passed as prop
+  const { data: reportsQuery, isLoading: reportsLoading } = useProjectReports(projectId);
+  const reports = reportsProp ?? reportsQuery ?? [];
   const [creationModalOpen, setCreationModalOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editReport, setEditReport] = useState<Report | null>(null);

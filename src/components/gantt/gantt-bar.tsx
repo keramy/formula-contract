@@ -2,332 +2,417 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { type GanttItem } from "./types";
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu";
-import {
-  DiamondIcon,
-  PencilIcon,
-  CopyIcon,
-  TrashIcon,
-} from "lucide-react";
+  type GanttItem,
+  TASK_BAR_HEIGHT,
+  ROW_HEIGHT,
+  formatDuration,
+} from "./gantt-types";
 
 // ============================================================================
-// GANTT BAR - Visual representation of an item on the timeline
+// GANTT BAR — Three shapes: bracket (parent), rectangle (task), diamond (milestone)
 // ============================================================================
+
+/** Half-height bar for bracket/summary shape */
+const BRACKET_BAR_HEIGHT = Math.round(TASK_BAR_HEIGHT * 0.45);
+/** Triangle cap width for bracket shape */
+const TRIANGLE_WIDTH = 8;
 
 export interface GanttBarProps {
   item: GanttItem;
   left: number;
   width: number;
-  onClick?: (item: GanttItem) => void;
+  y: number;
+  color: string;
+  depth: number;
+  hasChildren: boolean;
+  isSelected: boolean;
+  isEditable: boolean;
+  showCriticalPath?: boolean;
+  baselineLeft?: number;
+  baselineWidth?: number;
+  onDragStart?: (
+    e: React.MouseEvent,
+    item: GanttItem,
+    mode: "move" | "resize-left" | "resize-right"
+  ) => void;
   onDoubleClick?: (item: GanttItem) => void;
-  onEdit?: (item: GanttItem) => void;
-  onDuplicate?: (item: GanttItem) => void;
-  onDelete?: (item: GanttItem) => void;
-  onDragStart?: (item: GanttItem, edge: "left" | "right" | "middle") => void;
-  onDrag?: (deltaX: number) => void;
-  onDragEnd?: () => void;
-  className?: string;
+  onContextMenu?: (e: React.MouseEvent, item: GanttItem) => void;
 }
 
 export function GanttBar({
   item,
   left,
   width,
-  onClick,
-  onDoubleClick,
-  onEdit,
-  onDuplicate,
-  onDelete,
+  y,
+  color,
+  depth,
+  hasChildren,
+  isSelected,
+  isEditable,
+  showCriticalPath,
+  baselineLeft,
+  baselineWidth,
   onDragStart,
-  onDrag,
-  onDragEnd,
-  className,
+  onDoubleClick,
+  onContextMenu,
 }: GanttBarProps) {
-  const isMilestone = item.type === "milestone";
-  const isPhase = item.type === "phase";
-  const isTask = item.type === "task";
-  const isEditable = item.isEditable && (isPhase || isTask);
-  const [isDragging, setIsDragging] = React.useState(false);
-  const dragStartX = React.useRef(0);
+  const barTop = y + (ROW_HEIGHT - TASK_BAR_HEIGHT) / 2;
 
-  // Format date range for tooltip
-  const dateRange = React.useMemo(() => {
-    const formatDate = (date: Date) =>
-      date.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      });
+  // Critical path mode: dim non-critical, force red for critical
+  const isCritical = item.isOnCriticalPath;
+  const dimmed = showCriticalPath && !isCritical;
+  const effectiveColor = showCriticalPath && isCritical ? "#dc2626" : color;
 
-    if (isMilestone) {
-      return formatDate(item.startDate);
+  // Track mouse X for tooltip positioning
+  const [mouseX, setMouseX] = React.useState(0);
+  const barRef = React.useRef<HTMLDivElement>(null);
+  const handleMouseMove = React.useCallback((e: React.MouseEvent) => {
+    if (barRef.current) {
+      setMouseX(e.clientX - barRef.current.getBoundingClientRect().left);
     }
-    return `${formatDate(item.startDate)} - ${formatDate(item.endDate)}`;
-  }, [item.startDate, item.endDate, isMilestone]);
+  }, []);
 
-  // Handle drag start
-  const handleMouseDown = (
-    e: React.MouseEvent,
-    edge: "left" | "right" | "middle"
-  ) => {
-    if (!isEditable) return;
-    if (e.detail > 1) return; // allow double-click to edit without starting drag
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(true);
-    dragStartX.current = e.clientX;
-    onDragStart?.(item, edge);
-
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      const deltaX = moveEvent.clientX - dragStartX.current;
-      onDrag?.(deltaX);
-    };
-
-    const handleMouseUp = () => {
-      setIsDragging(false);
-      onDragEnd?.();
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-    };
-
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
-  };
-
-  // Milestone rendering (diamond shape)
-  if (isMilestone) {
+  // ── Milestone: diamond + label ──
+  if (item.type === "milestone") {
     return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div
+            className={cn(
+              "absolute flex items-center gap-1.5 select-none z-10 cursor-pointer",
+              isSelected && "ring-1 ring-primary/50 rounded-sm",
+              dimmed && "opacity-25"
+            )}
+            style={{
+              left: left - 7,
+              top: barTop,
+              height: TASK_BAR_HEIGHT,
+            }}
+            onDoubleClick={() => onDoubleClick?.(item)}
+            onContextMenu={(e) => onContextMenu?.(e, item)}
+          >
             <div
-              className={cn(
-                "absolute top-1/2 -translate-y-1/2 cursor-pointer transition-transform hover:scale-110",
-                className
-              )}
-              style={{ left: left + width / 2 - 12 }}
-              role="button"
-              tabIndex={0}
-              onClick={() => onClick?.(item)}
-              onDoubleClick={() => onDoubleClick?.(item)}
-              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onClick?.(item); }}
+              className="size-2.5 rotate-45"
+              style={{ backgroundColor: effectiveColor }}
+            />
+            <span
+              className="text-[9px] font-medium italic whitespace-nowrap"
+              style={{ color: effectiveColor }}
             >
-              <DiamondIcon
-                className="h-6 w-6"
-                style={{ color: item.color, fill: item.color }}
-              />
-            </div>
-          </TooltipTrigger>
-          <TooltipContent side="top" className="max-w-[200px]">
-            <div className="space-y-1">
-              <p className="font-medium">{item.name}</p>
-              <p className="text-xs text-muted-foreground">{dateRange}</p>
-              {item.status && (
-                <p className="text-xs">
-                  Status: <span className="font-medium">{item.status}</span>
-                </p>
-              )}
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+              {item.name}
+            </span>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="text-xs">
+          <p className="font-medium">{item.name}</p>
+          <p className="text-muted-foreground">
+            {item.startDate.toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })}
+          </p>
+        </TooltipContent>
+      </Tooltip>
     );
   }
 
-  // Bar content
-  const barContent = (
-    <div
-      className={cn(
-        "absolute top-1/2 -translate-y-1/2 rounded-md cursor-pointer",
-        "transition-colors",
-        isDragging && "opacity-70 shadow-lg ring-2 ring-primary",
-        // Phase styling: taller, more muted
-        isPhase && "h-7",
-        // Task styling: standard height
-        isTask && "h-6",
-        // Default (scope_item): standard height
-        !isPhase && !isTask && "h-6",
-        className
-      )}
-      style={{
-        left,
-        width,
-        backgroundColor: `${item.color}${isPhase ? "18" : "26"}`, // Phases more transparent
-        border: `1px solid ${item.color}`,
-        borderStyle: isPhase ? "dashed" : "solid", // Dashed border for phases
-      }}
-      role="button"
-      tabIndex={0}
-      onClick={() => onClick?.(item)}
-      onDoubleClick={() => onDoubleClick?.(item)}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onClick?.(item); }}
-    >
-      {/* Progress fill */}
-      {item.progress > 0 && (
+  // ── Phase: no bar ──
+  if (item.type === "phase") return null;
+
+  // ── Summary/Bracket bar: parent tasks with children ──
+  if (hasChildren) {
+    return <BracketBar
+      item={item}
+      left={left}
+      width={width}
+      y={y}
+      color={effectiveColor}
+      dimmed={dimmed}
+      isSelected={isSelected}
+      baselineLeft={baselineLeft}
+      baselineWidth={baselineWidth}
+      onDoubleClick={onDoubleClick}
+      onContextMenu={onContextMenu}
+    />;
+  }
+
+  // ── Regular task bar ──
+  const progress = Math.min(Math.max(item.progress, 0), 100);
+  const isDeep = depth >= 2;
+  // Background alpha by depth
+  const bgAlpha = depth === 0 ? "80" : depth === 1 ? "40" : "20";
+  // Fill alpha by depth
+  const fillAlpha = depth === 0 ? "ff" : depth === 1 ? "8c" : "4d";
+  // Bar label: inside for wide bars, right-side for narrow
+  const showNameInside = width > 120;
+  const showNameOutside = !showNameInside && width > 20;
+  const showProgress = width > 50 && progress > 0;
+
+  return (
+    <>
+      {/* Baseline ghost bar */}
+      {baselineLeft !== undefined && baselineWidth !== undefined && (
         <div
-          className="absolute inset-0 rounded-sm"
+          className="absolute rounded-[2px] pointer-events-none z-[9]"
           style={{
-            width: `${item.progress}%`,
-            backgroundColor: item.color,
-            opacity: isPhase ? 0.4 : 0.6,
+            left: baselineLeft,
+            top: barTop + TASK_BAR_HEIGHT - 3,
+            width: baselineWidth,
+            height: 3,
+            backgroundColor: "#9ca3af60",
           }}
         />
       )}
 
-      {/* Label - positioned to avoid overlap */}
-      {width > 60 && (
-        <div className="absolute inset-0 px-2 flex items-center overflow-hidden pointer-events-none z-[5]">
-          <span
-            className="text-[11px] font-medium truncate"
-            style={{ color: item.color, textShadow: "0 0 2px white, 0 0 2px white" }}
-          >
-            {item.name}
-          </span>
-          {/* Progress percentage inline */}
-          {item.progress > 0 && width > 100 && (
-            <span className="ml-auto text-[10px] font-medium opacity-70 shrink-0">
-              {item.progress}%
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Drag handles for editable items - on top of everything */}
-      {isEditable && (
-        <>
-          {/* Left resize handle */}
-          <div
-            className="absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-primary/40 rounded-l-md z-30"
-            onMouseDown={(e) => handleMouseDown(e, "left")}
-          />
-          {/* Right resize handle */}
-          <div
-            className="absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-primary/40 rounded-r-md z-30"
-            onMouseDown={(e) => handleMouseDown(e, "right")}
-          />
-          {/* Move handle (center) - lower z-index so resize handles take precedence */}
-          <div
-            className="absolute left-3 right-3 top-0 bottom-0 cursor-move z-20"
-            onMouseDown={(e) => handleMouseDown(e, "middle")}
-          />
-        </>
-      )}
-    </div>
-  );
-
-  // Wrap with context menu for editable items
-  if (isEditable) {
-    return (
-      <ContextMenu>
-        <ContextMenuTrigger asChild>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>{barContent}</TooltipTrigger>
-              <TooltipContent side="top" className="max-w-[250px]">
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="size-2 rounded"
-                      style={{ backgroundColor: item.color }}
-                    />
-                    <p className="font-medium">{item.name}</p>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{dateRange}</span>
-                    <span className="text-muted-foreground/50">•</span>
-                    <span className="capitalize">{item.type}</span>
-                  </div>
-                  {item.progress > 0 && (
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-1.5 bg-base-200 rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full"
-                          style={{
-                            width: `${item.progress}%`,
-                            backgroundColor: item.color,
-                          }}
-                        />
-                      </div>
-                      <span className="text-xs font-medium">{item.progress}%</span>
-                    </div>
-                  )}
-                  <p className="text-xs text-muted-foreground italic">
-                    Right-click for options • Drag edges to resize
-                  </p>
-                </div>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </ContextMenuTrigger>
-        <ContextMenuContent className="w-48">
-          <ContextMenuItem onClick={() => onEdit?.(item)}>
-            <PencilIcon className="size-4 mr-2" />
-            Edit
-          </ContextMenuItem>
-          <ContextMenuItem onClick={() => onDuplicate?.(item)}>
-            <CopyIcon className="size-4 mr-2" />
-            Duplicate
-          </ContextMenuItem>
-          <ContextMenuSeparator />
-          <ContextMenuItem
-            onClick={() => onDelete?.(item)}
-            className="text-destructive focus:text-destructive"
-          >
-            <TrashIcon className="size-4 mr-2" />
-            Delete
-          </ContextMenuItem>
-        </ContextMenuContent>
-      </ContextMenu>
-    );
-  }
-
-  // Non-editable items just get tooltip
-  return (
-    <TooltipProvider>
       <Tooltip>
-        <TooltipTrigger asChild>{barContent}</TooltipTrigger>
-        <TooltipContent side="top" className="max-w-[250px]">
-          <div className="space-y-1.5">
-            <p className="font-medium">{item.name}</p>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span>{dateRange}</span>
-            </div>
-            {item.progress > 0 && (
-              <div className="flex items-center gap-2">
-                <div className="flex-1 h-1.5 bg-base-200 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${item.progress}%`,
-                      backgroundColor: item.color,
-                    }}
-                  />
-                </div>
-                <span className="text-xs font-medium">{item.progress}%</span>
+        <TooltipTrigger asChild>
+          <div
+            ref={barRef}
+            role="button"
+            tabIndex={0}
+            className={cn(
+              "absolute rounded-[2px] select-none z-10",
+              "transition-shadow duration-150",
+              isSelected && "ring-1 ring-primary/70",
+              isEditable ? "cursor-grab active:cursor-grabbing hover:shadow-md" : "cursor-pointer",
+              isDeep ? "border border-dashed bg-transparent" : "overflow-hidden",
+              dimmed && "opacity-25"
+            )}
+            style={{
+              left,
+              top: barTop,
+              width,
+              height: TASK_BAR_HEIGHT,
+              ...(isDeep
+                ? { borderColor: `${effectiveColor}b3` }
+                : { backgroundColor: `${effectiveColor}${bgAlpha}` }),
+            }}
+            onDoubleClick={() => onDoubleClick?.(item)}
+            onKeyDown={(e) => { if (e.key === "Enter") onDoubleClick?.(item); }}
+            onContextMenu={(e) => onContextMenu?.(e, item)}
+            onMouseMove={handleMouseMove}
+            onMouseDown={(e) => {
+              if (!isEditable || e.button !== 0) return;
+              onDragStart?.(e, item, "move");
+            }}
+          >
+            {/* Progress fill */}
+            <div
+              className="h-full rounded-[2px] transition-all duration-300"
+              style={{
+                width: `${progress}%`,
+                backgroundColor: `${effectiveColor}${fillAlpha}`,
+              }}
+            />
+
+            {/* Name label INSIDE bar (for wide bars) */}
+            {showNameInside && (
+              <span className="absolute inset-0 flex items-center px-2 text-[9px] font-medium text-white truncate mix-blend-difference pointer-events-none">
+                {item.name}
+                {showProgress && ` · ${Math.round(progress)}%`}
+              </span>
+            )}
+
+            {/* Progress-only label (medium bars without name) */}
+            {!showNameInside && showProgress && (
+              <span className="absolute inset-0 flex items-center justify-center text-[10px] font-semibold text-white mix-blend-difference pointer-events-none">
+                {Math.round(progress)}%
+              </span>
+            )}
+
+            {/* Left resize handle */}
+            {isEditable && (
+              <div
+                role="separator"
+                aria-orientation="vertical"
+                tabIndex={-1}
+                className="absolute left-0 top-0 bottom-0 w-2 cursor-col-resize group/left"
+                onMouseDown={(e) => { e.stopPropagation(); onDragStart?.(e, item, "resize-left"); }}
+              >
+                <div className="absolute left-0 top-1 bottom-1 w-[3px] rounded-full bg-white/0 group-hover/left:bg-white/70 transition-colors" />
               </div>
             )}
-            {item.status && (
-              <p className="text-xs">
-                Status: <span className="font-medium">{item.status}</span>
-              </p>
+
+            {/* Right resize handle */}
+            {isEditable && (
+              <div
+                role="separator"
+                aria-orientation="vertical"
+                tabIndex={-1}
+                className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize group/right"
+                onMouseDown={(e) => { e.stopPropagation(); onDragStart?.(e, item, "resize-right"); }}
+              >
+                <div className="absolute right-0 top-1 bottom-1 w-[3px] rounded-full bg-white/0 group-hover/right:bg-white/70 transition-colors" />
+              </div>
             )}
           </div>
+        </TooltipTrigger>
+        <TooltipContent side="top" align="start" alignOffset={mouseX - 40} sideOffset={8} className="text-xs">
+          <p className="font-medium">{item.name}</p>
+          <p className="text-muted-foreground">
+            {item.startDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+            {" — "}
+            {item.endDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+          </p>
+          <p className="text-muted-foreground">{formatDuration(item)} · {Math.round(progress)}%</p>
         </TooltipContent>
       </Tooltip>
-    </TooltipProvider>
+
+      {/* Name label OUTSIDE bar (for narrow bars) */}
+      {showNameOutside && (
+        <span
+          className={cn(
+            "absolute text-[9px] font-medium whitespace-nowrap pointer-events-none z-10 truncate",
+            dimmed && "opacity-25"
+          )}
+          style={{
+            left: left + width + 6,
+            top: barTop,
+            height: TASK_BAR_HEIGHT,
+            lineHeight: `${TASK_BAR_HEIGHT}px`,
+            color: effectiveColor,
+            maxWidth: 150,
+          }}
+        >
+          {item.name}
+        </span>
+      )}
+    </>
   );
 }
 
+// ---------------------------------------------------------------------------
+// BracketBar — Summary/parent task: thin bar + triangle caps at each end
+// ---------------------------------------------------------------------------
+
+function BracketBar({
+  item,
+  left,
+  width,
+  y,
+  color,
+  dimmed,
+  isSelected,
+  baselineLeft,
+  baselineWidth,
+  onDoubleClick,
+  onContextMenu,
+}: {
+  item: GanttItem;
+  left: number;
+  width: number;
+  y: number;
+  color: string;
+  dimmed?: boolean;
+  isSelected: boolean;
+  baselineLeft?: number;
+  baselineWidth?: number;
+  onDoubleClick?: (item: GanttItem) => void;
+  onContextMenu?: (e: React.MouseEvent, item: GanttItem) => void;
+}) {
+  const bracketTop = y + (ROW_HEIGHT - TASK_BAR_HEIGHT) / 2;
+  const barY = bracketTop;
+  const progress = Math.min(Math.max(item.progress, 0), 100);
+
+  // Triangle points: downward-pointing from bottom of thin bar
+  const leftTriangle = `${left},${barY + BRACKET_BAR_HEIGHT} ${left},${barY + TASK_BAR_HEIGHT} ${left + TRIANGLE_WIDTH},${barY + BRACKET_BAR_HEIGHT}`;
+  const rightTriangle = `${left + width},${barY + BRACKET_BAR_HEIGHT} ${left + width},${barY + TASK_BAR_HEIGHT} ${left + width - TRIANGLE_WIDTH},${barY + BRACKET_BAR_HEIGHT}`;
+
+  return (
+    <>
+      {/* Baseline ghost bar */}
+      {baselineLeft !== undefined && baselineWidth !== undefined && (
+        <div
+          className="absolute rounded-[1px] pointer-events-none z-[9]"
+          style={{
+            left: baselineLeft,
+            top: barY + TASK_BAR_HEIGHT - 3,
+            width: baselineWidth,
+            height: 3,
+            backgroundColor: "#9ca3af60",
+          }}
+        />
+      )}
+
+      {/* SVG bracket shape */}
+      <svg
+        className={cn(
+          "absolute pointer-events-none z-10",
+          dimmed && "opacity-25"
+        )}
+        style={{ left: 0, top: 0, width: "100%", height: "100%", overflow: "visible" }}
+      >
+        {/* Thin bar */}
+        <rect
+          x={left}
+          y={barY}
+          width={width}
+          height={BRACKET_BAR_HEIGHT}
+          fill={`${color}90`}
+          rx={1}
+        />
+        {/* Progress fill */}
+        {progress > 0 && (
+          <rect
+            x={left}
+            y={barY}
+            width={width * (progress / 100)}
+            height={BRACKET_BAR_HEIGHT}
+            fill={color}
+            rx={1}
+          />
+        )}
+        {/* Left triangle cap */}
+        <polygon points={leftTriangle} fill={color} />
+        {/* Right triangle cap */}
+        <polygon points={rightTriangle} fill={color} />
+      </svg>
+
+      {/* Clickable overlay for interactions */}
+      <div
+        role="button"
+        tabIndex={0}
+        className={cn(
+          "absolute select-none z-11 cursor-pointer",
+          isSelected && "ring-1 ring-primary/70 rounded-sm"
+        )}
+        style={{
+          left,
+          top: barY,
+          width,
+          height: TASK_BAR_HEIGHT,
+        }}
+        onDoubleClick={() => onDoubleClick?.(item)}
+        onKeyDown={(e) => { if (e.key === "Enter") onDoubleClick?.(item); }}
+        onContextMenu={(e) => onContextMenu?.(e, item)}
+      />
+
+      {/* Name label to the right */}
+      {width > 20 && (
+        <span
+          className={cn(
+            "absolute text-[9px] font-semibold whitespace-nowrap pointer-events-none z-10",
+            dimmed && "opacity-25"
+          )}
+          style={{
+            left: left + width + 6,
+            top: barY,
+            height: TASK_BAR_HEIGHT,
+            lineHeight: `${TASK_BAR_HEIGHT}px`,
+            color,
+            maxWidth: 150,
+          }}
+        >
+          {item.name}
+        </span>
+      )}
+    </>
+  );
+}

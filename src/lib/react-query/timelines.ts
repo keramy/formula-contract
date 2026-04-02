@@ -13,10 +13,16 @@ import {
   createTimelineDependency,
   updateTimelineDependency,
   deleteTimelineDependency,
+  getBaselines,
+  getBaselineItems,
+  saveBaseline,
+  deleteBaseline,
   type GanttItem as TimelineItem,
   type GanttItemInput as TimelineItemInput,
   type GanttDependency as TimelineDependency,
   type GanttDependencyInput as TimelineDependencyInput,
+  type GanttBaseline,
+  type GanttBaselineItem,
   type DependencyType,
 } from "@/lib/actions/timelines";
 
@@ -34,6 +40,9 @@ export const timelineKeys = {
   list: (projectId: string) => [...timelineKeys.lists(), projectId] as const,
   dependencies: () => [...timelineKeys.all, "dependencies"] as const,
   dependencyList: (projectId: string) => [...timelineKeys.dependencies(), projectId] as const,
+  baselines: () => [...timelineKeys.all, "baselines"] as const,
+  baselineList: (projectId: string) => [...timelineKeys.baselines(), projectId] as const,
+  baselineItems: (baselineId: string) => [...timelineKeys.all, "baseline-items", baselineId] as const,
 };
 
 // ============================================================================
@@ -111,6 +120,8 @@ export function useCreateTimelineItem(projectId: string) {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         progress: 0,
+        description: input.description || null,
+        is_on_critical_path: input.is_on_critical_path ?? false,
         linked_scope_item_ids: input.linked_scope_item_ids || [],
       };
 
@@ -546,6 +557,65 @@ export function useDeleteTimelineDependency(projectId: string) {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: timelineKeys.dependencyList(projectId) });
+    },
+  });
+}
+
+// ============================================================================
+// Baseline Hooks
+// ============================================================================
+
+export function useBaselines(projectId: string) {
+  return useQuery({
+    queryKey: timelineKeys.baselineList(projectId),
+    queryFn: () => getBaselines(projectId),
+    staleTime: 60_000,
+  });
+}
+
+export function useBaselineItems(baselineId: string | null) {
+  return useQuery({
+    queryKey: timelineKeys.baselineItems(baselineId ?? "none"),
+    queryFn: () => (baselineId ? getBaselineItems(baselineId) : Promise.resolve([])),
+    enabled: !!baselineId,
+    staleTime: 60_000,
+  });
+}
+
+export function useSaveBaseline(projectId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (name: string) => saveBaseline(projectId, name),
+    onSuccess: (result) => {
+      if (result.success) {
+        toast.success("Baseline saved");
+        queryClient.invalidateQueries({ queryKey: timelineKeys.baselineList(projectId) });
+      } else {
+        toast.error(result.error || "Failed to save baseline");
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+}
+
+export function useDeleteBaseline(projectId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (baselineId: string) => deleteBaseline(baselineId),
+    onSuccess: (result) => {
+      if (result.success) {
+        toast.success("Baseline deleted");
+        queryClient.invalidateQueries({ queryKey: timelineKeys.baselineList(projectId) });
+      } else {
+        toast.error(result.error || "Failed to delete baseline");
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
     },
   });
 }

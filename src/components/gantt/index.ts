@@ -1,26 +1,34 @@
+// Gantt Chart — barrel exports
 export { GanttChart, type GanttChartProps } from "./gantt-chart";
-export { GanttHeader, type GanttHeaderProps } from "./gantt-header";
-export { GanttRow, type GanttRowProps } from "./gantt-row";
-export { GanttBar, type GanttBarProps } from "./gantt-bar";
-export { GanttSidebar, type GanttSidebarProps } from "./gantt-sidebar";
-export { GanttDependencies, type GanttDependenciesProps, type BarPosition } from "./gantt-dependencies";
-export { DependencyDialog, type DependencyDialogProps } from "./dependency-dialog";
+export { GanttDependencyDialog, type GanttDependencyDialogProps } from "./gantt-dependency-dialog";
 export type {
   GanttItem,
-  GanttViewMode,
   GanttDependency,
+  GanttRow,
+  GanttViewMode,
+  GanttPanel,
+  GanttDateRange,
+  GanttStats,
+  BarPosition,
   DependencyType,
   Priority,
-  WeekendSettings,
-} from "./types";
+  PhaseKey,
+  GanttItemType,
+} from "./gantt-types";
 export {
-  DEPENDENCY_TYPES,
+  PHASE_COLORS,
   DEPENDENCY_LABELS,
   DEPENDENCY_SHORT_LABELS,
-  PRIORITY_LEVELS,
+  DEPENDENCY_COLORS,
   PRIORITY_LABELS,
   PRIORITY_COLORS,
-  DEFAULT_WEEKEND_SETTINGS,
-  calculateWorkDays,
+  ROW_HEIGHT,
+  CATEGORY_HEIGHT,
+  SIDEBAR_WIDTH,
+  buildGanttRows,
+  computeStats,
+  computeDateRange,
   daysBetween,
-} from "./types";
+  formatDuration,
+  resolveItemColor,
+} from "./gantt-types";

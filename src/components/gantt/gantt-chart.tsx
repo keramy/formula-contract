@@ -4,77 +4,47 @@ import * as React from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { GlassCard } from "@/components/ui/ui-helpers";
-import { GanttHeader } from "./gantt-header";
-import { GanttRow } from "./gantt-row";
-import { GanttSidebar } from "./gantt-sidebar";
-import { GanttDependencies, type BarPosition } from "./gantt-dependencies";
-import { DependencyDialog } from "./dependency-dialog";
 import {
   type GanttItem,
   type GanttDependency,
   type DependencyType,
-  type GanttViewMode,
   type GanttDateRange,
-  type WeekendSettings,
-  DEFAULT_WEEKEND_SETTINGS,
-  generateColumns,
-  calculateBarPosition,
-} from "./types";
-import {
-  ZoomInIcon,
-  ZoomOutIcon,
-  CalendarIcon,
-  CalendarDaysIcon,
-  CalendarRangeIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  ChevronDownIcon,
-  PlusIcon,
-  Maximize2Icon,
-  Minimize2Icon,
-  XIcon,
-  LinkIcon,
-  SettingsIcon,
-  ArrowUpIcon,
-  ArrowDownIcon,
-  IndentIncreaseIcon,
-  IndentDecreaseIcon,
-} from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuCheckboxItem,
-  DropdownMenuTrigger,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-} from "@/components/ui/dropdown-menu";
+  buildGanttRows,
+  computeStats,
+  computeDateRange,
+  BASE_COLUMN_WIDTHS,
+} from "./gantt-types";
+import { useGanttState } from "./use-gantt-state";
+import { GanttToolbar } from "./gantt-toolbar";
+import { GanttSidebar } from "./gantt-sidebar";
+import { GanttTimeline } from "./gantt-timeline";
+import { GanttTable } from "./gantt-table";
+import { GanttStatusBar } from "./gantt-status-bar";
+import { GanttDependencyDialog } from "./gantt-dependency-dialog";
+import { GanttContextMenu } from "./gantt-context-menu";
+import { XIcon, PlusIcon } from "lucide-react";
 
 // ============================================================================
-// GANTT CHART - Main timeline visualization component with advanced features
+// GANTT CHART — Main orchestrator
+// Owns: ganttRows computation, drag state, dependency dialog, scroll sync
 // ============================================================================
+
+const EMPTY_DEPS: GanttDependency[] = [];
 
 export interface GanttChartProps {
   items: GanttItem[];
   dependencies?: GanttDependency[];
-  onItemClick?: (item: GanttItem) => void;
+  projectTitle?: string;
+  projectSubtitle?: string;
+  // Callbacks
   onItemEdit?: (item: GanttItem) => void;
-  onItemDuplicate?: (item: GanttItem) => void;
   onItemDelete?: (item: GanttItem) => void;
   onItemDatesChange?: (item: GanttItem, startDate: Date, endDate: Date) => void;
   onAddItem?: () => void;
   onReorderItems?: (itemIds: string[]) => void;
-  /** Change an item's parent (indent/outdent). Pass null to make top-level. */
   onItemParentChange?: (itemId: string, newParentId: string | null) => void;
-  // Dependency callbacks
   onCreateDependency?: (
     sourceId: string,
     targetId: string,
@@ -87,37 +57,28 @@ export interface GanttChartProps {
     lagDays: number
   ) => Promise<void>;
   onDeleteDependency?: (dependencyId: string) => Promise<void>;
+  onAddSubtask?: (parentId: string) => void;
+  onConvertToMilestone?: (item: GanttItem) => void;
+  onSetPriority?: (item: GanttItem, priority: number) => void;
+  onToggleCriticalPath?: (item: GanttItem) => void;
+  onExport?: () => void;
+  // Baseline
+  baselines?: { id: string; name: string; created_at: string }[];
+  baselineItems?: { gantt_item_id: string; start_date: string; end_date: string }[];
+  onSaveBaseline?: () => void;
+  onDeleteBaseline?: (id: string) => void;
+  /** URL for "Open Full View" link in the stats bar */
+  fullViewUrl?: string;
   className?: string;
-  initialViewMode?: GanttViewMode;
-  showSidebar?: boolean;
   showAddButton?: boolean;
-  /** Show the fullscreen toggle button. Set false when embedded (e.g. project detail tab). */
-  showFullscreenToggle?: boolean;
 }
-
-// Base column widths for each view mode
-const BASE_COLUMN_WIDTHS: Record<GanttViewMode, number> = {
-  day: 40,
-  week: 80,
-  month: 120,
-};
-
-// Zoom levels (multipliers)
-const ZOOM_LEVELS = [0.5, 0.75, 1, 1.25, 1.5, 2];
-const DEFAULT_ZOOM_INDEX = 2; // 1x
-
-const ROW_HEIGHT = 36;
-
-// Sidebar resize constraints
-
-const EMPTY_DEPENDENCIES: GanttDependency[] = [];
 
 export function GanttChart({
   items,
-  dependencies = EMPTY_DEPENDENCIES,
-  onItemClick: _onItemClick, // Kept for API compatibility but single-click now only selects
+  dependencies = EMPTY_DEPS,
+  projectTitle,
+  projectSubtitle,
   onItemEdit,
-  onItemDuplicate,
   onItemDelete,
   onItemDatesChange,
   onAddItem,
@@ -126,815 +87,524 @@ export function GanttChart({
   onCreateDependency,
   onUpdateDependency,
   onDeleteDependency,
+  onAddSubtask,
+  onConvertToMilestone,
+  onSetPriority,
+  onToggleCriticalPath,
+  onExport,
+  baselines,
+  baselineItems,
+  onSaveBaseline,
+  onDeleteBaseline,
+  fullViewUrl,
   className,
-  initialViewMode = "week",
-  showSidebar = true,
   showAddButton = false,
-  showFullscreenToggle = true,
 }: GanttChartProps) {
-  const [viewMode, setViewMode] = React.useState<GanttViewMode>(initialViewMode);
-  const [isFullscreen, setIsFullscreen] = React.useState(false);
-  const [zoomIndex, setZoomIndex] = React.useState(DEFAULT_ZOOM_INDEX);
   const scrollRef = React.useRef<HTMLDivElement>(null);
 
-  // Weekend settings for duration calculation
-  const [weekendSettings, setWeekendSettings] = React.useState<WeekendSettings>(DEFAULT_WEEKEND_SETTINGS);
+  // ---------------------------------------------------------------------------
+  // State
+  // ---------------------------------------------------------------------------
+  const ganttState = useGanttState(items); // items used for range-select indexing
+  const {
+    panel,
+    viewMode,
+    zoomLevel,
+    showGrid,
+    showDependencies,
+    selectedIds,
+    collapsedIds,
+    scrollTop,
+    setPanel,
+    setViewMode,
+    toggleGrid,
+    toggleDependencies,
+    selectItem,
+    clearSelection,
+    toggleCollapse,
+    expandAll,
+    collapseAll,
+    setScrollTop,
+  } = ganttState;
 
-  // Selection state (for linking items)
-  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
-  const [collapsedIds, setCollapsedIds] = React.useState<Set<string>>(new Set());
+  // ---------------------------------------------------------------------------
+  // Computed data (memoized)
+  // ---------------------------------------------------------------------------
 
-  // Dependency dialog state
-  const [dependencyDialogOpen, setDependencyDialogOpen] = React.useState(false);
-  const [selectedDependency, setSelectedDependency] = React.useState<GanttDependency | null>(null);
-  const [linkSourceItem, setLinkSourceItem] = React.useState<GanttItem | null>(null);
-  const [linkTargetItem, setLinkTargetItem] = React.useState<GanttItem | null>(null);
+  /** THE single source of truth for row positioning */
+  const allGanttRows = React.useMemo(
+    () => buildGanttRows(items, collapsedIds),
+    [items, collapsedIds]
+  );
 
-  // Zoom functions
-  const zoomIn = () => setZoomIndex((prev) => Math.min(prev + 1, ZOOM_LEVELS.length - 1));
-  const zoomOut = () => setZoomIndex((prev) => Math.max(prev - 1, 0));
-  const canZoomIn = zoomIndex < ZOOM_LEVELS.length - 1;
-  const canZoomOut = zoomIndex > 0;
-  const zoomLevel = ZOOM_LEVELS[zoomIndex];
+  /** Filtered by search query (rebuild Y positions after filtering) */
+  const ganttRows = React.useMemo(() => {
+    const q = ganttState.searchQuery.trim().toLowerCase();
+    if (!q) return allGanttRows;
 
-  // Build item map for quick lookup
-  const itemMap = React.useMemo(() => {
-    const map = new Map<string, GanttItem>();
-    items.forEach((item) => {
-      map.set(item.id, item);
-      if (item.timelineId) {
-        map.set(item.timelineId, item);
-      }
-    });
-    return map;
-  }, [items]);
+    // Find matching item IDs + their ancestor IDs for context
+    const matchIds = new Set<string>();
+    const ancestorIds = new Set<string>();
 
-  // Get editable items from selection
-  const selectedItems = React.useMemo(() => {
-    return Array.from(selectedIds)
-      .map((id) => itemMap.get(id))
-      .filter((item): item is GanttItem => !!item && item.isEditable === true);
-  }, [selectedIds, itemMap]);
-
-  // Filter visible items (hide children of collapsed parents)
-  const visibleItems = React.useMemo(() => {
-    if (collapsedIds.size === 0) return items;
-
-    const hiddenIds = new Set<string>();
-
-    const collectHiddenIds = (parentId: string) => {
-      items.forEach((item) => {
-        if (item.parentId === parentId) {
-          hiddenIds.add(item.id);
-          collectHiddenIds(item.id);
+    for (const row of allGanttRows) {
+      if (row.item.name.toLowerCase().includes(q)) {
+        matchIds.add(row.id);
+        // Walk up parents to keep ancestors visible
+        let parentId = row.item.parentId;
+        while (parentId) {
+          ancestorIds.add(parentId);
+          const parentRow = allGanttRows.find((r) => r.id === parentId);
+          parentId = parentRow?.item.parentId ?? null;
         }
-      });
-    };
-
-    collapsedIds.forEach((id) => collectHiddenIds(id));
-
-    return items.filter((item) => !hiddenIds.has(item.id));
-  }, [items, collapsedIds]);
-
-  // Handle escape key to clear selection (NOT exit fullscreen - user must use X button)
-  React.useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && selectedIds.size > 0) {
-        setSelectedIds(new Set());
       }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-
-    if (isFullscreen) {
-      document.body.style.overflow = "hidden";
     }
 
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = "";
-    };
-  }, [isFullscreen, selectedIds.size]);
-
-  // Calculate date range from items
-  const dateRange = React.useMemo<GanttDateRange>(() => {
-    const today = new Date();
-
-    if (items.length === 0) {
-      const start = new Date(today);
-      start.setDate(start.getDate() - 14);
-      const end = new Date(today);
-      end.setMonth(end.getMonth() + 3);
-      return { start, end };
-    }
-
-    let minDate = new Date(items[0].startDate);
-    let maxDate = new Date(items[0].endDate);
-
-    items.forEach((item) => {
-      if (item.startDate < minDate) minDate = new Date(item.startDate);
-      if (item.endDate > maxDate) maxDate = new Date(item.endDate);
+    // Filter and rebuild Y positions
+    const filtered = allGanttRows.filter(
+      (r) => matchIds.has(r.id) || ancestorIds.has(r.id)
+    );
+    let currentY = 0;
+    return filtered.map((r, i) => {
+      const row = { ...r, y: currentY, rowIndex: i };
+      currentY += r.height;
+      return row;
     });
+  }, [allGanttRows, ganttState.searchQuery]);
 
-    const startPadding = viewMode === "day" ? 14 : viewMode === "week" ? 21 : 30;
-    const endPadding = viewMode === "day" ? 30 : viewMode === "week" ? 60 : 90;
+  const stats = React.useMemo(() => computeStats(allGanttRows), [allGanttRows]);
 
-    minDate.setDate(minDate.getDate() - startPadding);
-
-    const threeMonthsFromNow = new Date(today);
-    threeMonthsFromNow.setMonth(threeMonthsFromNow.getMonth() + 3);
-
-    maxDate.setDate(maxDate.getDate() + endPadding);
-    if (threeMonthsFromNow > maxDate) {
-      maxDate = threeMonthsFromNow;
-    }
-
-    return { start: minDate, end: maxDate };
-  }, [items, viewMode]);
-
-  // Generate columns
-  const columns = React.useMemo(
-    () => generateColumns(dateRange, viewMode),
-    [dateRange, viewMode]
+  const dateRange = React.useMemo(
+    () => computeDateRange(items, viewMode),
+    [items, viewMode]
   );
 
   const columnWidth = Math.round(BASE_COLUMN_WIDTHS[viewMode] * zoomLevel);
-  const totalWidth = columns.length * columnWidth;
 
-  // Calculate header height (2 rows for day/week, 1 for month)
-  const headerHeight = 48; // Fixed height across all views to prevent layout shift
-
-  // Build a map of bar positions for dependency arrows
-  const barPositionMap = React.useMemo(() => {
-    const map = new Map<string, BarPosition>();
-    visibleItems.forEach((item, index) => {
-      const { left, width } = calculateBarPosition(item, dateRange, totalWidth);
-      const top = index * ROW_HEIGHT;
-      map.set(item.id, { left, width, top });
-      if (item.timelineId) {
-        map.set(item.timelineId, { left, width, top });
+  /** IDs of all items that have children (phases + parent tasks) */
+  const collapsibleIds = React.useMemo(() => {
+    const ids: string[] = [];
+    const walk = (list: GanttItem[]) => {
+      for (const item of list) {
+        if (item.children.length > 0) {
+          ids.push(item.id);
+          walk(item.children);
+        }
       }
-    });
-    return map;
-  }, [visibleItems, dateRange, totalWidth]);
+    };
+    walk(items);
+    return ids;
+  }, [items]);
 
-  // Get bar position for dependency arrows
-  const getBarPosition = React.useCallback(
-    (itemId: string): BarPosition | null => {
-      return barPositionMap.get(itemId) || null;
+  // Item lookup map
+  const itemMap = React.useMemo(() => {
+    const map = new Map<string, GanttItem>();
+    const walk = (list: GanttItem[]) => {
+      for (const item of list) {
+        map.set(item.id, item);
+        if (item.timelineId) map.set(item.timelineId, item);
+        if (item.children.length > 0) walk(item.children);
+      }
+    };
+    walk(items);
+    return map;
+  }, [items]);
+
+  // ---------------------------------------------------------------------------
+  // Selected item helpers (for indent/outdent)
+  // ---------------------------------------------------------------------------
+  /** Selected items in visible order (for indent/outdent) */
+  const selectedItemsOrdered = React.useMemo(() => {
+    if (selectedIds.size === 0 || !onItemParentChange) return [];
+    return ganttRows
+      .filter((r) => selectedIds.has(r.id) && r.item.isEditable && r.type !== "phase")
+      .map((r) => r.item);
+  }, [selectedIds, ganttRows, onItemParentChange]);
+
+  /**
+   * Find the correct indent target for the first selected item.
+   *
+   * Rule: indent should first make the item a SIBLING of the item above
+   * (same parent as that item), not a child of it. Only if already at
+   * the same level should it go one level deeper.
+   *
+   * Example:
+   *   Task A (parent)
+   *     Task B (child of A)
+   *   Task C              ← selected
+   *
+   * First indent:  Task C → child of Task A (sibling of Task B)
+   * Second indent: Task C → child of Task B (one level deeper)
+   */
+  const getIndentTarget = React.useCallback((): GanttItem | null => {
+    if (selectedItemsOrdered.length === 0) return null;
+    const firstSelected = selectedItemsOrdered[0];
+    const selectedSet = new Set(selectedItemsOrdered.map((i) => i.id));
+
+    // Find the row just above the first selected item (not in selection)
+    const firstIdx = ganttRows.findIndex((r) => r.id === firstSelected.id);
+    let aboveRow: typeof ganttRows[number] | null = null;
+    for (let i = firstIdx - 1; i >= 0; i--) {
+      if (!selectedSet.has(ganttRows[i].id)) {
+        aboveRow = ganttRows[i];
+        break;
+      }
+    }
+    if (!aboveRow || aboveRow.type === "milestone") return null;
+
+    const selectedDepth = ganttRows[firstIdx]?.depth ?? 0;
+    const aboveDepth = aboveRow.depth;
+    const sameParent = firstSelected.parentId === aboveRow.item.parentId;
+
+    if (selectedDepth < aboveDepth) {
+      // Shallower than above → become sibling of above (adopt its parent)
+      if (aboveRow.item.parentId) {
+        return itemMap.get(aboveRow.item.parentId) ?? null;
+      }
+      return aboveRow.item;
+    }
+
+    if (selectedDepth === aboveDepth && sameParent) {
+      // Same level, same parent → go deeper (become child of item above)
+      return aboveRow.item;
+    }
+
+    if (selectedDepth === aboveDepth && !sameParent) {
+      // Same level, different parent → become sibling of above first
+      if (aboveRow.item.parentId) {
+        return itemMap.get(aboveRow.item.parentId) ?? null;
+      }
+      return aboveRow.item;
+    }
+
+    // Deeper than above → become child of the item above
+    return aboveRow.item;
+  }, [selectedItemsOrdered, ganttRows, itemMap]);
+
+  const canIndent = React.useMemo(() => {
+    if (selectedItemsOrdered.length === 0) return false;
+    return getIndentTarget() !== null;
+  }, [selectedItemsOrdered, getIndentTarget]);
+
+  const canOutdent = React.useMemo(() => {
+    if (selectedItemsOrdered.length === 0) return false;
+    // At least one selected item must have a parent
+    return selectedItemsOrdered.some((item) => !!item.parentId);
+  }, [selectedItemsOrdered]);
+
+  const handleIndent = React.useCallback(() => {
+    if (!onItemParentChange) return;
+    const target = getIndentTarget();
+    if (!target) return;
+    const newParentId = target.timelineId || target.id;
+
+    for (const item of selectedItemsOrdered) {
+      const itemId = item.timelineId || item.id;
+      onItemParentChange(itemId, newParentId);
+    }
+  }, [selectedItemsOrdered, getIndentTarget, onItemParentChange]);
+
+  const handleOutdent = React.useCallback(() => {
+    if (!onItemParentChange) return;
+
+    // Process deepest items first so children move before their parents.
+    // This prevents stale hierarchy lookups when parent and child are both selected.
+    const sorted = [...selectedItemsOrdered].sort((a, b) => {
+      const aRow = ganttRows.find((r) => r.id === a.id);
+      const bRow = ganttRows.find((r) => r.id === b.id);
+      return (bRow?.depth ?? 0) - (aRow?.depth ?? 0); // deepest first
+    });
+
+    for (const item of sorted) {
+      if (!item.parentId) continue;
+      const parent = itemMap.get(item.parentId);
+      // Grandparent = parent's parent. If parent is root, grandparent is null (→ item becomes root).
+      const grandparentId = parent?.parentId ?? null;
+      const itemId = item.timelineId || item.id;
+      onItemParentChange(itemId, grandparentId);
+    }
+  }, [selectedItemsOrdered, ganttRows, itemMap, onItemParentChange]);
+
+  // ---------------------------------------------------------------------------
+  // Dependency dialog state
+  // ---------------------------------------------------------------------------
+  const [depDialogOpen, setDepDialogOpen] = React.useState(false);
+  const [selectedDep, setSelectedDep] = React.useState<GanttDependency | null>(null);
+  const [linkSource, setLinkSource] = React.useState<GanttItem | null>(null);
+  const [linkTarget, setLinkTarget] = React.useState<GanttItem | null>(null);
+
+  const handleDependencyClick = React.useCallback((dep: GanttDependency) => {
+    setSelectedDep(dep);
+    setLinkSource(null);
+    setLinkTarget(null);
+    setDepDialogOpen(true);
+  }, []);
+
+  const handleSaveDependency = React.useCallback(
+    async (data: { type: DependencyType; lagDays: number }) => {
+      if (selectedDep) {
+        await onUpdateDependency?.(selectedDep.id, data.type, data.lagDays);
+      } else if (linkSource && linkTarget) {
+        const sourceId = linkSource.timelineId || linkSource.id;
+        const targetId = linkTarget.timelineId || linkTarget.id;
+        await onCreateDependency?.(sourceId, targetId, data.type, data.lagDays);
+      }
+      setDepDialogOpen(false);
+      setSelectedDep(null);
+      setLinkSource(null);
+      setLinkTarget(null);
+      clearSelection();
     },
-    [barPositionMap]
+    [selectedDep, linkSource, linkTarget, onUpdateDependency, onCreateDependency, clearSelection]
   );
 
-  // Scroll to today
+  const handleDeleteDependency = React.useCallback(async () => {
+    if (selectedDep) await onDeleteDependency?.(selectedDep.id);
+    setDepDialogOpen(false);
+    setSelectedDep(null);
+  }, [selectedDep, onDeleteDependency]);
+
+  const getItemName = React.useCallback(
+    (id: string) => itemMap.get(id)?.name || "Unknown",
+    [itemMap]
+  );
+
+  // ---------------------------------------------------------------------------
+  // Drag state for bar date changes
+  // ---------------------------------------------------------------------------
+  // Drag state: track pixel offset locally, only commit to server on mouseup.
+  // This avoids re-rendering the entire gantt on every mousemove.
+  const [dragState, setDragState] = React.useState<{
+    itemId: string;
+    mode: "move" | "resize-left" | "resize-right";
+    startX: number;
+    originalStart: Date;
+    originalEnd: Date;
+    item: GanttItem;
+  } | null>(null);
+
+  /** Pixel offset of the dragged bar — updated on every mousemove, only affects the dragged bar */
+  const [dragDeltaPx, setDragDeltaPx] = React.useState(0);
+
+  const handleDragStart = React.useCallback(
+    (e: React.MouseEvent, item: GanttItem, mode: "move" | "resize-left" | "resize-right") => {
+      if (!onItemDatesChange) return;
+      e.preventDefault();
+      setDragDeltaPx(0);
+      setDragState({
+        itemId: item.id,
+        mode,
+        startX: e.clientX,
+        originalStart: new Date(item.startDate),
+        originalEnd: new Date(item.endDate),
+        item,
+      });
+    },
+    [onItemDatesChange]
+  );
+
+  React.useEffect(() => {
+    if (!dragState) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      setDragDeltaPx(e.clientX - dragState.startX);
+    };
+
+    const handleMouseUp = (e: MouseEvent) => {
+      // Calculate final dates from pixel delta
+      const totalMs = dateRange.end.getTime() - dateRange.start.getTime();
+      const cols = Math.ceil(totalMs / (viewMode === "day" ? 86400000 : viewMode === "week" ? 604800000 : 2592000000));
+      const totalWidth = cols * columnWidth;
+      const msPerPixel = totalMs / totalWidth;
+
+      const dx = e.clientX - dragState.startX;
+      const daysDelta = Math.round((dx * msPerPixel) / 86400000);
+
+      if (daysDelta !== 0) {
+        const newStart = new Date(dragState.originalStart);
+        const newEnd = new Date(dragState.originalEnd);
+
+        switch (dragState.mode) {
+          case "move":
+            newStart.setDate(newStart.getDate() + daysDelta);
+            newEnd.setDate(newEnd.getDate() + daysDelta);
+            break;
+          case "resize-left":
+            newStart.setDate(newStart.getDate() + daysDelta);
+            if (newStart >= newEnd) { setDragState(null); setDragDeltaPx(0); return; }
+            break;
+          case "resize-right":
+            newEnd.setDate(newEnd.getDate() + daysDelta);
+            if (newEnd <= newStart) { setDragState(null); setDragDeltaPx(0); return; }
+            break;
+        }
+
+        // Commit ONCE on mouseup
+        onItemDatesChange?.(dragState.item, newStart, newEnd);
+      }
+
+      setDragState(null);
+      setDragDeltaPx(0);
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [dragState, dateRange, columnWidth, viewMode, onItemDatesChange]);
+
+  // ---------------------------------------------------------------------------
+  // Scroll sync: timeline scrollTop → sidebar offset
+  // ---------------------------------------------------------------------------
+  const handleTimelineScroll = React.useCallback((e: React.UIEvent) => {
+    setScrollTop((e.currentTarget as HTMLDivElement).scrollTop);
+  }, [setScrollTop]);
+
+  // Scroll to today on mount
   const scrollToToday = React.useCallback(() => {
     if (!scrollRef.current) return;
-
     const today = new Date();
-    const todayIndex = columns.findIndex(
-      (col) =>
-        col.date.getDate() === today.getDate() &&
-        col.date.getMonth() === today.getMonth() &&
-        col.date.getFullYear() === today.getFullYear()
-    );
+    today.setHours(0, 0, 0, 0);
+    const totalMs = dateRange.end.getTime() - dateRange.start.getTime();
+    const offsetMs = today.getTime() - dateRange.start.getTime();
+    if (offsetMs < 0 || offsetMs > totalMs) return;
+    const columns = Math.ceil(totalMs / (viewMode === "day" ? 86400000 : viewMode === "week" ? 604800000 : 2592000000));
+    const totalWidth = columns * columnWidth;
+    const todayX = (offsetMs / totalMs) * totalWidth;
+    scrollRef.current.scrollLeft = Math.max(0, todayX - 200);
+  }, [dateRange, viewMode, columnWidth]);
 
-    if (todayIndex >= 0) {
-      const scrollPosition = todayIndex * columnWidth - 200;
-      scrollRef.current.scrollLeft = Math.max(0, scrollPosition);
-    }
-  }, [columns, columnWidth]);
-
-  // Scroll to today on initial render
   React.useEffect(() => {
     scrollToToday();
   }, [scrollToToday]);
 
-  // Navigation (scroll left/right)
-  const navigate = (direction: "left" | "right") => {
-    if (!scrollRef.current) return;
-    const scrollAmount = columnWidth * 5;
-    scrollRef.current.scrollLeft += direction === "right" ? scrollAmount : -scrollAmount;
-  };
+  // Double-click handler
+  const handleDoubleClick = React.useCallback(
+    (item: GanttItem) => {
+      if (item.isEditable) onItemEdit?.(item);
+    },
+    [onItemEdit]
+  );
 
-  // Handle item click with multi-select support
-  // Single-click = SELECT only, Double-click = EDIT (handled separately)
-  const handleItemClick = (item: GanttItem, event?: React.MouseEvent) => {
-    // Multi-select with Ctrl/Cmd or Shift
-    if (event?.ctrlKey || event?.metaKey) {
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        if (next.has(item.id)) {
-          next.delete(item.id);
-        } else {
-          next.add(item.id);
-        }
-        return next;
-      });
-    } else if (event?.shiftKey && selectedIds.size > 0) {
-      // Range select
-      const lastSelected = Array.from(selectedIds).pop();
-      const lastIndex = visibleItems.findIndex((i) => i.id === lastSelected);
-      const currentIndex = visibleItems.findIndex((i) => i.id === item.id);
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
+  return (
+    <TooltipProvider>
+    <GlassCard className={cn("overflow-hidden py-0 gap-0 flex flex-col h-full", className)}>
+        {/* Toolbar (stats bar removed — bottom status bar has the same info) */}
+        <GanttToolbar
+          panel={panel}
+          onPanelChange={setPanel}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          showGrid={showGrid}
+          onGridToggle={toggleGrid}
+          showDependencies={showDependencies}
+          onDependenciesToggle={toggleDependencies}
+          onAddItem={showAddButton ? onAddItem : undefined}
+          onIndent={canIndent ? handleIndent : undefined}
+          onOutdent={canOutdent ? handleOutdent : undefined}
+          hasSelection={selectedItemsOrdered.length > 0}
+          showCriticalPath={ganttState.showCriticalPath}
+          onCriticalPathToggle={ganttState.toggleCriticalPath}
+          searchQuery={ganttState.searchQuery}
+          onSearchChange={ganttState.setSearchQuery}
+          baselines={baselines}
+          activeBaselineId={ganttState.activeBaselineId}
+          onBaselineSelect={ganttState.setActiveBaselineId}
+          onBaselineSave={onSaveBaseline}
+          onBaselineDelete={onDeleteBaseline}
+          onExpandAll={expandAll}
+          onCollapseAll={() => collapseAll(collapsibleIds)}
+          onScrollToToday={scrollToToday}
+          fullViewUrl={fullViewUrl}
+          onZoomIn={ganttState.zoomIn}
+          onZoomOut={ganttState.zoomOut}
+          canZoomIn={ganttState.zoomIndex < 5}
+          canZoomOut={ganttState.zoomIndex > 0}
+          zoomPercent={Math.round(ganttState.zoomLevel * 100)}
+          rowCount={ganttRows.length}
+        />
 
-      if (lastIndex !== -1 && currentIndex !== -1) {
-        const start = Math.min(lastIndex, currentIndex);
-        const end = Math.max(lastIndex, currentIndex);
-        const rangeIds = visibleItems.slice(start, end + 1).map((i) => i.id);
-        setSelectedIds(new Set([...selectedIds, ...rangeIds]));
-      }
-    } else {
-      // Single select (toggle)
-      if (selectedIds.has(item.id) && selectedIds.size === 1) {
-        setSelectedIds(new Set());
-      } else {
-        setSelectedIds(new Set([item.id]));
-      }
-    }
-    // NOTE: We do NOT call onItemClick here - single-click only selects
-    // Double-click is handled by handleItemDoubleClick
-  };
-
-  // Handle double-click to edit (only for editable items)
-  const handleItemDoubleClick = (item: GanttItem) => {
-    if (item.isEditable) {
-      onItemEdit?.(item);
-    }
-  };
-
-  // Handle sidebar item click (pass through to main handler)
-  const handleSidebarItemClick = (item: GanttItem, event: React.MouseEvent) => {
-    handleItemClick(item, event);
-  };
-
-  // Toggle collapse
-  const handleToggleCollapse = (itemId: string) => {
-    setCollapsedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(itemId)) {
-        next.delete(itemId);
-      } else {
-        next.add(itemId);
-      }
-      return next;
-    });
-  };
-
-  // Link selected items
-  const handleLinkItems = () => {
-    if (selectedItems.length !== 2) return;
-
-    setLinkSourceItem(selectedItems[0]);
-    setLinkTargetItem(selectedItems[1]);
-    setSelectedDependency(null);
-    setDependencyDialogOpen(true);
-  };
-
-  // Click on existing dependency
-  const handleDependencyClick = (dependency: GanttDependency) => {
-    setSelectedDependency(dependency);
-    setLinkSourceItem(null);
-    setLinkTargetItem(null);
-    setDependencyDialogOpen(true);
-  };
-
-  // Save dependency (create or update)
-  const handleSaveDependency = async (data: { type: DependencyType; lagDays: number }) => {
-    if (selectedDependency) {
-      // Update existing
-      await onUpdateDependency?.(selectedDependency.id, data.type, data.lagDays);
-    } else if (linkSourceItem && linkTargetItem) {
-      // Create new
-      const sourceId = linkSourceItem.timelineId || linkSourceItem.id;
-      const targetId = linkTargetItem.timelineId || linkTargetItem.id;
-      await onCreateDependency?.(sourceId, targetId, data.type, data.lagDays);
-    }
-
-    setDependencyDialogOpen(false);
-    setSelectedDependency(null);
-    setLinkSourceItem(null);
-    setLinkTargetItem(null);
-    setSelectedIds(new Set());
-  };
-
-  // Delete dependency
-  const handleDeleteDependency = async () => {
-    if (selectedDependency) {
-      await onDeleteDependency?.(selectedDependency.id);
-    }
-    setDependencyDialogOpen(false);
-    setSelectedDependency(null);
-  };
-
-  // Helper: Get sibling IDs in current order (same parent)
-  const getSiblingIds = React.useCallback((item: GanttItem): string[] => {
-    return items
-      .filter((i) => i.isEditable && i.type === "task" && i.parentId === item.parentId)
-      .map((i) => i.id);
-  }, [items]);
-
-  // Move selected item up (swap with previous sibling at same level, move subtree together)
-  const handleMoveUp = React.useCallback(() => {
-    if (selectedItems.length !== 1 || !onReorderItems) return;
-    const item = selectedItems[0];
-    if (!item.isEditable || item.type !== "task") return;
-
-    const siblingIds = getSiblingIds(item);
-    const index = siblingIds.indexOf(item.id);
-    if (index <= 0) return;
-
-    const newOrder = [...siblingIds];
-    const swapWith = index - 1;
-    [newOrder[index], newOrder[swapWith]] = [newOrder[swapWith], newOrder[index]];
-
-    onReorderItems(newOrder);
-  }, [selectedItems, onReorderItems, getSiblingIds]);
-
-  // Move selected item down (swap with next sibling at same level, move subtree together)
-  const handleMoveDown = React.useCallback(() => {
-    if (selectedItems.length !== 1 || !onReorderItems) return;
-    const item = selectedItems[0];
-    if (!item.isEditable || item.type !== "task") return;
-
-    const siblingIds = getSiblingIds(item);
-    const index = siblingIds.indexOf(item.id);
-    if (index < 0 || index >= siblingIds.length - 1) return;
-
-    const newOrder = [...siblingIds];
-    const swapWith = index + 1;
-    [newOrder[index], newOrder[swapWith]] = [newOrder[swapWith], newOrder[index]];
-
-    onReorderItems(newOrder);
-  }, [selectedItems, onReorderItems, getSiblingIds]);
-
-  // Calculate whether move up/down is possible (only for editable items, check siblings)
-  const canMoveUp = React.useMemo(() => {
-    if (selectedItems.length !== 1 || !selectedItems[0].isEditable || selectedItems[0].type !== "task") return false;
-    const item = selectedItems[0];
-    const siblingIds = getSiblingIds(item);
-    return siblingIds.indexOf(item.id) > 0;
-  }, [selectedItems, getSiblingIds]);
-
-  const canMoveDown = React.useMemo(() => {
-    if (selectedItems.length !== 1 || !selectedItems[0].isEditable || selectedItems[0].type !== "task") return false;
-    const item = selectedItems[0];
-    const siblingIds = getSiblingIds(item);
-    const index = siblingIds.indexOf(item.id);
-    return index >= 0 && index < siblingIds.length - 1;
-  }, [selectedItems, getSiblingIds]);
-
-  // Indent: make selected item a child of its previous sibling
-  const handleIndent = React.useCallback(() => {
-    if (selectedItems.length !== 1 || !onItemParentChange) return;
-    const item = selectedItems[0];
-    const siblings = items.filter((i) => i.parentId === item.parentId);
-    const index = siblings.findIndex((i) => i.id === item.id);
-    if (index <= 0) return;
-    const newParent = siblings[index - 1];
-    if (newParent.type === "milestone") return;
-    onItemParentChange(item.timelineId || item.id, newParent.timelineId || newParent.id);
-  }, [selectedItems, items, onItemParentChange]);
-
-  // Outdent: move selected item up one hierarchy level
-  const handleOutdent = React.useCallback(() => {
-    if (selectedItems.length !== 1 || !onItemParentChange) return;
-    const item = selectedItems[0];
-    if (!item.parentId) return;
-    const parent = itemMap.get(item.parentId);
-    const newParentId = parent?.parentId
-      ? (parent.timelineId || parent.parentId)
-      : null;
-    onItemParentChange(item.timelineId || item.id, newParentId);
-  }, [selectedItems, itemMap, onItemParentChange]);
-
-  const canIndent = React.useMemo(() => {
-    if (selectedItems.length !== 1 || !onItemParentChange) return false;
-    const item = selectedItems[0];
-    const siblings = items.filter((i) => i.parentId === item.parentId);
-    const index = siblings.findIndex((i) => i.id === item.id);
-    if (index <= 0) return false;
-    return siblings[index - 1].type !== "milestone";
-  }, [selectedItems, items, onItemParentChange]);
-
-  const canOutdent = React.useMemo(() => {
-    if (selectedItems.length !== 1 || !onItemParentChange) return false;
-    return !!selectedItems[0].parentId;
-  }, [selectedItems, onItemParentChange]);
-
-  // Clear selection on background click
-  const handleBackgroundClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      setSelectedIds(new Set());
-    }
-  };
-
-  // Get item name by ID
-  const getItemName = (id: string): string => {
-    const item = itemMap.get(id);
-    return item?.name || "Unknown Item";
-  };
-
-  // Chart content (shared between normal and fullscreen modes)
-  const chartContent = (
-    <>
-      {/* Toolbar - Compact layout, all buttons h-7 */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-base-200 bg-base-50/60 gap-2">
-        {/* Left side - Add button and selection actions */}
-        <div className="flex items-center gap-2 min-w-0">
-          {/* Add Task button */}
-          {showAddButton && onAddItem && (
-            <Button size="sm" onClick={onAddItem} className="h-7 px-2.5 text-xs">
-              <PlusIcon className="h-4 w-4 mr-1.5" />
-              Add Task
-            </Button>
-          )}
-
-          {/* Reorder buttons (shown when 1 item selected and reorder is enabled) */}
-          {selectedItems.length === 1 && onReorderItems && (
-            <div className="flex items-center border border-base-200 rounded-lg overflow-hidden">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={handleMoveUp}
-                      disabled={!canMoveUp}
-                      className="rounded-none h-7 w-7"
-                      aria-label="Move up"
-                    >
-                      <ArrowUpIcon className="h-3.5 w-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Move up</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={handleMoveDown}
-                      disabled={!canMoveDown}
-                      className="rounded-none h-7 w-7 border-l border-base-200"
-                      aria-label="Move down"
-                    >
-                      <ArrowDownIcon className="h-3.5 w-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Move down</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-          )}
-
-          {/* Indent/Outdent buttons (shown when 1 item selected and parent change is enabled) */}
-          {selectedItems.length === 1 && onItemParentChange && (
-            <div className="flex items-center border border-base-200 rounded-lg overflow-hidden">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={handleOutdent}
-                      disabled={!canOutdent}
-                      className="rounded-none h-7 w-7"
-                      aria-label="Outdent"
-                    >
-                      <IndentDecreaseIcon className="h-3.5 w-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Outdent (move to parent level)</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={handleIndent}
-                      disabled={!canIndent}
-                      className="rounded-none h-7 w-7 border-l border-base-200"
-                      aria-label="Indent"
-                    >
-                      <IndentIncreaseIcon className="h-3.5 w-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Indent (make child of item above)</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-          )}
-
-          {/* Link button (shown when 2 items selected) */}
-          {selectedItems.length === 2 && onCreateDependency && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleLinkItems}
-              className="h-7 text-xs"
-            >
-              <LinkIcon className="h-3.5 w-3.5 mr-1.5" />
-              Link
-            </Button>
-          )}
-
-          {/* Selection indicator */}
-          {selectedItems.length > 0 && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span>{selectedItems.length} selected</span>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setSelectedIds(new Set())}
-                className="h-7 w-7"
-                aria-label="Clear selection"
-              >
-                <XIcon className="h-3 w-3" />
-              </Button>
-            </div>
-          )}
-        </div>
-
-        {/* Right side - Navigation, Settings and View */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          {/* Today + Navigation arrows — grouped with border */}
-          <div className="flex items-center border border-base-200 rounded-lg overflow-hidden">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={scrollToToday}
-              className="rounded-none h-7 px-2 text-xs"
-            >
-              Today
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate("left")}
-              className="rounded-none h-7 w-7 border-l border-base-200"
-              aria-label="Navigate left"
-            >
-              <ChevronLeftIcon className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate("right")}
-              className="rounded-none h-7 w-7 border-l border-base-200"
-              aria-label="Navigate right"
-            >
-              <ChevronRightIcon className="h-3.5 w-3.5" />
-            </Button>
+        {/* Main content */}
+        {panel === "timeline" ? (
+          <div className="flex flex-1 min-h-0 overflow-hidden">
+            <GanttSidebar
+              rows={ganttRows}
+              selectedIds={selectedIds}
+              onToggleCollapse={toggleCollapse}
+              onSelectItem={selectItem}
+              onDoubleClickItem={handleDoubleClick}
+              onReorder={onReorderItems}
+              scrollTop={scrollTop}
+              onEditItem={onItemEdit ? handleDoubleClick : undefined}
+              onDeleteItem={onItemDelete}
+              onAddSubtask={onAddSubtask}
+              onConvertToMilestone={onConvertToMilestone}
+              onSetPriority={onSetPriority}
+              onToggleCriticalPath={onToggleCriticalPath}
+            />
+            <GanttTimeline
+              rows={ganttRows}
+              dateRange={dateRange}
+              viewMode={viewMode}
+              columnWidth={columnWidth}
+              showGrid={showGrid}
+              showDependencies={showDependencies}
+              showCriticalPath={ganttState.showCriticalPath}
+              selectedIds={selectedIds}
+              dependencies={dependencies}
+              onItemDragStart={handleDragStart}
+              onItemDoubleClick={handleDoubleClick}
+              dragItemId={dragState?.itemId}
+              dragDeltaPx={dragDeltaPx}
+              dragMode={dragState?.mode}
+              onDependencyClick={onUpdateDependency ? handleDependencyClick : undefined}
+              baselineItems={ganttState.activeBaselineId ? baselineItems : undefined}
+              scrollRef={scrollRef}
+              onScroll={handleTimelineScroll}
+            />
           </div>
-
-          {/* Settings dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" className="h-7 w-7">
-                <SettingsIcon className="h-3.5 w-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48 z-[10000]">
-              <DropdownMenuLabel>Workdays</DropdownMenuLabel>
-              <DropdownMenuCheckboxItem
-                checked={weekendSettings.includeSaturday}
-                onCheckedChange={(checked) =>
-                  setWeekendSettings((prev) => ({ ...prev, includeSaturday: checked }))
-                }
-              >
-                Include Saturday
-              </DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem
-                checked={weekendSettings.includeSunday}
-                onCheckedChange={(checked) =>
-                  setWeekendSettings((prev) => ({ ...prev, includeSunday: checked }))
-                }
-              >
-                Include Sunday
-              </DropdownMenuCheckboxItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel>Zoom ({Math.round(zoomLevel * 100)}%)</DropdownMenuLabel>
-              <div className="flex items-center justify-between px-2 py-1">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={zoomOut}
-                  disabled={!canZoomOut}
-                  className="h-7 w-7"
-                  aria-label="Zoom out"
-                >
-                  <ZoomOutIcon className="h-3.5 w-3.5" />
-                </Button>
-                <span className="text-xs font-medium">{Math.round(zoomLevel * 100)}%</span>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={zoomIn}
-                  disabled={!canZoomIn}
-                  className="h-7 w-7"
-                  aria-label="Zoom in"
-                >
-                  <ZoomInIcon className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* View dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-7 px-2 text-xs">
-                {viewMode === "day" && <CalendarIcon className="h-3.5 w-3.5 mr-1.5" />}
-                {viewMode === "week" && <CalendarDaysIcon className="h-3.5 w-3.5 mr-1.5" />}
-                {viewMode === "month" && <CalendarRangeIcon className="h-3.5 w-3.5 mr-1.5" />}
-                {viewMode.charAt(0).toUpperCase() + viewMode.slice(1)}
-                <ChevronDownIcon className="h-3 w-3 ml-1 opacity-50" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="z-[10000]">
-              <DropdownMenuRadioGroup value={viewMode} onValueChange={(v) => setViewMode(v as GanttViewMode)}>
-                <DropdownMenuRadioItem value="day">
-                  <CalendarIcon className="h-4 w-4 mr-2" />
-                  Day
-                </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="week">
-                  <CalendarDaysIcon className="h-4 w-4 mr-2" />
-                  Week
-                </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="month">
-                  <CalendarRangeIcon className="h-4 w-4 mr-2" />
-                  Month
-                </DropdownMenuRadioItem>
-              </DropdownMenuRadioGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Fullscreen toggle (hidden when embedded, e.g. in project detail tab) */}
-          {showFullscreenToggle && (
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setIsFullscreen(!isFullscreen)}
-              className="h-7 w-7"
-              aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-            >
-              {isFullscreen ? (
-                <Minimize2Icon className="h-3.5 w-3.5" />
-              ) : (
-                <Maximize2Icon className="h-3.5 w-3.5" />
-              )}
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* Chart area */}
-      <div
-        className="flex overflow-hidden flex-1 min-h-0"
-      >
-        {/* Sidebar */}
-        {showSidebar && (
-          <GanttSidebar
-            items={items}
-            rowHeight={ROW_HEIGHT}
-            headerHeight={headerHeight}
-            viewMode={viewMode}
+        ) : (
+          <GanttTable
+            rows={ganttRows}
             selectedIds={selectedIds}
-            collapsedIds={collapsedIds}
-            weekendSettings={weekendSettings}
-            onItemClick={handleSidebarItemClick}
-            onItemDoubleClick={handleItemDoubleClick}
-            onToggleCollapse={handleToggleCollapse}
-            onReorderItems={onReorderItems}
+            onToggleCollapse={toggleCollapse}
+            onSelectItem={selectItem}
+            onDoubleClickItem={handleDoubleClick}
           />
         )}
 
-        {/* Timeline */}
-        <div
-          className="flex-1 overflow-auto"
-          ref={scrollRef}
-          role="presentation"
-          onClick={handleBackgroundClick}
-        >
-          <div style={{ width: totalWidth, minWidth: "100%" }}>
-            {/* Header */}
-            <GanttHeader
-              columns={columns}
-              viewMode={viewMode}
-              columnWidth={columnWidth}
-              headerHeight={headerHeight}
-            />
-
-            {/* Rows with dependency overlay */}
-            <div className="relative">
-              {visibleItems.map((item, index) => (
-                <GanttRow
-                  key={item.id}
-                  item={item}
-                  columns={columns}
-                  dateRange={dateRange}
-                  columnWidth={columnWidth}
-                  rowHeight={ROW_HEIGHT}
-                  rowIndex={index}
-                  isSelected={selectedIds.has(item.id)}
-                  onItemClick={(clickedItem) => handleItemClick(clickedItem)}
-                  onItemDoubleClick={handleItemDoubleClick}
-                  onItemEdit={onItemEdit}
-                  onItemDuplicate={onItemDuplicate}
-                  onItemDelete={onItemDelete}
-                  onItemDatesChange={onItemDatesChange}
-                />
-              ))}
-
-              {/* Dependency arrows overlay */}
-              {dependencies.length > 0 && (
-                <GanttDependencies
-                  dependencies={dependencies}
-                  items={visibleItems}
-                  getBarPosition={getBarPosition}
-                  rowHeight={ROW_HEIGHT}
-                  totalHeight={visibleItems.length * ROW_HEIGHT}
-                  totalWidth={totalWidth}
-                  selectedDependencyId={selectedDependency?.id}
-                  onDependencyClick={onUpdateDependency ? handleDependencyClick : undefined}
-                />
-              )}
-
-              {/* Empty state */}
-              {items.length === 0 && (
-                <div className="flex flex-col items-center justify-center h-40 text-muted-foreground gap-2">
-                  <p>No timeline items yet</p>
-                  {showAddButton && onAddItem && (
-                    <Button variant="outline" size="sm" onClick={onAddItem}>
-                      <PlusIcon className="h-4 w-4 mr-1.5" />
-                      Add your first timeline
-                    </Button>
-                  )}
-                </div>
-              )}
-            </div>
+        {/* Empty state */}
+        {items.length === 0 && (
+          <div className="flex flex-col items-center justify-center flex-1 text-muted-foreground gap-2 py-16">
+            <p>No timeline items yet</p>
+            {showAddButton && onAddItem && (
+              <Button variant="outline" size="sm" onClick={onAddItem}>
+                <PlusIcon className="h-4 w-4 mr-1.5" />
+                Add your first task
+              </Button>
+            )}
           </div>
-        </div>
-      </div>
+        )}
 
-      {/* Dependency dialog */}
-      <DependencyDialog
-        open={dependencyDialogOpen}
-        onOpenChange={setDependencyDialogOpen}
-        sourceItem={linkSourceItem}
-        targetItem={linkTargetItem}
-        existingDependency={selectedDependency}
-        getItemName={getItemName}
-        onSave={handleSaveDependency}
-        onDelete={selectedDependency ? handleDeleteDependency : undefined}
-      />
-    </>
-  );
+        {/* Status bar */}
+        <GanttStatusBar stats={stats} />
 
-  // Fullscreen overlay (rendered via portal to escape parent constraints)
-  const fullscreenOverlay = isFullscreen
-    ? createPortal(
-        <div
-          className="fixed inset-0 z-[9999] bg-background flex flex-col"
-          style={{ top: 0, left: 0, right: 0, bottom: 0, position: "fixed" }}
-        >
-          {/* Fullscreen header with close button */}
-          <div className="flex items-center justify-between px-4 py-3 border-b bg-background shrink-0">
-            <div className="flex items-center gap-3">
-              <h2 className="text-lg font-semibold">Project Timeline</h2>
-              <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
-                ESC clears selection
-              </span>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsFullscreen(false)}
-              aria-label="Close fullscreen"
-            >
-              <XIcon className="h-5 w-5" />
-            </Button>
-          </div>
-          {/* Chart content fills remaining space */}
-          <div className="flex-1 min-h-0 overflow-hidden bg-background">
-            {chartContent}
-          </div>
-        </div>,
-        document.body
-      )
-    : null;
-
-  // Normal mode
-  return (
-    <>
-      {fullscreenOverlay}
-      <GlassCard className={cn("overflow-hidden py-0 gap-0", className)}>
-        {chartContent}
-      </GlassCard>
-    </>
+        {/* Dependency dialog */}
+        <GanttDependencyDialog
+          open={depDialogOpen}
+          onOpenChange={setDepDialogOpen}
+          sourceItem={linkSource}
+          targetItem={linkTarget}
+          existingDependency={selectedDep}
+          getItemName={getItemName}
+          onSave={handleSaveDependency}
+          onDelete={selectedDep ? handleDeleteDependency : undefined}
+        />
+    </GlassCard>
+    </TooltipProvider>
   );
 }
-

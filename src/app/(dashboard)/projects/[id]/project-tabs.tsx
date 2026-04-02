@@ -40,7 +40,7 @@ interface ProjectTabsProps {
   openSnaggingCount: number;
   milestonesCount: number;
   incompleteMilestonesCount: number;
-  reportsCount: number;
+  reportsCount?: number;
   assignmentsCount: number;
   drawingsReadyCount?: number;
   isClient: boolean;
@@ -63,7 +63,7 @@ export function ProjectTabs({
   openSnaggingCount,
   milestonesCount,
   incompleteMilestonesCount,
-  reportsCount,
+  reportsCount = 0,
   assignmentsCount,
   drawingsReadyCount,
   isClient,
@@ -145,7 +145,7 @@ export function ProjectTabs({
   const activeTabMeta = allTabs.find((tab) => tab.value === activeTab) || allTabs[0];
 
   return (
-    <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 flex-1 flex flex-col">
       <div className="md:hidden">
         <Sheet open={mobileSectionsOpen} onOpenChange={setMobileSectionsOpen}>
           <SheetTrigger asChild>

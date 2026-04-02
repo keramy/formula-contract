@@ -50,6 +50,25 @@ export interface ActionResult<T = void> {
 }
 
 // ============================================================================
+// Get Milestones for a project
+// ============================================================================
+
+export async function getMilestones(projectId: string): Promise<Milestone[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("milestones")
+    .select("id, project_id, name, description, due_date, is_completed, completed_at, alert_days_before")
+    .eq("project_id", projectId)
+    .order("due_date");
+
+  if (error) {
+    console.error("Error fetching milestones:", error.message);
+    return [];
+  }
+  return (data || []) as Milestone[];
+}
+
+// ============================================================================
 // Create Milestone
 // ============================================================================
 

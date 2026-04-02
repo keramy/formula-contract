@@ -2,11 +2,9 @@
 
 import * as React from "react";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils";
 import { useBreakpoint } from "@/hooks/use-media-query";
 import { GanttChart, type GanttItem, type GanttDependency } from "@/components/gantt";
 import { GlassCard, EmptyState } from "@/components/ui/ui-helpers";
-import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import {
   AlertDialog,
@@ -18,11 +16,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { CalendarIcon, PlusIcon } from "lucide-react";
+import { CalendarIcon } from "lucide-react";
 import { TimelineFormDialog } from "../timeline-form-dialog";
 import {
   useTimelineItems,
   useTimelineDependencies,
+  useCreateTimelineItem,
   useUpdateTimelineItem,
   useUpdateTimelineItemDates,
   useDeleteTimelineItem,
@@ -30,6 +29,10 @@ import {
   useCreateTimelineDependency,
   useUpdateTimelineDependency,
   useDeleteTimelineDependency,
+  useBaselines,
+  useBaselineItems,
+  useSaveBaseline,
+  useDeleteBaseline,
 } from "@/lib/react-query/timelines";
 import type { GanttItem as TimelineItem, DependencyType } from "@/lib/actions/timelines";
 
@@ -64,7 +67,11 @@ interface TimelineClientProps {
   projectId: string;
   scopeItems: ScopeItem[];
   canEdit?: boolean;
+  /** URL for "Open Full View" button inside the gantt stats bar */
+  fullViewUrl?: string;
+  /** @deprecated Kept for backwards compat — header is now inside GanttChart */
   showHeader?: boolean;
+  /** @deprecated Kept for backwards compat */
   showFullscreenToggle?: boolean;
 }
 
@@ -76,8 +83,7 @@ export function TimelineClient({
   projectId,
   scopeItems,
   canEdit = false,
-  showHeader = true,
-  showFullscreenToggle = true,
+  fullViewUrl,
 }: TimelineClientProps) {
   const { isMobile } = useBreakpoint();
   // React Query hooks for timeline data
@@ -85,6 +91,7 @@ export function TimelineClient({
   const { data: timelineDependencies = [], isLoading: isLoadingDeps } = useTimelineDependencies(projectId);
 
   // Mutations
+  const createItem = useCreateTimelineItem(projectId);
   const updateItem = useUpdateTimelineItem(projectId);
   const updateDates = useUpdateTimelineItemDates(projectId);
   const deleteItem = useDeleteTimelineItem(projectId);
@@ -92,6 +99,13 @@ export function TimelineClient({
   const createDependency = useCreateTimelineDependency(projectId);
   const updateDependency = useUpdateTimelineDependency(projectId);
   const deleteDependency = useDeleteTimelineDependency(projectId);
+
+  // Baseline hooks
+  const { data: baselines = [] } = useBaselines(projectId);
+  const [activeBaselineId, setActiveBaselineId] = React.useState<string | null>(null);
+  const { data: baselineItems = [] } = useBaselineItems(activeBaselineId);
+  const saveBaselineMutation = useSaveBaseline(projectId);
+  const deleteBaselineMutation = useDeleteBaseline(projectId);
 
   // Form dialog state
   const [formOpen, setFormOpen] = React.useState(false);
@@ -101,11 +115,11 @@ export function TimelineClient({
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [deleteItemId, setDeleteItemId] = React.useState<string | null>(null);
 
-  // Convert milestones and timeline items to Gantt items
+  // Convert timeline items to Gantt items (tree structure)
   const ganttItems = React.useMemo<GanttItem[]>(() => {
     const today = new Date();
 
-    const parentMap = new Map(timelineItems.map((i) => [i.id, i.parent_id || null]));
+    // Build child count map
     const childrenMap = new Map<string, number>();
     timelineItems.forEach((i) => {
       if (i.parent_id) {
@@ -113,59 +127,69 @@ export function TimelineClient({
       }
     });
 
-    // Any item that has children should be treated as a parent (not just phases)
     const parentIds = new Set(
       timelineItems.filter((i) => (childrenMap.get(i.id) || 0) > 0).map((i) => i.id)
     );
-    const getDepth = (id: string): number => {
-      let depth = 0;
-      let current = parentMap.get(id);
-      while (current) {
-        depth += 1;
-        current = parentMap.get(current) || null;
-      }
-      return depth;
-    };
 
-    return timelineItems
+    // Convert flat items to GanttItem (without children first)
+    const itemById = new Map<string, GanttItem>();
+    const allItems: GanttItem[] = timelineItems
       .filter((item) => item.item_type !== "phase" || parentIds.has(item.id))
       .map((item) => {
-      const color = item.color || TIMELINE_COLORS[item.item_type] || "#64748b";
-      const isMilestone = item.item_type === "milestone";
-      const isOverdue = isMilestone && !item.is_completed && new Date(item.end_date) < today;
+        const color = item.color || TIMELINE_COLORS[item.item_type] || "#64748b";
+        const isMilestone = item.item_type === "milestone";
+        const isOverdue = isMilestone && !item.is_completed && new Date(item.end_date) < today;
 
-      let status: string | undefined;
-      if (item.item_type === "milestone") {
-        status = item.is_completed ? "Completed" : isOverdue ? "Overdue" : "Upcoming";
+        let status: string | undefined;
+        if (isMilestone) {
+          status = item.is_completed ? "Completed" : isOverdue ? "Overdue" : "Upcoming";
+        } else {
+          status = item.progress === 100 ? "Complete" : `${item.progress || 0}%`;
+        }
+
+        const displayColor = isMilestone
+          ? item.is_completed
+            ? MILESTONE_COLORS.completed
+            : isOverdue
+            ? MILESTONE_COLORS.overdue
+            : MILESTONE_COLORS.upcoming
+          : color;
+
+        const ganttItem: GanttItem = {
+          id: item.id,
+          timelineId: item.id,
+          name: item.name,
+          type: item.item_type as "phase" | "task" | "milestone",
+          startDate: new Date(item.start_date),
+          endDate: new Date(item.end_date),
+          progress: item.progress || 0,
+          color: displayColor,
+          priority: (item.priority || 2) as 1 | 2 | 3 | 4,
+          status,
+          isEditable: canEdit && item.item_type !== "phase",
+          parentId: item.parent_id && parentIds.has(item.parent_id) ? item.parent_id : null,
+          phaseKey: (item.phase_key || undefined) as GanttItem["phaseKey"],
+          children: [],
+          description: (item as any).description || null,
+          isOnCriticalPath: (item as any).is_on_critical_path || false,
+          isCompleted: item.is_completed || false,
+        };
+
+        itemById.set(item.id, ganttItem);
+        return ganttItem;
+      });
+
+    // Build tree: assign children to parents
+    const roots: GanttItem[] = [];
+    for (const gi of allItems) {
+      if (gi.parentId && itemById.has(gi.parentId)) {
+        itemById.get(gi.parentId)!.children.push(gi);
       } else {
-        status = item.progress === 100 ? "Complete" : `${item.progress || 0}%`;
+        roots.push(gi);
       }
+    }
 
-      const displayColor = isMilestone
-        ? item.is_completed
-          ? MILESTONE_COLORS.completed
-          : isOverdue
-          ? MILESTONE_COLORS.overdue
-          : MILESTONE_COLORS.upcoming
-        : color;
-
-      return {
-        id: item.id,
-        timelineId: item.id,
-        name: item.name,
-        type: item.item_type as "phase" | "task" | "milestone",
-        startDate: new Date(item.start_date),
-        endDate: new Date(item.end_date),
-        progress: item.progress || 0,
-        color: displayColor,
-        priority: item.priority,
-        status,
-        isEditable: canEdit && item.item_type !== "phase",
-        parentId: item.parent_id && parentIds.has(item.parent_id) ? item.parent_id : null,
-        hierarchyLevel: getDepth(item.id),
-        phaseKey: item.phase_key || undefined,
-      };
-    });
+    return roots;
   }, [timelineItems, canEdit]);
 
   // Convert dependencies to Gantt format
@@ -225,10 +249,22 @@ export function TimelineClient({
     deleteDependency.mutate(dependencyId);
   };
 
-  // Handle add new item
+  // Handle add new item — creates instantly with defaults, user edits via double-click
+  // Guard: ignore if previous create is still pending (prevents rapid-fire DB hits)
   const handleAddItem = () => {
-    setEditItem(null);
-    setFormOpen(true);
+    if (createItem.isPending) return;
+    const today = new Date();
+    const endDate = new Date(today);
+    endDate.setDate(endDate.getDate() + 14);
+
+    createItem.mutate({
+      project_id: projectId,
+      name: "New Task",
+      item_type: "task",
+      start_date: format(today, "yyyy-MM-dd"),
+      end_date: format(endDate, "yyyy-MM-dd"),
+      priority: 2,
+    });
   };
 
   // Handle edit item
@@ -242,7 +278,55 @@ export function TimelineClient({
     }
   };
 
-  // Handle duplicate item
+  // Handle add subtask — creates a child task under the given parent
+  const handleAddSubtask = (parentId: string) => {
+    const today = new Date();
+    const endDate = new Date(today);
+    endDate.setDate(endDate.getDate() + 14);
+
+    createItem.mutate({
+      project_id: projectId,
+      name: "New Subtask",
+      item_type: "task",
+      parent_id: parentId,
+      start_date: format(today, "yyyy-MM-dd"),
+      end_date: format(endDate, "yyyy-MM-dd"),
+      priority: 2,
+    });
+  };
+
+  // Handle convert to milestone
+  const handleConvertToMilestone = (ganttItem: GanttItem) => {
+    if (!ganttItem.timelineId) return;
+    const startDate = format(ganttItem.startDate, "yyyy-MM-dd");
+    updateItem.mutate({
+      timelineId: ganttItem.timelineId,
+      input: {
+        item_type: "milestone",
+        end_date: startDate,
+        is_completed: false,
+      },
+    });
+  };
+
+  // Handle set priority
+  const handleSetPriority = (ganttItem: GanttItem, priority: number) => {
+    if (!ganttItem.timelineId) return;
+    updateItem.mutate({
+      timelineId: ganttItem.timelineId,
+      input: { priority: priority as 1 | 2 | 3 | 4 },
+    });
+  };
+
+  // Handle toggle critical path
+  const handleToggleCriticalPath = (ganttItem: GanttItem) => {
+    if (!ganttItem.timelineId) return;
+    updateItem.mutate({
+      timelineId: ganttItem.timelineId,
+      input: { is_on_critical_path: !ganttItem.isOnCriticalPath },
+    });
+  };
+
   // Handle delete click
   const handleDeleteClick = (ganttItem: GanttItem) => {
     if (!ganttItem.timelineId) return;
@@ -258,7 +342,7 @@ export function TimelineClient({
     setDeleteItemId(null);
   };
 
-  // Handle dates change (from drag)
+  // Handle dates change (from drag) — also auto-expand parent if child exceeds it
   const handleDatesChange = async (
     ganttItem: GanttItem,
     startDate: Date,
@@ -266,11 +350,32 @@ export function TimelineClient({
   ) => {
     if (!ganttItem.timelineId) return;
 
+    // Update the dragged item
     updateDates.mutate({
       timelineId: ganttItem.timelineId,
       startDate: format(startDate, "yyyy-MM-dd"),
       endDate: format(endDate, "yyyy-MM-dd"),
     });
+
+    // Auto-expand parent if child now exceeds parent's date range
+    if (ganttItem.parentId) {
+      const parent = timelineItems.find((t) => t.id === ganttItem.parentId);
+      if (parent) {
+        const parentStart = new Date(parent.start_date);
+        const parentEnd = new Date(parent.end_date);
+        let needsUpdate = false;
+        const newStart = startDate < parentStart ? format(startDate, "yyyy-MM-dd") : parent.start_date;
+        const newEnd = endDate > parentEnd ? format(endDate, "yyyy-MM-dd") : parent.end_date;
+
+        if (newStart !== parent.start_date || newEnd !== parent.end_date) {
+          updateDates.mutate({
+            timelineId: parent.id,
+            startDate: newStart,
+            endDate: newEnd,
+          });
+        }
+      }
+    }
   };
 
   // Loading state
@@ -313,68 +418,34 @@ export function TimelineClient({
   }
 
   return (
-    <div className={cn("flex flex-col h-full", showHeader ? "gap-4" : "gap-0")}>
-      {showHeader && (
-        <>
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-medium">Project Timeline</h3>
-              <p className="text-sm text-muted-foreground">
-                Visualize milestones, phases, and tasks for this project.
-              </p>
-            </div>
-            {canEdit && (
-              <Button size="sm" onClick={handleAddItem}>
-                <PlusIcon className="size-4 mr-1.5" />
-                Add Item
-              </Button>
-            )}
-          </div>
-
-          {/* Legend */}
-          <div className="flex flex-wrap items-center gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <div className="size-3 rounded-full" style={{ backgroundColor: MILESTONE_COLORS.completed }} />
-              <span>Completed</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="size-3 rounded-full" style={{ backgroundColor: MILESTONE_COLORS.upcoming }} />
-              <span>Upcoming</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="size-3 rounded-full" style={{ backgroundColor: MILESTONE_COLORS.overdue }} />
-              <span>Overdue</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="size-3 rounded" style={{ backgroundColor: TIMELINE_COLORS.phase, opacity: 0.6 }} />
-              <span>Phase</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="size-3 rounded" style={{ backgroundColor: TIMELINE_COLORS.task }} />
-              <span>Task</span>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Gantt Chart - fills remaining space */}
+    <div className="flex flex-col h-full">
+      {/* Gantt Chart - fills entire space */}
       <div className="flex-1 min-h-0">
         <GanttChart
           items={ganttItems}
           dependencies={ganttDependencies}
-          initialViewMode="month"
-          showSidebar={true}
           showAddButton={canEdit}
+          fullViewUrl={fullViewUrl}
           onAddItem={handleAddItem}
           onItemEdit={handleEditItem}
           onItemDelete={handleDeleteClick}
           onItemDatesChange={handleDatesChange}
+          onAddSubtask={canEdit ? handleAddSubtask : undefined}
+          onConvertToMilestone={canEdit ? handleConvertToMilestone : undefined}
+          onSetPriority={canEdit ? handleSetPriority : undefined}
+          onToggleCriticalPath={canEdit ? handleToggleCriticalPath : undefined}
+          baselines={baselines}
+          baselineItems={baselineItems}
+          onSaveBaseline={canEdit ? () => {
+            const name = `Baseline ${baselines.length + 1} — ${new Date().toLocaleDateString()}`;
+            saveBaselineMutation.mutate(name);
+          } : undefined}
+          onDeleteBaseline={canEdit ? (id: string) => deleteBaselineMutation.mutate(id) : undefined}
           onReorderItems={canEdit ? handleReorder : undefined}
           onItemParentChange={canEdit ? handleParentChange : undefined}
           onCreateDependency={canEdit ? handleCreateDependency : undefined}
           onUpdateDependency={canEdit ? handleUpdateDependency : undefined}
           onDeleteDependency={canEdit ? handleDeleteDependency : undefined}
-          showFullscreenToggle={showFullscreenToggle}
           className="h-full"
         />
       </div>

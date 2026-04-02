@@ -1,8 +1,9 @@
 /**
- * Executive Summary PDF — React-PDF V2
+ * Executive Summary PDF — React-PDF V5 (Visual-First)
  *
- * Renders a branded, chart-rich project summary PDF using @react-pdf/renderer.
- * Matches the app's design language: GlassCards, teal accents, clean typography.
+ * Visual-first infographic with slim one-line section subtitles.
+ * No essays. No formulas. Charts and numbers speak for themselves.
+ * Zero values hidden. Smart inline labels explain context.
  */
 
 import React from "react";
@@ -61,28 +62,26 @@ export interface SummaryOptions {
 }
 
 // ============================================================================
-// Design Tokens (matching app Design Handbook)
+// Design Tokens
 // ============================================================================
 
 const C = {
-  teal: "#0EA58F",
-  tealLight: "#CCFBF1",
+  teal: "#0D9488",
+  tealDark: "#0F766E",
   dark: "#1A2B3C",
   black: "#1E293B",
-  gray: "#6B7280",
-  grayLight: "#9CA3AF",
-  border: "#E5E7EB",
-  bg: "#F8FAFC",
-  bgAlt: "#F1F5F9",
+  gray600: "#4B5563",
+  gray500: "#6B7280",
+  gray400: "#9CA3AF",
+  gray300: "#D1D5DB",
+  gray200: "#E5E7EB",
+  gray100: "#F3F4F6",
+  gray50: "#F9FAFB",
   white: "#FFFFFF",
-  green: "#22C55E",
-  greenBg: "#F0FDF4",
-  red: "#EF4444",
-  redBg: "#FEF2F2",
-  amber: "#F59E0B",
-  amberBg: "#FFFBEB",
-  blue: "#3B82F6",
-  blueBg: "#EFF6FF",
+  green: "#16A34A",
+  red: "#DC2626",
+  amber: "#D97706",
+  blue: "#2563EB",
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -96,7 +95,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 const STATUS_COLORS: Record<string, string> = {
   active: C.green, completed: C.green, complete: C.green, installed: C.green, received: C.green,
-  tender: C.blue, in_design: C.blue, approved: C.blue,
+  tender: C.blue, in_design: C.blue, approved: C.teal,
   on_hold: C.amber, pending: C.amber, awaiting_approval: C.amber, pm_approval: C.amber,
   cancelled: C.red, not_awarded: C.red,
   in_production: C.teal, ordered: C.teal, shipped: C.teal, installing: C.teal,
@@ -112,8 +111,18 @@ function fmtDate(d: string): string {
 }
 
 function fmtAmt(n: number, currency?: string): string {
-  const sym = ({ TRY: "\u20BA", USD: "$", EUR: "\u20AC" } as Record<string, string>)[currency || ""] || "";
-  return `${sym}${n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  const sym = ({ TRY: "", USD: "$", EUR: "\u20AC" } as Record<string, string>)[currency || ""] || "";
+  const suffix = currency === "TRY" ? " TL" : "";
+  return `${sym}${n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}${suffix}`;
+}
+
+function pct(n: number, total: number): number {
+  if (total === 0) return 0;
+  return Math.round((n / total) * 100);
+}
+
+function daysUntil(dateStr: string): number {
+  return Math.ceil((new Date(dateStr).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
 }
 
 // ============================================================================
@@ -123,289 +132,394 @@ function fmtAmt(n: number, currency?: string): string {
 const s = StyleSheet.create({
   page: {
     paddingTop: 0,
-    paddingBottom: 30,
-    paddingHorizontal: 28,
+    paddingBottom: 36,
+    paddingHorizontal: 0,
     fontFamily: "Helvetica",
     fontSize: 9,
     color: C.black,
+    backgroundColor: C.white,
   },
-  // Top accent bar
-  topBar: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 3,
-    backgroundColor: C.teal,
-  },
-  bottomBar: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 3,
-    backgroundColor: C.teal,
-  },
+  topBar: { height: 8, backgroundColor: C.teal },
+
   // Header
+  headerArea: {
+    paddingHorizontal: 28,
+    paddingTop: 14,
+    paddingBottom: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: C.teal,
+  },
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 14,
-    marginBottom: 4,
+    alignItems: "flex-end",
+    marginBottom: 8,
   },
   companyName: {
-    fontSize: 7,
-    color: C.gray,
-    letterSpacing: 1.5,
-    textTransform: "uppercase",
-  },
-  headerRight: {
-    fontSize: 7,
-    color: C.gray,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: C.teal,
-    marginBottom: 8,
-  },
-  title: {
-    fontSize: 16,
+    fontSize: 10,
     fontFamily: "Helvetica-Bold",
-    color: C.dark,
-    marginBottom: 4,
-  },
-  metaLine: {
-    fontSize: 7.5,
-    color: C.gray,
-    marginBottom: 10,
-  },
-  // Section header
-  sectionHeader: {
-    fontSize: 7.5,
     color: C.teal,
     letterSpacing: 1,
-    textTransform: "uppercase",
-    fontFamily: "Helvetica-Bold",
-    marginBottom: 2,
   },
-  sectionLine: {
-    width: 30,
-    height: 0.8,
-    backgroundColor: C.teal,
-    marginBottom: 6,
-  },
-  // GlassCard
-  card: {
-    borderWidth: 1,
-    borderColor: C.border,
-    borderRadius: 6,
-    backgroundColor: C.white,
-    padding: 10,
-    marginBottom: 8,
-  },
-  // KPI Grid
-  kpiGrid: {
-    flexDirection: "row",
-    gap: 6,
-    marginBottom: 10,
-  },
-  kpiCard: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: C.border,
-    borderRadius: 5,
-    backgroundColor: C.white,
-    paddingVertical: 8,
-    paddingHorizontal: 6,
-    alignItems: "center",
-  },
-  kpiAccent: {
-    position: "absolute",
-    top: 0,
-    left: 1,
-    right: 1,
-    height: 2.5,
-    borderTopLeftRadius: 5,
-    borderTopRightRadius: 5,
-  },
-  kpiLabel: {
-    fontSize: 6.5,
-    color: C.gray,
-    textTransform: "uppercase",
+  docLabel: {
+    fontSize: 8,
+    color: C.gray500,
     letterSpacing: 0.5,
-    marginBottom: 3,
-    marginTop: 4,
   },
-  kpiValue: {
-    fontSize: 12,
-    fontFamily: "Helvetica-Bold",
-  },
-  // Progress
-  progressRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginBottom: 4,
-  },
-  progressPercent: {
-    fontSize: 26,
+  title: {
+    fontSize: 18,
     fontFamily: "Helvetica-Bold",
     color: C.dark,
-    width: 50,
+    marginBottom: 3,
   },
-  progressBarOuter: {
-    flex: 1,
-    height: 10,
-    backgroundColor: C.border,
-    borderRadius: 5,
-    overflow: "hidden",
+  subtitle: {
+    fontSize: 8,
+    color: C.gray500,
   },
-  progressBarInner: {
-    height: 10,
-    backgroundColor: C.teal,
-    borderRadius: 5,
+
+  // Content
+  content: { paddingHorizontal: 28, paddingTop: 6 },
+
+  // Section bar + subtitle
+  sectionBar: {
+    backgroundColor: C.tealDark,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    marginTop: 8,
   },
-  statsLine: {
-    fontSize: 7,
-    color: C.gray,
-    marginBottom: 6,
-  },
-  // Two column
-  twoCol: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 10,
-  },
-  colLeft: {
-    flex: 3,
-  },
-  colRight: {
-    flex: 2,
-    borderWidth: 1,
-    borderColor: C.border,
-    borderRadius: 6,
-    padding: 8,
-  },
-  // Status bars
-  statusRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 3,
-    paddingHorizontal: 4,
-  },
-  statusRowAlt: {
-    backgroundColor: C.bgAlt,
-    borderRadius: 3,
-  },
-  statusLabel: {
-    width: 70,
-    fontSize: 7.5,
-    color: C.gray,
-  },
-  statusBar: {
-    height: 6,
-    borderRadius: 3,
-    marginRight: 6,
-  },
-  statusCount: {
+  sectionBarText: {
     fontSize: 7.5,
     fontFamily: "Helvetica-Bold",
-    color: C.black,
+    color: C.white,
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
   },
-  // Milestones
-  milestoneRow: {
+  sectionSub: {
+    fontSize: 7,
+    color: C.gray500,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    backgroundColor: C.gray50,
+    borderWidth: 1,
+    borderColor: C.gray200,
+    borderTopWidth: 0,
+  },
+
+  // Info table
+  infoTable: {
     flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: C.gray200,
+    borderTopWidth: 0,
+  },
+  infoCol: { flex: 1 },
+  infoRow: {
+    flexDirection: "row",
     borderBottomWidth: 0.5,
-    borderBottomColor: C.border,
+    borderBottomColor: C.gray200,
+    minHeight: 18,
   },
-  milestoneIcon: {
-    width: 14,
-    fontSize: 9,
-    textAlign: "center",
+  infoLabel: {
+    width: 75,
+    fontSize: 7.5,
+    color: C.gray600,
+    fontFamily: "Helvetica-Bold",
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    backgroundColor: C.gray50,
+    borderRightWidth: 0.5,
+    borderRightColor: C.gray200,
   },
-  milestoneName: {
+  infoValue: {
     flex: 1,
     fontSize: 8,
     color: C.black,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
   },
-  milestoneDate: {
-    width: 50,
+  infoDivider: { width: 0.5, backgroundColor: C.gray200 },
+
+  // KPI row
+  kpiRow: {
+    flexDirection: "row",
+    borderWidth: 1,
+    borderColor: C.gray200,
+    borderTopWidth: 0,
+  },
+  kpiCell: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 8,
+    borderRightWidth: 0.5,
+    borderRightColor: C.gray200,
+  },
+  kpiCellLast: { borderRightWidth: 0 },
+  kpiLabel: {
+    fontSize: 6.5,
+    color: C.gray500,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginBottom: 3,
+  },
+  kpiValue: { fontSize: 13, fontFamily: "Helvetica-Bold" },
+  kpiSub: { fontSize: 6.5, color: C.gray400, marginTop: 2 },
+
+  // Progress
+  progressContainer: {
+    borderWidth: 1,
+    borderColor: C.gray200,
+    borderTopWidth: 0,
+    padding: 12,
+  },
+  progressTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  progressPercent: {
+    fontSize: 28,
+    fontFamily: "Helvetica-Bold",
+    color: C.dark,
+    marginRight: 12,
+  },
+  progressBarContainer: { flex: 1 },
+  progressBarOuter: {
+    height: 14,
+    backgroundColor: C.gray100,
+    borderRadius: 7,
+    overflow: "hidden",
+  },
+  progressBarInner: {
+    height: 14,
+    backgroundColor: C.teal,
+    borderRadius: 7,
+  },
+  progressLegend: {
+    flexDirection: "row",
+    gap: 16,
+    marginTop: 4,
+  },
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  legendDot: { width: 6, height: 6, borderRadius: 3 },
+  legendText: { fontSize: 7, color: C.gray600 },
+
+  // Approval mini-bars
+  approvalSection: {
+    marginTop: 10,
+    borderTopWidth: 0.5,
+    borderTopColor: C.gray200,
+    paddingTop: 8,
+  },
+  approvalSectionTitle: {
     fontSize: 7,
-    color: C.gray,
-    textAlign: "center",
+    fontFamily: "Helvetica-Bold",
+    color: C.tealDark,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginBottom: 6,
   },
-  milestoneStatus: {
-    width: 45,
-    fontSize: 7,
-    textAlign: "right",
-  },
-  // Cost bars
-  costRow: {
+  approvalRow: {
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 5,
   },
-  costLabel: {
-    width: 55,
-    fontSize: 7.5,
-    color: C.gray,
-  },
-  costBar: {
-    height: 7,
+  approvalLabel: { width: 60, fontSize: 7.5, color: C.gray600 },
+  approvalBarOuter: {
+    flex: 1,
+    height: 6,
+    backgroundColor: C.gray200,
     borderRadius: 3,
+    overflow: "hidden",
     marginRight: 6,
   },
-  costAmount: {
+  approvalBarInner: {
+    height: 6,
+    backgroundColor: C.teal,
+    borderRadius: 3,
+  },
+  approvalFraction: {
     fontSize: 7.5,
     fontFamily: "Helvetica-Bold",
-    color: C.black,
+    color: C.dark,
+    width: 36,
+    textAlign: "right",
   },
-  // Footer
-  footer: {
-    position: "absolute",
-    bottom: 8,
-    left: 28,
-    right: 28,
+
+  // Table
+  table: {
+    borderWidth: 1,
+    borderColor: C.gray200,
+    borderTopWidth: 0,
+  },
+  tableHeader: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    borderTopWidth: 0.5,
-    borderTopColor: C.border,
-    paddingTop: 4,
+    backgroundColor: C.gray100,
+    borderBottomWidth: 1,
+    borderBottomColor: C.gray200,
   },
-  footerText: {
-    fontSize: 6,
-    color: C.grayLight,
+  tableHeaderCell: {
+    fontSize: 7,
+    fontFamily: "Helvetica-Bold",
+    color: C.gray600,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
-  // Bullet
-  bullet: {
+  tableRow: {
+    flexDirection: "row",
+    borderBottomWidth: 0.5,
+    borderBottomColor: C.gray200,
+    minHeight: 18,
+    alignItems: "center",
+  },
+  tableRowAlt: { backgroundColor: C.gray50 },
+  tableCell: {
     fontSize: 8,
-    color: C.teal,
-    marginRight: 4,
+    color: C.black,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
   },
-  bulletRow: {
+
+  // Status bars
+  statusBarRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 3,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
   },
-  bulletText: {
+  statusLabel: { width: 85, fontSize: 7.5, color: C.gray600 },
+  statusBarOuter: {
+    flex: 1,
+    height: 8,
+    backgroundColor: C.gray100,
+    borderRadius: 2,
+    overflow: "hidden",
+    marginRight: 8,
+  },
+  statusBarFill: { height: 8, borderRadius: 2 },
+  statusCount: {
+    width: 24,
     fontSize: 8,
-    color: C.black,
-  },
-  // Scope section header
-  scopeHeader: {
-    fontSize: 7,
-    color: C.teal,
     fontFamily: "Helvetica-Bold",
-    letterSpacing: 0.8,
-    textTransform: "uppercase",
-    marginBottom: 4,
+    color: C.black,
+    textAlign: "right",
   },
+
+  // Cost
+  costTable: {
+    borderWidth: 1,
+    borderColor: C.gray200,
+    borderTopWidth: 0,
+  },
+  costRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderBottomWidth: 0.5,
+    borderBottomColor: C.gray200,
+  },
+  costLabel: { width: 80, fontSize: 8, color: C.gray600 },
+  costBarArea: { flex: 1, marginRight: 10 },
+  costBar: { height: 10, borderRadius: 2 },
+  costAmount: {
+    width: 80,
+    fontSize: 8,
+    fontFamily: "Helvetica-Bold",
+    color: C.black,
+    textAlign: "right",
+  },
+  costPct: {
+    width: 35,
+    fontSize: 7,
+    color: C.gray500,
+    textAlign: "right",
+    marginRight: 8,
+  },
+  costTotalRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: C.gray50,
+  },
+  costTotalLabel: {
+    width: 80,
+    fontSize: 8.5,
+    fontFamily: "Helvetica-Bold",
+    color: C.dark,
+  },
+  costTotalAmount: {
+    flex: 1,
+    fontSize: 10,
+    fontFamily: "Helvetica-Bold",
+    color: C.dark,
+    textAlign: "right",
+  },
+
+  // Alert inline
+  alertLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: C.gray200,
+    borderTopWidth: 0,
+  },
+  alertText: {
+    fontSize: 7.5,
+    color: C.gray600,
+    flex: 1,
+  },
+
+  // Footer
+  footer: { position: "absolute", bottom: 0, left: 0, right: 0 },
+  footerContent: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 28,
+    paddingVertical: 5,
+  },
+  footerText: { fontSize: 6.5, color: C.gray400 },
+  footerBar: { height: 4, backgroundColor: C.teal },
 });
 
 // ============================================================================
-// PDF Document Component
+// Sub-Components
+// ============================================================================
+
+function SectionBar({ title, subtitle, dark }: { title: string; subtitle?: string; dark?: boolean }) {
+  return (
+    <>
+      <View style={[s.sectionBar, dark ? { backgroundColor: C.dark } : {}]}>
+        <Text style={s.sectionBarText}>{title}</Text>
+      </View>
+      {subtitle && (
+        <View style={s.sectionSub}>
+          <Text>{subtitle}</Text>
+        </View>
+      )}
+    </>
+  );
+}
+
+function TRow({ children, index }: { children: React.ReactNode; index: number }) {
+  return (
+    <View style={[s.tableRow, index % 2 !== 0 ? s.tableRowAlt : {}]}>
+      {children}
+    </View>
+  );
+}
+
+// ============================================================================
+// PDF Document
 // ============================================================================
 
 interface DocProps {
@@ -416,190 +530,329 @@ interface DocProps {
 function ExecutiveSummaryDocument({ data, options }: DocProps) {
   const variance = data.budgetAllocated - data.actualSpent;
   const totalCost = data.productionCost + data.procurementCost;
+  const hasFinancials = data.contractValue > 0 || data.budgetAllocated > 0 || data.actualSpent > 0;
   const maxStatusCount = data.statusBreakdown.length > 0
-    ? Math.max(...data.statusBreakdown.map((s) => s.count))
+    ? Math.max(...data.statusBreakdown.map((sb) => sb.count))
     : 1;
+
+  // Milestone alerts
+  const overdueMilestones = data.milestones.filter((m) => !m.isCompleted && new Date(m.dueDate) < new Date());
 
   return (
     <Document>
       <Page size="A4" style={s.page}>
-        {/* Top accent bar */}
         <View style={s.topBar} fixed />
-        <View style={s.bottomBar} fixed />
 
-        {/* Header */}
-        <View style={s.headerRow}>
-          <Text style={s.companyName}>Formula International</Text>
-          <Text style={s.headerRight}>Executive Summary</Text>
+        {/* ======== HEADER ======== */}
+        <View style={s.headerArea}>
+          <View style={s.headerRow}>
+            <Text style={s.companyName}>FORMULA INTERNATIONAL</Text>
+            <Text style={s.docLabel}>EXECUTIVE SUMMARY</Text>
+          </View>
+          <Text style={s.title}>{data.projectCode} {"\u2014"} {data.projectName}</Text>
+          <View style={{ flexDirection: "row", gap: 4 }}>
+            <Text style={[s.subtitle, { fontFamily: "Helvetica-Bold" }]}>Date:</Text>
+            <Text style={s.subtitle}>{fmtDate(new Date().toISOString())}</Text>
+          </View>
         </View>
-        <View style={s.divider} />
 
-        <Text style={s.title}>{data.projectCode} {"\u2014"} {data.projectName}</Text>
-        <Text style={s.metaLine}>
-          Client: {data.clientName}{"   \u00B7   "}
-          Status: {STATUS_LABELS[data.status] || data.status}{"   \u00B7   "}
-          Generated: {fmtDate(new Date().toISOString())}
-          {data.installationDate ? `   \u00B7   Installation: ${fmtDate(data.installationDate)}` : ""}
-        </Text>
+        <View style={s.content}>
 
-        {/* KPI Cards */}
-        {options.includeMetrics && (
-          <View style={s.kpiGrid}>
-            <View style={s.kpiCard}>
-              <View style={[s.kpiAccent, { backgroundColor: C.teal }]} />
-              <Text style={s.kpiLabel}>Contract Value</Text>
-              <Text style={[s.kpiValue, { color: C.teal }]}>{fmtAmt(data.contractValue, data.currency)}</Text>
-            </View>
-            <View style={s.kpiCard}>
-              <View style={[s.kpiAccent, { backgroundColor: C.blue }]} />
-              <Text style={s.kpiLabel}>Budget Allocated</Text>
-              <Text style={[s.kpiValue, { color: C.blue }]}>{fmtAmt(data.budgetAllocated, data.currency)}</Text>
-            </View>
-            <View style={s.kpiCard}>
-              <View style={[s.kpiAccent, { backgroundColor: C.dark }]} />
-              <Text style={s.kpiLabel}>Actual Spent</Text>
-              <Text style={[s.kpiValue, { color: C.dark }]}>{fmtAmt(data.actualSpent, data.currency)}</Text>
-            </View>
-            <View style={s.kpiCard}>
-              <View style={[s.kpiAccent, { backgroundColor: variance >= 0 ? C.green : C.red }]} />
-              <Text style={s.kpiLabel}>Variance</Text>
-              <Text style={[s.kpiValue, { color: variance >= 0 ? C.green : C.red }]}>
-                {variance >= 0 ? "+" : ""}{fmtAmt(variance, data.currency)}
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {/* Progress + Scope (two columns) */}
-        {(options.includeProgress || options.includeScope) && (
-          <View style={s.twoCol}>
-            {/* Left: Progress */}
-            {options.includeProgress && (
-              <View style={s.colLeft}>
-                <Text style={s.sectionHeader}>Progress</Text>
-                <View style={s.sectionLine} />
-                <View style={s.progressRow}>
-                  <Text style={s.progressPercent}>{data.overallProgress}%</Text>
-                  <View style={s.progressBarOuter}>
-                    <View style={[s.progressBarInner, { width: `${Math.max(2, data.overallProgress)}%` }]} />
-                  </View>
-                </View>
-                <Text style={s.statsLine}>
-                  {data.completedItems} completed  {"\u00B7"}  {data.inProgressItems} in progress  {"\u00B7"}  {data.pendingItems} pending  {"\u00B7"}  {data.totalItems} total
+          {/* ════════ PROJECT OVERVIEW ════════ */}
+          <SectionBar title="Project Overview" />
+          {/* No subtitle — table is self-explanatory */}
+          <View style={s.infoTable}>
+            <View style={s.infoCol}>
+              <View style={s.infoRow}>
+                <Text style={s.infoLabel}>Client</Text>
+                <Text style={s.infoValue}>{data.clientName}</Text>
+              </View>
+              <View style={s.infoRow}>
+                <Text style={s.infoLabel}>Status</Text>
+                <Text style={[s.infoValue, { color: STATUS_COLORS[data.status] || C.black, fontFamily: "Helvetica-Bold" }]}>
+                  {STATUS_LABELS[data.status] || data.status}
                 </Text>
-                {options.includeSnagging && data.snaggingTotal > 0 && (
-                  <Text style={s.statsLine}>Snagging: {data.snaggingResolved}/{data.snaggingTotal} resolved</Text>
+              </View>
+              <View style={[s.infoRow, { borderBottomWidth: 0 }]}>
+                <Text style={s.infoLabel}>Scope</Text>
+                <Text style={s.infoValue}>
+                  {data.productionItems} prod. + {data.procurementItems} proc. ({data.totalItems} total)
+                </Text>
+              </View>
+            </View>
+            <View style={s.infoDivider} />
+            <View style={s.infoCol}>
+              <View style={s.infoRow}>
+                <Text style={s.infoLabel}>Installation</Text>
+                <Text style={s.infoValue}>
+                  {data.installationDate
+                    ? `${fmtDate(data.installationDate)}${daysUntil(data.installationDate) > 0 ? ` (${daysUntil(data.installationDate)} days)` : ""}`
+                    : "Not scheduled"}
+                </Text>
+              </View>
+              <View style={s.infoRow}>
+                <Text style={s.infoLabel}>Currency</Text>
+                <Text style={s.infoValue}>{data.currency}</Text>
+              </View>
+              <View style={[s.infoRow, { borderBottomWidth: 0 }]}>
+                <Text style={s.infoLabel}>Sales Price</Text>
+                <Text style={[s.infoValue, { fontFamily: "Helvetica-Bold" }]}>
+                  {data.totalSalesPrice > 0 ? fmtAmt(data.totalSalesPrice, data.currency) : "Not set"}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* ════════ FINANCIAL SUMMARY ════════ */}
+          {options.includeMetrics && (
+            <>
+              <SectionBar
+                title="Financial Summary"
+                subtitle={hasFinancials ? "Budget vs actual spending across all scope items" : "No financial data entered yet"}
+              />
+              {hasFinancials && (
+                <View style={s.kpiRow}>
+                  {data.contractValue > 0 && (
+                    <View style={s.kpiCell}>
+                      <Text style={s.kpiLabel}>Contract Value</Text>
+                      <Text style={[s.kpiValue, { color: C.teal }]}>{fmtAmt(data.contractValue, data.currency)}</Text>
+                      <Text style={s.kpiSub}>Agreed with client</Text>
+                    </View>
+                  )}
+                  {data.budgetAllocated > 0 && (
+                    <View style={s.kpiCell}>
+                      <Text style={s.kpiLabel}>Budget</Text>
+                      <Text style={[s.kpiValue, { color: C.blue }]}>{fmtAmt(data.budgetAllocated, data.currency)}</Text>
+                      <Text style={s.kpiSub}>Initial estimates</Text>
+                    </View>
+                  )}
+                  {data.actualSpent > 0 && (
+                    <View style={s.kpiCell}>
+                      <Text style={s.kpiLabel}>Spent</Text>
+                      <Text style={[s.kpiValue, { color: C.dark }]}>{fmtAmt(data.actualSpent, data.currency)}</Text>
+                      <Text style={s.kpiSub}>
+                        {data.budgetAllocated > 0 ? `${pct(data.actualSpent, data.budgetAllocated)}% of budget` : "Actual to date"}
+                      </Text>
+                    </View>
+                  )}
+                  {data.budgetAllocated > 0 && data.actualSpent > 0 && (
+                    <View style={[s.kpiCell, s.kpiCellLast]}>
+                      <Text style={s.kpiLabel}>Variance</Text>
+                      <Text style={[s.kpiValue, { color: variance >= 0 ? C.green : C.red }]}>
+                        {variance >= 0 ? "+" : ""}{fmtAmt(variance, data.currency)}
+                      </Text>
+                      <Text style={[s.kpiSub, { color: variance >= 0 ? C.green : C.red }]}>
+                        {variance >= 0 ? "Under budget" : "Over budget"}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </>
+          )}
+
+          {/* ════════ PROGRESS & APPROVALS ════════ */}
+          {options.includeProgress && (
+            <>
+              <SectionBar
+                title="Progress & Approvals"
+                subtitle="Scope item completion and client approval status"
+              />
+              {data.totalItems > 0 && (
+                <View style={s.progressContainer}>
+                  <View style={s.progressTopRow}>
+                    <Text style={s.progressPercent}>{data.overallProgress}%</Text>
+                    <View style={s.progressBarContainer}>
+                      <View style={s.progressBarOuter}>
+                        <View style={[s.progressBarInner, { width: `${Math.max(2, data.overallProgress)}%` }]} />
+                      </View>
+                    </View>
+                  </View>
+                  <View style={s.progressLegend}>
+                    <View style={s.legendItem}>
+                      <View style={[s.legendDot, { backgroundColor: C.green }]} />
+                      <Text style={s.legendText}>{data.completedItems} Completed</Text>
+                    </View>
+                    <View style={s.legendItem}>
+                      <View style={[s.legendDot, { backgroundColor: C.teal }]} />
+                      <Text style={s.legendText}>{data.inProgressItems} In Progress</Text>
+                    </View>
+                    <View style={s.legendItem}>
+                      <View style={[s.legendDot, { backgroundColor: C.gray300 }]} />
+                      <Text style={s.legendText}>{data.pendingItems} Pending</Text>
+                    </View>
+                  </View>
+
+                  {/* Approval bars */}
+                  {options.includeScope && (data.drawingsTotal > 0 || data.materialsTotal > 0) && (
+                    <View style={s.approvalSection}>
+                      <Text style={s.approvalSectionTitle}>Client Approvals</Text>
+                      {data.drawingsTotal > 0 && (
+                        <View style={s.approvalRow}>
+                          <Text style={s.approvalLabel}>Drawings</Text>
+                          <View style={s.approvalBarOuter}>
+                            <View style={[s.approvalBarInner, {
+                              width: `${Math.max(2, pct(data.drawingsApproved, data.drawingsTotal))}%`,
+                            }]} />
+                          </View>
+                          <Text style={s.approvalFraction}>{data.drawingsApproved}/{data.drawingsTotal}</Text>
+                        </View>
+                      )}
+                      {data.materialsTotal > 0 && (
+                        <View style={s.approvalRow}>
+                          <Text style={s.approvalLabel}>Materials</Text>
+                          <View style={s.approvalBarOuter}>
+                            <View style={[s.approvalBarInner, {
+                              width: `${Math.max(2, pct(data.materialsApproved, data.materialsTotal))}%`,
+                              backgroundColor: C.blue,
+                            }]} />
+                          </View>
+                          <Text style={s.approvalFraction}>{data.materialsApproved}/{data.materialsTotal}</Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
+
+                  {/* Snagging */}
+                  {options.includeSnagging && data.snaggingTotal > 0 && (
+                    <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8, gap: 6 }}>
+                      <Text style={{ fontSize: 7.5, color: C.amber, fontFamily: "Helvetica-Bold" }}>SNAGGING</Text>
+                      <Text style={{ fontSize: 7.5, color: C.gray600 }}>
+                        {data.snaggingResolved}/{data.snaggingTotal} resolved
+                        {data.snaggingTotal - data.snaggingResolved > 0
+                          ? ` \u2014 ${data.snaggingTotal - data.snaggingResolved} outstanding`
+                          : ""}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </>
+          )}
+
+          {/* ════════ ITEMS BY STATUS ════════ */}
+          {options.includeStatus && data.statusBreakdown.length > 0 && (
+            <>
+              <SectionBar
+                title="Scope Items by Status"
+                subtitle="Number of items in each workflow stage"
+              />
+              <View style={s.table}>
+                {data.statusBreakdown.map((item, idx) => {
+                  const barColor = STATUS_COLORS[item.status] || C.teal;
+                  const itemPct = maxStatusCount > 0 ? (item.count / maxStatusCount) * 100 : 0;
+                  return (
+                    <View key={item.status} style={[s.statusBarRow, idx % 2 !== 0 ? { backgroundColor: C.gray50 } : {}]}>
+                      <Text style={s.statusLabel}>{STATUS_LABELS[item.status] || item.status}</Text>
+                      <View style={s.statusBarOuter}>
+                        <View style={[s.statusBarFill, {
+                          width: `${Math.max(3, itemPct)}%`,
+                          backgroundColor: barColor,
+                        }]} />
+                      </View>
+                      <Text style={s.statusCount}>{item.count}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </>
+          )}
+
+          {/* ════════ MILESTONES ════════ */}
+          {options.includeMilestones && data.milestones.length > 0 && (
+            <View wrap={false}>
+              <SectionBar
+                title="Milestones"
+                subtitle="Key dates and deadlines"
+              />
+              {/* Overdue alert */}
+              {overdueMilestones.length > 0 && (
+                <View style={[s.alertLine, { backgroundColor: "#FEF2F2", borderColor: "#FECACA" }]}>
+                  <Text style={{ fontSize: 8, color: C.red, fontFamily: "Helvetica-Bold" }}>{overdueMilestones.length} overdue</Text>
+                  <Text style={s.alertText}>
+                    {overdueMilestones.map((m) => m.name).join(", ")}
+                  </Text>
+                </View>
+              )}
+              <View style={s.table}>
+                <View style={s.tableHeader}>
+                  <Text style={[s.tableHeaderCell, { flex: 3 }]}>Milestone</Text>
+                  <Text style={[s.tableHeaderCell, { width: 65, textAlign: "center" }]}>Due Date</Text>
+                  <Text style={[s.tableHeaderCell, { width: 65, textAlign: "center" }]}>Status</Text>
+                </View>
+                {data.milestones.map((m, idx) => {
+                  const isPast = new Date(m.dueDate) < new Date();
+                  const statusColor = m.isCompleted ? C.green : isPast ? C.red : C.gray500;
+                  const statusText = m.isCompleted ? "Complete" : isPast ? "Overdue" : "Upcoming";
+                  const icon = m.isCompleted ? "\u2713" : isPast ? "\u2022" : "\u25CB";
+                  return (
+                    <TRow key={m.name} index={idx}>
+                      <View style={{ flex: 3, flexDirection: "row", alignItems: "center", paddingHorizontal: 8, paddingVertical: 4 }}>
+                        <Text style={{ fontSize: 9, color: statusColor, marginRight: 6, fontFamily: "Helvetica-Bold" }}>{icon}</Text>
+                        <Text style={{ fontSize: 8, color: C.black }}>{m.name}</Text>
+                      </View>
+                      <Text style={[s.tableCell, { width: 65, textAlign: "center", color: C.gray600 }]}>{fmtDate(m.dueDate)}</Text>
+                      <Text style={[s.tableCell, { width: 65, textAlign: "center", color: statusColor, fontFamily: "Helvetica-Bold" }]}>{statusText}</Text>
+                    </TRow>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
+          {/* ════════ COST BREAKDOWN ════════ */}
+          {options.includeCosts && totalCost > 0 && (
+            <View wrap={false}>
+              <SectionBar
+                title="Cost Breakdown"
+                subtitle="Production vs procurement costs"
+                dark
+              />
+              <View style={s.costTable}>
+                {data.productionCost > 0 && (
+                  <View style={s.costRow}>
+                    <Text style={s.costLabel}>Production</Text>
+                    <View style={s.costBarArea}>
+                      <View style={[s.costBar, {
+                        width: `${Math.max(3, pct(data.productionCost, totalCost))}%`,
+                        backgroundColor: C.teal,
+                      }]} />
+                    </View>
+                    <Text style={s.costPct}>{pct(data.productionCost, totalCost)}%</Text>
+                    <Text style={s.costAmount}>{fmtAmt(data.productionCost, data.currency)}</Text>
+                  </View>
                 )}
-              </View>
-            )}
-
-            {/* Right: Scope + Approvals */}
-            {options.includeScope && (
-              <View style={s.colRight}>
-                <Text style={s.scopeHeader}>Scope</Text>
-                <View style={s.bulletRow}>
-                  <Text style={s.bullet}>{"\u25CF"}</Text>
-                  <Text style={s.bulletText}>Production: {data.productionItems} items</Text>
-                </View>
-                <View style={[s.bulletRow, { marginBottom: 8 }]}>
-                  <Text style={s.bullet}>{"\u25CF"}</Text>
-                  <Text style={s.bulletText}>Procurement: {data.procurementItems} items</Text>
-                </View>
-
-                <Text style={s.scopeHeader}>Approvals</Text>
-                <View style={s.bulletRow}>
-                  <Text style={s.bulletText}>Drawings: {data.drawingsApproved}/{data.drawingsTotal} approved</Text>
-                </View>
-                <View style={s.bulletRow}>
-                  <Text style={s.bulletText}>Materials: {data.materialsApproved}/{data.materialsTotal} approved</Text>
+                {data.procurementCost > 0 && (
+                  <View style={s.costRow}>
+                    <Text style={s.costLabel}>Procurement</Text>
+                    <View style={s.costBarArea}>
+                      <View style={[s.costBar, {
+                        width: `${Math.max(3, pct(data.procurementCost, totalCost))}%`,
+                        backgroundColor: C.blue,
+                      }]} />
+                    </View>
+                    <Text style={s.costPct}>{pct(data.procurementCost, totalCost)}%</Text>
+                    <Text style={s.costAmount}>{fmtAmt(data.procurementCost, data.currency)}</Text>
+                  </View>
+                )}
+                <View style={s.costTotalRow}>
+                  <Text style={s.costTotalLabel}>Total</Text>
+                  <Text style={s.costTotalAmount}>{fmtAmt(totalCost, data.currency)}</Text>
                 </View>
               </View>
-            )}
-          </View>
-        )}
-
-        {/* Items by Status */}
-        {options.includeStatus && data.statusBreakdown.length > 0 && (
-          <View style={{ marginBottom: 10 }}>
-            <Text style={s.sectionHeader}>Items by Status</Text>
-            <View style={s.sectionLine} />
-            {data.statusBreakdown.map((item, idx) => {
-              const barWidth = Math.max(8, (item.count / maxStatusCount) * 200);
-              const barColor = STATUS_COLORS[item.status] || C.teal;
-              return (
-                <View key={item.status} style={[s.statusRow, idx % 2 === 0 ? s.statusRowAlt : {}]}>
-                  <Text style={s.statusLabel}>{STATUS_LABELS[item.status] || item.status}</Text>
-                  <View style={[s.statusBar, { width: barWidth, backgroundColor: barColor, opacity: 0.8 }]} />
-                  <Text style={s.statusCount}>{item.count}</Text>
-                </View>
-              );
-            })}
-          </View>
-        )}
-
-        {/* Milestones */}
-        {options.includeMilestones && data.milestones.length > 0 && (
-          <View style={{ marginBottom: 10 }} wrap={false}>
-            <Text style={s.sectionHeader}>Milestones</Text>
-            <View style={s.sectionLine} />
-            {data.milestones.map((m) => {
-              const isPast = new Date(m.dueDate) < new Date();
-              const icon = m.isCompleted ? "\u2713" : isPast ? "\u26A0" : "\u25CB";
-              const color = m.isCompleted ? C.green : isPast ? C.red : C.gray;
-              const label = m.isCompleted ? "Complete" : isPast ? "Overdue" : "Upcoming";
-              return (
-                <View key={m.name} style={s.milestoneRow}>
-                  <Text style={[s.milestoneIcon, { color }]}>{icon}</Text>
-                  <Text style={s.milestoneName}>{m.name}</Text>
-                  <Text style={s.milestoneDate}>{fmtDate(m.dueDate)}</Text>
-                  <Text style={[s.milestoneStatus, { color }]}>{label}</Text>
-                </View>
-              );
-            })}
-          </View>
-        )}
-
-        {/* Cost Breakdown */}
-        {options.includeCosts && (
-          <View style={{ marginBottom: 10 }} wrap={false}>
-            <Text style={s.sectionHeader}>Cost Breakdown</Text>
-            <View style={s.sectionLine} />
-
-            <View style={s.costRow}>
-              <Text style={s.costLabel}>Production</Text>
-              <View style={[s.costBar, {
-                width: totalCost > 0 ? Math.max(8, (data.productionCost / totalCost) * 200) : 8,
-                backgroundColor: C.teal,
-              }]} />
-              <Text style={s.costAmount}>{fmtAmt(data.productionCost, data.currency)}</Text>
             </View>
+          )}
 
-            <View style={s.costRow}>
-              <Text style={s.costLabel}>Procurement</Text>
-              <View style={[s.costBar, {
-                width: totalCost > 0 ? Math.max(8, (data.procurementCost / totalCost) * 200) : 8,
-                backgroundColor: C.blue,
-              }]} />
-              <Text style={s.costAmount}>{fmtAmt(data.procurementCost, data.currency)}</Text>
-            </View>
+        </View>
 
-            {totalCost > 0 && (
-              <>
-                <View style={{ borderTopWidth: 0.5, borderTopColor: C.border, marginTop: 2, marginBottom: 4 }} />
-                <View style={s.costRow}>
-                  <Text style={[s.costLabel, { fontFamily: "Helvetica-Bold" }]}>Total</Text>
-                  <Text style={[s.costAmount, { fontSize: 9 }]}>{fmtAmt(totalCost, data.currency)}</Text>
-                </View>
-              </>
-            )}
-          </View>
-        )}
-
-        {/* Footer */}
+        {/* ======== FOOTER ======== */}
         <View style={s.footer} fixed>
-          <Text style={s.footerText}>Formula International</Text>
-          <Text style={s.footerText}>Confidential</Text>
-          <Text style={s.footerText} render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
+          <View style={s.footerContent}>
+            <Text style={s.footerText}>Formula International</Text>
+            <Text style={s.footerText}>Confidential</Text>
+            <Text style={s.footerText} render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
+          </View>
+          <View style={s.footerBar} />
         </View>
       </Page>
     </Document>
@@ -607,7 +860,7 @@ function ExecutiveSummaryDocument({ data, options }: DocProps) {
 }
 
 // ============================================================================
-// Export Function (called from server action)
+// Export
 // ============================================================================
 
 const DEFAULT_OPTIONS: SummaryOptions = {

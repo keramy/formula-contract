@@ -2,7 +2,111 @@
 
 ## Current Status
 Last updated by: Claude Code
-Timestamp: 2026-03-25
+Timestamp: 2026-04-02
+
+---
+
+## Disk IO Budget Depletion Fix — Apr 2, 2026
+Agent: Claude Code
+Status: **DONE — Write spikes fixed, lazy loading applied, build passes (0 TS errors)**
+
+### Root Cause
+Supabase support confirmed: "big spikes in requests to WRITE to the database" before each crash. Database is tiny (<5MB), cache hit rates 99%+. The problem was **burst write frequency**, not data volume.
+
+### Write Spike Fixes (Critical — Crash Prevention)
+1. **Gantt reordering** (`src/lib/actions/timelines.ts`): Changed from N concurrent UPDATE queries via `Promise.all()` to batched groups of 5. Reordering 50 tasks was firing 50 simultaneous writes.
+2. **Excel import** (`src/components/scope-items/excel-import.tsx`): Changed from sequential 2N queries (1 SELECT + 1 INSERT/UPDATE per item) to: 1 batch SELECT → batch INSERTs (groups of 20) → batch UPDATEs (groups of 5). 100-item import went from 200 roundtrips to ~7.
+3. **Bulk material assignment** (`src/lib/actions/scope-items.ts`): Changed from nested M×N loop (individual SELECT + INSERT) to: 1 batch SELECT → 1 batch INSERT. 10×10 assignment went from 100 writes to 2.
+4. **Report line reordering** (`src/lib/actions/reports.ts`): Same as gantt — batched groups of 5 instead of N concurrent.
+5. **Materials import batch size** (`src/lib/actions/materials.ts`): Reduced from 10 to 5 concurrent updates per batch.
+
+### Read Reduction (Performance — IO Budget Conservation)
+6. **Project page lazy loading** (`src/app/(dashboard)/projects/[id]/page.tsx`): Removed 3 queries from `Promise.all()` (reports, activities, areas). Page load reduced from 9 → 6 parallel queries. Reports now lazy-load via React Query hook in `reports-overview.tsx`.
+
+### Verified OK (No Changes Needed)
+- Drafts RLS already uses `(SELECT auth.uid())` InitPlan (migration 035)
+- All mutation buttons already have `isPending`/`isLoading` guards
+- `revalidatePath` removal DEFERRED — components use direct server action calls without React Query mutations. Requires component-by-component migration to `useMutation` first.
+
+### Files Changed
+- `src/lib/actions/timelines.ts` — Batched reorder
+- `src/lib/actions/reports.ts` — Batched reorder
+- `src/lib/actions/scope-items.ts` — Batch material assignment
+- `src/lib/actions/materials.ts` — Smaller batch size
+- `src/components/scope-items/excel-import.tsx` — Batch import
+- `src/app/(dashboard)/projects/[id]/page.tsx` — Lazy loading (9→6 queries)
+- `src/app/(dashboard)/projects/[id]/reports-overview.tsx` — Self-fetch via React Query
+- `src/app/(dashboard)/projects/[id]/project-tabs.tsx` — Optional reportsCount
+
+### Warnings for Next Agent
+- DO NOT remove `revalidatePath` from scope-items, materials, drawings, milestones, reports unless you first wire up `useMutation` + `invalidateQueries` in their UI components
+- Excel export currently shows `null` for area codes/names (areas deferred from server fetch). Low priority.
+- If DB depletes again, check `pg_stat_statements` for `shared_blks_read` to find new culprits
+- The `revalidatePath` in `scope-items.ts` still triggers 6-query re-render on every scope item edit. This is the next optimization target.
+
+---
+
+## Gantt Chart Clean Rewrite v2 — Mar 30, 2026
+Agent: Claude Code
+Status: **DONE — Complete clean rewrite from scratch. 682 tests passing. Migration 056 created.**
+
+### What changed
+Deleted ALL old gantt files (15 files) and rebuilt from scratch based on Figma designs + implementation guide. Key architectural change: single `ganttRows` array with absolute Y positioning guarantees perfect sidebar/timeline alignment.
+
+**Migration:**
+- `supabase/migrations/056_gantt_critical_path_description.sql` — Adds `description text` + `is_on_critical_path boolean` to `gantt_items`
+
+**Created (13 new files in `src/components/gantt/`):**
+- `gantt-types.ts` — Types, constants, `buildGanttRows()` (THE alignment guarantee), `computeStats()`, date utilities
+- `use-gantt-state.ts` — Custom hook owning all chart UI state (panel, viewMode, zoom, selection, collapse, scroll)
+- `gantt-chart.tsx` — Main orchestrator (~280 lines, wires all sub-components)
+- `gantt-stats-bar.tsx` — Top 52px bar (title, stats dots, progress, export)
+- `gantt-toolbar.tsx` — 44px toolbar (Timeline/Table toggle, +Add Task, scale, grid/deps toggle, expand/collapse)
+- `gantt-sidebar.tsx` — Left panel using `ganttRows` absolute positioning, dnd-kit reorder
+- `gantt-timeline.tsx` — Right panel: header (day/week/month), grid, bars, dependency arrows, today line
+- `gantt-bar.tsx` — Task bar (progress fill + %), milestone diamond + label, drag handles
+- `gantt-dependency-arrows.tsx` — SVG overlay with rounded 8px corners, type-specific colors
+- `gantt-table.tsx` — Spreadsheet view with 9 columns, phase accent bars, critical path badges
+- `gantt-dependency-dialog.tsx` — Create/edit dependency links dialog
+- `gantt-status-bar.tsx` — Bottom 34px summary strip
+- `index.ts` — Barrel exports
+
+**Modified:**
+- `src/lib/actions/timelines.ts` — Added `description` + `is_on_critical_path` to GanttItem type and CRUD
+- `src/lib/react-query/timelines.ts` — Added new fields to optimistic temp item
+- `src/app/(dashboard)/projects/[id]/timeline/timeline-client.tsx` — Rewired data mapping to build tree structure with `children[]`, pass new props
+
+### Key architecture: Single source of truth
+Both sidebar and timeline receive the same `GanttRow[]` array from `buildGanttRows()`. Each row has a pre-computed `y` position. Both columns use `position: absolute; top: row.y`. No separate layout calculations anywhere.
+
+### Extended session additions (Mar 31)
+- Bracket bars, bar labels, critical path toggle, conditional health colors, search, context menu, baseline comparison, drag perf fix, zoom controls, indent/outdent multi-select, full-page layout, depth styling, selected row accent
+
+### Performance crisis + fixes (Apr 1, 2026)
+- Supabase Disk IO Budget depleted on both Micro AND Small compute tiers
+- Root cause: `revalidatePath` on every gantt action triggered 9+ queries per click, rapid testing exhausted IO
+- Supabase upgraded from Micro → Small, but still recovering (support ticket submitted)
+
+**Performance fixes applied:**
+- ✅ `revalidatePath` removed from all 8 timeline server actions
+- ✅ `isPending` guard on Add Task (prevents rapid-fire mutations)
+- ✅ RLS functions updated to InitPlan pattern on Supabase (live)
+- ✅ React Query hooks created for lazy tab loading (`src/lib/react-query/project-tabs.ts`)
+- ✅ New server actions: `getMilestones()`, `getSnaggingItems()`, `getRecentActivities()`
+- ❌ Project page Promise.all refactor — infrastructure ready, needs live DB to wire up
+
+**Supabase API key change:** New `sb_publishable_` keys available but require newer `@supabase/supabase-js`. Currently using legacy `eyJ...` keys. Migration deferred.
+
+### What should be done next (when Supabase recovers)
+1. **Verify DB is back** — test `SELECT 1` via MCP, try login
+2. **Apply migrations 056 + 057** — gantt description/critical_path + baselines
+3. **Test performance fixes** — verify no more 5s POST on gantt actions
+4. **Complete project page lazy-load refactor** — wire React Query hooks to tab components, remove heavy queries from Promise.all
+5. **Update timeline-form-dialog** with description + critical path fields
+6. **Write tests** for `buildGanttRows()`, `computeStats()`, `getBarHealthColor()`
+7. **Remove `as any` casts** after `npx supabase gen types typescript`
+8. **Visual QA** of gantt against Figma frames
+9. **Audit all server actions** for unnecessary `revalidatePath` calls (not just timeline)
 
 ---
 

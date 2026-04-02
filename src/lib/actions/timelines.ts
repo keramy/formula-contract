@@ -10,7 +10,9 @@
  */
 
 import { createClient } from "@/lib/supabase/server";
-import { revalidatePath } from "next/cache";
+// NOTE: revalidatePath removed from timeline actions.
+// React Query handles client-side cache invalidation via onSettled.
+// revalidatePath was causing 5s full-page server re-renders on every action.
 
 // ============================================================================
 // Types
@@ -36,6 +38,8 @@ export interface GanttItem {
   is_completed: boolean | null;
   completed_at: string | null;
   color: string | null;
+  description?: string | null;
+  is_on_critical_path?: boolean;
   created_by: string | null;
   created_at: string | null;
   updated_at: string | null;
@@ -68,6 +72,8 @@ export interface GanttItemInput {
   priority?: Priority;
   progress_override?: number | null;
   is_completed?: boolean;
+  description?: string | null;
+  is_on_critical_path?: boolean;
   linked_scope_item_ids?: string[];
 }
 
@@ -329,6 +335,8 @@ export async function createTimelineItem(input: GanttItemInput): Promise<ActionR
       progress_override: input.progress_override ?? null,
       is_completed: input.is_completed ?? false,
       color: input.color || null,
+      description: input.description || null,
+      is_on_critical_path: input.is_on_critical_path ?? false,
       created_by: user.id,
     })
     .select()
@@ -347,7 +355,7 @@ export async function createTimelineItem(input: GanttItemInput): Promise<ActionR
     await supabase.from("gantt_item_scope_items").insert(links);
   }
 
-  revalidatePath(`/projects/${input.project_id}`);
+  // revalidatePath removed — React Query handles cache
   return { success: true, data: created };
 }
 
@@ -405,6 +413,8 @@ export async function updateTimelineItem(
   if (input.progress_override !== undefined) updateData.progress_override = input.progress_override;
   if (input.is_completed !== undefined) updateData.is_completed = input.is_completed;
   if (input.color !== undefined) updateData.color = input.color;
+  if (input.description !== undefined) updateData.description = input.description;
+  if (input.is_on_critical_path !== undefined) updateData.is_on_critical_path = input.is_on_critical_path;
 
   const { data: updated, error } = await supabase
     .from("gantt_items")
@@ -429,7 +439,7 @@ export async function updateTimelineItem(
     }
   }
 
-  revalidatePath(`/projects/${existing.project_id}`);
+  // revalidatePath removed — React Query handles cache
   return { success: true, data: updated };
 }
 
@@ -481,7 +491,7 @@ export async function deleteTimelineItem(timelineId: string): Promise<ActionResu
     return { success: false, error: error.message };
   }
 
-  revalidatePath(`/projects/${existing.project_id}`);
+  // revalidatePath removed — React Query handles cache
   return { success: true };
 }
 
@@ -490,16 +500,24 @@ export async function reorderTimelineItems(projectId: string, itemIds: string[])
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { success: false, error: "Not authenticated" };
 
-  const updates = itemIds.map((id, index) =>
-    supabase.from("gantt_items").update({ sort_order: index + 1 }).eq("id", id).eq("project_id", projectId)
-  );
+  if (itemIds.length === 0) return { success: true };
 
-  const results = await Promise.all(updates);
-  if (results.some((r) => r.error)) {
-    return { success: false, error: "Failed to reorder items" };
+  // PERF: Batch updates in groups of 5 instead of N concurrent writes.
+  // Before: 50 tasks = 50 simultaneous DB writes (caused IO budget depletion).
+  // After: 50 tasks = 10 sequential batches of 5 writes each.
+  const BATCH_SIZE = 5;
+  for (let i = 0; i < itemIds.length; i += BATCH_SIZE) {
+    const batch = itemIds.slice(i, i + BATCH_SIZE);
+    const updates = batch.map((id, idx) =>
+      supabase.from("gantt_items").update({ sort_order: i + idx + 1 }).eq("id", id).eq("project_id", projectId)
+    );
+    const results = await Promise.all(updates);
+    if (results.some((r) => r.error)) {
+      return { success: false, error: "Failed to reorder items" };
+    }
   }
 
-  revalidatePath(`/projects/${projectId}`);
+  // revalidatePath removed — React Query handles cache
   return { success: true };
 }
 
@@ -537,7 +555,7 @@ export async function createTimelineDependency(
     return { success: false, error: error?.message || "Failed to create dependency" };
   }
 
-  revalidatePath(`/projects/${input.project_id}`);
+  // revalidatePath removed — React Query handles cache
   return { success: true, data: created };
 }
 
@@ -576,7 +594,7 @@ export async function updateTimelineDependency(
     return { success: false, error: error?.message || "Failed to update dependency" };
   }
 
-  revalidatePath(`/projects/${existing.project_id}`);
+  // revalidatePath removed — React Query handles cache
   return { success: true, data: updated };
 }
 
@@ -603,6 +621,110 @@ export async function deleteTimelineDependency(dependencyId: string): Promise<Ac
     return { success: false, error: error.message };
   }
 
-  revalidatePath(`/projects/${existing.project_id}`);
+  // revalidatePath removed — React Query handles cache
+  return { success: true };
+}
+
+// ============================================================================
+// Baselines
+// ============================================================================
+
+export interface GanttBaseline {
+  id: string;
+  project_id: string;
+  name: string;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface GanttBaselineItem {
+  id: string;
+  baseline_id: string;
+  gantt_item_id: string;
+  start_date: string;
+  end_date: string;
+  progress: number;
+}
+
+/** Save a baseline snapshot: copies all gantt_items dates for a project */
+export async function saveBaseline(
+  projectId: string,
+  name: string
+): Promise<ActionResult<GanttBaseline>> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "Not authenticated" };
+
+  const { data: userData } = await supabase.from("users").select("role").eq("id", user.id).single();
+  if (!userData || !["admin", "pm"].includes(userData.role)) {
+    return { success: false, error: "Only PM and Admin can save baselines" };
+  }
+
+  // Create baseline header
+  const { data: baselineRaw, error: baselineError } = await supabase
+    .from("gantt_baselines" as any)
+    .insert({ project_id: projectId, name, created_by: user.id })
+    .select()
+    .single();
+
+  const baseline = baselineRaw as GanttBaseline | null;
+  if (baselineError || !baseline) {
+    return { success: false, error: baselineError?.message || "Failed to create baseline" };
+  }
+
+  // Copy all gantt items for this project
+  const { data: items } = await supabase
+    .from("gantt_items")
+    .select("id, start_date, end_date, progress_override")
+    .eq("project_id", projectId);
+
+  if (items && items.length > 0) {
+    const baselineItems = items.map((item) => ({
+      baseline_id: baseline.id,
+      gantt_item_id: item.id,
+      start_date: item.start_date,
+      end_date: item.end_date,
+      progress: item.progress_override ?? 0,
+    }));
+
+    await supabase.from("gantt_baseline_items" as any).insert(baselineItems);
+  }
+
+  // revalidatePath removed — React Query handles cache
+  return { success: true, data: baseline };
+}
+
+/** List all baselines for a project */
+export async function getBaselines(projectId: string): Promise<GanttBaseline[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("gantt_baselines" as any)
+    .select("*")
+    .eq("project_id", projectId)
+    .order("created_at", { ascending: false });
+
+  return (data ?? []) as unknown as GanttBaseline[];
+}
+
+/** Get baseline items for a specific baseline */
+export async function getBaselineItems(baselineId: string): Promise<GanttBaselineItem[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("gantt_baseline_items" as any)
+    .select("*")
+    .eq("baseline_id", baselineId);
+
+  return (data ?? []) as unknown as GanttBaselineItem[];
+}
+
+/** Delete a baseline and its items (cascade) */
+export async function deleteBaseline(baselineId: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "Not authenticated" };
+
+  const { error } = await supabase.from("gantt_baselines" as any).delete().eq("id", baselineId);
+  if (error) return { success: false, error: error.message };
+
   return { success: true };
 }
