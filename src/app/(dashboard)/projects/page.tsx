@@ -1,5 +1,6 @@
 import { Suspense } from "react";
-import { createClient, getUserRoleFromJWT } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import { getRequestContext } from "@/lib/supabase/server";
 import { ProjectsListClient } from "./projects-list-client";
 import { ProjectsPageHeader } from "./projects-page-header";
 import { AlertTriangleIcon } from "lucide-react";
@@ -13,7 +14,7 @@ interface Project {
   installation_date: string | null;
   created_at: string;
   client: { id: string; company_name: string } | null;
-  progress?: number; // Percentage of completed items
+  progress?: number;
   totalItems?: number;
   completedItems?: number;
   hasAttention?: boolean;
@@ -21,61 +22,27 @@ interface Project {
 }
 
 export default async function ProjectsPage() {
-  const supabase = await createClient();
+  const ctx = await getRequestContext();
+  if (!ctx) redirect("/login");
+
+  const { supabase, user, role: userRole } = ctx;
 
   // ============================================================================
-  // PHASE 1: Get auth user and role from JWT (avoids ~3s DB query!)
-  // ============================================================================
-  const { data: { user } } = await supabase.auth.getUser();
-  const userId = user?.id || "";
-
-  // PERFORMANCE: Get role from JWT metadata instead of DB
-  const userRole = user ? await getUserRoleFromJWT(user, supabase) : "pm";
-
-  // ============================================================================
-  // PHASE 2: Fetch assignments, projects, scope items, and clients in PARALLEL
-  // (Note: removed profile query - now using JWT metadata above)
+  // Only 2 queries: projects + assignments (for role filtering)
+  // Progress & attention data will be fetched client-side via React Query
   // ============================================================================
   const [
     { data: assignments },
     { data: allProjects, error },
-    { data: allScopeItems },
-    { data: allClients },
-    { data: overdueMilestones },
-    { data: openSnagging },
   ] = await Promise.all([
-    // Project assignments (for client filtering)
-    user
-      ? supabase.from("project_assignments").select("project_id").eq("user_id", user.id)
-      : Promise.resolve({ data: null }),
+    // Project assignments (for role-based filtering)
+    supabase.from("project_assignments").select("project_id").eq("user_id", user.id),
     // All projects with client info
     supabase
       .from("projects")
       .select(`*, client:clients(id, company_name)`)
       .eq("is_deleted", false)
       .order("created_at", { ascending: false }),
-    // All scope items for progress calculation
-    // Fetch fields needed to match Project Overview calculation
-    supabase
-      .from("scope_items")
-      .select("project_id, item_path, production_percentage, is_installed")
-      .eq("is_deleted", false),
-    // All clients for filter dropdown
-    supabase
-      .from("clients")
-      .select("id, company_name")
-      .order("company_name", { ascending: true }),
-    // Overdue milestones for attention indicator
-    supabase
-      .from("milestones")
-      .select("project_id")
-      .eq("is_completed", false)
-      .lt("due_date", new Date().toISOString()),
-    // Open snagging issues for attention indicator
-    supabase
-      .from("snagging")
-      .select("project_id")
-      .eq("is_resolved", false),
   ]);
 
   const canCreateProject = ["admin", "pm"].includes(userRole);
@@ -100,12 +67,9 @@ export default async function ProjectsPage() {
   }
 
   // ============================================================================
-  // Filter and process data (client-side - fast)
+  // Filter by role: admin/management see all, others see only assigned
   // ============================================================================
-
-  // Admin and Management see ALL projects
-  // Everyone else (PM, production, procurement, client) sees only assigned projects
-  let projectsData = (allProjects || []) as unknown as Project[];
+  let projects = (allProjects || []) as unknown as Project[];
   const canSeeAllProjects = ["admin", "management"].includes(userRole);
 
   if (!canSeeAllProjects) {
@@ -123,109 +87,7 @@ export default async function ProjectsPage() {
         </div>
       );
     }
-    projectsData = projectsData.filter(p => assignedProjectIds.includes(p.id));
-  }
-
-  // Calculate progress for each project from scope items
-  let projects = projectsData;
-
-  // Build attention map from overdue milestones and open snagging
-  const attentionMap = new Map<string, number>();
-  if (overdueMilestones) {
-    for (const m of overdueMilestones) {
-      attentionMap.set(m.project_id, (attentionMap.get(m.project_id) || 0) + 1);
-    }
-  }
-  if (openSnagging) {
-    for (const s of openSnagging) {
-      attentionMap.set(s.project_id, (attentionMap.get(s.project_id) || 0) + 1);
-    }
-  }
-
-  if (allScopeItems && projects.length > 0) {
-    const projectIds = new Set(projects.map(p => p.id));
-
-    // Group items by project and calculate progress
-    // Progress formula:
-    // - Production items: (production_percentage * 90%) + (is_installed * 10%) = max 100%
-    // - Procurement items: is_installed = 100%, not installed = 0%
-    // - Overall: average of all item progress values
-    const progressMap = new Map<string, {
-      itemProgresses: number[];  // Individual item progress values (0-100)
-      total: number;
-    }>();
-
-    for (const item of allScopeItems) {
-      if (!projectIds.has(item.project_id)) continue; // Skip items from other projects
-
-      const existing = progressMap.get(item.project_id) || {
-        itemProgresses: [],
-        total: 0,
-      };
-
-      existing.total++;
-
-      // Calculate individual item progress
-      let itemProgress = 0;
-      if (item.item_path === "production") {
-        // Production: 90% from production_percentage + 10% from installation
-        const productionPart = (item.production_percentage || 0) * 0.9;
-        const installationPart = item.is_installed ? 10 : 0;
-        itemProgress = Math.round(productionPart + installationPart);
-      } else if (item.item_path === "procurement") {
-        // Procurement: 100% when installed, 0% otherwise
-        itemProgress = item.is_installed ? 100 : 0;
-      }
-
-      existing.itemProgresses.push(itemProgress);
-      progressMap.set(item.project_id, existing);
-    }
-
-    // Add progress and attention data to projects
-    projects = projects.map(project => {
-      const stats = progressMap.get(project.id);
-      const attentionCount = attentionMap.get(project.id) || 0;
-
-      if (stats && stats.total > 0) {
-        // Overall progress = average of all item progress values
-        const overallProgress = Math.round(
-          stats.itemProgresses.reduce((sum, p) => sum + p, 0) / stats.total
-        );
-
-        // Count completed items (100% progress)
-        const completedItems = stats.itemProgresses.filter(p => p === 100).length;
-
-        return {
-          ...project,
-          progress: overallProgress,
-          totalItems: stats.total,
-          completedItems,
-          hasAttention: attentionCount > 0,
-          attentionCount,
-        };
-      }
-      return {
-        ...project,
-        progress: 0,
-        totalItems: 0,
-        completedItems: 0,
-        hasAttention: attentionCount > 0,
-        attentionCount,
-      };
-    });
-  } else {
-    // Still add attention data even if no scope items
-    projects = projects.map(project => {
-      const attentionCount = attentionMap.get(project.id) || 0;
-      return {
-        ...project,
-        progress: 0,
-        totalItems: 0,
-        completedItems: 0,
-        hasAttention: attentionCount > 0,
-        attentionCount,
-      };
-    });
+    projects = projects.filter(p => assignedProjectIds.includes(p.id));
   }
 
   return (
@@ -241,7 +103,7 @@ export default async function ProjectsPage() {
 
       {/* Client-side filtering for instant response */}
       <Suspense fallback={<div className="py-8 text-center text-muted-foreground">Loading projects...</div>}>
-        <ProjectsListClient projects={projects} clients={allClients || []} canCreateProject={canCreateProject} />
+        <ProjectsListClient projects={projects} canCreateProject={canCreateProject} />
       </Suspense>
     </div>
   );
