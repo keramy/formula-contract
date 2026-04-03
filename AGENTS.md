@@ -2,7 +2,53 @@
 
 ## Current Status
 Last updated by: Claude Code
-Timestamp: 2026-04-02
+Timestamp: 2026-04-03
+
+---
+
+## Supabase IO Budget / RLS Recursion Fix — Apr 3, 2026
+Agent: Claude Code + external AI agent review
+Status: **DONE — Root cause found and fixed. App fully operational.**
+
+### Root Cause
+`get_user_role()` and `is_assigned_to_project()` were NOT `SECURITY DEFINER`. When called from RLS policies, they triggered RLS on the tables they queried, causing infinite recursion (`stack depth limit exceeded`). Fix: `ALTER FUNCTION ... SECURITY DEFINER` (migration 059).
+
+### All Changes (17 commits total)
+**Database fixes (applied live):**
+- Migration 058: RLS InitPlan for notifications + users
+- Migration 059: SECURITY DEFINER on get_user_role() + is_assigned_to_project()
+- authenticated role timeout: 8s → 30s
+- Disabled extensions: pg_graphql, pg_net, pg_cron
+- Synced user names to JWT metadata
+
+**Code improvements:**
+- Shared request context with React cache() (66 functions across 7 files)
+- Thin project detail page (6 → 2 server queries, lazy React Query tabs)
+- Thin projects list page (6 → 2 server queries)
+- Replaced 31 revalidatePath with React Query invalidation
+- Removed Gantt drag/resize/reorder (586 lines)
+- Removed middleware last_active_at write
+- Disabled Link prefetch on all dashboard/sidebar links
+- Layout uses JWT metadata only (no DB query)
+- Dashboard staged queries + failure tracking with dev warning
+- Error states on /projects, /clients, /users (visible errors vs silent empty)
+- Notifications: removed revalidatePath("/")
+- Fixed React Rules of Hooks in 5 tab components
+
+**Metrics:**
+- TypeScript: 0 errors
+- Tests: 676 passing
+- React Doctor: 96/100
+- Dashboard queries: ~27 → ~8 per load
+- Project page queries: 9 → 2 per load
+
+### Warnings for Next Agent
+- RLS helper functions MUST be SECURITY DEFINER — see CLAUDE.md gotcha #42
+- Migrations 051-059 applied live but NOT tracked in supabase_migrations table
+- authenticated role timeout is 30s (Supabase default is 8s) — monitor
+- Medium compute active ($85/mo) — can downgrade to Small after stability verified
+- Progress bars removed from /projects list (deferred enrichment)
+- Gantt drag/resize removed — users edit via form dialogs
 
 ---
 
