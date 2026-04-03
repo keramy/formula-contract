@@ -257,7 +257,7 @@ export default async function DashboardPage() {
                   </CardTitle>
                 </div>
                 <Button variant="ghost" size="sm" asChild className="h-7 text-xs">
-                  <Link href="/projects">
+                  <Link href="/projects" prefetch={false}>
                     View all
                     <ArrowRightIcon className="size-3 ml-1" />
                   </Link>

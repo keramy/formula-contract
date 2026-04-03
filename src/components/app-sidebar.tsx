@@ -201,7 +201,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
                           !isActive && "hover:bg-primary/10 hover:text-foreground"
                         )}
                       >
-                        <Link href={item.href}>
+                        <Link href={item.href} prefetch={false}>
                           <item.icon className={cn("size-4 transition-colors", getIconClasses(item.href, isActive))} />
                           <span className={cn("font-medium", isActive && "font-semibold")}>{item.title}</span>
                         </Link>
@@ -239,7 +239,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
                             !isActive && "hover:bg-primary/10 hover:text-foreground"
                           )}
                         >
-                          <Link href={item.href}>
+                          <Link href={item.href} prefetch={false}>
                             <item.icon className={cn("size-4 transition-colors", getIconClasses(item.href, isActive))} />
                             <span className={cn("font-medium", isActive && "font-semibold")}>{item.title}</span>
                           </Link>
