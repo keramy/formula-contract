@@ -1,7 +1,7 @@
 # Formula Contract - Project Intelligence
 
-> **Last Updated:** March 13, 2026
-> **Version:** 1.1.0
+> **Last Updated:** April 3, 2026
+> **Version:** 1.2.0
 > **Supabase Project:** `lsuiaqrpkhejeavsrsqc` (contract-eu, eu-central-1)
 
 ---
@@ -49,7 +49,7 @@ Tender → Active → Scope Items → Drawings/Materials Approval → Production
 
 | Layer | Technology |
 |-------|------------|
-| Framework | Next.js 14+ (App Router) |
+| Framework | Next.js 16.1.1 (App Router) |
 | Language | TypeScript |
 | Styling | Tailwind CSS v4 + shadcn/ui |
 | Database | Supabase (PostgreSQL + Auth + Storage + RLS) |
@@ -57,8 +57,7 @@ Tender → Active → Scope Items → Drawings/Materials Approval → Production
 | Client State | Zustand |
 | Forms | react-hook-form + zod |
 | Tables | @tanstack/react-table |
-| Gantt Chart | Custom built (`components/gantt/`, 7 files) |
-| Drag & Drop | @dnd-kit/core + @dnd-kit/sortable |
+| Gantt Chart | Custom built (`components/gantt/`, 13 files, view-only positioning) |
 | Deployment | Vercel |
 
 ---
@@ -74,7 +73,7 @@ src/
 ├── emails/           # React-email templates (welcome, assignment, milestone, report, drawing)
 └── types/            # TypeScript definitions
 
-supabase/migrations/  # Database migrations (001-046)
+supabase/migrations/  # Database migrations (001-059)
 docs/                 # Extended documentation (see "Documentation Map" below)
 ```
 
@@ -84,7 +83,7 @@ docs/                 # Extended documentation (see "Documentation Map" below)
 
 25 tables total. See `docs/DATABASE.md` for full field definitions.
 
-**Core:** `users`, `clients`, `projects`, `scope_items`, `drawings`, `drawing_revisions`, `materials`, `reports`, `report_lines`, `project_timelines`, `timeline_dependencies`
+**Core:** `users`, `clients`, `projects`, `scope_items`, `drawings`, `drawing_revisions`, `materials`, `reports`, `report_lines`, `gantt_items`, `gantt_dependencies`, `gantt_baselines`, `gantt_baseline_items`
 
 **Supporting:** `project_assignments`, `item_materials`, `milestones`, `snagging`, `notifications`, `activity_log`, `drafts`, `report_shares`
 
@@ -257,7 +256,7 @@ scope-items/{project_id}/{item_id}/image_1.jpg
 47. **No revalidatePath on project mutations** - Removed from scope-items, materials, reports, drawings, milestones, project-assignments. UI updates via `queryClient.invalidateQueries()` in components. Only CRM, Finance, Users still use revalidatePath.
 48. **Link prefetch={false} on dashboard** - All Link components in sidebar, dashboard page, and dashboard widgets must have `prefetch={false}` to prevent hidden route storms that overwhelm the DB.
 
-### React Code Health (React Doctor score: 92/100)
+### React Code Health (React Doctor score: 96/100)
 21. **Never define components inside other components** - Nested components get recreated every render, destroying state and killing performance. Extract to module scope or a separate file with explicit props.
 22. **`next/image fill` always needs `sizes`** - Without `sizes`, Next.js serves the full-resolution image. Match `sizes` to the container: `sizes="64px"` for `size-16`, `sizes="96px"` for `size-24`, etc.
 23. **Don't mix named + default exports** - Use `export function Foo()` only. Don't also add `export default Foo` in the same file.
@@ -311,27 +310,30 @@ npm run version:major   # 1.0.0 → 2.0.0 (breaking changes)
 
 ---
 
-## Current Status (Mar 2026)
+## Current Status (Apr 2026)
 
 ### Recently Completed
-- Payments Module (Mar 17-23, 2026): Full AP/AR payment tracking under `/payments`. 8 DB tables (migrations 052-055), whitelist-based access. Invoices with VAT/installments/project linking/approval, receivables, suppliers with real-time IBAN validation. Notification system: 3 methods (auto weekly digest via pg_cron, manual summary with timeframe picker, urgent multi-select notify) — all with PDF attachment via Resend. Excel export (3 types). Preview drawer with documents. Simplified status badges with hover tooltips (Ready to Pay, Needs Approval, etc.). Paperclip indicator for document attachments. Spreadsheet-style tables. 698 tests (128 validation + 61 server action). React Doctor 100/100.
-- Password Reset Flow Fix (Mar 13, 2026): Configured Resend as custom SMTP for Supabase Auth emails. Fixed password reset flow by using `token_hash` pattern in email templates instead of `{{ .ConfirmationURL }}`. Added `/auth/confirm/route.ts` server-side handler. Branded email template matching existing design system.
-- CRM Module (Feb 27, 2026): Full sales CRM — 6 tables, 37 brands, 12 firms, pipeline kanban, contacts, activities timeline. Routes: `/crm/*` for admin/pm/management.
-- React Doctor code health audit: score improved from 76 → 92 → 100/100
-- CRM UI Polish (Mar 2, 2026): Migrated all 6 CRM pages to `usePageHeader()` AppHeader pattern, replaced `<Loader2Icon>` spinners with `<Skeleton>` loading states, added timeline dots, polished kanban cards/columns, improved detail page typography with `GradientIcon` section headers. 9 files modified, zero new files.
+- DB Performance & RLS Recursion Fix (Apr 3, 2026): Root cause of Supabase IO budget depletion was recursive RLS (missing SECURITY DEFINER on helper functions). Fixed with migration 059. Also: shared request context (React cache), thin project pages (9→2 queries), replaced 31 revalidatePath with React Query invalidation, removed Gantt drag/resize, removed middleware DB writes, staged dashboard queries, error states on list pages. 676 tests, React Doctor 96/100.
+- Gantt Chart Rewrite (Apr 1, 2026): Complete clean rewrite — 13 new files, single ganttRows array with absolute Y positioning, table view, dependency arrows, baselines, critical path. Migrations 056-057. Drag/resize removed for DB safety — edit via dialogs.
+- Executive Summary PDF (Mar 28, 2026): React-PDF based executive summary with design options dialog.
+- Payments Module (Mar 17-23, 2026): Full AP/AR payment tracking under `/payments`. 8 DB tables (migrations 052-055), whitelist-based access, invoices with VAT/installments, Excel export, notification system.
+- CRM Module (Feb 27, 2026): Full sales CRM — 6 tables, 37 brands, 12 firms, pipeline kanban, contacts, activities timeline.
 
 ### In Progress
-- Gantt chart UI polish (migration 045 applied, data is live)
 - Mobile optimization (responsive data views done, Gantt tablet enabled, remaining: full E2E testing)
+- Consider downgrading Supabase from Medium back to Small compute (monitor for 1 week)
 
 ### Planned
 - Payments: sequential multi-step approval (plan in memory, deferred)
 - Global capacity view (cross-project phase workload overview)
 - Command menu (Cmd+K)
-- PDF Executive Summary generation
+- Restore progress bars on /projects list page (via React Query enrichment)
+- Drop unused database indexes (after 7 days of usage stats accumulate)
 
 ### Known Issues
 - `shannon_auditfiles/` excluded from tsconfig.json — contains pentest artifacts with TS errors (intentional)
+- Migrations 051-059 applied live but NOT tracked in supabase_migrations table
+- `authenticated` role timeout set to 30s (Supabase default is 8s) — monitor and consider reverting
 
 **Full changelog:** See [docs/CHANGELOG.md](./docs/CHANGELOG.md)
 
