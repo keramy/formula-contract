@@ -87,9 +87,7 @@ import {
   getTimelineDependencies,
   createTimelineItem,
   updateTimelineItem,
-  updateTimelineItemDates,
   deleteTimelineItem,
-  reorderTimelineItems,
   createTimelineDependency,
   updateTimelineDependency,
   deleteTimelineDependency,
@@ -376,34 +374,6 @@ describe("updateTimelineItem", () => {
 });
 
 // ============================================================================
-// updateTimelineItemDates
-// ============================================================================
-
-describe("updateTimelineItemDates", () => {
-  it("delegates to updateTimelineItem with start and end dates", async () => {
-    const updated = makeGanttItem({ role: "pm" });
-    mockTerminalResult = { data: updated, error: null };
-
-    const result = await updateTimelineItemDates(
-      ITEM_ID,
-      "2026-04-01",
-      "2026-05-01"
-    );
-
-    expect(result.success).toBe(true);
-  });
-
-  it("returns error when not authenticated", async () => {
-    mockUser = null;
-
-    const result = await updateTimelineItemDates(ITEM_ID, "2026-04-01", "2026-05-01");
-
-    expect(result.success).toBe(false);
-    expect(result.error).toBe("Not authenticated");
-  });
-});
-
-// ============================================================================
 // deleteTimelineItem
 // ============================================================================
 
@@ -470,42 +440,6 @@ describe("deleteTimelineItem", () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toBe("Only PM and Admin can delete timeline items");
-  });
-});
-
-// ============================================================================
-// reorderTimelineItems
-// ============================================================================
-
-describe("reorderTimelineItems", () => {
-  it("updates sort_order for each item", async () => {
-    mockTerminalResult = { data: null, error: null };
-
-    const result = await reorderTimelineItems(PROJECT_ID, [
-      "item-3",
-      "item-1",
-      "item-2",
-    ]);
-
-    expect(result.success).toBe(true);
-
-    // Verify 3 update calls (one per item)
-    const updateCalls = mockCalls.filter((c) => c.method === "update");
-    expect(updateCalls.length).toBe(3);
-
-    // Verify sort_order values (1-based)
-    expect((updateCalls[0]?.args[0] as Record<string, unknown>).sort_order).toBe(1);
-    expect((updateCalls[1]?.args[0] as Record<string, unknown>).sort_order).toBe(2);
-    expect((updateCalls[2]?.args[0] as Record<string, unknown>).sort_order).toBe(3);
-  });
-
-  it("rejects when not authenticated", async () => {
-    mockUser = null;
-
-    const result = await reorderTimelineItems(PROJECT_ID, ["item-1"]);
-
-    expect(result.success).toBe(false);
-    expect(result.error).toBe("Not authenticated");
   });
 });
 

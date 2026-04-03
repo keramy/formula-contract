@@ -23,9 +23,7 @@ import {
   useTimelineDependencies,
   useCreateTimelineItem,
   useUpdateTimelineItem,
-  useUpdateTimelineItemDates,
   useDeleteTimelineItem,
-  useReorderTimelineItems,
   useCreateTimelineDependency,
   useUpdateTimelineDependency,
   useDeleteTimelineDependency,
@@ -93,9 +91,7 @@ export function TimelineClient({
   // Mutations
   const createItem = useCreateTimelineItem(projectId);
   const updateItem = useUpdateTimelineItem(projectId);
-  const updateDates = useUpdateTimelineItemDates(projectId);
   const deleteItem = useDeleteTimelineItem(projectId);
-  const reorderItems = useReorderTimelineItems(projectId);
   const createDependency = useCreateTimelineDependency(projectId);
   const updateDependency = useUpdateTimelineDependency(projectId);
   const deleteDependency = useDeleteTimelineDependency(projectId);
@@ -203,13 +199,6 @@ export function TimelineClient({
       lagDays: dep.lag_days,
     }));
   }, [timelineDependencies]);
-
-  // Handle reorder items
-  const handleReorder = (itemIds: string[]) => {
-    const timelineIds = itemIds;
-    if (timelineIds.length === 0) return;
-    reorderItems.mutate(timelineIds);
-  };
 
   // Handle indent/outdent (change parent)
   const handleParentChange = (timelineId: string, newParentId: string | null) => {
@@ -342,42 +331,6 @@ export function TimelineClient({
     setDeleteItemId(null);
   };
 
-  // Handle dates change (from drag) — also auto-expand parent if child exceeds it
-  const handleDatesChange = async (
-    ganttItem: GanttItem,
-    startDate: Date,
-    endDate: Date
-  ) => {
-    if (!ganttItem.timelineId) return;
-
-    // Update the dragged item
-    updateDates.mutate({
-      timelineId: ganttItem.timelineId,
-      startDate: format(startDate, "yyyy-MM-dd"),
-      endDate: format(endDate, "yyyy-MM-dd"),
-    });
-
-    // Auto-expand parent if child now exceeds parent's date range
-    if (ganttItem.parentId) {
-      const parent = timelineItems.find((t) => t.id === ganttItem.parentId);
-      if (parent) {
-        const parentStart = new Date(parent.start_date);
-        const parentEnd = new Date(parent.end_date);
-        let needsUpdate = false;
-        const newStart = startDate < parentStart ? format(startDate, "yyyy-MM-dd") : parent.start_date;
-        const newEnd = endDate > parentEnd ? format(endDate, "yyyy-MM-dd") : parent.end_date;
-
-        if (newStart !== parent.start_date || newEnd !== parent.end_date) {
-          updateDates.mutate({
-            timelineId: parent.id,
-            startDate: newStart,
-            endDate: newEnd,
-          });
-        }
-      }
-    }
-  };
-
   // Loading state
   if (isLoadingItems || isLoadingDeps) {
     return (
@@ -429,7 +382,6 @@ export function TimelineClient({
           onAddItem={handleAddItem}
           onItemEdit={handleEditItem}
           onItemDelete={handleDeleteClick}
-          onItemDatesChange={handleDatesChange}
           onAddSubtask={canEdit ? handleAddSubtask : undefined}
           onConvertToMilestone={canEdit ? handleConvertToMilestone : undefined}
           onSetPriority={canEdit ? handleSetPriority : undefined}
@@ -441,7 +393,6 @@ export function TimelineClient({
             saveBaselineMutation.mutate(name);
           } : undefined}
           onDeleteBaseline={canEdit ? (id: string) => deleteBaselineMutation.mutate(id) : undefined}
-          onReorderItems={canEdit ? handleReorder : undefined}
           onItemParentChange={canEdit ? handleParentChange : undefined}
           onCreateDependency={canEdit ? handleCreateDependency : undefined}
           onUpdateDependency={canEdit ? handleUpdateDependency : undefined}

@@ -11,9 +11,7 @@ const mockGetTimelineItems = vi.fn();
 const mockGetTimelineDependencies = vi.fn();
 const mockCreateTimelineItem = vi.fn();
 const mockUpdateTimelineItem = vi.fn();
-const mockUpdateTimelineItemDates = vi.fn();
 const mockDeleteTimelineItem = vi.fn();
-const mockReorderTimelineItems = vi.fn();
 const mockCreateTimelineDependency = vi.fn();
 const mockUpdateTimelineDependency = vi.fn();
 const mockDeleteTimelineDependency = vi.fn();
@@ -23,9 +21,7 @@ vi.mock("@/lib/actions/timelines", () => ({
   getTimelineDependencies: (...args: unknown[]) => mockGetTimelineDependencies(...args),
   createTimelineItem: (...args: unknown[]) => mockCreateTimelineItem(...args),
   updateTimelineItem: (...args: unknown[]) => mockUpdateTimelineItem(...args),
-  updateTimelineItemDates: (...args: unknown[]) => mockUpdateTimelineItemDates(...args),
   deleteTimelineItem: (...args: unknown[]) => mockDeleteTimelineItem(...args),
-  reorderTimelineItems: (...args: unknown[]) => mockReorderTimelineItems(...args),
   createTimelineDependency: (...args: unknown[]) => mockCreateTimelineDependency(...args),
   updateTimelineDependency: (...args: unknown[]) => mockUpdateTimelineDependency(...args),
   deleteTimelineDependency: (...args: unknown[]) => mockDeleteTimelineDependency(...args),
@@ -49,9 +45,7 @@ import {
   useTimelineDependencies,
   useCreateTimelineItem,
   useUpdateTimelineItem,
-  useUpdateTimelineItemDates,
   useDeleteTimelineItem,
-  useReorderTimelineItems,
   useCreateTimelineDependency,
   useUpdateTimelineDependency,
   useDeleteTimelineDependency,
@@ -342,37 +336,6 @@ describe("useUpdateTimelineItem", () => {
 });
 
 // ============================================================================
-// useUpdateTimelineItemDates - Drag Operations
-// ============================================================================
-
-describe("useUpdateTimelineItemDates", () => {
-  it("updates dates optimistically (drag)", async () => {
-    mockUpdateTimelineItemDates.mockResolvedValue({ success: true });
-
-    const { wrapper, queryClient } = createWrapper();
-    queryClient.setQueryData(timelineKeys.list(PROJECT_ID), [makeItem()]);
-
-    const { result } = renderHook(() => useUpdateTimelineItemDates(PROJECT_ID), { wrapper });
-
-    await act(async () => {
-      result.current.mutate({
-        timelineId: "item-001",
-        startDate: "2026-04-01",
-        endDate: "2026-05-01",
-      });
-    });
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-
-    expect(mockUpdateTimelineItemDates).toHaveBeenCalledWith(
-      "item-001",
-      "2026-04-01",
-      "2026-05-01"
-    );
-  });
-});
-
-// ============================================================================
 // useDeleteTimelineItem - Optimistic Remove
 // ============================================================================
 
@@ -414,32 +377,6 @@ describe("useDeleteTimelineItem", () => {
     await waitFor(() => expect(result.current.isError).toBe(true));
 
     expect(toast.error).toHaveBeenCalledWith("Cannot delete phase");
-  });
-});
-
-// ============================================================================
-// useReorderTimelineItems
-// ============================================================================
-
-describe("useReorderTimelineItems", () => {
-  it("reorders items", async () => {
-    mockReorderTimelineItems.mockResolvedValue({ success: true });
-
-    const { wrapper, queryClient } = createWrapper();
-    queryClient.setQueryData(timelineKeys.list(PROJECT_ID), [
-      makeItem({ id: "item-A", sort_order: 1 }),
-      makeItem({ id: "item-B", sort_order: 2 }),
-    ]);
-
-    const { result } = renderHook(() => useReorderTimelineItems(PROJECT_ID), { wrapper });
-
-    await act(async () => {
-      result.current.mutate(["item-B", "item-A"]);
-    });
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-
-    expect(mockReorderTimelineItems).toHaveBeenCalledWith(PROJECT_ID, ["item-B", "item-A"]);
   });
 });
 

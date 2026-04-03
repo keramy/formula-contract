@@ -15,22 +15,7 @@ import {
   totalRowsHeight,
 } from "./gantt-types";
 import { GanttContextMenu } from "./gantt-context-menu";
-import { ChevronRightIcon, GripVerticalIcon } from "lucide-react";
-import {
-  DndContext,
-  closestCenter,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-  useSortable,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
+import { ChevronRightIcon } from "lucide-react";
 
 // ============================================================================
 // GANTT SIDEBAR — Left panel using ganttRows for absolute positioning
@@ -43,7 +28,6 @@ interface GanttSidebarProps {
   onToggleCollapse: (id: string) => void;
   onSelectItem: (id: string, e: React.MouseEvent) => void;
   onDoubleClickItem: (item: GanttItem) => void;
-  onReorder?: (itemIds: string[]) => void;
   scrollTop: number;
   // Context menu callbacks
   onEditItem?: (item: GanttItem) => void;
@@ -61,7 +45,6 @@ export function GanttSidebar({
   onToggleCollapse,
   onSelectItem,
   onDoubleClickItem,
-  onReorder,
   scrollTop,
   onEditItem,
   onDeleteItem,
@@ -71,28 +54,6 @@ export function GanttSidebar({
   onToggleCriticalPath,
   className,
 }: GanttSidebarProps) {
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
-  );
-
-  const handleDragEnd = React.useCallback(
-    (event: DragEndEvent) => {
-      const { active, over } = event;
-      if (!over || active.id === over.id || !onReorder) return;
-
-      const ids = rows.map((r) => r.id);
-      const oldIndex = ids.indexOf(active.id as string);
-      const newIndex = ids.indexOf(over.id as string);
-      if (oldIndex === -1 || newIndex === -1) return;
-
-      const reordered = [...ids];
-      const [moved] = reordered.splice(oldIndex, 1);
-      reordered.splice(newIndex, 0, moved);
-      onReorder(reordered);
-    },
-    [rows, onReorder]
-  );
-
   const contentHeight = totalRowsHeight(rows);
 
   return (
@@ -118,38 +79,26 @@ export function GanttSidebar({
             transform: `translateY(-${scrollTop}px)`,
           }}
         >
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            modifiers={[restrictToVerticalAxis]}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={rows.map((r) => r.id)}
-              strategy={verticalListSortingStrategy}
+          {rows.map((row) => (
+            <GanttContextMenu
+              key={row.id}
+              item={row.item}
+              onEdit={onEditItem}
+              onDelete={onDeleteItem}
+              onAddSubtask={onAddSubtask}
+              onConvertToMilestone={onConvertToMilestone}
+              onSetPriority={onSetPriority}
+              onToggleCriticalPath={onToggleCriticalPath}
             >
-              {rows.map((row) => (
-                <GanttContextMenu
-                  key={row.id}
-                  item={row.item}
-                  onEdit={onEditItem}
-                  onDelete={onDeleteItem}
-                  onAddSubtask={onAddSubtask}
-                  onConvertToMilestone={onConvertToMilestone}
-                  onSetPriority={onSetPriority}
-                  onToggleCriticalPath={onToggleCriticalPath}
-                >
-                  <SidebarRow
-                    row={row}
-                    isSelected={selectedIds.has(row.id)}
-                    onToggleCollapse={onToggleCollapse}
-                    onSelect={onSelectItem}
-                    onDoubleClick={onDoubleClickItem}
-                  />
-                </GanttContextMenu>
-              ))}
-            </SortableContext>
-          </DndContext>
+              <SidebarRow
+                row={row}
+                isSelected={selectedIds.has(row.id)}
+                onToggleCollapse={onToggleCollapse}
+                onSelect={onSelectItem}
+                onDoubleClick={onDoubleClickItem}
+              />
+            </GanttContextMenu>
+          ))}
         </div>
       </div>
     </div>
@@ -173,15 +122,6 @@ function SidebarRow({
   onSelect: (id: string, e: React.MouseEvent) => void;
   onDoubleClick: (item: GanttItem) => void;
 }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: row.id });
-
   const { item, depth, hasChildren, isCollapsed, phaseColor, type } = row;
   const isPhase = type === "phase";
   const isMilestone = type === "milestone";
@@ -193,21 +133,16 @@ function SidebarRow({
     left: 0,
     right: 0,
     height: row.height,
-    transform: CSS.Transform.toString(transform),
-    transition,
   };
 
   return (
     <div
-      ref={setNodeRef}
       style={style}
-      {...attributes}
       role="row"
       tabIndex={0}
       className={cn(
         "flex items-center gap-1.5 px-4 border-b border-border/50 cursor-pointer select-none group relative",
         isSelected ? "bg-primary/10" : row.rowIndex % 2 === 0 ? "bg-background" : "bg-muted/20",
-        isDragging && "opacity-50 z-50",
         isPhase ? "font-semibold" : "text-[11px]",
       )}
       onClick={(e) => onSelect(row.id, e)}
@@ -234,17 +169,9 @@ function SidebarRow({
         </button>
       )}
 
-      {/* Task/milestone: fixed-width prefix area (drag handle + indent + chevron/spacer) */}
+      {/* Task/milestone: fixed-width prefix area (indent + chevron/spacer) */}
       {!isPhase && (
         <>
-          {/* Drag handle — always 14px wide, visible on hover */}
-          <div
-            {...listeners}
-            className="shrink-0 w-3.5 opacity-0 group-hover:opacity-40 cursor-grab active:cursor-grabbing"
-          >
-            <GripVerticalIcon className="size-3" />
-          </div>
-
           {/* Indent spacer */}
           {indent > 0 && <div style={{ width: indent }} className="shrink-0" />}
 

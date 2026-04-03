@@ -28,7 +28,7 @@ import { XIcon, PlusIcon } from "lucide-react";
 
 // ============================================================================
 // GANTT CHART — Main orchestrator
-// Owns: ganttRows computation, drag state, dependency dialog, scroll sync
+// Owns: ganttRows computation, dependency dialog, scroll sync
 // ============================================================================
 
 const EMPTY_DEPS: GanttDependency[] = [];
@@ -41,9 +41,7 @@ export interface GanttChartProps {
   // Callbacks
   onItemEdit?: (item: GanttItem) => void;
   onItemDelete?: (item: GanttItem) => void;
-  onItemDatesChange?: (item: GanttItem, startDate: Date, endDate: Date) => void;
   onAddItem?: () => void;
-  onReorderItems?: (itemIds: string[]) => void;
   onItemParentChange?: (itemId: string, newParentId: string | null) => void;
   onCreateDependency?: (
     sourceId: string,
@@ -80,9 +78,7 @@ export function GanttChart({
   projectSubtitle,
   onItemEdit,
   onItemDelete,
-  onItemDatesChange,
   onAddItem,
-  onReorderItems,
   onItemParentChange,
   onCreateDependency,
   onUpdateDependency,
@@ -369,92 +365,6 @@ export function GanttChart({
   );
 
   // ---------------------------------------------------------------------------
-  // Drag state for bar date changes
-  // ---------------------------------------------------------------------------
-  // Drag state: track pixel offset locally, only commit to server on mouseup.
-  // This avoids re-rendering the entire gantt on every mousemove.
-  const [dragState, setDragState] = React.useState<{
-    itemId: string;
-    mode: "move" | "resize-left" | "resize-right";
-    startX: number;
-    originalStart: Date;
-    originalEnd: Date;
-    item: GanttItem;
-  } | null>(null);
-
-  /** Pixel offset of the dragged bar — updated on every mousemove, only affects the dragged bar */
-  const [dragDeltaPx, setDragDeltaPx] = React.useState(0);
-
-  const handleDragStart = React.useCallback(
-    (e: React.MouseEvent, item: GanttItem, mode: "move" | "resize-left" | "resize-right") => {
-      if (!onItemDatesChange) return;
-      e.preventDefault();
-      setDragDeltaPx(0);
-      setDragState({
-        itemId: item.id,
-        mode,
-        startX: e.clientX,
-        originalStart: new Date(item.startDate),
-        originalEnd: new Date(item.endDate),
-        item,
-      });
-    },
-    [onItemDatesChange]
-  );
-
-  React.useEffect(() => {
-    if (!dragState) return;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      setDragDeltaPx(e.clientX - dragState.startX);
-    };
-
-    const handleMouseUp = (e: MouseEvent) => {
-      // Calculate final dates from pixel delta
-      const totalMs = dateRange.end.getTime() - dateRange.start.getTime();
-      const cols = Math.ceil(totalMs / (viewMode === "day" ? 86400000 : viewMode === "week" ? 604800000 : 2592000000));
-      const totalWidth = cols * columnWidth;
-      const msPerPixel = totalMs / totalWidth;
-
-      const dx = e.clientX - dragState.startX;
-      const daysDelta = Math.round((dx * msPerPixel) / 86400000);
-
-      if (daysDelta !== 0) {
-        const newStart = new Date(dragState.originalStart);
-        const newEnd = new Date(dragState.originalEnd);
-
-        switch (dragState.mode) {
-          case "move":
-            newStart.setDate(newStart.getDate() + daysDelta);
-            newEnd.setDate(newEnd.getDate() + daysDelta);
-            break;
-          case "resize-left":
-            newStart.setDate(newStart.getDate() + daysDelta);
-            if (newStart >= newEnd) { setDragState(null); setDragDeltaPx(0); return; }
-            break;
-          case "resize-right":
-            newEnd.setDate(newEnd.getDate() + daysDelta);
-            if (newEnd <= newStart) { setDragState(null); setDragDeltaPx(0); return; }
-            break;
-        }
-
-        // Commit ONCE on mouseup
-        onItemDatesChange?.(dragState.item, newStart, newEnd);
-      }
-
-      setDragState(null);
-      setDragDeltaPx(0);
-    };
-
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
-    return () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [dragState, dateRange, columnWidth, viewMode, onItemDatesChange]);
-
-  // ---------------------------------------------------------------------------
   // Scroll sync: timeline scrollTop → sidebar offset
   // ---------------------------------------------------------------------------
   const handleTimelineScroll = React.useCallback((e: React.UIEvent) => {
@@ -537,7 +447,6 @@ export function GanttChart({
               onToggleCollapse={toggleCollapse}
               onSelectItem={selectItem}
               onDoubleClickItem={handleDoubleClick}
-              onReorder={onReorderItems}
               scrollTop={scrollTop}
               onEditItem={onItemEdit ? handleDoubleClick : undefined}
               onDeleteItem={onItemDelete}
@@ -556,11 +465,7 @@ export function GanttChart({
               showCriticalPath={ganttState.showCriticalPath}
               selectedIds={selectedIds}
               dependencies={dependencies}
-              onItemDragStart={handleDragStart}
               onItemDoubleClick={handleDoubleClick}
-              dragItemId={dragState?.itemId}
-              dragDeltaPx={dragDeltaPx}
-              dragMode={dragState?.mode}
               onDependencyClick={onUpdateDependency ? handleDependencyClick : undefined}
               baselineItems={ganttState.activeBaselineId ? baselineItems : undefined}
               scrollRef={scrollRef}

@@ -443,15 +443,6 @@ export async function updateTimelineItem(
   return { success: true, data: updated };
 }
 
-export async function updateTimelineItemDates(
-  timelineId: string,
-  startDate: string,
-  endDate: string
-): Promise<ActionResult> {
-  const result = await updateTimelineItem(timelineId, { start_date: startDate, end_date: endDate });
-  return { success: result.success, error: result.error };
-}
-
 export async function deleteTimelineItem(timelineId: string): Promise<ActionResult> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -489,32 +480,6 @@ export async function deleteTimelineItem(timelineId: string): Promise<ActionResu
   if (error) {
     console.error("Error deleting gantt item:", error);
     return { success: false, error: error.message };
-  }
-
-  // revalidatePath removed — React Query handles cache
-  return { success: true };
-}
-
-export async function reorderTimelineItems(projectId: string, itemIds: string[]): Promise<ActionResult> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { success: false, error: "Not authenticated" };
-
-  if (itemIds.length === 0) return { success: true };
-
-  // PERF: Batch updates in groups of 5 instead of N concurrent writes.
-  // Before: 50 tasks = 50 simultaneous DB writes (caused IO budget depletion).
-  // After: 50 tasks = 10 sequential batches of 5 writes each.
-  const BATCH_SIZE = 5;
-  for (let i = 0; i < itemIds.length; i += BATCH_SIZE) {
-    const batch = itemIds.slice(i, i + BATCH_SIZE);
-    const updates = batch.map((id, idx) =>
-      supabase.from("gantt_items").update({ sort_order: i + idx + 1 }).eq("id", id).eq("project_id", projectId)
-    );
-    const results = await Promise.all(updates);
-    if (results.some((r) => r.error)) {
-      return { success: false, error: "Failed to reorder items" };
-    }
   }
 
   // revalidatePath removed — React Query handles cache

@@ -7,9 +7,7 @@ import {
   getTimelineDependencies,
   createTimelineItem,
   updateTimelineItem,
-  updateTimelineItemDates,
   deleteTimelineItem,
-  reorderTimelineItems,
   createTimelineDependency,
   updateTimelineDependency,
   deleteTimelineDependency,
@@ -218,62 +216,6 @@ export function useUpdateTimelineItem(projectId: string) {
 }
 
 /**
- * Hook for updating timeline item dates (drag operations)
- * Includes optimistic updates for instant feedback
- */
-export function useUpdateTimelineItemDates(projectId: string) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({
-      timelineId,
-      startDate,
-      endDate,
-    }: {
-      timelineId: string;
-      startDate: string;
-      endDate: string;
-    }) => {
-      const result = await updateTimelineItemDates(timelineId, startDate, endDate);
-      if (!result.success) {
-        throw new Error(result.error || "Failed to update dates");
-      }
-    },
-    // Optimistic update for instant drag feedback
-    onMutate: async ({ timelineId, startDate, endDate }) => {
-      await queryClient.cancelQueries({ queryKey: timelineKeys.list(projectId) });
-
-      const previousItems = queryClient.getQueryData<TimelineItem[]>(
-        timelineKeys.list(projectId)
-      );
-
-      queryClient.setQueryData<TimelineItem[]>(
-        timelineKeys.list(projectId),
-        (old) => {
-          if (!old) return old;
-          return old.map((item) =>
-            item.id === timelineId
-              ? { ...item, start_date: startDate, end_date: endDate }
-              : item
-          );
-        }
-      );
-
-      return { previousItems };
-    },
-    onError: (error: Error, _, context) => {
-      if (context?.previousItems) {
-        queryClient.setQueryData(timelineKeys.list(projectId), context.previousItems);
-      }
-      toast.error(error.message);
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: timelineKeys.list(projectId) });
-    },
-  });
-}
-
-/**
  * Hook for deleting a timeline item
  */
 export function useDeleteTimelineItem(projectId: string) {
@@ -325,62 +267,6 @@ export function useDeleteTimelineItem(projectId: string) {
  * Hook for duplicating a timeline item
  */
 // Duplicate removed in rewrite (can be added later if needed)
-
-/**
- * Hook for reordering timeline items
- * Includes optimistic updates for instant reorder feedback
- */
-export function useReorderTimelineItems(projectId: string) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (itemIds: string[]) => {
-      const result = await reorderTimelineItems(projectId, itemIds);
-      if (!result.success) {
-        throw new Error(result.error || "Failed to reorder items");
-      }
-    },
-    // Optimistic update for instant reorder
-    onMutate: async (itemIds) => {
-      await queryClient.cancelQueries({ queryKey: timelineKeys.list(projectId) });
-
-      const previousItems = queryClient.getQueryData<TimelineItem[]>(
-        timelineKeys.list(projectId)
-      );
-
-      // Reorder items according to new IDs order
-      queryClient.setQueryData<TimelineItem[]>(
-        timelineKeys.list(projectId),
-        (old) => {
-          if (!old) return old;
-
-          const itemMap = new Map(old.map((item) => [item.id, item]));
-          const reorderSet = new Set(itemIds);
-          let cursor = 0;
-
-          // Reorder only the subset, keeping other items in place
-          return old.map((item) => {
-            if (!reorderSet.has(item.id)) return item;
-            const nextId = itemIds[cursor++];
-            return itemMap.get(nextId) || item;
-          });
-        }
-      );
-
-      return { previousItems };
-    },
-    onError: (error: Error, _, context) => {
-      if (context?.previousItems) {
-        queryClient.setQueryData(timelineKeys.list(projectId), context.previousItems);
-      }
-      toast.error(error.message);
-    },
-    // No success toast for reorder - feels more natural
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: timelineKeys.list(projectId) });
-    },
-  });
-}
 
 // ============================================================================
 // Mutation Hooks - Hierarchy (Indent/Outdent)

@@ -39,18 +39,7 @@ interface GanttTimelineProps {
   showCriticalPath: boolean;
   selectedIds: Set<string>;
   dependencies: GanttDependency[];
-  onItemDragStart: (
-    e: React.MouseEvent,
-    item: GanttItem,
-    mode: "move" | "resize-left" | "resize-right"
-  ) => void;
   onItemDoubleClick: (item: GanttItem) => void;
-  /** ID of the item currently being dragged */
-  dragItemId?: string | null;
-  /** Pixel offset during drag — applied locally to the dragged bar only */
-  dragDeltaPx?: number;
-  /** Drag mode for adjusting bar position */
-  dragMode?: "move" | "resize-left" | "resize-right";
   onDependencyClick?: (dep: GanttDependency) => void;
   baselineItems?: { gantt_item_id: string; start_date: string; end_date: string }[];
   scrollRef: React.RefObject<HTMLDivElement | null>;
@@ -68,11 +57,7 @@ export function GanttTimeline({
   showCriticalPath,
   selectedIds,
   dependencies,
-  onItemDragStart,
   onItemDoubleClick,
-  dragItemId,
-  dragDeltaPx = 0,
-  dragMode,
   onDependencyClick,
   baselineItems,
   scrollRef,
@@ -193,27 +178,12 @@ export function GanttTimeline({
             const pos = barPositions.get(row.id);
             if (!pos) return null;
 
-            // Apply local drag offset to the dragged bar only (no full re-render)
-            const isDragging = dragItemId === row.id && dragDeltaPx !== 0;
-            let barLeft = pos.left;
-            let barWidth = pos.width;
-            if (isDragging) {
-              if (dragMode === "move") {
-                barLeft += dragDeltaPx;
-              } else if (dragMode === "resize-left") {
-                barLeft += dragDeltaPx;
-                barWidth = Math.max(20, barWidth - dragDeltaPx);
-              } else if (dragMode === "resize-right") {
-                barWidth = Math.max(20, barWidth + dragDeltaPx);
-              }
-            }
-
             return (
               <GanttBar
                 key={row.id}
                 item={row.item}
-                left={barLeft}
-                width={barWidth}
+                left={pos.left}
+                width={pos.width}
                 y={row.y}
                 color={getBarHealthColor(row.item) ?? row.phaseColor}
                 depth={row.depth}
@@ -223,7 +193,6 @@ export function GanttTimeline({
                 showCriticalPath={showCriticalPath}
                 baselineLeft={baselineMap?.get(row.id)?.left}
                 baselineWidth={baselineMap?.get(row.id)?.width}
-                onDragStart={onItemDragStart}
                 onDoubleClick={onItemDoubleClick}
               />
             );

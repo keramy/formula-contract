@@ -36,11 +36,6 @@ export interface GanttBarProps {
   showCriticalPath?: boolean;
   baselineLeft?: number;
   baselineWidth?: number;
-  onDragStart?: (
-    e: React.MouseEvent,
-    item: GanttItem,
-    mode: "move" | "resize-left" | "resize-right"
-  ) => void;
   onDoubleClick?: (item: GanttItem) => void;
   onContextMenu?: (e: React.MouseEvent, item: GanttItem) => void;
 }
@@ -58,7 +53,6 @@ export function GanttBar({
   showCriticalPath,
   baselineLeft,
   baselineWidth,
-  onDragStart,
   onDoubleClick,
   onContextMenu,
 }: GanttBarProps) {
@@ -181,7 +175,7 @@ export function GanttBar({
               "absolute rounded-[2px] select-none z-10",
               "transition-shadow duration-150",
               isSelected && "ring-1 ring-primary/70",
-              isEditable ? "cursor-grab active:cursor-grabbing hover:shadow-md" : "cursor-pointer",
+              "cursor-pointer",
               isDeep ? "border border-dashed bg-transparent" : "overflow-hidden",
               dimmed && "opacity-25"
             )}
@@ -198,10 +192,6 @@ export function GanttBar({
             onKeyDown={(e) => { if (e.key === "Enter") onDoubleClick?.(item); }}
             onContextMenu={(e) => onContextMenu?.(e, item)}
             onMouseMove={handleMouseMove}
-            onMouseDown={(e) => {
-              if (!isEditable || e.button !== 0) return;
-              onDragStart?.(e, item, "move");
-            }}
           >
             {/* Progress fill */}
             <div
@@ -227,31 +217,6 @@ export function GanttBar({
               </span>
             )}
 
-            {/* Left resize handle */}
-            {isEditable && (
-              <div
-                role="separator"
-                aria-orientation="vertical"
-                tabIndex={-1}
-                className="absolute left-0 top-0 bottom-0 w-2 cursor-col-resize group/left"
-                onMouseDown={(e) => { e.stopPropagation(); onDragStart?.(e, item, "resize-left"); }}
-              >
-                <div className="absolute left-0 top-1 bottom-1 w-[3px] rounded-full bg-white/0 group-hover/left:bg-white/70 transition-colors" />
-              </div>
-            )}
-
-            {/* Right resize handle */}
-            {isEditable && (
-              <div
-                role="separator"
-                aria-orientation="vertical"
-                tabIndex={-1}
-                className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize group/right"
-                onMouseDown={(e) => { e.stopPropagation(); onDragStart?.(e, item, "resize-right"); }}
-              >
-                <div className="absolute right-0 top-1 bottom-1 w-[3px] rounded-full bg-white/0 group-hover/right:bg-white/70 transition-colors" />
-              </div>
-            )}
           </div>
         </TooltipTrigger>
         <TooltipContent side="top" align="start" alignOffset={mouseX - 40} sideOffset={8} className="text-xs">
