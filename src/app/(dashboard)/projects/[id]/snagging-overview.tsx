@@ -76,9 +76,6 @@ export function SnaggingOverview({
   const { data: fetchedItems, isLoading: hookLoading } = useProjectSnagging(projectId);
   const snaggingItems = (propItems ?? fetchedItems ?? []) as Snagging[];
 
-  if (hookLoading && !propItems) {
-    return <div className="space-y-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-48 w-full" /></div>;
-  }
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [formDialogOpen, setFormDialogOpen] = useState(false);
@@ -88,6 +85,10 @@ export function SnaggingOverview({
   const [resolveDialogOpen, setResolveDialogOpen] = useState(false);
   const [resolveItem, setResolveItem] = useState<Snagging | null>(null);
   const [filter, setFilter] = useState<FilterType>("all");
+
+  if (hookLoading && !propItems) {
+    return <div className="space-y-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-48 w-full" /></div>;
+  }
 
   // Stats
   const stats = {

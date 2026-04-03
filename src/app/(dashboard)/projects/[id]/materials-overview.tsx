@@ -96,9 +96,6 @@ export function MaterialsOverview({
     };
   });
 
-  if (hookLoading && !propMaterials) {
-    return <div className="space-y-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-48 w-full" /></div>;
-  }
   // Role-based permissions
   const canManageMaterials = ["admin", "pm"].includes(userRole);
   const canApproveMaterials = ["admin", "pm", "client"].includes(userRole);
@@ -115,6 +112,10 @@ export function MaterialsOverview({
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
   const [approvalAction, setApprovalAction] = useState<"approve" | "reject">("approve");
   const [approvalMaterial, setApprovalMaterial] = useState<Material | null>(null);
+
+  if (hookLoading && !propMaterials) {
+    return <div className="space-y-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-48 w-full" /></div>;
+  }
 
   // OPTIMIZED: Memoize stats calculation to avoid recomputing on every render
   const stats = useMemo(() => ({

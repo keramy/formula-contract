@@ -75,9 +75,6 @@ export function TeamOverview({ projectId, assignments: propAssignments, canManag
   const { data: fetchedAssignments, isLoading: hookLoading } = useProjectAssignments(projectId);
   const assignments = (propAssignments ?? fetchedAssignments ?? []) as Assignment[];
 
-  if (hookLoading && !propAssignments) {
-    return <div className="space-y-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-48 w-full" /></div>;
-  }
   const router = useRouter();
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
@@ -210,6 +207,10 @@ export function TeamOverview({ projectId, assignments: propAssignments, canManag
       return acc;
     }, {} as Record<string, Assignment[]>),
   [assignments]);
+
+  if (hookLoading && !propAssignments) {
+    return <div className="space-y-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-48 w-full" /></div>;
+  }
 
   return (
     <div className="space-y-4">

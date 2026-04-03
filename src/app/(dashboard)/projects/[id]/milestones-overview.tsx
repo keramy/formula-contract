@@ -70,15 +70,16 @@ export function MilestonesOverview({
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  if (hookLoading && !propMilestones) {
-    return <div className="space-y-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-48 w-full" /></div>;
-  }
   const [isLoading, setIsLoading] = useState(false);
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [editItem, setEditItem] = useState<Milestone | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteItemId, setDeleteItemId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("cards"); // Default to cards view
+
+  if (hookLoading && !propMilestones) {
+    return <div className="space-y-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-48 w-full" /></div>;
+  }
 
   // Stats
   const stats = {

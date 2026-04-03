@@ -90,9 +90,6 @@ export function DrawingsOverview({ projectId, productionItems, drawings: propDra
   const { data: fetchedDrawings, isLoading: hookLoading } = useProjectDrawings(projectId);
   const drawings = (propDrawings ?? fetchedDrawings ?? []) as Drawing[];
 
-  if (hookLoading && !propDrawings) {
-    return <div className="space-y-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-48 w-full" /></div>;
-  }
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -116,6 +113,10 @@ export function DrawingsOverview({ projectId, productionItems, drawings: propDra
   // Bulk send state
   const [bulkSendDialogOpen, setBulkSendDialogOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);
+
+  if (hookLoading && !propDrawings) {
+    return <div className="space-y-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-48 w-full" /></div>;
+  }
 
   // Open the view sheet for an item
   const openViewSheet = (itemId: string) => {
