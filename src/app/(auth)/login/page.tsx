@@ -136,6 +136,7 @@ function LoginForm() {
                 <Label htmlFor="password" className="text-sm font-medium">Password</Label>
                 <Link
                   href="/forgot-password"
+                  prefetch={false}
                   className="text-sm text-muted-foreground hover:text-primary transition-colors"
                 >
                     Forgot password?

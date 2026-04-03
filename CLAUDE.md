@@ -180,8 +180,10 @@ SET search_path = public  -- REQUIRED!
 AS $$ ... $$;
 ```
 
-### RLS Helper Functions
+### RLS Helper Functions — MUST be SECURITY DEFINER
 `get_user_role()`, `is_assigned_to_project(uuid)`, `is_client_for_project(uuid)`, `is_admin()`
+
+**CRITICAL:** These functions MUST be `SECURITY DEFINER`. Without it, they execute as the `authenticated` role inside RLS policies, which triggers RLS on the tables they query, causing **infinite recursion** (`stack depth limit exceeded`). This was the root cause of a multi-hour production outage (Apr 3, 2026). Migration 059 fixed it. **Never recreate these functions without `SECURITY DEFINER`.** If you `CREATE OR REPLACE` them, always include `SECURITY DEFINER SET search_path = public`.
 
 ---
 
@@ -233,6 +235,8 @@ scope-items/{project_id}/{item_id}/image_1.jpg
     **PM assignment RLS fix migration 048** - `048_fix_pm_assignment_privilege_escalation.sql` — PMs can only manage assignments for projects they're already assigned to
     **CRM module migration 049 applied** - `049_crm_module.sql` — 6 tables, sequences, auto-code triggers, RLS, indexes, 3 admin views
     **CRM seed data migration 050 applied** - `050_crm_seed_data.sql` — 37 brands, 12 firms, 18 links, 5 opportunities
+    **RLS InitPlan fix migration 058 applied** - `058_fix_rls_initplan_notifications_users.sql` — notifications + users policies use (SELECT auth.uid())
+    **RLS recursion fix migration 059 applied** - `059_fix_rls_recursion_security_definer.sql` — get_user_role() and is_assigned_to_project() set to SECURITY DEFINER to prevent infinite recursion
 14. **Adjacent panel alignment** - Both header wrappers must set explicit `height` + `box-border`
 15. **Storage paths MUST start with `{projectId}/`** - Migration 040 enforces this via RLS
 16. **Use `useBreakpoint()` not `useIsMobile()`** - Old hook deprecated, use `use-media-query.ts`
@@ -245,6 +249,13 @@ scope-items/{project_id}/{item_id}/image_1.jpg
 29. **CRM access roles** - admin = read/write, management = read-only, others (including pm) = no access. Server actions use `requireCrmAccess(["admin"])` for writes, default `["admin", "management"]` for reads.
 30. **Supabase email templates must use `token_hash` not `ConfirmationURL`** - Custom SMTP (Resend) email templates must link to `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=recovery&next=/reset-password`. Never use `{{ .ConfirmationURL }}` — it routes through Supabase's `/verify` which uses hash fragments that server-side handlers can't read.
 31. **Auth callback handles both `code` and `token_hash`** - `/auth/callback/route.ts` supports PKCE code exchange AND token_hash OTP verification. `/auth/confirm/route.ts` is a secondary handler for the confirm path.
+42. **RLS helper functions MUST be SECURITY DEFINER** - `get_user_role()`, `is_assigned_to_project()`, `is_client_for_project()` must all be `SECURITY DEFINER`. Without it, they trigger RLS on the tables they query, causing `stack depth limit exceeded` (infinite recursion). This caused a production outage. See migration 059.
+43. **Check Postgres error logs FIRST when debugging** - Before optimizing code, check `Supabase Dashboard → Observability → Logs → Postgres` for ERROR-level entries. `stack depth limit exceeded`, `statement timeout`, etc. point directly to the root cause.
+44. **JWT metadata must include `name`** - Layout reads user name from `user.user_metadata.name`. When creating/updating users, always sync name to JWT metadata via `auth.admin.updateUserById()`. If missing, sidebar shows email prefix instead of full name.
+45. **`authenticated` role timeout is 8s by default** - Supabase sets `statement_timeout=8s` for the `authenticated` role. All app queries through PostgREST run under this timeout. Currently set to 30s (changed Apr 3, 2026). Monitor and consider reverting to 8s once query performance is optimized.
+46. **Shared request context pattern** - Use `getRequestContext()` from `server.ts` to resolve auth once per request. All server actions accept optional `ctx?: RequestContext` as last parameter. Dashboard creates context once, passes to all helpers.
+47. **No revalidatePath on project mutations** - Removed from scope-items, materials, reports, drawings, milestones, project-assignments. UI updates via `queryClient.invalidateQueries()` in components. Only CRM, Finance, Users still use revalidatePath.
+48. **Link prefetch={false} on dashboard** - All Link components in sidebar, dashboard page, and dashboard widgets must have `prefetch={false}` to prevent hidden route storms that overwhelm the DB.
 
 ### React Code Health (React Doctor score: 92/100)
 21. **Never define components inside other components** - Nested components get recreated every render, destroying state and killing performance. Extract to module scope or a separate file with explicit props.
