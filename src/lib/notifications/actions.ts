@@ -1,8 +1,6 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { revalidatePath } from "next/cache";
-
 export interface Notification {
   id: string;
   user_id: string;
@@ -85,7 +83,6 @@ export async function markAsRead(notificationId: string): Promise<{ success: boo
     return { success: false };
   }
 
-  revalidatePath("/");
   return { success: true };
 }
 
@@ -109,7 +106,6 @@ export async function markAllAsRead(): Promise<{ success: boolean }> {
     return { success: false };
   }
 
-  revalidatePath("/");
   return { success: true };
 }
 

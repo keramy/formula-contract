@@ -37,11 +37,14 @@ const statusConfig: Record<string, { variant: "info" | "success" | "warning" | "
 };
 
 // Safety wrapper — if a dashboard server action throws, return fallback instead of crashing the page
-async function safe<T>(promise: Promise<T>, fallback: T): Promise<T> {
+const failedHelpers: string[] = [];
+
+async function safe<T>(promise: Promise<T>, fallback: T, helperName?: string): Promise<T> {
   try {
     return await promise;
   } catch (error) {
-    console.error("[Dashboard] Data fetch failed:", error);
+    console.error(`[Dashboard] ${helperName || "Unknown"} failed:`, error);
+    if (helperName) failedHelpers.push(helperName);
     return fallback;
   }
 }
@@ -84,8 +87,8 @@ export default async function DashboardPage() {
   if (canSeeAllProjects) {
     // Admin/Management: See all projects (cached)
     const [cachedStats, cachedRecent] = await Promise.all([
-      safe(getCachedDashboardStats(), { projectCounts: { total: 0, active: 0, tender: 0, on_hold: 0, completed: 0, cancelled: 0, not_awarded: 0 }, clientCount: 0, userCount: 0 }),
-      safe(getCachedRecentProjects(), []),
+      safe(getCachedDashboardStats(), { projectCounts: { total: 0, active: 0, tender: 0, on_hold: 0, completed: 0, cancelled: 0, not_awarded: 0 }, clientCount: 0, userCount: 0 }, "getCachedDashboardStats"),
+      safe(getCachedRecentProjects(), [], "getCachedRecentProjects"),
     ]);
     projectCounts = cachedStats.projectCounts;
     clientCount = cachedStats.clientCount;
@@ -95,7 +98,8 @@ export default async function DashboardPage() {
     // PM/Production/Procurement: Only assigned projects
     const myStats = await safe(
       getMyDashboardStats(assignedProjectIds, ctx),
-      { projectCounts: { total: 0, tender: 0, active: 0, on_hold: 0, completed: 0, cancelled: 0, not_awarded: 0 }, recentProjects: [] }
+      { projectCounts: { total: 0, tender: 0, active: 0, on_hold: 0, completed: 0, cancelled: 0, not_awarded: 0 }, recentProjects: [] },
+      "getMyDashboardStats"
     );
     projectCounts = myStats.projectCounts;
     recentProjects = myStats.recentProjects;
@@ -115,39 +119,39 @@ export default async function DashboardPage() {
   const emptyThisWeek = { itemsCompletedThisWeek: 0, reportsPublishedThisWeek: 0, upcomingMilestones: 0, milestonesOverdue: 0 };
   const emptyProjectsStatus = { tender: 0, active: 0, on_hold: 0, completed: 0, cancelled: 0, not_awarded: 0, total: 0 };
 
-  // PERF: Staged execution — max 2 concurrent PostgREST requests per stage.
+  // PERF: Staged execution — batched PostgREST requests per stage.
   // Before: 6-10 parallel queries overwhelmed PostgREST on Small compute.
-  // After: 3 sequential stages of 2 queries each.
+  // After: 3 sequential stages (2, 3, and 5 queries respectively).
 
   // Stage 1: Core widgets (tasks + at-risk)
   const [tasksData, atRiskData] = await Promise.all([
     (userRole === "pm" || canSeeAllProjects)
-      ? safe(getMyTasks(userRole === "pm" ? assignedProjectIds : undefined, ctx), emptyTasks)
+      ? safe(getMyTasks(userRole === "pm" ? assignedProjectIds : undefined, ctx), emptyTasks, "getMyTasks")
       : Promise.resolve(emptyTasks),
     (canSeeAllProjects || userRole === "pm")
-      ? safe(getAtRiskProjects(userRole === "pm" ? assignedProjectIds : undefined, ctx), [])
+      ? safe(getAtRiskProjects(userRole === "pm" ? assignedProjectIds : undefined, ctx), [], "getAtRiskProjects")
       : Promise.resolve([]),
   ]);
 
   // Stage 2: Role-specific widgets
   const [pendingApprovalsData, clientProjectsData, milestonesData] = await Promise.all([
-    isClient ? safe(getPendingApprovals(userId, ctx), []) : Promise.resolve([]),
-    isClient ? safe(getClientProjectProgress(userId, ctx), []) : Promise.resolve([]),
+    isClient ? safe(getPendingApprovals(userId, ctx), [], "getPendingApprovals") : Promise.resolve([]),
+    isClient ? safe(getClientProjectProgress(userId, ctx), [], "getClientProjectProgress") : Promise.resolve([]),
     !isClient
-      ? safe(getDashboardMilestones(userRole === "pm" ? assignedProjectIds : undefined, ctx), [])
+      ? safe(getDashboardMilestones(userRole === "pm" ? assignedProjectIds : undefined, ctx), [], "getDashboardMilestones")
       : Promise.resolve([]),
   ]);
 
   // Stage 3: Secondary widgets
   const [productionQueueData, procurementQueueData, financialData, thisWeekData, projectsStatusData] = await Promise.all([
-    isProduction ? safe(getProductionQueue(ctx), emptyProductionQueue) : Promise.resolve(emptyProductionQueue),
-    isProcurement ? safe(getProcurementQueue(ctx), emptyProcurementQueue) : Promise.resolve(emptyProcurementQueue),
-    canSeeAllProjects ? safe(getFinancialOverview(ctx), emptyFinancial) : Promise.resolve(emptyFinancial),
+    isProduction ? safe(getProductionQueue(ctx), emptyProductionQueue, "getProductionQueue") : Promise.resolve(emptyProductionQueue),
+    isProcurement ? safe(getProcurementQueue(ctx), emptyProcurementQueue, "getProcurementQueue") : Promise.resolve(emptyProcurementQueue),
+    canSeeAllProjects ? safe(getFinancialOverview(ctx), emptyFinancial, "getFinancialOverview") : Promise.resolve(emptyFinancial),
     (canSeeAllProjects || userRole === "pm")
-      ? safe(getThisWeekSummary(userRole === "pm" ? assignedProjectIds : undefined, ctx), emptyThisWeek)
+      ? safe(getThisWeekSummary(userRole === "pm" ? assignedProjectIds : undefined, ctx), emptyThisWeek, "getThisWeekSummary")
       : Promise.resolve(emptyThisWeek),
     canSeeAllProjects
-      ? safe(getProjectsByStatus(ctx), emptyProjectsStatus)
+      ? safe(getProjectsByStatus(ctx), emptyProjectsStatus, "getProjectsByStatus")
       : Promise.resolve(emptyProjectsStatus),
   ]);
 
@@ -160,6 +164,11 @@ export default async function DashboardPage() {
     return (
       <div className="min-h-screen bg-background">
         <div className="p-4 md:p-6 space-y-5">
+          {process.env.NODE_ENV === "development" && failedHelpers.length > 0 && (
+            <div className="mb-4 rounded-lg border border-amber-500/50 bg-amber-50 p-3 text-sm text-amber-800">
+              <strong>Dev Warning:</strong> {failedHelpers.length} dashboard helper(s) failed: {failedHelpers.join(", ")}
+            </div>
+          )}
           <DashboardHeader userName={userName} />
 
           <div className="grid gap-5">
@@ -194,6 +203,11 @@ export default async function DashboardPage() {
   return (
     <div className="min-h-screen bg-background relative">
       <div className="p-4 md:p-6 space-y-5 pb-16">
+        {process.env.NODE_ENV === "development" && failedHelpers.length > 0 && (
+          <div className="mb-4 rounded-lg border border-amber-500/50 bg-amber-50 p-3 text-sm text-amber-800">
+            <strong>Dev Warning:</strong> {failedHelpers.length} dashboard helper(s) failed: {failedHelpers.join(", ")}
+          </div>
+        )}
         <DashboardHeader userName={userName} />
 
         {/* Top Section: Layout varies by role */}

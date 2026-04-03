@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { UsersTable } from "./users-table";
 import { UsersPageHeader } from "./users-page-header";
 import { TeamMembersCard } from "@/components/users/team-members-card";
+import { AlertTriangleIcon } from "lucide-react";
 
 interface User {
   id: string;
@@ -42,6 +43,16 @@ export default async function UsersPage({
 
   if (error) {
     console.error("Error fetching users:", error);
+    return (
+      <div className="p-4 md:p-6 space-y-6">
+        <UsersPageHeader />
+        <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-6 text-center">
+          <AlertTriangleIcon className="size-8 text-destructive mx-auto mb-2" />
+          <h3 className="font-medium text-destructive">Failed to load users</h3>
+          <p className="text-sm text-muted-foreground mt-1">{error.message || "An unexpected error occurred"}</p>
+        </div>
+      </div>
+    );
   }
 
   const allUsers = (users || []) as User[];

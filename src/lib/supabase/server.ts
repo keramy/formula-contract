@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createServerClient } from "@supabase/ssr";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
@@ -126,16 +127,22 @@ export interface RequestContext {
 }
 
 /**
- * Resolve auth context once per request.
+ * Resolve auth context once per request tree (layout + page + components).
+ * Wrapped in React cache() so multiple calls in the same request return the same result.
  * Pass the returned context to server action helpers to avoid redundant auth calls.
+ *
+ * Usage pattern:
+ * - Server-rendered hot paths (layout, page): always call this and pass ctx to helpers
+ * - Client-triggered server actions (React Query hooks): omit ctx, action falls back internally
+ * - Never call auth.getUser() directly in new hot-path code — use this instead
  */
-export async function getRequestContext(): Promise<RequestContext | null> {
+export const getRequestContext = cache(async (): Promise<RequestContext | null> => {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
   const role = await getUserRoleFromJWT(user, supabase);
   return { supabase, user, role };
-}
+});
 
 /**
  * Creates a Supabase service role client for server-side operations.

@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { ClientsTable } from "./clients-table";
 import { ClientsPageHeader } from "./clients-page-header";
+import { AlertTriangleIcon } from "lucide-react";
 
 export default async function ClientsPage({
   searchParams,
@@ -26,6 +27,16 @@ export default async function ClientsPage({
 
   if (error) {
     console.error("Error fetching clients:", error);
+    return (
+      <div className="p-4 md:p-6">
+        <ClientsPageHeader />
+        <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-6 text-center">
+          <AlertTriangleIcon className="size-8 text-destructive mx-auto mb-2" />
+          <h3 className="font-medium text-destructive">Failed to load clients</h3>
+          <p className="text-sm text-muted-foreground mt-1">{error.message || "An unexpected error occurred"}</p>
+        </div>
+      </div>
+    );
   }
 
   return (

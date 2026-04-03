@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { createClient, getUserRoleFromJWT } from "@/lib/supabase/server";
 import { ProjectsListClient } from "./projects-list-client";
 import { ProjectsPageHeader } from "./projects-page-header";
+import { AlertTriangleIcon } from "lucide-react";
 
 interface Project {
   id: string;
@@ -82,6 +83,20 @@ export default async function ProjectsPage() {
 
   if (error) {
     console.error("Error fetching projects:", error);
+    return (
+      <div className="p-6">
+        <ProjectsPageHeader
+          title="Projects"
+          subtitle="Manage your furniture manufacturing projects"
+          canCreateProject={canCreateProject}
+        />
+        <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-6 text-center">
+          <AlertTriangleIcon className="size-8 text-destructive mx-auto mb-2" />
+          <h3 className="font-medium text-destructive">Failed to load projects</h3>
+          <p className="text-sm text-muted-foreground mt-1">{error.message || "An unexpected error occurred"}</p>
+        </div>
+      </div>
+    );
   }
 
   // ============================================================================
