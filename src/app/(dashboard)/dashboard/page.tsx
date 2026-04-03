@@ -115,45 +115,37 @@ export default async function DashboardPage() {
   const emptyThisWeek = { itemsCompletedThisWeek: 0, reportsPublishedThisWeek: 0, upcomingMilestones: 0, milestonesOverdue: 0 };
   const emptyProjectsStatus = { tender: 0, active: 0, on_hold: 0, completed: 0, cancelled: 0, not_awarded: 0, total: 0 };
 
-  const [
-    tasksData,
-    atRiskData,
-    pendingApprovalsData,
-    clientProjectsData,
-    milestonesData,
-    productionQueueData,
-    procurementQueueData,
-    financialData,
-    thisWeekData,
-    projectsStatusData,
-  ] = await Promise.all([
-    // My Tasks - PM and Admin only
+  // PERF: Staged execution — max 2 concurrent PostgREST requests per stage.
+  // Before: 6-10 parallel queries overwhelmed PostgREST on Small compute.
+  // After: 3 sequential stages of 2 queries each.
+
+  // Stage 1: Core widgets (tasks + at-risk)
+  const [tasksData, atRiskData] = await Promise.all([
     (userRole === "pm" || canSeeAllProjects)
       ? safe(getMyTasks(userRole === "pm" ? assignedProjectIds : undefined, ctx), emptyTasks)
       : Promise.resolve(emptyTasks),
-    // At-Risk Projects - admin/management/pm
     (canSeeAllProjects || userRole === "pm")
       ? safe(getAtRiskProjects(userRole === "pm" ? assignedProjectIds : undefined, ctx), [])
       : Promise.resolve([]),
-    // Pending Approvals - Client only
+  ]);
+
+  // Stage 2: Role-specific widgets
+  const [pendingApprovalsData, clientProjectsData, milestonesData] = await Promise.all([
     isClient ? safe(getPendingApprovals(userId, ctx), []) : Promise.resolve([]),
-    // Client Project Progress - Client only
     isClient ? safe(getClientProjectProgress(userId, ctx), []) : Promise.resolve([]),
-    // Upcoming Milestones - non-client users
     !isClient
       ? safe(getDashboardMilestones(userRole === "pm" ? assignedProjectIds : undefined, ctx), [])
       : Promise.resolve([]),
-    // Production Queue - Production role
+  ]);
+
+  // Stage 3: Secondary widgets
+  const [productionQueueData, procurementQueueData, financialData, thisWeekData, projectsStatusData] = await Promise.all([
     isProduction ? safe(getProductionQueue(ctx), emptyProductionQueue) : Promise.resolve(emptyProductionQueue),
-    // Procurement Queue - Procurement role
     isProcurement ? safe(getProcurementQueue(ctx), emptyProcurementQueue) : Promise.resolve(emptyProcurementQueue),
-    // Financial Overview - Admin/Management only
     canSeeAllProjects ? safe(getFinancialOverview(ctx), emptyFinancial) : Promise.resolve(emptyFinancial),
-    // This Week Summary - Admin/Management/PM
     (canSeeAllProjects || userRole === "pm")
       ? safe(getThisWeekSummary(userRole === "pm" ? assignedProjectIds : undefined, ctx), emptyThisWeek)
       : Promise.resolve(emptyThisWeek),
-    // Projects by Status Chart - Admin/Management only
     canSeeAllProjects
       ? safe(getProjectsByStatus(ctx), emptyProjectsStatus)
       : Promise.resolve(emptyProjectsStatus),

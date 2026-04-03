@@ -1,43 +1,27 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getRequestContext } from "@/lib/supabase/server";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { CommandMenu } from "@/components/layout/command-menu";
 import { AppHeader, PageHeaderProvider } from "@/components/layout/app-header";
 import { ErrorBoundary } from "@/components/error-boundary";
 
-interface UserProfile {
-  id: string;
-  email: string;
-  name: string;
-  role: string;
-}
-
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  // PERF: Use JWT metadata only — no DB query for profile.
+  // The old pattern queried the users table on every page render,
+  // which was timing out on Small compute and showing "User" as fallback.
+  const ctx = await getRequestContext();
+  if (!ctx) redirect("/login");
 
-  if (!user) {
-    redirect("/login");
-  }
-
-  // Get user profile
-  let profile: UserProfile | null = null;
-  const { data } = await supabase
-    .from("users")
-    .select("id, email, name, role")
-    .eq("id", user.id)
-    .single();
-  profile = data as UserProfile | null;
-
+  const { user, role } = ctx;
   const userData = {
-    name: profile?.name || user.email || "User",
+    name: user.user_metadata?.name || user.email?.split("@")[0] || "User",
     email: user.email || "",
-    role: profile?.role || "user",
+    role: role,
   };
 
   return (
