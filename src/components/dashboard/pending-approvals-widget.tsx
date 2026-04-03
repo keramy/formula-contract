@@ -110,7 +110,7 @@ export function PendingApprovalsWidget({ approvals }: PendingApprovalsWidgetProp
         {approvals.length > 5 && (
           <div className="text-center pt-2">
             <Button variant="outline" size="sm" asChild>
-              <Link href="/projects">
+              <Link href="/projects" prefetch={false}>
                 View all {approvals.length} items
                 <ArrowRightIcon className="size-4 ml-1" />
               </Link>

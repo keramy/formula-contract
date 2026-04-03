@@ -60,7 +60,7 @@ export function ClientProjectProgressWidget({ projects }: ClientProjectProgressP
             </Badge>
           </div>
           <Button variant="ghost" size="sm" asChild>
-            <Link href="/projects">
+            <Link href="/projects" prefetch={false}>
               View all
               <ArrowRightIcon className="size-4 ml-1" />
             </Link>

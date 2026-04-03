@@ -271,6 +271,7 @@ export default async function DashboardPage() {
                     <Link
                       key={project.id}
                       href={`/projects/${project.slug || project.id}`}
+                      prefetch={false}
                       className="group block p-3 rounded-lg bg-base-50/50 hover:bg-primary/5 border border-transparent hover:border-primary/20 transition-all"
                     >
                       <div className="flex flex-col gap-1">
@@ -346,7 +347,7 @@ export default async function DashboardPage() {
                   </span>
                 )}
               </div>
-              <Link href="/projects" className="text-xs text-primary hover:text-primary/80 font-medium">
+              <Link href="/projects" prefetch={false} className="text-xs text-primary hover:text-primary/80 font-medium">
                 View all →
               </Link>
             </div>

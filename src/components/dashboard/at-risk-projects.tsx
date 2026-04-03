@@ -70,7 +70,7 @@ export function AtRiskProjects({ projects }: AtRiskProjectsProps) {
             </Badge>
           </div>
           <Button variant="ghost" size="sm" asChild>
-            <Link href="/projects?status=active">
+            <Link href="/projects?status=active" prefetch={false}>
               View all
               <ArrowRightIcon className="size-4 ml-1" />
             </Link>
