@@ -236,6 +236,7 @@ scope-items/{project_id}/{item_id}/image_1.jpg
     **CRM seed data migration 050 applied** - `050_crm_seed_data.sql` — 37 brands, 12 firms, 18 links, 5 opportunities
     **RLS InitPlan fix migration 058 applied** - `058_fix_rls_initplan_notifications_users.sql` — notifications + users policies use (SELECT auth.uid())
     **RLS recursion fix migration 059 applied** - `059_fix_rls_recursion_security_definer.sql` — get_user_role() and is_assigned_to_project() set to SECURITY DEFINER to prevent infinite recursion
+    **Auto-assign creator migration 060 applied** - `060_auto_assign_project_creator.sql` — SECURITY DEFINER trigger on projects INSERT auto-assigns creator to project_assignments. Bypasses RLS chicken-and-egg (PM can't assign to project they're not on yet)
 14. **Adjacent panel alignment** - Both header wrappers must set explicit `height` + `box-border`
 15. **Storage paths MUST start with `{projectId}/`** - Migration 040 enforces this via RLS
 16. **Use `useBreakpoint()` not `useIsMobile()`** - Old hook deprecated, use `use-media-query.ts`
@@ -255,6 +256,7 @@ scope-items/{project_id}/{item_id}/image_1.jpg
 46. **Shared request context pattern** - Use `getRequestContext()` from `server.ts` to resolve auth once per request. All server actions accept optional `ctx?: RequestContext` as last parameter. Dashboard creates context once, passes to all helpers. Server-rendered hot paths should always pass `ctx`; client-triggered server actions may omit it (they create their own). No new hot-path helper should call `auth.getUser()` if `ctx` is available.
 47. **No revalidatePath on project mutations** - Removed from scope-items, materials, reports, drawings, milestones, project-assignments. UI updates via `queryClient.invalidateQueries()` in components. Only CRM, Finance, Users still use revalidatePath.
 48. **Link prefetch={false} on dashboard** - All Link components in sidebar, dashboard page, and dashboard widgets must have `prefetch={false}` to prevent hidden route storms that overwhelm the DB.
+49. **Project creator is auto-assigned** - Migration 060 adds an `AFTER INSERT` trigger on `projects` that auto-inserts the creator into `project_assignments` (SECURITY DEFINER, bypasses RLS). The wizard passes `created_by: authUser.id` in the insert payload. Other team members are assigned separately via `assignUserToProject()` which now passes RLS because the creator is already assigned.
 
 ### React Code Health (React Doctor score: 96/100)
 21. **Never define components inside other components** - Nested components get recreated every render, destroying state and killing performance. Extract to module scope or a separate file with explicit props.

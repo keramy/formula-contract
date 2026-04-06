@@ -55,6 +55,7 @@ interface ProjectWizardProps {
   clients: Client[];
   users: User[];
   userRole: string;
+  currentUserId: string;
 }
 
 const STEPS = [
@@ -64,7 +65,7 @@ const STEPS = [
   { title: "Review", description: "Confirm and create" },
 ];
 
-export function ProjectWizard({ clients, users, userRole }: ProjectWizardProps) {
+export function ProjectWizard({ clients, users, userRole, currentUserId }: ProjectWizardProps) {
   const isAdmin = userRole === "admin";
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
@@ -107,8 +108,10 @@ export function ProjectWizard({ clients, users, userRole }: ProjectWizardProps) 
     phone: "",
   });
 
-  // Team assignment
-  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  // Team assignment — pre-select the creating user
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>(
+    currentUserId ? [currentUserId] : []
+  );
   const [teamSearch, setTeamSearch] = useState("");
 
   const handleChange = (field: string, value: string) => {
@@ -156,12 +159,16 @@ export function ProjectWizard({ clients, users, userRole }: ProjectWizardProps) 
         clientId = newClient.id;
       }
 
+      // Get current user for created_by (triggers auto-assignment via DB trigger)
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+
       // Create project
       const projectData: ProjectInsert = {
         project_code: sanitizeText(formData.project_code),
         name: sanitizeText(formData.name),
         description: formData.description ? sanitizeText(formData.description) : null,
         client_id: clientId,
+        created_by: authUser?.id ?? null,
         status: formData.status as ProjectStatus,
         installation_date: formData.installation_date || null,
         contract_value_manual: formData.contract_value_manual
@@ -183,10 +190,13 @@ export function ProjectWizard({ clients, users, userRole }: ProjectWizardProps) 
         throw projectError;
       }
 
-      // Assign team members (uses server action — sends email + notification)
-      if (selectedUserIds.length > 0) {
+      // Assign additional team members (uses server action — sends email + notification)
+      // Note: The creator is already assigned by the DB trigger (migration 060),
+      // so we only need to assign OTHER selected team members here.
+      const otherMembers = selectedUserIds.filter((id) => id !== currentUserId);
+      if (otherMembers.length > 0) {
         await Promise.all(
-          selectedUserIds.map((userId) =>
+          otherMembers.map((userId) =>
             assignUserToProject(newProject.id, userId).catch((err) =>
               console.error(`Failed to assign user ${userId}:`, err)
             )

@@ -38,7 +38,7 @@ export default async function NewProjectPage() {
       </div>
 
       {/* Multi-Step Wizard */}
-      <ProjectWizard clients={clients || []} users={users || []} userRole={profile?.role || "pm"} />
+      <ProjectWizard clients={clients || []} users={users || []} userRole={profile?.role || "pm"} currentUserId={user?.id || ""} />
     </div>
   );
 }
