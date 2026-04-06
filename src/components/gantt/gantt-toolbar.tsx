@@ -14,6 +14,7 @@ import {
   PlusIcon,
   LayoutGridIcon,
   LinkIcon,
+  Link2Icon,
   CalendarIcon,
   ZoomInIcon,
   ZoomOutIcon,
@@ -52,6 +53,9 @@ interface GanttToolbarProps {
   onGridToggle: () => void;
   showDependencies: boolean;
   onDependenciesToggle: () => void;
+  linkMode?: boolean;
+  onLinkModeToggle?: () => void;
+  linkSourceId?: string | null;
   onAddItem?: () => void;
   onIndent?: () => void;
   onOutdent?: () => void;
@@ -88,6 +92,9 @@ export function GanttToolbar({
   onGridToggle,
   showDependencies,
   onDependenciesToggle,
+  linkMode,
+  onLinkModeToggle,
+  linkSourceId,
   onAddItem,
   onIndent,
   onOutdent,
@@ -142,6 +149,35 @@ export function GanttToolbar({
           <PlusIcon className="size-3.5" />
           Add Task
         </Button>
+      )}
+
+      {/* Link Mode — create dependency by clicking two bars */}
+      {onLinkModeToggle && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant={linkMode ? "default" : "outline"}
+              size="sm"
+              onClick={onLinkModeToggle}
+              className={cn(
+                "h-7 gap-1.5 text-xs",
+                linkMode && "animate-pulse"
+              )}
+            >
+              <Link2Icon className="size-3.5" />
+              {linkMode
+                ? linkSourceId
+                  ? "Select target..."
+                  : "Select source..."
+                : "Link Tasks"}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            {linkMode
+              ? "Click two tasks to create a dependency (ESC to cancel)"
+              : "Enter link mode to create dependencies between tasks"}
+          </TooltipContent>
+        </Tooltip>
       )}
 
       {/* Indent / Outdent — shown when 1 task is selected */}

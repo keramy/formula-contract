@@ -20,6 +20,10 @@ export interface GanttState {
   searchQuery: string;
   activeBaselineId: string | null;
 
+  // Link mode (dependency creation)
+  linkMode: boolean;
+  linkSourceId: string | null;
+
   // Selection & collapse
   selectedIds: Set<string>;
   collapsedIds: Set<string>;
@@ -38,6 +42,11 @@ export interface GanttActions {
   toggleCriticalPath: () => void;
   setSearchQuery: (query: string) => void;
   setActiveBaselineId: (id: string | null) => void;
+
+  // Link mode
+  toggleLinkMode: () => void;
+  setLinkSourceId: (id: string | null) => void;
+  exitLinkMode: () => void;
 
   selectItem: (id: string, e: React.MouseEvent) => void;
   clearSelection: () => void;
@@ -60,22 +69,30 @@ export function useGanttState(
   const [showCriticalPath, setShowCriticalPath] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [activeBaselineId, setActiveBaselineId] = React.useState<string | null>(null);
+  const [linkMode, setLinkMode] = React.useState(false);
+  const [linkSourceId, setLinkSourceId] = React.useState<string | null>(null);
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const [collapsedIds, setCollapsedIds] = React.useState<Set<string>>(new Set());
   const [scrollTop, setScrollTop] = React.useState(0);
 
   const zoomLevel = ZOOM_LEVELS[zoomIndex];
 
-  // Escape key clears selection
+  // Escape key clears selection and exits link mode
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && selectedIds.size > 0) {
-        setSelectedIds(new Set());
+      if (e.key === "Escape") {
+        if (linkMode) {
+          setLinkMode(false);
+          setLinkSourceId(null);
+        }
+        if (selectedIds.size > 0) {
+          setSelectedIds(new Set());
+        }
       }
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [selectedIds.size]);
+  }, [selectedIds.size, linkMode]);
 
   const selectItem = React.useCallback(
     (id: string, e: React.MouseEvent) => {
@@ -134,6 +151,8 @@ export function useGanttState(
     showCriticalPath,
     searchQuery,
     activeBaselineId,
+    linkMode,
+    linkSourceId,
     selectedIds,
     collapsedIds,
     scrollTop,
@@ -154,6 +173,17 @@ export function useGanttState(
     toggleCriticalPath: React.useCallback(() => setShowCriticalPath((v) => !v), []),
     setSearchQuery,
     setActiveBaselineId,
+    toggleLinkMode: React.useCallback(() => {
+      setLinkMode((v) => {
+        if (v) setLinkSourceId(null); // exiting → clear source
+        return !v;
+      });
+    }, []),
+    setLinkSourceId,
+    exitLinkMode: React.useCallback(() => {
+      setLinkMode(false);
+      setLinkSourceId(null);
+    }, []),
     selectItem,
     clearSelection: React.useCallback(() => setSelectedIds(new Set()), []),
     toggleCollapse,

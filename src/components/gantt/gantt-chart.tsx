@@ -108,6 +108,8 @@ export function GanttChart({
     zoomLevel,
     showGrid,
     showDependencies,
+    linkMode,
+    linkSourceId,
     selectedIds,
     collapsedIds,
     scrollTop,
@@ -115,6 +117,9 @@ export function GanttChart({
     setViewMode,
     toggleGrid,
     toggleDependencies,
+    toggleLinkMode,
+    setLinkSourceId,
+    exitLinkMode,
     selectItem,
     clearSelection,
     toggleCollapse,
@@ -321,6 +326,36 @@ export function GanttChart({
   }, [selectedItemsOrdered, ganttRows, itemMap, onItemParentChange]);
 
   // ---------------------------------------------------------------------------
+  // Link mode: click bar → set source, click second bar → open dialog
+  // ---------------------------------------------------------------------------
+  const handleLinkModeClick = React.useCallback(
+    (item: GanttItem) => {
+      if (!linkMode) return;
+      const itemId = item.id;
+
+      if (!linkSourceId) {
+        // First click → set source
+        setLinkSourceId(itemId);
+      } else if (itemId === linkSourceId) {
+        // Clicked same item → deselect source
+        setLinkSourceId(null);
+      } else {
+        // Second click → open dependency dialog
+        const source = itemMap.get(linkSourceId) ?? null;
+        const target = itemMap.get(itemId) ?? null;
+        if (source && target) {
+          setLinkSource(source);
+          setLinkTarget(target);
+          setSelectedDep(null);
+          setDepDialogOpen(true);
+        }
+        exitLinkMode();
+      }
+    },
+    [linkMode, linkSourceId, itemMap, setLinkSourceId, exitLinkMode]
+  );
+
+  // ---------------------------------------------------------------------------
   // Dependency dialog state
   // ---------------------------------------------------------------------------
   const [depDialogOpen, setDepDialogOpen] = React.useState(false);
@@ -413,6 +448,9 @@ export function GanttChart({
           onGridToggle={toggleGrid}
           showDependencies={showDependencies}
           onDependenciesToggle={toggleDependencies}
+          linkMode={linkMode}
+          onLinkModeToggle={onCreateDependency ? toggleLinkMode : undefined}
+          linkSourceId={linkSourceId}
           onAddItem={showAddButton ? onAddItem : undefined}
           onIndent={canIndent ? handleIndent : undefined}
           onOutdent={canOutdent ? handleOutdent : undefined}
@@ -466,7 +504,10 @@ export function GanttChart({
               selectedIds={selectedIds}
               dependencies={dependencies}
               onItemDoubleClick={handleDoubleClick}
+              onItemClick={linkMode ? handleLinkModeClick : undefined}
               onDependencyClick={onUpdateDependency ? handleDependencyClick : undefined}
+              linkMode={linkMode}
+              linkSourceId={linkSourceId}
               baselineItems={ganttState.activeBaselineId ? baselineItems : undefined}
               scrollRef={scrollRef}
               onScroll={handleTimelineScroll}

@@ -37,7 +37,10 @@ export interface GanttBarProps {
   baselineLeft?: number;
   baselineWidth?: number;
   onDoubleClick?: (item: GanttItem) => void;
+  onClick?: (item: GanttItem) => void;
   onContextMenu?: (e: React.MouseEvent, item: GanttItem) => void;
+  linkMode?: boolean;
+  isLinkSource?: boolean;
 }
 
 export function GanttBar({
@@ -54,7 +57,10 @@ export function GanttBar({
   baselineLeft,
   baselineWidth,
   onDoubleClick,
+  onClick,
   onContextMenu,
+  linkMode,
+  isLinkSource,
 }: GanttBarProps) {
   const barTop = y + (ROW_HEIGHT - TASK_BAR_HEIGHT) / 2;
 
@@ -62,6 +68,17 @@ export function GanttBar({
   const isCritical = item.isOnCriticalPath;
   const dimmed = showCriticalPath && !isCritical;
   const effectiveColor = showCriticalPath && isCritical ? "#dc2626" : color;
+
+  // Link mode: handle single-click to select source/target
+  const handleClick = React.useCallback(
+    (e: React.MouseEvent) => {
+      if (linkMode && onClick) {
+        e.stopPropagation();
+        onClick(item);
+      }
+    },
+    [linkMode, onClick, item]
+  );
 
   // Track mouse X for tooltip positioning
   const [mouseX, setMouseX] = React.useState(0);
@@ -81,13 +98,16 @@ export function GanttBar({
             className={cn(
               "absolute flex items-center gap-1.5 select-none z-10 cursor-pointer",
               isSelected && "ring-1 ring-primary/50 rounded-sm",
-              dimmed && "opacity-25"
+              dimmed && "opacity-25",
+              linkMode && "cursor-crosshair",
+              isLinkSource && "ring-2 ring-blue-500 ring-offset-1 rounded-sm"
             )}
             style={{
               left: left - 7,
               top: barTop,
               height: TASK_BAR_HEIGHT,
             }}
+            onClick={handleClick}
             onDoubleClick={() => onDoubleClick?.(item)}
             onContextMenu={(e) => onContextMenu?.(e, item)}
           >
@@ -177,7 +197,9 @@ export function GanttBar({
               isSelected && "ring-1 ring-primary/70",
               "cursor-pointer",
               isDeep ? "border border-dashed bg-transparent" : "overflow-hidden",
-              dimmed && "opacity-25"
+              dimmed && "opacity-25",
+              linkMode && "cursor-crosshair hover:ring-2 hover:ring-blue-400/60",
+              isLinkSource && "ring-2 ring-blue-500 ring-offset-1"
             )}
             style={{
               left,
@@ -188,6 +210,7 @@ export function GanttBar({
                 ? { borderColor: `${effectiveColor}b3` }
                 : { backgroundColor: `${effectiveColor}${bgAlpha}` }),
             }}
+            onClick={handleClick}
             onDoubleClick={() => onDoubleClick?.(item)}
             onKeyDown={(e) => { if (e.key === "Enter") onDoubleClick?.(item); }}
             onContextMenu={(e) => onContextMenu?.(e, item)}
@@ -215,6 +238,14 @@ export function GanttBar({
               <span className="absolute inset-0 flex items-center justify-center text-[10px] font-semibold text-white mix-blend-difference pointer-events-none">
                 {Math.round(progress)}%
               </span>
+            )}
+
+            {/* Link mode connection dots on bar edges */}
+            {linkMode && (
+              <>
+                <div className="absolute -left-[4px] top-1/2 -translate-y-1/2 size-[8px] rounded-full bg-blue-500 border-2 border-white shadow-sm pointer-events-none z-20" />
+                <div className="absolute -right-[4px] top-1/2 -translate-y-1/2 size-[8px] rounded-full bg-blue-500 border-2 border-white shadow-sm pointer-events-none z-20" />
+              </>
             )}
 
           </div>

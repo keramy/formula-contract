@@ -40,7 +40,10 @@ interface GanttTimelineProps {
   selectedIds: Set<string>;
   dependencies: GanttDependency[];
   onItemDoubleClick: (item: GanttItem) => void;
+  onItemClick?: (item: GanttItem) => void;
   onDependencyClick?: (dep: GanttDependency) => void;
+  linkMode?: boolean;
+  linkSourceId?: string | null;
   baselineItems?: { gantt_item_id: string; start_date: string; end_date: string }[];
   scrollRef: React.RefObject<HTMLDivElement | null>;
   onScroll: (e: React.UIEvent) => void;
@@ -58,7 +61,10 @@ export function GanttTimeline({
   selectedIds,
   dependencies,
   onItemDoubleClick,
+  onItemClick,
   onDependencyClick,
+  linkMode,
+  linkSourceId,
   baselineItems,
   scrollRef,
   onScroll,
@@ -194,6 +200,9 @@ export function GanttTimeline({
                 baselineLeft={baselineMap?.get(row.id)?.left}
                 baselineWidth={baselineMap?.get(row.id)?.width}
                 onDoubleClick={onItemDoubleClick}
+                onClick={onItemClick}
+                linkMode={linkMode}
+                isLinkSource={linkMode && linkSourceId === row.id}
               />
             );
           })}

@@ -11,8 +11,8 @@ import {
 } from "./gantt-types";
 
 // ============================================================================
-// GANTT DEPENDENCY ARROWS — SVG overlay with rounded-corner paths
-// Figma: gray for FS, blue for SS, single continuous path, 8px radius corners
+// GANTT DEPENDENCY ARROWS — Animated SVG overlay with smooth bezier paths
+// Features: draw-in animation, hover glow, rounded corners, click detection
 // ============================================================================
 
 interface GanttDependencyArrowsProps {
@@ -42,6 +42,30 @@ export function GanttDependencyArrows({
       width={containerWidth}
       height={containerHeight}
     >
+      {/* CSS animations for arrow draw-in and hover effects */}
+      <style>{`
+        @keyframes gantt-draw-in {
+          from { stroke-dashoffset: var(--path-length); }
+          to   { stroke-dashoffset: 0; }
+        }
+        .gantt-arrow-path {
+          animation: gantt-draw-in 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+          stroke-dasharray: var(--path-length);
+          stroke-dashoffset: var(--path-length);
+        }
+        .gantt-arrow-group:hover .gantt-arrow-visible {
+          stroke-width: 2.5;
+          filter: drop-shadow(0 0 4px var(--arrow-color));
+          transition: stroke-width 0.2s ease, filter 0.2s ease;
+        }
+        .gantt-arrow-group:hover .gantt-arrow-hit {
+          cursor: pointer;
+        }
+        .gantt-arrow-visible {
+          transition: stroke-width 0.2s ease, filter 0.2s ease, opacity 0.3s ease;
+        }
+      `}</style>
+
       <defs>
         {([0, 1, 2, 3] as DependencyType[]).map((type) => (
           <marker
@@ -70,26 +94,34 @@ export function GanttDependencyArrows({
         if (!path) return null;
 
         const color = DEPENDENCY_COLORS[dep.type];
+        const pathLength = estimatePathLength(dep.type, source, target);
 
         return (
-          <g key={dep.id}>
+          <g
+            key={dep.id}
+            className="gantt-arrow-group"
+            style={{ "--arrow-color": color } as React.CSSProperties}
+          >
             {/* Wide invisible click target */}
             <path
               d={path}
               fill="none"
               stroke="transparent"
               strokeWidth={14}
-              className="pointer-events-auto cursor-pointer"
+              className="pointer-events-auto gantt-arrow-hit cursor-pointer"
               onClick={() => onDependencyClick?.(dep)}
             />
-            {/* Visible arrow */}
+            {/* Animated visible arrow */}
             <path
               d={path}
               fill="none"
               stroke={color}
               strokeWidth={1.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
               markerEnd={`url(#gantt-arrow-${dep.type})`}
-              className="pointer-events-none"
+              className="pointer-events-none gantt-arrow-path gantt-arrow-visible"
+              style={{ "--path-length": pathLength } as React.CSSProperties}
             />
           </g>
         );
@@ -99,7 +131,30 @@ export function GanttDependencyArrows({
 }
 
 // ---------------------------------------------------------------------------
-// Path building
+// Path length estimation (for stroke-dasharray animation)
+// ---------------------------------------------------------------------------
+
+function estimatePathLength(
+  type: DependencyType,
+  source: BarPosition,
+  target: BarPosition
+): number {
+  let sx: number, tx: number;
+  switch (type) {
+    case 0: sx = source.left + source.width; tx = target.left; break;
+    case 1: sx = source.left; tx = target.left; break;
+    case 2: sx = source.left + source.width; tx = target.left + target.width; break;
+    case 3: sx = source.left; tx = target.left + target.width; break;
+    default: return 200;
+  }
+  const dx = Math.abs(tx - sx) + GAP * 2;
+  const dy = Math.abs(target.y - source.y);
+  // Manhattan distance + some extra for curves
+  return Math.round(dx + dy + 40);
+}
+
+// ---------------------------------------------------------------------------
+// Path building (same routing logic, now with smoother curves)
 // ---------------------------------------------------------------------------
 
 function buildPath(
