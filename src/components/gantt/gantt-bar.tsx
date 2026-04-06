@@ -153,7 +153,10 @@ export function GanttBar({
       baselineLeft={baselineLeft}
       baselineWidth={baselineWidth}
       onDoubleClick={onDoubleClick}
+      onClick={handleClick}
       onContextMenu={onContextMenu}
+      linkMode={linkMode}
+      isLinkSource={isLinkSource}
     />;
   }
 
@@ -299,7 +302,10 @@ function BracketBar({
   baselineLeft,
   baselineWidth,
   onDoubleClick,
+  onClick,
   onContextMenu,
+  linkMode,
+  isLinkSource,
 }: {
   item: GanttItem;
   left: number;
@@ -311,7 +317,10 @@ function BracketBar({
   baselineLeft?: number;
   baselineWidth?: number;
   onDoubleClick?: (item: GanttItem) => void;
+  onClick?: (e: React.MouseEvent) => void;
   onContextMenu?: (e: React.MouseEvent, item: GanttItem) => void;
+  linkMode?: boolean;
+  isLinkSource?: boolean;
 }) {
   const bracketTop = y + (ROW_HEIGHT - TASK_BAR_HEIGHT) / 2;
   const barY = bracketTop;
@@ -377,7 +386,9 @@ function BracketBar({
         tabIndex={0}
         className={cn(
           "absolute select-none z-11 cursor-pointer",
-          isSelected && "ring-1 ring-primary/70 rounded-sm"
+          isSelected && "ring-1 ring-primary/70 rounded-sm",
+          linkMode && "cursor-crosshair hover:ring-2 hover:ring-blue-400/60",
+          isLinkSource && "ring-2 ring-blue-500 ring-offset-1"
         )}
         style={{
           left,
@@ -385,6 +396,7 @@ function BracketBar({
           width,
           height: TASK_BAR_HEIGHT,
         }}
+        onClick={onClick}
         onDoubleClick={() => onDoubleClick?.(item)}
         onKeyDown={(e) => { if (e.key === "Enter") onDoubleClick?.(item); }}
         onContextMenu={(e) => onContextMenu?.(e, item)}

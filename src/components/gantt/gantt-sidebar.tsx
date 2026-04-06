@@ -29,6 +29,8 @@ interface GanttSidebarProps {
   onSelectItem: (id: string, e: React.MouseEvent) => void;
   onDoubleClickItem: (item: GanttItem) => void;
   scrollTop: number;
+  linkMode?: boolean;
+  linkSourceId?: string | null;
   // Context menu callbacks
   onEditItem?: (item: GanttItem) => void;
   onDeleteItem?: (item: GanttItem) => void;
@@ -52,6 +54,8 @@ export function GanttSidebar({
   onConvertToMilestone,
   onSetPriority,
   onToggleCriticalPath,
+  linkMode,
+  linkSourceId,
   className,
 }: GanttSidebarProps) {
   const contentHeight = totalRowsHeight(rows);
@@ -96,6 +100,8 @@ export function GanttSidebar({
                 onToggleCollapse={onToggleCollapse}
                 onSelect={onSelectItem}
                 onDoubleClick={onDoubleClickItem}
+                linkMode={linkMode}
+                isLinkSource={linkMode && linkSourceId === row.id}
               />
             </GanttContextMenu>
           ))}
@@ -115,12 +121,16 @@ function SidebarRow({
   onToggleCollapse,
   onSelect,
   onDoubleClick,
+  linkMode,
+  isLinkSource,
 }: {
   row: GanttRow;
   isSelected: boolean;
   onToggleCollapse: (id: string) => void;
   onSelect: (id: string, e: React.MouseEvent) => void;
   onDoubleClick: (item: GanttItem) => void;
+  linkMode?: boolean;
+  isLinkSource?: boolean;
 }) {
   const { item, depth, hasChildren, isCollapsed, phaseColor, type } = row;
   const isPhase = type === "phase";
@@ -144,6 +154,8 @@ function SidebarRow({
         "flex items-center gap-1.5 px-4 border-b border-border/50 cursor-pointer select-none group relative",
         isSelected ? "bg-primary/10" : row.rowIndex % 2 === 0 ? "bg-background" : "bg-muted/20",
         isPhase ? "font-semibold" : "text-[11px]",
+        linkMode && !isPhase && "cursor-crosshair hover:bg-blue-50 dark:hover:bg-blue-950/30",
+        isLinkSource && "bg-blue-100 dark:bg-blue-900/40 ring-1 ring-inset ring-blue-500",
       )}
       onClick={(e) => onSelect(row.id, e)}
       onDoubleClick={() => onDoubleClick(item)}

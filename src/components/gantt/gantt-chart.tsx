@@ -326,11 +326,22 @@ export function GanttChart({
   }, [selectedItemsOrdered, ganttRows, itemMap, onItemParentChange]);
 
   // ---------------------------------------------------------------------------
-  // Link mode: click bar → set source, click second bar → open dialog
+  // Dependency dialog state
+  // ---------------------------------------------------------------------------
+  const [depDialogOpen, setDepDialogOpen] = React.useState(false);
+  const [selectedDep, setSelectedDep] = React.useState<GanttDependency | null>(null);
+  const [linkSource, setLinkSource] = React.useState<GanttItem | null>(null);
+  const [linkTarget, setLinkTarget] = React.useState<GanttItem | null>(null);
+
+  // ---------------------------------------------------------------------------
+  // Link mode: click bar or sidebar row → set source, click second → open dialog
   // ---------------------------------------------------------------------------
   const handleLinkModeClick = React.useCallback(
     (item: GanttItem) => {
       if (!linkMode) return;
+      // Don't allow phases as dependency endpoints
+      if (item.type === "phase") return;
+
       const itemId = item.id;
 
       if (!linkSourceId) {
@@ -355,13 +366,20 @@ export function GanttChart({
     [linkMode, linkSourceId, itemMap, setLinkSourceId, exitLinkMode]
   );
 
-  // ---------------------------------------------------------------------------
-  // Dependency dialog state
-  // ---------------------------------------------------------------------------
-  const [depDialogOpen, setDepDialogOpen] = React.useState(false);
-  const [selectedDep, setSelectedDep] = React.useState<GanttDependency | null>(null);
-  const [linkSource, setLinkSource] = React.useState<GanttItem | null>(null);
-  const [linkTarget, setLinkTarget] = React.useState<GanttItem | null>(null);
+  // Intercept sidebar clicks in link mode
+  const handleSelectItem = React.useCallback(
+    (id: string, e: React.MouseEvent) => {
+      if (linkMode) {
+        const item = itemMap.get(id);
+        if (item) {
+          handleLinkModeClick(item);
+          return;
+        }
+      }
+      selectItem(id, e);
+    },
+    [linkMode, itemMap, handleLinkModeClick, selectItem]
+  );
 
   const handleDependencyClick = React.useCallback((dep: GanttDependency) => {
     setSelectedDep(dep);
@@ -483,9 +501,11 @@ export function GanttChart({
               rows={ganttRows}
               selectedIds={selectedIds}
               onToggleCollapse={toggleCollapse}
-              onSelectItem={selectItem}
+              onSelectItem={handleSelectItem}
               onDoubleClickItem={handleDoubleClick}
               scrollTop={scrollTop}
+              linkMode={linkMode}
+              linkSourceId={linkSourceId}
               onEditItem={onItemEdit ? handleDoubleClick : undefined}
               onDeleteItem={onItemDelete}
               onAddSubtask={onAddSubtask}
@@ -518,7 +538,7 @@ export function GanttChart({
             rows={ganttRows}
             selectedIds={selectedIds}
             onToggleCollapse={toggleCollapse}
-            onSelectItem={selectItem}
+            onSelectItem={handleSelectItem}
             onDoubleClickItem={handleDoubleClick}
           />
         )}
