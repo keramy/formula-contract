@@ -6,10 +6,15 @@
  * Dialog for adding or editing report sections.
  * Includes title, description, and photo upload functionality.
  *
+ * Photo capture modes:
+ * 1. In-browser camera (getUserMedia) — Apple Notes-like continuous capture
+ * 2. Native camera fallback (<input capture>) — if getUserMedia unavailable
+ * 3. Gallery picker (<input multiple>) — multi-select from photo library
+ *
  * Used in both report creation and editing modals.
  */
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,26 +29,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ImageIcon, XIcon } from "lucide-react";
+import { CameraIcon, ImageIcon, XIcon, CheckCircleIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { sanitizeText, sanitizeHTML } from "@/lib/sanitize";
 import { validateFile, IMAGE_CONFIG } from "@/lib/file-validation";
 import { compressImage } from "@/lib/image-utils";
+import { CameraViewfinder } from "./camera-viewfinder";
 import type { LocalSection } from "./report-types";
 import { generateLocalId } from "./report-types";
+import { toast } from "sonner";
 
 interface SectionFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editingSection: LocalSection | null;
   onSave: (section: LocalSection) => void;
-  /**
-   * Project ID for organizing uploaded photos
-   */
   projectId: string;
-  /**
-   * Report ID for organizing uploaded photos (optional for new reports)
-   */
   reportId?: string;
 }
 
@@ -56,6 +57,7 @@ export function SectionFormDialog({
   reportId,
 }: SectionFormDialogProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const nativeCameraRef = useRef<HTMLInputElement>(null);
 
   // Form state
   const [title, setTitle] = useState("");
@@ -64,7 +66,18 @@ export function SectionFormDialog({
 
   // Loading/error state
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Camera mode: "off" | "viewfinder" (getUserMedia) | "native" (input capture fallback)
+  const [cameraMode, setCameraMode] = useState<"off" | "viewfinder" | "native">(
+    "off"
+  );
+  const photosBeforeCameraRef = useRef(0);
+  const [cameraCaptureCount, setCameraCaptureCount] = useState(0);
 
   // Reset form when opening or when editing section changes
   useEffect(() => {
@@ -79,87 +92,196 @@ export function SectionFormDialog({
         setPhotos([]);
       }
       setError(null);
+      setCameraMode("off");
+      setUploadProgress(null);
+      setCameraCaptureCount(0);
     }
   }, [open, editingSection]);
 
-  // Photo upload handler with compression
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // -------------------------------------------------------------------
+  // Shared upload helper
+  // -------------------------------------------------------------------
+  const uploadSingleFile = useCallback(
+    async (file: File): Promise<string | null> => {
+      const validation = validateFile(file, IMAGE_CONFIG);
+      if (!validation.valid) {
+        throw new Error(`${file.name}: ${validation.error || "Invalid file"}`);
+      }
+
+      const compressedFile = await compressImage(file, {
+        maxWidth: 1920,
+        maxHeight: 1080,
+        quality: 0.8,
+      });
+
+      const uploadPath = reportId
+        ? `${projectId}/${reportId}`
+        : `${projectId}/temp`;
+
+      const fileExt =
+        compressedFile.name.split(".").pop()?.toLowerCase() || "jpg";
+      const fileName = `${uploadPath}/${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
+
+      const supabase = createClient();
+      const { data, error: uploadError } = await supabase.storage
+        .from("reports")
+        .upload(fileName, compressedFile);
+
+      if (uploadError) {
+        throw new Error(`${file.name}: ${uploadError.message}`);
+      }
+
+      if (data) {
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from("reports").getPublicUrl(data.path);
+        return publicUrl;
+      }
+
+      return null;
+    },
+    [projectId, reportId]
+  );
+
+  // -------------------------------------------------------------------
+  // Gallery upload — multiple files at once
+  // -------------------------------------------------------------------
+  const handleGalleryUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     setIsUploading(true);
     setError(null);
+    setUploadProgress({ done: 0, total: files.length });
 
-    const supabase = createClient();
     const newPhotos: string[] = [];
     const errors: string[] = [];
 
-    // Determine upload path
-    const uploadPath = reportId
-      ? `${projectId}/${reportId}`
-      : `${projectId}/temp`;
-
-    for (const originalFile of Array.from(files)) {
-      // Validate file
-      const validation = validateFile(originalFile, IMAGE_CONFIG);
-      if (!validation.valid) {
-        errors.push(`${originalFile.name}: ${validation.error || "Invalid file"}`);
-        continue;
-      }
-
+    for (let i = 0; i < files.length; i++) {
       try {
-        // Compress the image before upload (max 1920x1080, 80% quality)
-        const compressedFile = await compressImage(originalFile, {
-          maxWidth: 1920,
-          maxHeight: 1080,
-          quality: 0.8,
-        });
+        const url = await uploadSingleFile(files[i]);
+        if (url) newPhotos.push(url);
+      } catch (err) {
+        errors.push(err instanceof Error ? err.message : "Upload failed");
+      }
+      setUploadProgress({ done: i + 1, total: files.length });
+    }
 
-        const fileExt = compressedFile.name.split(".").pop()?.toLowerCase() || "jpg";
-        const fileName = `${uploadPath}/${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
+    if (errors.length > 0) setError(errors.join(". "));
+    if (newPhotos.length > 0) setPhotos((prev) => [...prev, ...newPhotos]);
 
-        const { data, error: uploadError } = await supabase.storage
-          .from("reports")
-          .upload(fileName, compressedFile);
+    setIsUploading(false);
+    setUploadProgress(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
-        if (uploadError) {
-          console.error("Upload error:", uploadError);
-          errors.push(`${originalFile.name}: ${uploadError.message}`);
-          continue;
-        }
-
-        if (data) {
-          const {
-            data: { publicUrl },
-          } = supabase.storage.from("reports").getPublicUrl(data.path);
-
-          newPhotos.push(publicUrl);
+  // -------------------------------------------------------------------
+  // In-browser camera capture (from CameraViewfinder)
+  // -------------------------------------------------------------------
+  const handleViewfinderCapture = useCallback(
+    async (file: File) => {
+      try {
+        const url = await uploadSingleFile(file);
+        if (url) {
+          setPhotos((prev) => [...prev, url]);
+          setCameraCaptureCount((c) => c + 1);
         }
       } catch (err) {
-        console.error("Upload exception:", err);
-        errors.push(`${originalFile.name}: Upload failed`);
+        toast.error(err instanceof Error ? err.message : "Upload failed");
       }
+    },
+    [uploadSingleFile]
+  );
+
+  const handleViewfinderClose = useCallback(() => {
+    setCameraMode("off");
+  }, []);
+
+  const handleViewfinderError = useCallback((message: string) => {
+    // getUserMedia failed — fall back to native camera input
+    toast.info(message);
+    setCameraMode("native");
+    // Open native camera after a tick
+    setTimeout(() => {
+      if (nativeCameraRef.current) {
+        nativeCameraRef.current.click();
+      }
+    }, 200);
+  }, []);
+
+  // -------------------------------------------------------------------
+  // Native camera fallback (auto-reopen after each capture)
+  // -------------------------------------------------------------------
+  const handleNativeCameraCapture = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) {
+      // User cancelled — exit camera mode
+      setCameraMode("off");
+      return;
     }
 
-    if (errors.length > 0) {
-      setError(errors.join(". "));
-    }
+    setIsUploading(true);
+    setError(null);
 
-    if (newPhotos.length > 0) {
-      setPhotos((prev) => [...prev, ...newPhotos]);
+    try {
+      const url = await uploadSingleFile(files[0]);
+      if (url) {
+        setPhotos((prev) => [...prev, url]);
+        setCameraCaptureCount((c) => c + 1);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed");
     }
 
     setIsUploading(false);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
+    if (nativeCameraRef.current) nativeCameraRef.current.value = "";
+
+    // Auto-reopen native camera
+    if (cameraMode === "native") {
+      setTimeout(() => {
+        if (nativeCameraRef.current) {
+          nativeCameraRef.current.click();
+        }
+      }, 300);
     }
+  };
+
+  // -------------------------------------------------------------------
+  // Start camera — try viewfinder first, fallback to native
+  // -------------------------------------------------------------------
+  const startCamera = () => {
+    photosBeforeCameraRef.current = photos.length;
+    setCameraCaptureCount(0);
+
+    // Try getUserMedia first (in-browser viewfinder)
+    if (typeof navigator.mediaDevices?.getUserMedia === "function") {
+      setCameraMode("viewfinder");
+    } else {
+      // Fallback to native camera input
+      setCameraMode("native");
+      setTimeout(() => {
+        if (nativeCameraRef.current) {
+          nativeCameraRef.current.click();
+        }
+      }, 100);
+    }
+  };
+
+  const stopCamera = () => {
+    setCameraMode("off");
   };
 
   const handleRemovePhoto = (index: number) => {
     setPhotos((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // -------------------------------------------------------------------
   // Save section
+  // -------------------------------------------------------------------
   const handleSave = () => {
     if (!title.trim()) return;
 
@@ -187,12 +309,42 @@ export function SectionFormDialog({
     onOpenChange(false);
   };
 
+  // -------------------------------------------------------------------
+  // Render
+  // -------------------------------------------------------------------
+
+  // When viewfinder is active, the dialog shows ONLY the camera
+  if (cameraMode === "viewfinder") {
+    return (
+      <Dialog
+        open={open}
+        onOpenChange={(newOpen) => {
+          if (!newOpen) setCameraMode("off");
+          onOpenChange(newOpen);
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl p-0 gap-0 overflow-hidden max-sm:h-[100dvh] max-sm:max-h-[100dvh] max-sm:rounded-none">
+          <CameraViewfinder
+            onCapture={handleViewfinderCapture}
+            onClose={handleViewfinderClose}
+            onError={handleViewfinderError}
+            capturedCount={cameraCaptureCount}
+          />
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // Normal form view (with optional native camera mode banner)
   return (
     <Dialog
       open={open}
       onOpenChange={(newOpen) => {
+        if (!newOpen) {
+          setCameraMode("off");
+          setError(null);
+        }
         onOpenChange(newOpen);
-        if (!newOpen) setError(null);
       }}
     >
       <DialogContent className="sm:max-w-2xl">
@@ -246,52 +398,117 @@ export function SectionFormDialog({
                 {photos.length} {photos.length === 1 ? "photo" : "photos"}
               </span>
             </div>
-            <div className="flex flex-wrap gap-3">
-              {photos.map((url, idx) => (
-                <div
-                  key={idx}
-                  className="relative w-28 h-20 rounded-lg overflow-hidden bg-slate-100 group border"
-                >
-                  <Image
-                    src={url}
-                    alt={`Photo ${idx + 1}`}
-                    fill
-                    sizes="80px"
-                    className="object-cover"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleRemovePhoto(idx)}
-                    className="absolute top-1 right-1 size-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-                  >
-                    <XIcon className="size-3.5" />
-                  </button>
-                </div>
-              ))}
 
-              {/* Upload Button */}
-              <label className="w-28 h-20 rounded-lg border-2 border-dashed border-muted-foreground/25 hover:border-muted-foreground/50 hover:bg-muted/50 flex flex-col items-center justify-center cursor-pointer transition-colors">
-                {isUploading ? (
-                  <Spinner className="size-5" />
-                ) : (
-                  <>
-                    <ImageIcon className="size-5 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground mt-1">
-                      Add Photos
-                    </span>
-                  </>
-                )}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handlePhotoUpload}
-                  className="hidden"
+            {/* Photo thumbnails */}
+            {photos.length > 0 && (
+              <div className="flex flex-wrap gap-3">
+                {photos.map((url, idx) => (
+                  <div
+                    key={idx}
+                    className="relative w-28 h-20 rounded-lg overflow-hidden bg-slate-100 group border"
+                  >
+                    <Image
+                      src={url}
+                      alt={`Photo ${idx + 1}`}
+                      fill
+                      sizes="80px"
+                      className="object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemovePhoto(idx)}
+                      className="absolute top-1 right-1 size-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 max-sm:opacity-100 transition-opacity shadow-sm"
+                    >
+                      <XIcon className="size-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Native camera mode banner (fallback) */}
+            {cameraMode === "native" && (
+              <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-primary/10 border border-primary/20">
+                <div className="flex items-center gap-2 min-w-0">
+                  <CameraIcon className="size-4 text-primary shrink-0" />
+                  <span className="text-sm font-medium text-primary truncate">
+                    {isUploading
+                      ? "Uploading photo..."
+                      : cameraCaptureCount > 0
+                      ? `${cameraCaptureCount} photo${cameraCaptureCount !== 1 ? "s" : ""} taken`
+                      : "Camera ready"}
+                  </span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={stopCamera}
+                  className="shrink-0 h-8 gap-1.5"
+                >
+                  <CheckCircleIcon className="size-3.5" />
+                  Done
+                </Button>
+              </div>
+            )}
+
+            {/* Upload progress */}
+            {uploadProgress && uploadProgress.total > 1 && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Spinner className="size-4" />
+                <span>
+                  Uploading {uploadProgress.done} of {uploadProgress.total}...
+                </span>
+              </div>
+            )}
+
+            {/* Action buttons — hidden when in native camera mode */}
+            {cameraMode === "off" && (
+              <div className="flex flex-wrap gap-2">
+                {/* Take Photos — opens in-browser camera or native fallback */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={startCamera}
                   disabled={isUploading}
-                />
-              </label>
-            </div>
+                  className="h-9 gap-2"
+                >
+                  {isUploading ? (
+                    <Spinner className="size-4" />
+                  ) : (
+                    <CameraIcon className="size-4" />
+                  )}
+                  Take Photos
+                </Button>
+
+                {/* Choose from Gallery — opens file picker */}
+                <label className="inline-flex items-center gap-2 h-9 px-3 rounded-md border border-input bg-background text-sm font-medium hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors">
+                  <ImageIcon className="size-4" />
+                  Choose from Gallery
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleGalleryUpload}
+                    className="hidden"
+                    disabled={isUploading}
+                  />
+                </label>
+              </div>
+            )}
+
+            {/* Hidden native camera input (fallback for getUserMedia failure) */}
+            <input
+              ref={nativeCameraRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handleNativeCameraCapture}
+              className="hidden"
+              disabled={isUploading}
+            />
+
             <p className="text-xs text-muted-foreground">
               Max 10MB per image. JPG, PNG, GIF, WebP supported.
             </p>
