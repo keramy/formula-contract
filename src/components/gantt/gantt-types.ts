@@ -102,11 +102,14 @@ export const DEPENDENCY_SHORT_LABELS: Record<DependencyType, string> = {
   3: "SF",
 };
 
+/** Unified arrow color — type is shown in the dialog, not via color coding */
+export const DEPENDENCY_COLOR = "#94a3b8"; // slate-400
+
 export const DEPENDENCY_COLORS: Record<DependencyType, string> = {
-  0: "#94a3b8", // gray (FS — most common)
-  1: "#3b82f6", // blue (SS)
-  2: "#22c55e", // green (FF)
-  3: "#ef4444", // red (SF)
+  0: DEPENDENCY_COLOR,
+  1: DEPENDENCY_COLOR,
+  2: DEPENDENCY_COLOR,
+  3: DEPENDENCY_COLOR,
 };
 
 // ---------------------------------------------------------------------------

@@ -162,15 +162,18 @@ export function GanttBar({
 
   // ── Regular task bar ──
   const progress = Math.min(Math.max(item.progress, 0), 100);
-  const isDeep = depth >= 2;
-  // Background alpha by depth
-  const bgAlpha = depth === 0 ? "80" : depth === 1 ? "40" : "20";
-  // Fill alpha by depth
-  const fillAlpha = depth === 0 ? "ff" : depth === 1 ? "8c" : "4d";
-  // Bar label: inside for wide bars, right-side for narrow
-  const showNameInside = width > 120;
+  // Fix 6: All depths use solid fill — deeper = lower opacity (no dashed borders)
+  const bgAlpha = depth === 0 ? "70" : depth === 1 ? "50" : "35";
+  const fillAlpha = depth === 0 ? "cc" : depth === 1 ? "90" : "70";
+  // Fix 4-5: Bar label + date thresholds
+  const showNameInside = width > 80;
+  const showDateInside = width > 160;
   const showNameOutside = !showNameInside && width > 20;
   const showProgress = width > 50 && progress > 0;
+
+  // Date formatting for inline display
+  const fmtDate = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const dateLabel = `${fmtDate(item.startDate)} — ${fmtDate(item.endDate)}`;
 
   return (
     <>
@@ -195,11 +198,10 @@ export function GanttBar({
             role="button"
             tabIndex={0}
             className={cn(
-              "absolute rounded-[2px] select-none z-10",
+              "absolute rounded-[3px] select-none z-10 overflow-hidden",
               "transition-shadow duration-150",
               isSelected && "ring-1 ring-primary/70",
               "cursor-pointer",
-              isDeep ? "border border-dashed bg-transparent" : "overflow-hidden",
               dimmed && "opacity-25",
               linkMode && "cursor-crosshair hover:ring-2 hover:ring-blue-400/60",
               isLinkSource && "ring-2 ring-blue-500 ring-offset-1"
@@ -209,9 +211,7 @@ export function GanttBar({
               top: barTop,
               width,
               height: TASK_BAR_HEIGHT,
-              ...(isDeep
-                ? { borderColor: `${effectiveColor}b3` }
-                : { backgroundColor: `${effectiveColor}${bgAlpha}` }),
+              backgroundColor: `${effectiveColor}${bgAlpha}`,
             }}
             onClick={handleClick}
             onDoubleClick={() => onDoubleClick?.(item)}
@@ -221,24 +221,49 @@ export function GanttBar({
           >
             {/* Progress fill */}
             <div
-              className="h-full rounded-[2px] transition-all duration-300"
+              className="h-full rounded-[3px] transition-all duration-300"
               style={{
                 width: `${progress}%`,
                 backgroundColor: `${effectiveColor}${fillAlpha}`,
               }}
             />
 
-            {/* Name label INSIDE bar (for wide bars) */}
+            {/* Fix 5: Name label — white with text shadow for readability */}
             {showNameInside && (
-              <span className="absolute inset-0 flex items-center px-2 text-[9px] font-medium text-white truncate mix-blend-difference pointer-events-none">
+              <span
+                className="absolute inset-0 flex items-center px-2 text-[10px] font-semibold truncate pointer-events-none"
+                style={{
+                  color: "#fff",
+                  textShadow: `0 0 3px ${effectiveColor}, 0 1px 2px rgba(0,0,0,0.5)`,
+                }}
+              >
                 {item.name}
-                {showProgress && ` · ${Math.round(progress)}%`}
+                {showProgress && !showDateInside && ` · ${Math.round(progress)}%`}
+              </span>
+            )}
+
+            {/* Fix 4: Date range inside bar (wide bars only) */}
+            {showDateInside && (
+              <span
+                className="absolute right-2 inset-y-0 flex items-center text-[9px] font-medium pointer-events-none"
+                style={{
+                  color: "rgba(255,255,255,0.75)",
+                  textShadow: `0 0 2px ${effectiveColor}`,
+                }}
+              >
+                {dateLabel}
               </span>
             )}
 
             {/* Progress-only label (medium bars without name) */}
             {!showNameInside && showProgress && (
-              <span className="absolute inset-0 flex items-center justify-center text-[10px] font-semibold text-white mix-blend-difference pointer-events-none">
+              <span
+                className="absolute inset-0 flex items-center justify-center text-[10px] font-semibold pointer-events-none"
+                style={{
+                  color: "#fff",
+                  textShadow: `0 0 3px ${effectiveColor}, 0 1px 2px rgba(0,0,0,0.5)`,
+                }}
+              >
                 {Math.round(progress)}%
               </span>
             )}
@@ -255,33 +280,35 @@ export function GanttBar({
         </TooltipTrigger>
         <TooltipContent side="top" align="start" alignOffset={mouseX - 40} sideOffset={8} className="text-xs">
           <p className="font-medium">{item.name}</p>
-          <p className="text-muted-foreground">
-            {item.startDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-            {" — "}
-            {item.endDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-          </p>
+          <p className="text-muted-foreground">{dateLabel}</p>
           <p className="text-muted-foreground">{formatDuration(item)} · {Math.round(progress)}%</p>
         </TooltipContent>
       </Tooltip>
 
-      {/* Name label OUTSIDE bar (for narrow bars) */}
+      {/* Name label OUTSIDE bar (for narrow bars) + date below */}
       {showNameOutside && (
-        <span
+        <div
           className={cn(
-            "absolute text-[9px] font-medium whitespace-nowrap pointer-events-none z-10 truncate",
+            "absolute pointer-events-none z-10",
             dimmed && "opacity-25"
           )}
           style={{
             left: left + width + 6,
             top: barTop,
             height: TASK_BAR_HEIGHT,
-            lineHeight: `${TASK_BAR_HEIGHT}px`,
-            color: effectiveColor,
-            maxWidth: 150,
           }}
         >
-          {item.name}
-        </span>
+          <span
+            className="text-[10px] font-semibold whitespace-nowrap truncate block"
+            style={{
+              color: effectiveColor,
+              lineHeight: `${TASK_BAR_HEIGHT}px`,
+              maxWidth: 180,
+            }}
+          >
+            {item.name}
+          </span>
+        </div>
       )}
     </>
   );

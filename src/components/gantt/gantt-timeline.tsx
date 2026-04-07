@@ -16,7 +16,6 @@ import {
   generateColumns,
   calculateBarPosition,
   dateToX,
-  getBarHealthColor,
   isToday,
   isWeekend,
   getWeekNumber,
@@ -191,7 +190,7 @@ export function GanttTimeline({
                 left={pos.left}
                 width={pos.width}
                 y={row.y}
-                color={getBarHealthColor(row.item) ?? row.phaseColor}
+                color={row.phaseColor}
                 depth={row.depth}
                 hasChildren={row.hasChildren}
                 isSelected={selectedIds.has(row.id)}

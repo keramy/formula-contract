@@ -23,7 +23,7 @@ interface GanttDependencyArrowsProps {
   onDependencyClick?: (dep: GanttDependency) => void;
 }
 
-const ARROW_SIZE = 6;
+const ARROW_SIZE = 8;
 const RADIUS = 8;
 const GAP = 12; // horizontal gap from bar edge before turning
 
@@ -67,22 +67,21 @@ export function GanttDependencyArrows({
       `}</style>
 
       <defs>
-        {([0, 1, 2, 3] as DependencyType[]).map((type) => (
-          <marker
-            key={type}
-            id={`gantt-arrow-${type}`}
-            markerWidth={ARROW_SIZE}
-            markerHeight={ARROW_SIZE}
-            refX={ARROW_SIZE}
-            refY={ARROW_SIZE / 2}
-            orient="auto"
-          >
-            <path
-              d={`M0,0 L${ARROW_SIZE},${ARROW_SIZE / 2} L0,${ARROW_SIZE} Z`}
-              fill={DEPENDENCY_COLORS[type]}
-            />
-          </marker>
-        ))}
+        {/* Single arrowhead marker — refX=0 so line ends at arrow base, not tip */}
+        <marker
+          id="gantt-arrow"
+          markerWidth={ARROW_SIZE}
+          markerHeight={ARROW_SIZE}
+          refX={1}
+          refY={ARROW_SIZE / 2}
+          orient="auto"
+          markerUnits="strokeWidth"
+        >
+          <path
+            d={`M0,0 L${ARROW_SIZE},${ARROW_SIZE / 2} L0,${ARROW_SIZE} Z`}
+            fill={DEPENDENCY_COLORS[0]}
+          />
+        </marker>
       </defs>
 
       {dependencies.map((dep) => {
@@ -119,7 +118,7 @@ export function GanttDependencyArrows({
               strokeWidth={1.5}
               strokeLinecap="round"
               strokeLinejoin="round"
-              markerEnd={`url(#gantt-arrow-${dep.type})`}
+              markerEnd="url(#gantt-arrow)"
               className="pointer-events-none gantt-arrow-path gantt-arrow-visible"
               style={{ "--path-length": pathLength } as React.CSSProperties}
             />

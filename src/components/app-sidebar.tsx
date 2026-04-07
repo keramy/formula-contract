@@ -47,7 +47,7 @@ const routePermissions: Record<string, string[]> = {
   "/clients": ["admin", "pm"],
   "/crm": ["admin", "management"],
   "/finance": ["admin", "management"],
-  "/payments": ["admin", "management"],
+  "/payments": ["admin", "pm", "management"], // PM access controlled by finance_access whitelist on the page
   "/users": ["admin"],
   "/reports": ["admin", "pm", "management", "client"], // Clients see their project reports
   "/settings": ["admin"],
