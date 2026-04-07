@@ -12,13 +12,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+// Note: Radix Select doesn't work inside Dialog (z-index portal issue).
+// Using native <select> instead. See CLAUDE.md gotcha #36.
 import {
   type GanttItem,
   type GanttDependency,
@@ -116,24 +111,20 @@ export function GanttDependencyDialog({
             </div>
           </div>
 
-          {/* Type */}
+          {/* Type — native select (Radix Select broken inside Dialog, gotcha #36) */}
           <div className="space-y-2">
             <Label>Dependency Type</Label>
-            <Select
+            <select
               value={dependencyType.toString()}
-              onValueChange={(v) => setDependencyType(parseInt(v, 10) as DependencyType)}
+              onChange={(e) => setDependencyType(parseInt(e.target.value, 10) as DependencyType)}
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(DEPENDENCY_LABELS).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              {Object.entries(DEPENDENCY_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
             <p className="text-xs text-muted-foreground">
               {dependencyType === 0 && "Target starts after source finishes"}
               {dependencyType === 1 && "Target starts when source starts"}
