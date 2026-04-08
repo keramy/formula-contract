@@ -140,88 +140,73 @@ export function WizardStepIndicator({
 
   return (
     <nav aria-label="Progress" className={cn("mb-8", className)}>
-      <ol className="flex items-center">
+      <ol className="flex items-start">
         {steps.map((step, index) => {
           const isCompleted = index < currentStep;
           const isCurrent = index === currentStep;
+          const isUpcoming = index > currentStep;
           const isClickable = allowNavigation && index <= currentStep;
+          const isLast = index === steps.length - 1;
 
           return (
-            <li
-              key={step.title}
-              className={cn(
-                "relative flex-1",
-                index !== steps.length - 1 && "pr-8 sm:pr-20"
-              )}
-            >
-              {/* Progress line */}
-              {index !== steps.length - 1 && (
+            <li key={step.title} className="flex-1 relative flex flex-col items-center">
+              {/* Connector line — between circles, not full width */}
+              {!isLast && (
                 <div
-                  className="absolute top-4 left-0 -right-8 sm:-right-20 h-0.5 bg-gray-200"
+                  className="absolute top-[14px] left-[calc(50%+14px)] right-[calc(-50%+14px)] h-[2px]"
                   aria-hidden="true"
                 >
+                  <div className="h-full w-full bg-border rounded-full" />
                   <div
                     className={cn(
-                      "h-full bg-primary transition-all duration-500",
+                      "absolute inset-0 bg-primary rounded-full transition-all duration-500",
                       isCompleted ? "w-full" : "w-0"
                     )}
                   />
                 </div>
               )}
 
-              {/* Step circle and content */}
-              <div className="relative flex flex-col items-center group">
-                <button
-                  type="button"
-                  onClick={() => isClickable && goToStep(index)}
-                  disabled={!isClickable}
-                  className={cn(
-                    "flex size-8 items-center justify-center rounded-full text-sm font-medium transition-all duration-200",
-                    isCompleted &&
-                      "bg-primary text-white hover:bg-primary-800",
-                    isCurrent &&
-                      "border-2 border-primary bg-white text-primary",
-                    !isCompleted &&
-                      !isCurrent &&
-                      "border-2 border-gray-300 bg-white text-gray-400",
-                    isClickable && "cursor-pointer",
-                    !isClickable && "cursor-default"
-                  )}
-                  aria-current={isCurrent ? "step" : undefined}
-                >
-                  {isCompleted ? (
-                    <svg
-                      className="size-5"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  ) : (
-                    index + 1
-                  )}
-                </button>
+              {/* Circle */}
+              <button
+                type="button"
+                onClick={() => isClickable && goToStep(index)}
+                disabled={!isClickable}
+                className={cn(
+                  "relative z-10 flex size-7 items-center justify-center rounded-full text-xs font-semibold transition-all duration-200 shrink-0",
+                  isCompleted && "bg-primary text-primary-foreground shadow-sm",
+                  isCurrent && "bg-primary/10 text-primary ring-2 ring-primary ring-offset-2 ring-offset-background",
+                  isUpcoming && "bg-muted text-muted-foreground",
+                  isClickable && "cursor-pointer hover:opacity-80",
+                  !isClickable && "cursor-default"
+                )}
+                aria-current={isCurrent ? "step" : undefined}
+              >
+                {isCompleted ? (
+                  <svg className="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  index + 1
+                )}
+              </button>
 
-                {/* Step label */}
-                <div className="mt-3 text-center">
-                  <span
-                    className={cn(
-                      "text-sm font-medium",
-                      isCurrent ? "text-primary" : "text-gray-500"
-                    )}
-                  >
-                    {step.title}
-                  </span>
-                  {step.description && (
-                    <p className="text-xs text-muted-foreground mt-0.5 hidden sm:block">
-                      {step.description}
-                    </p>
+              {/* Label */}
+              <div className="mt-2.5 text-center px-1">
+                <span
+                  className={cn(
+                    "text-xs font-medium leading-tight",
+                    isCompleted && "text-primary",
+                    isCurrent && "text-foreground",
+                    isUpcoming && "text-muted-foreground"
                   )}
-                </div>
+                >
+                  {step.title}
+                </span>
+                {step.description && (
+                  <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight hidden sm:block">
+                    {step.description}
+                  </p>
+                )}
               </div>
             </li>
           );
