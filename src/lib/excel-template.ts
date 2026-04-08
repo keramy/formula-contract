@@ -382,9 +382,13 @@ export async function parseScopeItemsExcel(file: ArrayBuffer): Promise<ParseResu
       seenItemCodes.set(itemCode, rowNum);
 
       // Parse area fields (optional)
-      const areaCode = row.area_code ? String(row.area_code).trim().toUpperCase() : null;
       const areaName = row.area_name ? String(row.area_name).trim() : null;
       const floor = row.floor ? String(row.floor).trim() : null;
+      // Auto-generate area_code from area_name if not provided
+      let areaCode = row.area_code ? String(row.area_code).trim().toUpperCase() : null;
+      if (!areaCode && areaName) {
+        areaCode = areaName.toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-|-$/g, "");
+      }
 
       // Warn if area_code is provided without area_name (needed for auto-creation)
       if (areaCode && !areaName) {

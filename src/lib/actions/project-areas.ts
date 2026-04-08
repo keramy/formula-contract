@@ -270,7 +270,7 @@ export async function bulkGetOrCreateAreas(
       return { success: false, error: fetchError.message };
     }
 
-    // Build result map with existing areas
+    // Build result map with existing areas + update their names/floors
     const resultMap = new Map<string, string>();
     const existingCodes = new Set<string>();
 
@@ -278,6 +278,18 @@ export async function bulkGetOrCreateAreas(
       if (!area.is_deleted) {
         resultMap.set(area.area_code, area.id);
         existingCodes.add(area.area_code);
+
+        // Update name/floor if Excel provides new values
+        const input = uniqueAreas.get(area.area_code);
+        if (input && input.area_name) {
+          await supabase
+            .from("project_areas")
+            .update({
+              name: input.area_name.trim(),
+              floor: input.floor.trim(),
+            })
+            .eq("id", area.id);
+        }
       }
     }
 

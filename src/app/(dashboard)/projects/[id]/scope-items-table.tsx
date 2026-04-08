@@ -555,13 +555,23 @@ const ScopeItemRow = memo(function ScopeItemRow({
       )}
       {isColumnVisible("status") && (
         <TableCell>
-          <Badge
-            variant="secondary"
-            className={`${statusColors[item.status]} cursor-help`}
-            title={statusTooltips[item.status] || ""}
-          >
-            {statusLabels[item.status] || item.status}
-          </Badge>
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge
+                  variant="secondary"
+                  className={`${statusColors[item.status]} cursor-help`}
+                >
+                  {statusLabels[item.status] || item.status}
+                </Badge>
+              </TooltipTrigger>
+              {statusTooltips[item.status] && (
+                <TooltipContent side="top" className="text-xs max-w-[200px]">
+                  {statusTooltips[item.status]}
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
         </TableCell>
       )}
       {isColumnVisible("quantity") && (

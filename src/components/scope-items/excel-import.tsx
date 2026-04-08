@@ -261,6 +261,13 @@ export function ExcelImport({ projectId, projectCode, compact = false }: ExcelIm
       setImportResults(results);
       setStep("complete");
 
+      // Invalidate cache after a brief delay so DB commits are visible
+      if (results.inserted > 0 || results.updated > 0 || results.deleted > 0) {
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: scopeItemKeys.list(projectId) });
+        }, 500);
+      }
+
       // Log activity if any items were imported
       if (results.inserted > 0 || results.updated > 0) {
         await logActivity({
@@ -603,7 +610,7 @@ export function ExcelImport({ projectId, projectCode, compact = false }: ExcelIm
             )}
 
             <div className="flex justify-end pt-2">
-              <Button onClick={handleClose}>Done</Button>
+              <Button onClick={handleClose}>Close</Button>
             </div>
           </div>
         )}

@@ -140,6 +140,7 @@ export default async function ProjectDetailPage({
   const [
     projectResult,
     scopeItemsResult,
+    areasResult,
   ] = await Promise.all([
     // 1. Project with Client (includes slug for URL generation)
     (async () => {
@@ -167,6 +168,14 @@ export default async function ProjectDetailPage({
       console.log(`  📋 Scope Items: ${(performance.now() - start).toFixed(0)}ms`);
       return result;
     })(),
+    // 3. Project Areas
+    supabase
+      .from("project_areas")
+      .select("id, area_code, name, floor")
+      .eq("project_id", projectId)
+      .eq("is_deleted", false)
+      .order("floor")
+      .order("name"),
   ]);
   console.log(`  ⏱️ Parallel queries total: ${(performance.now() - parallelStart).toFixed(0)}ms`);
   console.log(`📊 [PROFILE] Project Detail Total: ${(performance.now() - pageStart).toFixed(0)}ms\n`);
@@ -296,7 +305,7 @@ export default async function ProjectDetailPage({
             projectId={projectId}
             items={scopeItems}
             materials={[]}
-            areas={[]}
+            areas={(areasResult.data || []).map((a) => ({ id: a.id, area_code: a.area_code, name: a.name, floor: a.floor }))}
             currency={project.currency}
             isClient={isClient}
             userRole={userRole}
