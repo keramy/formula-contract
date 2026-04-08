@@ -18,6 +18,7 @@ import { ProjectOverview } from "./project-overview";
 // snagging, milestones, assignments, reports, areas, activities) lazy-loaded via React Query
 // when their tab is activated. This reduces page load from 6 parallel queries to 2.
 import { DownloadTemplateButton, ExcelImport, ExcelExport, ScopeItemAddButton } from "@/components/scope-items";
+import { BatchPhotoUpload } from "@/components/scope-items/batch-photo-upload";
 import { ActivityFeed } from "@/components/activity-log/activity-feed";
 import { isUUID } from "@/lib/slug";
 
@@ -156,7 +157,7 @@ export default async function ProjectDetailPage({
       console.log(`  📁 Project with Client: ${(performance.now() - start).toFixed(0)}ms`);
       return result;
     })(),
-    // 2. Scope Items - ordered by created_at to preserve Excel import order
+    // 2. Scope Items - ordered by item_code for consistent display
     (async () => {
       const start = performance.now();
       const result = await supabase
@@ -164,7 +165,7 @@ export default async function ProjectDetailPage({
         .select("id, item_code, name, description, width, depth, height, item_path, status, quantity, unit, initial_unit_cost, initial_total_cost, actual_unit_cost, actual_total_cost, unit_sales_price, total_sales_price, production_percentage, is_shipped, is_installation_started, is_installed, notes, images, created_at, parent_id, area_id")
         .eq("project_id", projectId)
         .eq("is_deleted", false)
-        .order("created_at", { ascending: true });
+        .order("item_code", { ascending: true });
       console.log(`  📋 Scope Items: ${(performance.now() - start).toFixed(0)}ms`);
       return result;
     })(),
@@ -299,6 +300,19 @@ export default async function ProjectDetailPage({
                   compact
                 />
               </div>
+              {canEdit && scopeItems.length > 0 && (
+                <div className="shrink-0">
+                  <BatchPhotoUpload
+                    projectId={projectId}
+                    items={scopeItems.map((item) => ({
+                      id: item.id,
+                      item_code: item.item_code,
+                      name: item.name,
+                      images: item.images,
+                    }))}
+                  />
+                </div>
+              )}
             </div>
           </div>
           <ScopeItemsTable
