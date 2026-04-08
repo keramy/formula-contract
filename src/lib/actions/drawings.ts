@@ -311,6 +311,51 @@ export async function overrideDrawingApproval(
 // ============================================================================
 
 /**
+ * Get download URLs for all drawings visible to clients (sent/approved/rejected).
+ * Returns the latest revision file URL + item code for each drawing.
+ * Used by the "Download All" button.
+ */
+export async function getDrawingDownloadUrls(
+  projectId: string,
+  ctx?: RequestContext
+): Promise<{ item_code: string; file_url: string; file_name: string; revision: string }[]> {
+  const supabase = ctx?.supabase ?? await createClient();
+
+  // Get all drawings with their scope item code and revisions
+  const { data } = await supabase
+    .from("drawings")
+    .select(`
+      id,
+      status,
+      current_revision,
+      scope_items!inner(item_code, project_id, is_deleted),
+      drawing_revisions(file_url, file_name, revision)
+    `)
+    .eq("scope_items.project_id", projectId)
+    .eq("scope_items.is_deleted", false)
+    .in("status", ["sent_to_client", "approved", "approved_with_comments", "rejected"]);
+
+  if (!data || data.length === 0) return [];
+
+  return (data as any[])
+    .filter((d) => d.drawing_revisions && d.drawing_revisions.length > 0)
+    .map((d) => {
+      // Pick the latest revision (sort by revision letter descending)
+      const sorted = [...d.drawing_revisions].sort((a: any, b: any) =>
+        b.revision.localeCompare(a.revision)
+      );
+      const latest = sorted[0];
+      const itemCode = d.scope_items?.item_code || "UNKNOWN";
+      return {
+        item_code: itemCode,
+        file_url: latest.file_url,
+        file_name: latest.file_name || `${itemCode}_Rev${latest.revision}.pdf`,
+        revision: latest.revision,
+      };
+    });
+}
+
+/**
  * Get all drawings for a project's production scope items.
  * Used by the drawings tab and overview for lazy loading.
  */
@@ -334,4 +379,95 @@ export async function getProjectDrawings(projectId: string, ctx?: RequestContext
     .in("item_id", itemIds);
 
   return data || [];
+}
+
+/**
+ * Delete a drawing and all its revisions. Admin only.
+ * Only allowed for drawings not yet sent to client (uploaded/not_uploaded).
+ * Deletes files from Supabase storage + DB records.
+ */
+export async function deleteDrawing(
+  drawingId: string
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "Not authenticated" };
+
+  // Admin only
+  const { data: userData } = await supabase
+    .from("users")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+  if (!userData || userData.role !== "admin") {
+    return { success: false, error: "Only admin can delete drawings" };
+  }
+
+  // Load drawing with its revisions
+  const { data: drawing } = await supabase
+    .from("drawings")
+    .select("id, status, item_id, drawing_revisions(id, file_url, cad_file_url)")
+    .eq("id", drawingId)
+    .single();
+
+  if (!drawing) return { success: false, error: "Drawing not found" };
+
+  // Block deletion only for approved drawings (audit trail)
+  if (["approved", "approved_with_comments"].includes(drawing.status)) {
+    return {
+      success: false,
+      error: "Cannot delete an approved drawing — it is part of the audit trail",
+    };
+  }
+
+  // Delete files from storage
+  const revisions = (drawing as any).drawing_revisions || [];
+  for (const rev of revisions) {
+    if (rev.file_url) {
+      // Extract storage path from public URL
+      const match = rev.file_url.match(/\/storage\/v1\/object\/public\/drawings\/(.+)/);
+      if (match) {
+        await supabase.storage.from("drawings").remove([match[1]]);
+      }
+    }
+    if (rev.cad_file_url) {
+      const match = rev.cad_file_url.match(/\/storage\/v1\/object\/public\/drawings\/(.+)/);
+      if (match) {
+        await supabase.storage.from("drawings").remove([match[1]]);
+      }
+    }
+  }
+
+  // Delete revisions first (FK constraint)
+  await supabase
+    .from("drawing_revisions")
+    .delete()
+    .eq("drawing_id", drawingId);
+
+  // Delete the drawing record
+  const { error } = await supabase
+    .from("drawings")
+    .delete()
+    .eq("id", drawingId);
+
+  if (error) {
+    console.error("Error deleting drawing:", error);
+    return { success: false, error: error.message };
+  }
+
+  // Reset scope item status back to pending
+  await supabase
+    .from("scope_items")
+    .update({ status: "pending" })
+    .eq("id", drawing.item_id);
+
+  // Log activity
+  await logActivity({
+    action: ACTIVITY_ACTIONS.DRAWING_DELETED,
+    entityType: "drawing",
+    entityId: drawingId,
+    details: { item_id: drawing.item_id },
+  });
+
+  return { success: true };
 }

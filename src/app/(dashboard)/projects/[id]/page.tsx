@@ -307,6 +307,8 @@ export default async function ProjectDetailPage({
         <TabsContent value="drawings">
           <DrawingsOverview
             projectId={projectId}
+            projectCode={project.project_code}
+            projectName={project.name}
             productionItems={productionItems.map((item) => ({
               id: item.id,
               item_code: item.item_code,
@@ -314,6 +316,7 @@ export default async function ProjectDetailPage({
             }))}
             projectCurrency={project.currency}
             isClient={isClient}
+            isAdmin={userRole === "admin"}
           />
         </TabsContent>
 

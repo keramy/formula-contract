@@ -38,6 +38,7 @@ import {
   Clock3Icon,
   CheckCircle2Icon,
   MoreHorizontalIcon,
+  TrashIcon,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -47,8 +48,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { DrawingUploadSheet } from "@/components/drawings/drawing-upload-sheet";
 import { ScopeItemSheet } from "@/components/scope-items/scope-item-sheet";
-import { sendDrawingsToClient } from "@/lib/actions/drawings";
+import { sendDrawingsToClient, getDrawingDownloadUrls, deleteDrawing } from "@/lib/actions/drawings";
 import { toast } from "sonner";
+import { DownloadIcon } from "lucide-react";
+import JSZip from "jszip";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useProjectDrawings } from "@/lib/react-query/project-tabs";
 
@@ -68,10 +71,13 @@ interface ProductionItem {
 
 interface DrawingsOverviewProps {
   projectId: string;
+  projectCode?: string;
+  projectName?: string;
   productionItems: ProductionItem[];
   drawings?: Drawing[];
   projectCurrency?: string;
   isClient?: boolean;
+  isAdmin?: boolean;
 }
 
 type StatusVariant = "info" | "success" | "warning" | "default" | "danger";
@@ -86,7 +92,7 @@ const statusConfig: Record<string, { variant: StatusVariant; label: string }> = 
   not_required: { variant: "default", label: "Not Required" },
 };
 
-export function DrawingsOverview({ projectId, productionItems, drawings: propDrawings, projectCurrency = "TRY", isClient = false }: DrawingsOverviewProps) {
+export function DrawingsOverview({ projectId, projectCode, projectName, productionItems, drawings: propDrawings, projectCurrency = "TRY", isClient = false, isAdmin = false }: DrawingsOverviewProps) {
   const { data: fetchedDrawings, isLoading: hookLoading } = useProjectDrawings(projectId);
   const drawings = (propDrawings ?? fetchedDrawings ?? []) as Drawing[];
 
@@ -113,6 +119,16 @@ export function DrawingsOverview({ projectId, productionItems, drawings: propDra
   // Bulk send state
   const [bulkSendDialogOpen, setBulkSendDialogOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);
+
+  // Download all state
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<{ done: number; total: number } | null>(null);
+
+  // Delete drawing state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [pendingDeleteDrawingId, setPendingDeleteDrawingId] = useState<string | null>(null);
+  const [pendingDeleteItemName, setPendingDeleteItemName] = useState<string>("");
+  const [isDeleting, setIsDeleting] = useState(false);
 
   if (hookLoading && !propDrawings) {
     return <div className="space-y-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-48 w-full" /></div>;
@@ -187,6 +203,77 @@ export function DrawingsOverview({ projectId, productionItems, drawings: propDra
       toast.error("Failed to send drawings");
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const handleDeleteDrawing = async () => {
+    if (!pendingDeleteDrawingId) return;
+    setIsDeleting(true);
+    try {
+      const result = await deleteDrawing(pendingDeleteDrawingId);
+      if (result.success) {
+        toast.success("Drawing deleted");
+        invalidateDrawingCaches();
+      } else {
+        toast.error(result.error || "Failed to delete drawing");
+      }
+    } catch {
+      toast.error("Failed to delete drawing");
+    } finally {
+      setIsDeleting(false);
+      setDeleteDialogOpen(false);
+      setPendingDeleteDrawingId(null);
+    }
+  };
+
+  // Download all drawings as a single ZIP file
+  const handleDownloadAll = async () => {
+    setIsDownloading(true);
+    setDownloadProgress(null);
+    try {
+      const urls = await getDrawingDownloadUrls(projectId);
+      if (urls.length === 0) {
+        toast.info("No drawings available to download");
+        setIsDownloading(false);
+        return;
+      }
+
+      setDownloadProgress({ done: 0, total: urls.length });
+
+      const zip = new JSZip();
+
+      for (let i = 0; i < urls.length; i++) {
+        const { file_url, item_code, revision, file_name } = urls[i];
+        try {
+          const response = await fetch(file_url);
+          const blob = await response.blob();
+          zip.file(file_name, blob);
+        } catch {
+          console.error(`Failed to fetch ${item_code}`);
+        }
+        setDownloadProgress({ done: i + 1, total: urls.length });
+      }
+
+      // Generate and download ZIP
+      setDownloadProgress({ done: urls.length, total: urls.length });
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      const blobUrl = window.URL.createObjectURL(zipBlob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      const safeName = (projectName || "Project").replace(/[^a-zA-Z0-9-_ ]/g, "").replace(/\s+/g, "-");
+      const date = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD
+      link.download = `${projectCode || "Project"}_${safeName}_Drawings_${urls.length}files_${date}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+
+      toast.success(`${urls.length} drawing${urls.length !== 1 ? "s" : ""} downloaded as ZIP`);
+    } catch {
+      toast.error("Failed to download drawings");
+    } finally {
+      setIsDownloading(false);
+      setDownloadProgress(null);
     }
   };
 
@@ -266,8 +353,33 @@ export function DrawingsOverview({ projectId, productionItems, drawings: propDra
             <><span>&middot;</span><span className="text-amber-600">{stats.awaitingClient} awaiting your review</span></>
           )}
         </div>
+        <div className="flex flex-wrap gap-1.5">
+          {/* Download All — visible to both clients and PMs */}
+          {visibleItems.some((i) => i.drawing) && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 px-2.5 text-xs md:h-9 md:px-3 md:text-sm"
+              onClick={handleDownloadAll}
+              disabled={isDownloading}
+            >
+              {isDownloading ? (
+                <>
+                  <Spinner className="size-3.5" />
+                  {downloadProgress
+                    ? `${downloadProgress.done}/${downloadProgress.total}`
+                    : "Preparing..."}
+                </>
+              ) : (
+                <>
+                  <DownloadIcon className="size-3.5" />
+                  Download All
+                </>
+              )}
+            </Button>
+          )}
         {!isClient && (
-          <div className="flex flex-wrap gap-1.5">
+          <>
             {readyToSendCount > 0 && (
               <Button
                 variant="outline"
@@ -291,8 +403,9 @@ export function DrawingsOverview({ projectId, productionItems, drawings: propDra
               <UploadIcon className="size-3.5" />
               Upload
             </Button>
-          </div>
+          </>
         )}
+        </div>
       </div>
 
       <ResponsiveDataView
@@ -376,6 +489,20 @@ export function DrawingsOverview({ projectId, productionItems, drawings: propDra
                             <EyeIcon className="size-3 mr-1" />
                             View
                           </Button>
+                          {isAdmin && item.drawing && !["approved", "approved_with_comments"].includes(item.drawing.status) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setPendingDeleteDrawingId(item.drawing!.id);
+                                setPendingDeleteItemName(`${item.item_code} — ${item.name}`);
+                                setDeleteDialogOpen(true);
+                              }}
+                              className="hover:text-destructive hover:bg-destructive/10"
+                            >
+                              <TrashIcon className="size-3" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -555,6 +682,41 @@ export function DrawingsOverview({ projectId, productionItems, drawings: propDra
                   <SendIcon className="size-4" />
                   Send All
                 </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete drawing confirmation dialog — admin only */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <TrashIcon className="size-5 text-destructive" />
+              Delete Drawing?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the drawing and all its revisions for <strong>{pendingDeleteItemName}</strong>. The files will be removed from storage. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleDeleteDrawing();
+              }}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <Spinner className="size-4" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Drawing"
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
