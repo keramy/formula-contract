@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import type { GanttViewMode, GanttPanel, GanttItem } from "./gantt-types";
-import { ZOOM_LEVELS, DEFAULT_ZOOM_INDEX } from "./gantt-types";
+import { ZOOM_LEVELS, DEFAULT_ZOOM_INDEX, SIDEBAR_WIDTH } from "./gantt-types";
 
 // ============================================================================
 // useGanttState — Owns ALL chart UI state
@@ -27,6 +27,9 @@ export interface GanttState {
   // Selection & collapse
   selectedIds: Set<string>;
   collapsedIds: Set<string>;
+
+  // Layout
+  sidebarWidth: number;
 
   // Scroll sync
   scrollTop: number;
@@ -55,6 +58,7 @@ export interface GanttActions {
   expandAll: () => void;
   collapseAll: (phaseIds: string[]) => void;
 
+  setSidebarWidth: (width: number) => void;
   setScrollTop: (top: number) => void;
 }
 
@@ -71,6 +75,7 @@ export function useGanttState(
   const [activeBaselineId, setActiveBaselineId] = React.useState<string | null>(null);
   const [linkMode, setLinkMode] = React.useState(false);
   const [linkSourceId, setLinkSourceId] = React.useState<string | null>(null);
+  const [sidebarWidth, setSidebarWidth] = React.useState(440);
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const [collapsedIds, setCollapsedIds] = React.useState<Set<string>>(new Set());
   const [scrollTop, setScrollTop] = React.useState(0);
@@ -153,6 +158,7 @@ export function useGanttState(
     activeBaselineId,
     linkMode,
     linkSourceId,
+    sidebarWidth,
     selectedIds,
     collapsedIds,
     scrollTop,
@@ -184,6 +190,7 @@ export function useGanttState(
       setLinkMode(false);
       setLinkSourceId(null);
     }, []),
+    setSidebarWidth,
     selectItem,
     clearSelection: React.useCallback(() => setSelectedIds(new Set()), []),
     toggleCollapse,

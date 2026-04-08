@@ -165,10 +165,8 @@ export function GanttBar({
   // Fix 6: All depths use solid fill — deeper = lower opacity (no dashed borders)
   const bgAlpha = depth === 0 ? "70" : depth === 1 ? "50" : "35";
   const fillAlpha = depth === 0 ? "cc" : depth === 1 ? "90" : "70";
-  // Fix 4-5: Bar label + date thresholds
-  const showNameInside = width > 80;
-  const showDateInside = width > 160;
-  const showNameOutside = !showNameInside && width > 20;
+  // Bar labels — names removed (shown in sidebar), only dates + progress on bar
+  const showDateInside = width > 120;
   const showProgress = width > 50 && progress > 0;
 
   // Date formatting for inline display
@@ -228,40 +226,27 @@ export function GanttBar({
               }}
             />
 
-            {/* Fix 5: Name label — white with text shadow for readability */}
-            {showNameInside && (
-              <span
-                className="absolute inset-0 flex items-center px-2 text-[10px] font-semibold truncate pointer-events-none"
-                style={{
-                  color: "#fff",
-                  textShadow: `0 0 3px ${effectiveColor}, 0 1px 2px rgba(0,0,0,0.5)`,
-                }}
-              >
-                {item.name}
-                {showProgress && !showDateInside && ` · ${Math.round(progress)}%`}
-              </span>
-            )}
-
-            {/* Fix 4: Date range inside bar (wide bars only) */}
+            {/* Date range inside bar (wide bars only) */}
             {showDateInside && (
               <span
-                className="absolute right-2 inset-y-0 flex items-center text-[9px] font-medium pointer-events-none"
+                className="absolute inset-0 flex items-center justify-center text-[9px] font-medium pointer-events-none"
                 style={{
-                  color: "rgba(255,255,255,0.75)",
-                  textShadow: `0 0 2px ${effectiveColor}`,
+                  color: "rgba(255,255,255,0.85)",
+                  textShadow: `0 0 3px ${effectiveColor}, 0 1px 2px rgba(0,0,0,0.4)`,
                 }}
               >
                 {dateLabel}
+                {showProgress && ` · ${Math.round(progress)}%`}
               </span>
             )}
 
-            {/* Progress-only label (medium bars without name) */}
-            {!showNameInside && showProgress && (
+            {/* Progress-only label (medium bars without date) */}
+            {!showDateInside && showProgress && (
               <span
-                className="absolute inset-0 flex items-center justify-center text-[10px] font-semibold pointer-events-none"
+                className="absolute inset-0 flex items-center justify-center text-[9px] font-semibold pointer-events-none"
                 style={{
-                  color: "#fff",
-                  textShadow: `0 0 3px ${effectiveColor}, 0 1px 2px rgba(0,0,0,0.5)`,
+                  color: "rgba(255,255,255,0.85)",
+                  textShadow: `0 0 3px ${effectiveColor}, 0 1px 2px rgba(0,0,0,0.4)`,
                 }}
               >
                 {Math.round(progress)}%
@@ -285,31 +270,7 @@ export function GanttBar({
         </TooltipContent>
       </Tooltip>
 
-      {/* Name label OUTSIDE bar (for narrow bars) + date below */}
-      {showNameOutside && (
-        <div
-          className={cn(
-            "absolute pointer-events-none z-10",
-            dimmed && "opacity-25"
-          )}
-          style={{
-            left: left + width + 6,
-            top: barTop,
-            height: TASK_BAR_HEIGHT,
-          }}
-        >
-          <span
-            className="text-[10px] font-semibold whitespace-nowrap truncate block"
-            style={{
-              color: effectiveColor,
-              lineHeight: `${TASK_BAR_HEIGHT}px`,
-              maxWidth: 180,
-            }}
-          >
-            {item.name}
-          </span>
-        </div>
-      )}
+      {/* No outside labels — names are in the sidebar */}
     </>
   );
 }
@@ -429,25 +390,7 @@ function BracketBar({
         onContextMenu={(e) => onContextMenu?.(e, item)}
       />
 
-      {/* Name label to the right */}
-      {width > 20 && (
-        <span
-          className={cn(
-            "absolute text-[9px] font-semibold whitespace-nowrap pointer-events-none z-10",
-            dimmed && "opacity-25"
-          )}
-          style={{
-            left: left + width + 6,
-            top: barY,
-            height: TASK_BAR_HEIGHT,
-            lineHeight: `${TASK_BAR_HEIGHT}px`,
-            color,
-            maxWidth: 150,
-          }}
-        >
-          {item.name}
-        </span>
-      )}
+      {/* No outside labels — names are in the sidebar */}
     </>
   );
 }

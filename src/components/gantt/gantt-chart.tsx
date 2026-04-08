@@ -110,6 +110,7 @@ export function GanttChart({
     showDependencies,
     linkMode,
     linkSourceId,
+    sidebarWidth,
     selectedIds,
     collapsedIds,
     scrollTop,
@@ -120,6 +121,7 @@ export function GanttChart({
     toggleLinkMode,
     setLinkSourceId,
     exitLinkMode,
+    setSidebarWidth,
     selectItem,
     clearSelection,
     toggleCollapse,
@@ -351,19 +353,33 @@ export function GanttChart({
         // Clicked same item → deselect source
         setLinkSourceId(null);
       } else {
-        // Second click → open dependency dialog
-        const source = itemMap.get(linkSourceId) ?? null;
-        const target = itemMap.get(itemId) ?? null;
-        if (source && target) {
-          setLinkSource(source);
-          setLinkTarget(target);
-          setSelectedDep(null);
-          setDepDialogOpen(true);
+        // Second click → check if dependency already exists between these two
+        const existingDep = dependencies.find(
+          (d) =>
+            (d.sourceId === linkSourceId && d.targetId === itemId) ||
+            (d.sourceId === itemId && d.targetId === linkSourceId)
+        );
+
+        if (existingDep) {
+          // Edit existing dependency
+          setSelectedDep(existingDep);
+          setLinkSource(null);
+          setLinkTarget(null);
+        } else {
+          // Create new dependency
+          const source = itemMap.get(linkSourceId) ?? null;
+          const target = itemMap.get(itemId) ?? null;
+          if (source && target) {
+            setLinkSource(source);
+            setLinkTarget(target);
+            setSelectedDep(null);
+          }
         }
+        setDepDialogOpen(true);
         exitLinkMode();
       }
     },
-    [linkMode, linkSourceId, itemMap, setLinkSourceId, exitLinkMode]
+    [linkMode, linkSourceId, itemMap, dependencies, setLinkSourceId, exitLinkMode]
   );
 
   // Intercept sidebar clicks in link mode
@@ -450,6 +466,33 @@ export function GanttChart({
     [onItemEdit]
   );
 
+  // Delete selected items
+  const handleDeleteSelected = React.useCallback(() => {
+    if (!onItemDelete || selectedIds.size === 0) return;
+    const editableSelected = ganttRows.filter(
+      (r) => selectedIds.has(r.id) && r.item.isEditable && r.type !== "phase"
+    );
+    for (const row of editableSelected) {
+      onItemDelete(row.item);
+    }
+    clearSelection();
+  }, [onItemDelete, selectedIds, ganttRows, clearSelection]);
+
+  // Delete key shortcut
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Delete" && selectedIds.size > 0 && onItemDelete) {
+        // Don't trigger if user is typing in an input
+        const tag = (e.target as HTMLElement)?.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+        e.preventDefault();
+        handleDeleteSelected();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [selectedIds.size, onItemDelete, handleDeleteSelected]);
+
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
@@ -470,9 +513,11 @@ export function GanttChart({
           onLinkModeToggle={onCreateDependency ? toggleLinkMode : undefined}
           linkSourceId={linkSourceId}
           onAddItem={showAddButton ? onAddItem : undefined}
+          onDeleteSelected={onItemDelete && selectedIds.size > 0 ? handleDeleteSelected : undefined}
           onIndent={canIndent ? handleIndent : undefined}
           onOutdent={canOutdent ? handleOutdent : undefined}
           hasSelection={selectedItemsOrdered.length > 0}
+          selectedCount={selectedIds.size}
           showCriticalPath={ganttState.showCriticalPath}
           onCriticalPathToggle={ganttState.toggleCriticalPath}
           searchQuery={ganttState.searchQuery}
@@ -504,6 +549,8 @@ export function GanttChart({
               onSelectItem={handleSelectItem}
               onDoubleClickItem={handleDoubleClick}
               scrollTop={scrollTop}
+              width={sidebarWidth}
+              onWidthChange={setSidebarWidth}
               linkMode={linkMode}
               linkSourceId={linkSourceId}
               onEditItem={onItemEdit ? handleDoubleClick : undefined}

@@ -29,6 +29,8 @@ interface GanttSidebarProps {
   onSelectItem: (id: string, e: React.MouseEvent) => void;
   onDoubleClickItem: (item: GanttItem) => void;
   scrollTop: number;
+  width: number;
+  onWidthChange: (width: number) => void;
   linkMode?: boolean;
   linkSourceId?: string | null;
   // Context menu callbacks
@@ -54,24 +56,60 @@ export function GanttSidebar({
   onConvertToMilestone,
   onSetPriority,
   onToggleCriticalPath,
+  width,
+  onWidthChange,
   linkMode,
   linkSourceId,
   className,
 }: GanttSidebarProps) {
   const contentHeight = totalRowsHeight(rows);
 
+  // Resize handle drag logic
+  const handleMouseDown = React.useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      const startX = e.clientX;
+      const startWidth = width;
+
+      const handleMouseMove = (moveEvent: MouseEvent) => {
+        const delta = moveEvent.clientX - startX;
+        const newWidth = Math.max(200, Math.min(600, startWidth + delta));
+        onWidthChange(newWidth);
+      };
+
+      const handleMouseUp = () => {
+        document.removeEventListener("mousemove", handleMouseMove);
+        document.removeEventListener("mouseup", handleMouseUp);
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+      };
+
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+    },
+    [width, onWidthChange]
+  );
+
   return (
     <div
       className={cn("relative shrink-0 border-r bg-background overflow-hidden", className)}
-      style={{ width: SIDEBAR_WIDTH }}
+      style={{ width }}
     >
       {/* Column headers — height MUST match timeline header exactly */}
       <div
-        className="flex items-center border-b px-4 text-[11px] font-semibold text-muted-foreground bg-muted/30 box-border"
+        className="flex items-center border-b text-[11px] font-semibold text-muted-foreground bg-muted/30 box-border"
         style={{ height: HEADER_HEIGHT }}
       >
-        <span className="flex-1">Task Name</span>
-        <span className="w-16 text-right">Duration</span>
+        <span className="flex-1 px-4 truncate">Task Name</span>
+        {width >= 300 && (
+          <span className="w-[68px] px-2 text-center shrink-0 border-l border-border/40">Start</span>
+        )}
+        {width >= 300 && (
+          <span className="w-[68px] px-2 text-center shrink-0 border-l border-border/40">End</span>
+        )}
+        <span className="w-[52px] px-2 text-center shrink-0 border-l border-border/40">Days</span>
       </div>
 
       {/* Scrollable row area — offset by scrollTop to sync with timeline */}
@@ -102,11 +140,18 @@ export function GanttSidebar({
                 onDoubleClick={onDoubleClickItem}
                 linkMode={linkMode}
                 isLinkSource={linkMode && linkSourceId === row.id}
+                sidebarWidth={width}
               />
             </GanttContextMenu>
           ))}
         </div>
       </div>
+
+      {/* Resize handle — drag to change sidebar width */}
+      <div
+        className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize z-30 hover:bg-primary/20 active:bg-primary/30 transition-colors"
+        onMouseDown={handleMouseDown}
+      />
     </div>
   );
 }
@@ -123,6 +168,7 @@ function SidebarRow({
   onDoubleClick,
   linkMode,
   isLinkSource,
+  sidebarWidth,
 }: {
   row: GanttRow;
   isSelected: boolean;
@@ -131,6 +177,7 @@ function SidebarRow({
   onDoubleClick: (item: GanttItem) => void;
   linkMode?: boolean;
   isLinkSource?: boolean;
+  sidebarWidth: number;
 }) {
   const { item, depth, hasChildren, isCollapsed, phaseColor, type } = row;
   const isPhase = type === "phase";
@@ -151,7 +198,7 @@ function SidebarRow({
       role="row"
       tabIndex={0}
       className={cn(
-        "flex items-center gap-1.5 px-4 border-b border-border/50 cursor-pointer select-none group relative",
+        "flex items-center gap-1.5 pl-4 border-b border-border/50 cursor-pointer select-none group relative",
         isSelected ? "bg-primary/10" : row.rowIndex % 2 === 0 ? "bg-background" : "bg-muted/20",
         isPhase ? "font-semibold" : "text-[11px]",
         linkMode && !isPhase && "cursor-crosshair hover:bg-blue-50 dark:hover:bg-blue-950/30",
@@ -244,10 +291,24 @@ function SidebarRow({
         {item.name}
       </span>
 
+      {/* Start date */}
+      {sidebarWidth >= 300 && (
+        <span className="w-[68px] px-2 text-center text-[10px] tabular-nums shrink-0 text-muted-foreground border-l border-border/30">
+          {item.type !== "phase" && item.startDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+        </span>
+      )}
+
+      {/* End date */}
+      {sidebarWidth >= 300 && (
+        <span className="w-[68px] px-2 text-center text-[10px] tabular-nums shrink-0 text-muted-foreground border-l border-border/30">
+          {item.type !== "phase" && item.endDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+        </span>
+      )}
+
       {/* Duration */}
       <span
         className={cn(
-          "w-16 text-right text-[11px] tabular-nums shrink-0",
+          "w-[52px] px-2 text-center text-[11px] tabular-nums shrink-0 border-l border-border/30",
           isPhase ? "font-semibold text-green-600" : "text-muted-foreground"
         )}
       >

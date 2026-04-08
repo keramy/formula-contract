@@ -57,9 +57,11 @@ interface GanttToolbarProps {
   onLinkModeToggle?: () => void;
   linkSourceId?: string | null;
   onAddItem?: () => void;
+  onDeleteSelected?: () => void;
   onIndent?: () => void;
   onOutdent?: () => void;
   hasSelection?: boolean;
+  selectedCount?: number;
   showCriticalPath?: boolean;
   onCriticalPathToggle?: () => void;
   searchQuery?: string;
@@ -96,9 +98,11 @@ export function GanttToolbar({
   onLinkModeToggle,
   linkSourceId,
   onAddItem,
+  onDeleteSelected,
   onIndent,
   onOutdent,
   hasSelection,
+  selectedCount,
   showCriticalPath,
   onCriticalPathToggle,
   searchQuery,
@@ -208,6 +212,24 @@ export function GanttToolbar({
             <TooltipContent>Indent (make child of task above)</TooltipContent>
           </Tooltip>
         </div>
+      )}
+
+      {/* Delete selected — shown when items are selected */}
+      {hasSelection && onDeleteSelected && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onDeleteSelected}
+              className="h-7 gap-1.5 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+            >
+              <TrashIcon className="size-3.5" />
+              Delete{selectedCount && selectedCount > 1 ? ` (${selectedCount})` : ""}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Delete selected tasks (Del key)</TooltipContent>
+        </Tooltip>
       )}
 
       {/* Table view: Add Category */}

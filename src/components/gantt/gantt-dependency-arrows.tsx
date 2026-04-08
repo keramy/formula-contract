@@ -23,7 +23,7 @@ interface GanttDependencyArrowsProps {
   onDependencyClick?: (dep: GanttDependency) => void;
 }
 
-const ARROW_SIZE = 8;
+const ARROW_SIZE = 5;
 const RADIUS = 8;
 const GAP = 12; // horizontal gap from bar edge before turning
 
