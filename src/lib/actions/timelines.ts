@@ -486,6 +486,253 @@ export async function deleteTimelineItem(timelineId: string): Promise<ActionResu
   return { success: true };
 }
 
+// ============================================================================
+// Dependency Date Propagation
+// ============================================================================
+
+/**
+ * Detect if adding an edge source→target would create a cycle.
+ * Walks forward from target through all outgoing dependencies.
+ * If we reach source, it's a cycle.
+ */
+function detectCycle(
+  sourceId: string,
+  targetId: string,
+  deps: { source_id: string; target_id: string }[]
+): boolean {
+  // Build adjacency list: source → [targets]
+  // Exclude the exact edge we're testing (it may already exist as a duplicate attempt)
+  const adj = new Map<string, string[]>();
+  for (const d of deps) {
+    if (d.source_id === sourceId && d.target_id === targetId) continue;
+    const existing = adj.get(d.source_id) || [];
+    existing.push(d.target_id);
+    adj.set(d.source_id, existing);
+  }
+
+  // BFS from targetId — if we can reach sourceId, adding source→target creates a cycle
+  const visited = new Set<string>();
+  const queue = [targetId];
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    if (current === sourceId) return true;
+    if (visited.has(current)) continue;
+    visited.add(current);
+    for (const next of adj.get(current) || []) {
+      queue.push(next);
+    }
+  }
+  return false;
+}
+
+/**
+ * Topological sort of task IDs based on dependencies.
+ * Returns ordered list where every source comes before its target.
+ * Only includes IDs that are downstream of changedIds.
+ */
+function topologicalSort(
+  allItemIds: string[],
+  deps: { source_id: string; target_id: string }[]
+): string[] {
+  const inDegree = new Map<string, number>();
+  const adj = new Map<string, string[]>();
+
+  for (const id of allItemIds) {
+    inDegree.set(id, 0);
+    adj.set(id, []);
+  }
+
+  for (const d of deps) {
+    if (inDegree.has(d.source_id) && inDegree.has(d.target_id)) {
+      adj.get(d.source_id)!.push(d.target_id);
+      inDegree.set(d.target_id, (inDegree.get(d.target_id) || 0) + 1);
+    }
+  }
+
+  // Kahn's algorithm
+  const queue = allItemIds.filter((id) => inDegree.get(id) === 0);
+  const sorted: string[] = [];
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    sorted.push(current);
+    for (const next of adj.get(current) || []) {
+      const newDeg = (inDegree.get(next) || 1) - 1;
+      inDegree.set(next, newDeg);
+      if (newDeg === 0) queue.push(next);
+    }
+  }
+
+  return sorted;
+}
+
+/**
+ * Calculate the constrained date for a target based on dependency type + lag.
+ * Returns the earliest allowed start or end date for the target.
+ */
+function calculateConstrainedDate(
+  depType: number,
+  lagDays: number,
+  sourceStart: Date,
+  sourceEnd: Date
+): { constrainedStart?: Date; constrainedEnd?: Date } {
+  const addDays = (d: Date, days: number) => {
+    const result = new Date(d);
+    result.setDate(result.getDate() + days);
+    return result;
+  };
+
+  switch (depType) {
+    case 0: // FS: target starts after source finishes
+      return { constrainedStart: addDays(sourceEnd, lagDays) };
+    case 1: // SS: target starts when source starts
+      return { constrainedStart: addDays(sourceStart, lagDays) };
+    case 2: // FF: target finishes when source finishes
+      return { constrainedEnd: addDays(sourceEnd, lagDays) };
+    case 3: // SF: target finishes when source starts
+      return { constrainedEnd: addDays(sourceStart, lagDays) };
+    default:
+      return {};
+  }
+}
+
+/**
+ * Propagate dependency dates for a project.
+ * Loads all items + deps, computes new dates via topological sort,
+ * batch-updates changed items. 3 queries total.
+ */
+export async function propagateDependencyDates(
+  projectId: string
+): Promise<ActionResult<{ updatedCount: number }>> {
+  const supabase = await createClient();
+
+  // Query 1: all items for this project
+  const { data: items, error: itemsError } = await supabase
+    .from("gantt_items")
+    .select("id, start_date, end_date, item_type")
+    .eq("project_id", projectId);
+
+  if (itemsError || !items) {
+    return { success: false, error: itemsError?.message || "Failed to load items" };
+  }
+
+  // Query 2: all dependencies for this project
+  const { data: deps, error: depsError } = await supabase
+    .from("gantt_dependencies")
+    .select("source_id, target_id, dependency_type, lag_days")
+    .eq("project_id", projectId);
+
+  if (depsError || !deps) {
+    return { success: false, error: depsError?.message || "Failed to load dependencies" };
+  }
+
+  if (deps.length === 0) return { success: true, data: { updatedCount: 0 } };
+
+  // Build item lookup
+  const itemMap = new Map<string, { start: Date; end: Date; type: string }>();
+  for (const item of items) {
+    itemMap.set(item.id, {
+      start: new Date(item.start_date),
+      end: new Date(item.end_date),
+      type: item.item_type,
+    });
+  }
+
+  // Topological sort — process sources before targets
+  const sorted = topologicalSort(
+    items.map((i) => i.id),
+    deps
+  );
+
+  // Build reverse dep lookup: targetId → [deps pointing to it]
+  const incomingDeps = new Map<string, typeof deps>();
+  for (const dep of deps) {
+    const existing = incomingDeps.get(dep.target_id) || [];
+    existing.push(dep);
+    incomingDeps.set(dep.target_id, existing);
+  }
+
+  // Propagate in topological order
+  const updates: { id: string; start_date: string; end_date: string }[] = [];
+
+  for (const itemId of sorted) {
+    const item = itemMap.get(itemId);
+    if (!item) continue;
+
+    // Skip phases — they don't get auto-scheduled
+    if (item.type === "phase") continue;
+
+    const incoming = incomingDeps.get(itemId);
+    if (!incoming || incoming.length === 0) continue;
+
+    const duration = item.end.getTime() - item.start.getTime();
+    let newStart = item.start;
+    let newEnd = item.end;
+
+    // Apply all incoming constraints
+    // FS/SS: constrain start date (target can't start before the constraint)
+    // FF/SF: align end date exactly (target end = source end + lag)
+    for (const dep of incoming) {
+      const source = itemMap.get(dep.source_id);
+      if (!source) continue;
+
+      const constraint = calculateConstrainedDate(
+        dep.dependency_type,
+        dep.lag_days,
+        source.start,
+        source.end
+      );
+
+      if (constraint.constrainedStart) {
+        // FS/SS: target can't start before the constrained date
+        if (constraint.constrainedStart > newStart) {
+          newStart = constraint.constrainedStart;
+          newEnd = new Date(newStart.getTime() + duration);
+        }
+      }
+
+      if (constraint.constrainedEnd) {
+        // FF/SF: target end aligns with source end (not just a floor)
+        const constrainedEnd = constraint.constrainedEnd;
+        if (constrainedEnd.getTime() !== newEnd.getTime()) {
+          newEnd = constrainedEnd;
+          newStart = new Date(newEnd.getTime() - duration);
+        }
+      }
+    }
+
+    // Only record if dates actually changed
+    if (newStart.getTime() !== item.start.getTime() || newEnd.getTime() !== item.end.getTime()) {
+      const startStr = newStart.toISOString().split("T")[0];
+      const endStr = newEnd.toISOString().split("T")[0];
+      updates.push({ id: itemId, start_date: startStr, end_date: endStr });
+
+      // Update in-memory map so downstream tasks see the new dates
+      itemMap.set(itemId, { start: newStart, end: newEnd, type: item.type });
+    }
+  }
+
+  // Query 3: batch update all changed items
+  if (updates.length > 0) {
+    // Supabase doesn't support batch update with different values per row,
+    // so we do individual updates in parallel (still one round-trip via Promise.all)
+    const updatePromises = updates.map((u) =>
+      supabase
+        .from("gantt_items")
+        .update({ start_date: u.start_date, end_date: u.end_date })
+        .eq("id", u.id)
+    );
+
+    const results = await Promise.all(updatePromises);
+    const failed = results.filter((r) => r.error);
+    if (failed.length > 0) {
+      console.error("Some date updates failed:", failed.map((f) => f.error));
+    }
+  }
+
+  return { success: true, data: { updatedCount: updates.length } };
+}
+
 // Dependencies
 export async function createTimelineDependency(
   input: GanttDependencyInput
@@ -501,6 +748,16 @@ export async function createTimelineDependency(
 
   if (input.source_id === input.target_id) {
     return { success: false, error: "Cannot create a dependency to itself" };
+  }
+
+  // Cycle detection: load existing deps and check if this would create a loop
+  const { data: existingDeps } = await supabase
+    .from("gantt_dependencies")
+    .select("source_id, target_id")
+    .eq("project_id", input.project_id);
+
+  if (existingDeps && detectCycle(input.source_id, input.target_id, existingDeps)) {
+    return { success: false, error: "This would create a circular dependency" };
   }
 
   const { data: created, error } = await supabase

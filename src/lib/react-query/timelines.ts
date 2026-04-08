@@ -11,6 +11,7 @@ import {
   createTimelineDependency,
   updateTimelineDependency,
   deleteTimelineDependency,
+  propagateDependencyDates,
   getBaselines,
   getBaselineItems,
   saveBaseline,
@@ -330,11 +331,19 @@ export function useCreateTimelineDependency(projectId: string) {
       }
       toast.error(error.message);
     },
-    onSuccess: () => {
-      toast.success("Dependency created");
+    onSuccess: async () => {
+      // Propagate dates through the dependency chain
+      const result = await propagateDependencyDates(projectId);
+      if (result.success && result.data && result.data.updatedCount > 0) {
+        toast.success(`Dependency created — ${result.data.updatedCount} task${result.data.updatedCount !== 1 ? "s" : ""} rescheduled`);
+      } else {
+        toast.success("Dependency created");
+      }
     },
     onSettled: () => {
+      // Invalidate both deps AND items (dates may have changed)
       queryClient.invalidateQueries({ queryKey: timelineKeys.dependencyList(projectId) });
+      queryClient.invalidateQueries({ queryKey: timelineKeys.list(projectId) });
     },
   });
 }
@@ -392,11 +401,18 @@ export function useUpdateTimelineDependency(projectId: string) {
       }
       toast.error(error.message);
     },
-    onSuccess: () => {
-      toast.success("Dependency updated");
+    onSuccess: async () => {
+      // Re-propagate dates after type/lag change
+      const result = await propagateDependencyDates(projectId);
+      if (result.success && result.data && result.data.updatedCount > 0) {
+        toast.success(`Dependency updated — ${result.data.updatedCount} task${result.data.updatedCount !== 1 ? "s" : ""} rescheduled`);
+      } else {
+        toast.success("Dependency updated");
+      }
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: timelineKeys.dependencyList(projectId) });
+      queryClient.invalidateQueries({ queryKey: timelineKeys.list(projectId) });
     },
   });
 }
