@@ -30,6 +30,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { GlassCard, GradientIcon } from "@/components/ui/ui-helpers";
 import { usePageHeader } from "@/components/layout/app-header";
 import {
@@ -41,9 +51,10 @@ import {
   DownloadIcon,
   CheckCircleIcon,
   PaperclipIcon,
+  Trash2Icon,
 } from "lucide-react";
 import { useBreakpoint } from "@/hooks/use-media-query";
-import { useInvoices, useSuppliers, useCategories, useProjectsForFinance, useExportInvoices, useNotifyTeamUrgent, useBulkApproveInvoices } from "@/lib/react-query/finance";
+import { useInvoices, useSuppliers, useCategories, useProjectsForFinance, useExportInvoices, useNotifyTeamUrgent, useBulkApproveInvoices, useBulkDeleteInvoices, useDeleteInvoice } from "@/lib/react-query/finance";
 import { INVOICE_STATUSES } from "@/types/finance";
 import type { InvoiceFilters, FinanceInvoiceWithDetails, InvoiceStatus } from "@/types/finance";
 import { formatCurrency } from "@/lib/utils";
@@ -54,17 +65,24 @@ import { cn } from "@/lib/utils";
 
 // Status badge is handled by InvoiceStatusBadge component
 
+const PAGE_SIZE = 50;
+
 export function InvoicesTable() {
   const [filters, setFilters] = useState<InvoiceFilters>({});
   const [search, setSearch] = useState("");
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<FinanceInvoiceWithDetails | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [notifyDialogOpen, setNotifyDialogOpen] = useState(false);
   const [notifyNote, setNotifyNote] = useState("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<"bulk" | string | null>(null);
   const notifyTeam = useNotifyTeamUrgent();
   const bulkApprove = useBulkApproveInvoices();
+  const bulkDelete = useBulkDeleteInvoices();
+  const singleDelete = useDeleteInvoice();
 
   const { data: invoices, isLoading } = useInvoices(filters);
   const { data: suppliers } = useSuppliers();
@@ -100,8 +118,13 @@ export function InvoicesTable() {
     return () => setContent({});
   }, [setContent]);
 
+  // Reset visible count when filters change
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [filters, search]);
+
   // Filter by search text (client-side on top of server filters)
-  const filtered = useMemo(() => {
+  const allFiltered = useMemo(() => {
     if (!invoices) return [];
     if (!search) return invoices;
     const q = search.toLowerCase();
@@ -113,6 +136,9 @@ export function InvoicesTable() {
         (inv.supplier as { name: string } | null)?.name?.toLowerCase().includes(q)
     );
   }, [invoices, search]);
+
+  const filtered = useMemo(() => allFiltered.slice(0, visibleCount), [allFiltered, visibleCount]);
+  const hasMore = allFiltered.length > visibleCount;
 
   const handleFilterChange = (key: keyof InvoiceFilters, value: string | undefined) => {
     setFilters((prev) => {
@@ -197,8 +223,28 @@ export function InvoicesTable() {
       {/* Filter Bar + Selection Actions */}
       <div className="flex flex-col sm:flex-row gap-2">
         <Select
-          value={filters.status || "all"}
-          onValueChange={(v) => handleFilterChange("status", v)}
+          value={filters.overdue_only ? "overdue" : filters.status || "all"}
+          onValueChange={(v) => {
+            if (v === "overdue") {
+              setFilters((prev) => {
+                const next = { ...prev };
+                delete next.status;
+                next.overdue_only = true;
+                return next;
+              });
+            } else {
+              setFilters((prev) => {
+                const next = { ...prev };
+                delete next.overdue_only;
+                if (v && v !== "all") {
+                  next.status = v as InvoiceStatus;
+                } else {
+                  delete next.status;
+                }
+                return next;
+              });
+            }
+          }}
         >
           <SelectTrigger className="w-full sm:w-36">
             <SelectValue placeholder="Status" />
@@ -304,6 +350,15 @@ export function InvoicesTable() {
               <Button size="sm" className="h-8" onClick={() => setNotifyDialogOpen(true)}>
                 <BellIcon className="size-3.5 mr-1" />
                 Notify ({selectedIds.size})
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-destructive border-destructive/30 hover:bg-destructive/10"
+                onClick={() => { setDeleteTarget("bulk"); setDeleteDialogOpen(true); }}
+              >
+                <Trash2Icon className="size-3.5 mr-1" />
+                Delete ({selectedIds.size})
               </Button>
             </div>
           );
@@ -543,6 +598,24 @@ export function InvoicesTable() {
         </GlassCard>
       )}
 
+      {/* Pagination Footer */}
+      {allFiltered.length > 0 && (
+        <div className="flex items-center justify-between px-1">
+          <span className="text-xs text-muted-foreground">
+            Showing {filtered.length} of {allFiltered.length} invoice{allFiltered.length !== 1 ? "s" : ""}
+          </span>
+          {hasMore && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setVisibleCount((prev) => prev + PAGE_SIZE)}
+            >
+              Load More ({allFiltered.length - visibleCount} remaining)
+            </Button>
+          )}
+        </div>
+      )}
+
       {/* Invoice Create/Edit Sheet */}
       <InvoiceSheet
         open={sheetOpen}
@@ -560,6 +633,12 @@ export function InvoicesTable() {
           setEditingInvoice(inv);
           setPreviewId(null);
           setSheetOpen(true);
+        }}
+        onDelete={() => {
+          if (previewId) {
+            setDeleteTarget(previewId);
+            setDeleteDialogOpen(true);
+          }
         }}
       />
 
@@ -623,6 +702,48 @@ export function InvoicesTable() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {deleteTarget === "bulk" ? `${selectedIds.size} Invoice${selectedIds.size !== 1 ? "s" : ""}` : "Invoice"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget === "bulk"
+                ? `Are you sure you want to delete ${selectedIds.size} selected invoice${selectedIds.size !== 1 ? "s" : ""}? This action can be undone by an admin.`
+                : "Are you sure you want to delete this invoice? This action can be undone by an admin."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={bulkDelete.isPending || singleDelete.isPending}
+              onClick={() => {
+                if (deleteTarget === "bulk") {
+                  bulkDelete.mutate(Array.from(selectedIds), {
+                    onSuccess: () => {
+                      setDeleteDialogOpen(false);
+                      setDeleteTarget(null);
+                      clearSelection();
+                    },
+                  });
+                } else if (deleteTarget) {
+                  singleDelete.mutate(deleteTarget, {
+                    onSuccess: () => {
+                      setDeleteDialogOpen(false);
+                      setDeleteTarget(null);
+                      setPreviewId(null);
+                    },
+                  });
+                }
+              }}
+            >
+              {bulkDelete.isPending || singleDelete.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

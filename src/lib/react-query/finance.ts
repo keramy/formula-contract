@@ -37,6 +37,7 @@ import {
   deleteInvoice,
   approveInvoice,
   bulkApproveInvoices,
+  bulkDeleteInvoices,
   rejectInvoice,
   // Receivables
   getReceivables,
@@ -423,6 +424,23 @@ export function useBulkApproveInvoices() {
       queryClient.invalidateQueries({ queryKey: financeKeys.invoices() });
       queryClient.invalidateQueries({ queryKey: financeKeys.dashboard() });
       toast.success(`${data.approved} invoice${data.approved !== 1 ? "s" : ""} approved`);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+}
+
+export function useBulkDeleteInvoices() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const result = await bulkDeleteInvoices(ids);
+      if (!result.success) throw new Error(result.error || "Failed to delete invoices");
+      return result.data!;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: financeKeys.invoices() });
+      queryClient.invalidateQueries({ queryKey: financeKeys.dashboard() });
+      toast.success(`${data.deleted} invoice${data.deleted !== 1 ? "s" : ""} deleted`);
     },
     onError: (error: Error) => toast.error(error.message),
   });

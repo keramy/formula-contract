@@ -552,7 +552,12 @@ export async function getInvoices(
       .not("status", "in", '("paid","cancelled")');
   }
 
-  const { data: invoices, error: dbError } = await query.order("due_date");
+  const pageLimit = filters?.limit || 50;
+  const pageOffset = filters?.offset || 0;
+
+  const { data: invoices, error: dbError } = await query
+    .order("due_date")
+    .range(pageOffset, pageOffset + pageLimit - 1);
 
   if (dbError) return { success: false, error: dbError.message };
 
@@ -868,6 +873,32 @@ export async function deleteInvoice(id: string): Promise<ActionResult> {
 
   revalidatePath("/payments");
   return { success: true };
+}
+
+export async function bulkDeleteInvoices(ids: string[]): Promise<ActionResult<{ deleted: number }>> {
+  const { error, supabase } = await requireFinanceAccess();
+  if (error) return { success: false, error };
+
+  if (ids.length === 0) return { success: true, data: { deleted: 0 } };
+
+  const { data, error: dbError } = await supabase!
+    .from("finance_invoices")
+    .update({ is_deleted: true })
+    .in("id", ids)
+    .select("id");
+
+  if (dbError) return { success: false, error: dbError.message };
+
+  for (const row of data || []) {
+    await logActivity({
+      action: "finance_invoice_deleted",
+      entityType: "finance_invoice",
+      entityId: row.id,
+    });
+  }
+
+  revalidatePath("/payments");
+  return { success: true, data: { deleted: data?.length || 0 } };
 }
 
 // ============================================================================

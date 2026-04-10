@@ -311,6 +311,8 @@ export interface InvoiceFilters {
   date_from?: string;
   date_to?: string;
   overdue_only?: boolean;
+  limit?: number;
+  offset?: number;
 }
 
 export interface ReceivableFilters {

@@ -34,6 +34,7 @@ import {
   FileIcon,
   PaperclipIcon,
   PencilIcon,
+  Trash2Icon,
 } from "lucide-react";
 import { paymentSchema } from "@/lib/validations/finance";
 import type { PaymentFormData } from "@/lib/validations/finance";
@@ -48,9 +49,10 @@ interface InvoicePreviewSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onEdit?: () => void;
+  onDelete?: () => void;
 }
 
-export function InvoicePreviewSheet({ invoiceId, open, onOpenChange, onEdit }: InvoicePreviewSheetProps) {
+export function InvoicePreviewSheet({ invoiceId, open, onOpenChange, onEdit, onDelete }: InvoicePreviewSheetProps) {
   const { data: invoice, isLoading } = useInvoice(invoiceId || "");
   const recordPayment = useRecordPayment();
 
@@ -351,6 +353,11 @@ export function InvoicePreviewSheet({ invoiceId, open, onOpenChange, onEdit }: I
                     <Button variant="outline" className="flex-1" size="sm" onClick={onEdit}>
                       <PencilIcon className="size-3.5 mr-1" />
                       Edit
+                    </Button>
+                  )}
+                  {onDelete && (
+                    <Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/10" onClick={onDelete}>
+                      <Trash2Icon className="size-3.5" />
                     </Button>
                   )}
                   {invoice.remaining > 0 && (
