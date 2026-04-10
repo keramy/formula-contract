@@ -30,12 +30,12 @@ function formatDate(dateStr: string): string {
 const STATUS_CONFIG: Record<InvoiceStatus, StatusConfig> = {
   pending: {
     label: "Ready to Pay",
-    className: "border-emerald-300 text-emerald-700 bg-emerald-50",
+    className: "border-orange-300 text-orange-700 bg-orange-50",
     getTooltip: () => "No approval required — ready for payment",
   },
   approved: {
     label: "Ready to Pay",
-    className: "border-emerald-300 text-emerald-700 bg-emerald-50",
+    className: "border-orange-300 text-orange-700 bg-orange-50",
     getTooltip: (inv) => {
       const approverName = (inv.approver as { name: string } | null)?.name;
       const date = inv.approved_at ? formatDate(inv.approved_at.split("T")[0]) : "";
@@ -65,7 +65,7 @@ const STATUS_CONFIG: Record<InvoiceStatus, StatusConfig> = {
   },
   paid: {
     label: "Paid",
-    className: "border-base-300 text-base-500 bg-base-50 opacity-70",
+    className: "border-emerald-300 text-emerald-700 bg-emerald-50",
     getTooltip: (inv) => {
       const lastPaid = inv.last_payment_date ? formatDate(inv.last_payment_date) : "";
       return lastPaid ? `Fully paid on ${lastPaid}` : "Fully paid";
@@ -86,7 +86,11 @@ const STATUS_CONFIG: Record<InvoiceStatus, StatusConfig> = {
 };
 
 export function InvoiceStatusBadge({ invoice, className }: InvoiceStatusBadgeProps) {
-  const config = STATUS_CONFIG[invoice.status as InvoiceStatus] || STATUS_CONFIG.pending;
+  // Show overdue badge when past due, regardless of DB status
+  const effectiveStatus = invoice.days_overdue > 0 && !["paid", "cancelled"].includes(invoice.status)
+    ? "overdue"
+    : invoice.status as InvoiceStatus;
+  const config = STATUS_CONFIG[effectiveStatus] || STATUS_CONFIG.pending;
   const tooltip = config.getTooltip(invoice);
 
   return (

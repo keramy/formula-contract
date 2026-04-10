@@ -778,31 +778,66 @@ export async function updateInvoice(
   const { error, supabase } = await requireFinanceAccess();
   if (error) return { success: false, error };
 
+  const requiresApproval = input.requires_approval as boolean;
+  const hasInstallments = input.has_installments as boolean;
+  const installments = (input.installments as { amount: number; due_date: string }[] | null) || [];
+
+  // If installments, due_date = last installment date
+  const dueDateValue = hasInstallments && installments.length > 0
+    ? installments[installments.length - 1].due_date
+    : (input.due_date as string);
+
   const sanitized = {
     supplier_id: input.supplier_id as string,
     category_id: input.category_id ? (input.category_id as string) : null,
+    project_id: input.project_id ? (input.project_id as string) : null,
     invoice_number: input.invoice_number
       ? sanitizeText((input.invoice_number as string).trim())
       : null,
     invoice_date: input.invoice_date as string,
-    due_date: input.due_date as string,
+    due_date: dueDateValue,
     total_amount: input.total_amount as number,
     currency: input.currency as string,
+    vat_rate: (input.vat_rate as number) || 0,
+    vat_amount: ((input.total_amount as number) * ((input.vat_rate as number) || 0)) / 100,
     description: input.description
       ? sanitizeText((input.description as string).trim())
       : null,
-    requires_approval: input.requires_approval as boolean,
+    requires_approval: requiresApproval,
+    has_installments: hasInstallments,
+    approved_by: requiresApproval && input.approved_by ? (input.approved_by as string) : null,
     notes: input.notes
       ? sanitizeText((input.notes as string).trim())
       : null,
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error: dbError } = await supabase!
     .from("finance_invoices")
-    .update(sanitized)
+    .update(sanitized as any)
     .eq("id", id);
 
   if (dbError) return { success: false, error: dbError.message };
+
+  // Sync installments: delete existing, re-insert if enabled
+  await supabase!
+    .from("finance_invoice_installments")
+    .delete()
+    .eq("invoice_id", id);
+
+  if (hasInstallments && installments.length > 0) {
+    const installmentRows = installments.map((inst, idx) => ({
+      invoice_id: id,
+      installment_number: idx + 1,
+      amount: inst.amount,
+      due_date: inst.due_date,
+      status: "pending",
+    }));
+
+    await supabase!
+      .from("finance_invoice_installments")
+      .insert(installmentRows);
+  }
 
   await logActivity({
     action: "finance_invoice_updated",

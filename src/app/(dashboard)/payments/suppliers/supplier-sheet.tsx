@@ -98,7 +98,7 @@ export function SupplierSheet({ open, onOpenChange, supplier }: SupplierSheetPro
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+      <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col">
         <SheetHeader>
           <SheetTitle>{isEditing ? "Edit Supplier" : "New Supplier"}</SheetTitle>
           <SheetDescription>
@@ -108,7 +108,8 @@ export function SupplierSheet({ open, onOpenChange, supplier }: SupplierSheetPro
           </SheetDescription>
         </SheetHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 px-4 mt-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex-1 flex flex-col overflow-hidden mt-4">
+          <div className="flex-1 overflow-y-auto px-4 space-y-4 pb-2">
           {/* Name */}
           <div className="space-y-1.5">
             <Label htmlFor="name">Supplier Name *</Label>
@@ -185,8 +186,9 @@ export function SupplierSheet({ open, onOpenChange, supplier }: SupplierSheetPro
             <Textarea id="notes" {...register("notes")} placeholder="Internal notes..." rows={2} />
           </div>
 
-          {/* Submit */}
-          <div className="flex justify-end gap-2 pt-4">
+          </div>
+          {/* Submit — pinned at bottom */}
+          <div className="flex justify-end gap-2 py-3 px-4 border-t border-base-200 shrink-0">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>

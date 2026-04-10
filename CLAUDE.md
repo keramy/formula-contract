@@ -239,6 +239,7 @@ scope-items/{project_id}/{item_id}/image_1.jpg
     **Auto-assign creator migration 060 applied** - `060_auto_assign_project_creator.sql` — SECURITY DEFINER trigger on projects INSERT auto-assigns creator to project_assignments. Bypasses RLS chicken-and-egg (PM can't assign to project they're not on yet)
     **Project SELECT for creator migration 061 applied** - `061_fix_project_select_for_creator.sql` — added `created_by = auth.uid()` to SELECT policy so creator can see their project immediately after INSERT+RETURNING
     **Supplier fields migration 062 applied** - `062_scope_items_supplier_fields.sql` — added supplier_id (FK to finance_suppliers), po_number, expected_delivery_date to scope_items. Also added PM/admin RLS policies on finance_suppliers for read+insert
+    **Finance storage RLS migration 063 applied** - `063_finance_storage_rls.sql` — added INSERT/SELECT/UPDATE/DELETE storage policies for `finance-documents` bucket using `has_finance_access()`. Bucket existed but had zero RLS policies, silently blocking all uploads
 14. **Adjacent panel alignment** - Both header wrappers must set explicit `height` + `box-border`
 15. **Storage paths MUST start with `{projectId}/`** - Migration 040 enforces this via RLS
 16. **Use `useBreakpoint()` not `useIsMobile()`** - Old hook deprecated, use `use-media-query.ts`

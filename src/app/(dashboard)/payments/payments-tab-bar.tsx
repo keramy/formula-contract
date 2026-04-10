@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -11,7 +12,7 @@ import {
   ShieldCheckIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useHasFinanceAccess } from "@/lib/react-query/finance";
+import { createClient } from "@/lib/supabase/client";
 
 const tabs = [
   { label: "Dashboard", href: "/payments", icon: LayoutDashboardIcon, exact: true },
@@ -24,7 +25,14 @@ const tabs = [
 
 export function PaymentsTabBar() {
   const pathname = usePathname();
-  const { data: hasAccess } = useHasFinanceAccess();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user?.user_metadata?.role === "admin") setIsAdmin(true);
+    });
+  }, []);
 
   // Don't render on detail pages (invoices/[id], receivables/[id])
   const isDetailPage = /\/payments\/(invoices|receivables)\/[^/]+/.test(pathname);
@@ -34,7 +42,7 @@ export function PaymentsTabBar() {
     <div className="border-b border-base-200 bg-card/80 backdrop-blur-sm">
       <div className="flex gap-1 px-4 overflow-x-auto">
         {tabs.map((tab) => {
-          if (tab.adminOnly && !hasAccess) return null;
+          if (tab.adminOnly && !isAdmin) return null;
 
           const isActive = tab.exact
             ? pathname === tab.href

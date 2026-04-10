@@ -33,6 +33,7 @@ import {
   AlertTriangleIcon,
   FileIcon,
   PaperclipIcon,
+  PencilIcon,
 } from "lucide-react";
 import { paymentSchema } from "@/lib/validations/finance";
 import type { PaymentFormData } from "@/lib/validations/finance";
@@ -46,9 +47,10 @@ interface InvoicePreviewSheetProps {
   invoiceId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onEdit?: () => void;
 }
 
-export function InvoicePreviewSheet({ invoiceId, open, onOpenChange }: InvoicePreviewSheetProps) {
+export function InvoicePreviewSheet({ invoiceId, open, onOpenChange, onEdit }: InvoicePreviewSheetProps) {
   const { data: invoice, isLoading } = useInvoice(invoiceId || "");
   const recordPayment = useRecordPayment();
 
@@ -115,7 +117,7 @@ export function InvoicePreviewSheet({ invoiceId, open, onOpenChange }: InvoicePr
     ? Math.min(100, Math.round((invoice.total_paid / invoice.total_amount) * 100))
     : 0;
 
-  const statusClassName = getStatusClassName(invoice?.status as InvoiceStatus);
+  const statusClassName = getStatusClassName(invoice?.status as InvoiceStatus, invoice?.days_overdue);
 
   return (
     <>
@@ -345,6 +347,12 @@ export function InvoicePreviewSheet({ invoiceId, open, onOpenChange }: InvoicePr
                       Full Details
                     </Link>
                   </Button>
+                  {onEdit && (
+                    <Button variant="outline" className="flex-1" size="sm" onClick={onEdit}>
+                      <PencilIcon className="size-3.5 mr-1" />
+                      Edit
+                    </Button>
+                  )}
                   {invoice.remaining > 0 && (
                     <Button className="flex-1" size="sm" onClick={openPaymentDialog}>
                       <CreditCardIcon className="size-3.5 mr-1" />
@@ -432,13 +440,17 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function getStatusClassName(status: InvoiceStatus | undefined): string {
+function getStatusClassName(status: InvoiceStatus | undefined, daysOverdue?: number): string {
   if (!status) return "";
+  // Overdue takes priority for unpaid statuses
+  if (daysOverdue && daysOverdue > 0 && !["paid", "cancelled"].includes(status)) {
+    return "bg-destructive text-destructive-foreground";
+  }
   const map: Record<InvoiceStatus, string> = {
-    pending: "",
+    pending: "border-orange-300 text-orange-700 bg-orange-50",
     awaiting_approval: "border-amber-300 text-amber-700 bg-amber-50",
-    approved: "border-blue-300 text-blue-700 bg-blue-50",
-    partially_paid: "border-orange-300 text-orange-700 bg-orange-50",
+    approved: "border-orange-300 text-orange-700 bg-orange-50",
+    partially_paid: "border-blue-300 text-blue-700 bg-blue-50",
     paid: "border-emerald-300 text-emerald-700 bg-emerald-50",
     overdue: "bg-destructive text-destructive-foreground",
     cancelled: "opacity-60",

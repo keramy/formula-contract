@@ -698,8 +698,10 @@ export function useUploadFinanceDocument() {
     onSuccess: (_, variables) => {
       if (variables.entityType === "invoice") {
         queryClient.invalidateQueries({ queryKey: financeKeys.invoiceDetail(variables.entityId) });
+        queryClient.invalidateQueries({ queryKey: financeKeys.invoices() });
       } else {
         queryClient.invalidateQueries({ queryKey: financeKeys.receivableDetail(variables.entityId) });
+        queryClient.invalidateQueries({ queryKey: financeKeys.receivables() });
       }
       toast.success("Document uploaded");
     },

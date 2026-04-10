@@ -456,18 +456,18 @@ export function InvoicesTable() {
                       </TableCell>
                       <TableCell>
                         <div className="text-xs">
-                          <span className="font-medium">{formatDate(inv.due_date)}</span>
+                          <div className="font-medium">{formatDate(inv.due_date)}</div>
                           {dueInfo && (
-                            <span className={cn(
-                              " ml-1",
+                            <div className={cn(
+                              "text-[11px] mt-0.5",
                               dueInfo.isOverdue
                                 ? "text-rose-600 font-semibold"
                                 : dueInfo.isUrgent
                                   ? "text-amber-600"
                                   : "text-muted-foreground"
                             )}>
-                              · {dueInfo.isOverdue && "⚠ "}{dueInfo.text}
-                            </span>
+                              {dueInfo.isOverdue && "⚠ "}{dueInfo.text}
+                            </div>
                           )}
                         </div>
                       </TableCell>
@@ -555,6 +555,12 @@ export function InvoicesTable() {
         invoiceId={previewId}
         open={!!previewId}
         onOpenChange={(open) => { if (!open) setPreviewId(null); }}
+        onEdit={() => {
+          const inv = filtered.find((i) => i.id === previewId) || null;
+          setEditingInvoice(inv);
+          setPreviewId(null);
+          setSheetOpen(true);
+        }}
       />
 
       {/* Notify Team Dialog */}

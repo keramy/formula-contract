@@ -272,11 +272,12 @@ export function UsersTable({ users }: UsersTableProps) {
                           </StatusBadge>
                         </TableCell>
                         <TableCell className="text-muted-foreground text-sm">
-                          {user.last_active_at
-                            ? format(new Date(user.last_active_at), "MMM d, yyyy 'at' h:mm a")
-                            : user.last_login_at
-                            ? format(new Date(user.last_login_at), "MMM d, yyyy 'at' h:mm a")
-                            : "Never"}
+                          {(() => {
+                            const dates = [user.last_active_at, user.last_login_at].filter(Boolean) as string[];
+                            if (dates.length === 0) return "Never";
+                            const latest = dates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0];
+                            return format(new Date(latest), "MMM d, yyyy 'at' h:mm a");
+                          })()}
                         </TableCell>
                         <TableCell>
                           <DropdownMenu>
@@ -376,11 +377,12 @@ export function UsersTable({ users }: UsersTableProps) {
                 <Badge variant="outline" className="font-mono">{user.employee_code || "—"}</Badge>
               </div>
               <p className="text-xs text-muted-foreground">
-                Last active: {user.last_active_at
-                  ? format(new Date(user.last_active_at), "MMM d, yyyy 'at' h:mm a")
-                  : user.last_login_at
-                  ? format(new Date(user.last_login_at), "MMM d, yyyy 'at' h:mm a")
-                  : "Never"}
+                Last active: {(() => {
+                  const dates = [user.last_active_at, user.last_login_at].filter(Boolean) as string[];
+                  if (dates.length === 0) return "Never";
+                  const latest = dates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0];
+                  return format(new Date(latest), "MMM d, yyyy 'at' h:mm a");
+                })()}
               </p>
             </GlassCard>
           );

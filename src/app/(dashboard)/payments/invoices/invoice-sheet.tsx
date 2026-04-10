@@ -180,7 +180,38 @@ export function InvoiceSheet({ open, onOpenChange, invoice }: InvoiceSheetProps)
     if (isEditing) {
       updateInvoice.mutate(
         { id: invoice.id, ...data } as Record<string, unknown> & { id: string },
-        { onSuccess: () => { setPendingFiles([]); setInstallmentModes({}); onOpenChange(false); } }
+        {
+          onSuccess: async () => {
+            // Upload pending files for existing invoice
+            if (pendingFiles.length > 0) {
+              try {
+                const fileData = await Promise.all(
+                  pendingFiles.map(async (file) => {
+                    const buffer = await file.arrayBuffer();
+                    const base64 = btoa(
+                      new Uint8Array(buffer).reduce((d, byte) => d + String.fromCharCode(byte), "")
+                    );
+                    return {
+                      name: file.name,
+                      type: file.type,
+                      data: `data:${file.type};base64,${base64}`,
+                    };
+                  })
+                );
+                uploadDocument.mutate({
+                  entityType: "invoice",
+                  entityId: invoice.id,
+                  files: fileData,
+                });
+              } catch (e) {
+                console.error("File upload failed:", e);
+              }
+            }
+            setPendingFiles([]);
+            setInstallmentModes({});
+            onOpenChange(false);
+          },
+        }
       );
     } else {
       createInvoice.mutate(data as Record<string, unknown>, {
@@ -273,8 +304,8 @@ export function InvoiceSheet({ open, onOpenChange, invoice }: InvoiceSheetProps)
           <SheetTitle>{isEditing ? "Edit Invoice" : "New Invoice"}</SheetTitle>
         </SheetHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="flex-1 flex flex-col px-4 mt-2">
-          <div className="space-y-3 flex-1">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex-1 flex flex-col overflow-hidden mt-2">
+          <div className="space-y-3 flex-1 overflow-y-auto px-4 pb-2">
             {/* Supplier + Category — 2 col */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
@@ -698,7 +729,7 @@ export function InvoiceSheet({ open, onOpenChange, invoice }: InvoiceSheetProps)
           </div>
 
           {/* Submit — pinned at bottom */}
-          <div className="flex justify-end gap-2 py-3 border-t border-base-200 mt-3">
+          <div className="flex justify-end gap-2 py-3 px-4 border-t border-base-200 shrink-0">
             <Button type="button" variant="outline" size="sm" onClick={() => handleOpenChange(false)}>
               Cancel
             </Button>
