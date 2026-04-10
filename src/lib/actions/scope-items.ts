@@ -769,24 +769,25 @@ export interface SplitItemParams {
   itemId: string;
   projectId: string;
   targetPath: "production" | "procurement";
-  newQuantity: number;
-  newName: string; // Custom name for the split item
+  newName: string; // Component name (e.g., "Marble Top", "Wood Structure")
 }
 
 /**
- * Split a scope item to create a related item with different path
- * Creates a new item with:
+ * Split a scope item to create a component child with the same quantity.
+ * Used when an item has parts from different paths (e.g., wood = production, marble = procurement).
+ *
+ * Rules:
+ * - Child inherits parent's quantity (not a quantity split — a component split)
+ * - Production parent → child can be production or procurement
+ * - Procurement parent → child can only be procurement
  * - New code: original.1, original.2, etc.
- * - Custom name (e.g., "Marble Supply" for a split from "Cabinet")
- * - Specified path (production or procurement)
- * - Specified quantity
- * Original item remains unchanged
+ * - Original item remains unchanged
  */
 export async function splitScopeItem(
   params: SplitItemParams,
   ctx?: RequestContext
 ): Promise<ActionResult<{ newItemId: string; newItemCode: string }>> {
-  const { itemId, projectId, targetPath, newQuantity, newName } = params;
+  const { itemId, projectId, targetPath, newName } = params;
 
   try {
     const supabase = ctx?.supabase ?? await createClient();
@@ -810,19 +811,19 @@ export async function splitScopeItem(
       return { success: false, error: "Failed to fetch original item" };
     }
 
-    // Validate quantity
-    if (newQuantity <= 0) {
-      return {
-        success: false,
-        error: "Quantity must be at least 1",
-      };
-    }
-
     // Validate name
     if (!newName || !newName.trim()) {
       return {
         success: false,
         error: "Name is required",
+      };
+    }
+
+    // Validate path: procurement parent can only split to procurement
+    if (originalItem.item_path === "procurement" && targetPath !== "procurement") {
+      return {
+        success: false,
+        error: "Procurement items can only be split into procurement components",
       };
     }
 
@@ -867,7 +868,7 @@ export async function splitScopeItem(
         depth: originalItem.depth,
         height: originalItem.height,
         unit: originalItem.unit,
-        quantity: newQuantity,
+        quantity: originalItem.quantity, // Same quantity as parent (component split, not quantity split)
         // Cost tracking: child starts with no cost (user will set), inherit sales price
         initial_unit_cost: null,
         initial_total_cost: null,
@@ -903,7 +904,7 @@ export async function splitScopeItem(
         new_code: newItemCode,
         new_name: newName.trim(),
         new_path: targetPath,
-        new_quantity: newQuantity,
+        quantity: originalItem.quantity,
       },
     });
 

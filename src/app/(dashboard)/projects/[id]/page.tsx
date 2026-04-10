@@ -142,6 +142,7 @@ export default async function ProjectDetailPage({
     projectResult,
     scopeItemsResult,
     areasResult,
+    suppliersResult,
   ] = await Promise.all([
     // 1. Project with Client (includes slug for URL generation)
     (async () => {
@@ -162,7 +163,7 @@ export default async function ProjectDetailPage({
       const start = performance.now();
       const result = await supabase
         .from("scope_items")
-        .select("id, item_code, name, description, width, depth, height, item_path, status, quantity, unit, initial_unit_cost, initial_total_cost, actual_unit_cost, actual_total_cost, unit_sales_price, total_sales_price, production_percentage, is_shipped, is_installation_started, is_installed, notes, images, created_at, parent_id, area_id")
+        .select("id, item_code, name, description, width, depth, height, item_path, status, quantity, unit, initial_unit_cost, initial_total_cost, actual_unit_cost, actual_total_cost, unit_sales_price, total_sales_price, production_percentage, is_shipped, is_installation_started, is_installed, notes, images, created_at, parent_id, area_id, supplier_id")
         .eq("project_id", projectId)
         .eq("is_deleted", false)
         .order("item_code", { ascending: true });
@@ -176,6 +177,12 @@ export default async function ProjectDetailPage({
       .eq("project_id", projectId)
       .eq("is_deleted", false)
       .order("floor")
+      .order("name"),
+    // 4. Suppliers (for procurement items)
+    supabase
+      .from("finance_suppliers")
+      .select("id, name, supplier_code")
+      .eq("is_deleted", false)
       .order("name"),
   ]);
   console.log(`  ⏱️ Parallel queries total: ${(performance.now() - parallelStart).toFixed(0)}ms`);
@@ -320,6 +327,7 @@ export default async function ProjectDetailPage({
             items={scopeItems}
             materials={[]}
             areas={(areasResult.data || []).map((a) => ({ id: a.id, area_code: a.area_code, name: a.name, floor: a.floor }))}
+            suppliers={isClient ? [] : (suppliersResult.data || []).map((s) => ({ id: s.id, name: s.name, supplier_code: s.supplier_code }))}
             currency={project.currency}
             isClient={isClient}
             userRole={userRole}

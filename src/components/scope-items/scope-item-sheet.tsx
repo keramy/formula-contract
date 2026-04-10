@@ -192,7 +192,15 @@ export function ScopeItemSheet({
     status: "pending",
     notes: "",
     area_id: "",
+    supplier_id: "",
+    po_number: "",
+    expected_delivery_date: "",
   });
+  // Supplier options for procurement items
+  const [suppliers, setSuppliers] = useState<{ id: string; name: string; supplier_code: string }[]>([]);
+  const [showNewSupplier, setShowNewSupplier] = useState(false);
+  const [newSupplierForm, setNewSupplierForm] = useState({ name: "", contact_person: "", phone: "", email: "" });
+  const [isCreatingSupplier, setIsCreatingSupplier] = useState(false);
   // Store original initial costs (read-only after creation)
   const [initialCostLocked, setInitialCostLocked] = useState({
     unit_cost: null as number | null,
@@ -216,6 +224,18 @@ export function ScopeItemSheet({
   useEffect(() => {
     if (open) {
       getProjectAreas(projectId).then(setAreas);
+      // Fetch suppliers for procurement dropdown (not client-visible)
+      if (!isClient) {
+        const supabase = createClient();
+        supabase
+          .from("finance_suppliers")
+          .select("id, name, supplier_code")
+          .eq("is_deleted", false)
+          .order("name")
+          .then(({ data }) => {
+            if (data) setSuppliers(data);
+          });
+      }
       if (itemId) {
         fetchItemData(itemId);
       } else {
@@ -238,6 +258,9 @@ export function ScopeItemSheet({
       status: "pending",
       notes: "",
       area_id: "",
+      supplier_id: "",
+      po_number: "",
+      expected_delivery_date: "",
     });
     setInitialCostLocked({ unit_cost: null, total_cost: null });
     setImages([]);
@@ -287,6 +310,23 @@ export function ScopeItemSheet({
 
       if (itemResult.data) {
         const item = itemResult.data as ScopeItemData & { area_id?: string | null };
+
+        // Fetch supplier fields separately (new columns from migration 062)
+        let supplierId = "";
+        let poNumber = "";
+        let expectedDelivery = "";
+        try {
+          const { data: sf } = await supabase
+            .from("scope_items")
+            .select("supplier_id, po_number, expected_delivery_date")
+            .eq("id", id)
+            .single();
+          if (sf) {
+            supplierId = (sf as any).supplier_id || "";
+            poNumber = (sf as any).po_number || "";
+            expectedDelivery = (sf as any).expected_delivery_date || "";
+          }
+        } catch { /* columns may not be visible via PostgREST yet — silently skip */ }
         setFormData({
           item_code: item.item_code || "",
           name: item.name || "",
@@ -300,6 +340,9 @@ export function ScopeItemSheet({
           status: item.status || "pending",
           notes: item.notes || "",
           area_id: item.area_id || "",
+          supplier_id: supplierId,
+          po_number: poNumber,
+          expected_delivery_date: expectedDelivery,
         });
         // Lock initial costs - they're read-only after creation
         setInitialCostLocked({
@@ -399,6 +442,9 @@ export function ScopeItemSheet({
             notes: formData.notes.trim() || null,
             images: images.length > 0 ? images : null,
             area_id: formData.area_id || null,
+            supplier_id: formData.supplier_id || null,
+            po_number: formData.po_number.trim() || null,
+            expected_delivery_date: formData.expected_delivery_date || null,
           };
 
           const { error } = await supabase
@@ -429,6 +475,9 @@ export function ScopeItemSheet({
             notes: formData.notes.trim() || null,
             images: images.length > 0 ? images : null,
             area_id: formData.area_id || null,
+            supplier_id: formData.supplier_id || null,
+            po_number: formData.po_number.trim() || null,
+            expected_delivery_date: formData.expected_delivery_date || null,
           };
 
           const { error } = await supabase.from("scope_items").insert(insertData);
@@ -778,6 +827,175 @@ export function ScopeItemSheet({
                         />
                         <p className="text-xs text-muted-foreground">Total (auto)</p>
                       </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Procurement Section — supplier, PO, delivery date */}
+              {formData.item_path === "procurement" && !isClient && (
+                <div className="space-y-3 p-3 rounded-lg bg-amber-50/50 border border-amber-200/50 dark:bg-amber-900/10 dark:border-amber-800/30">
+                  <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                    <ShoppingCartIcon className="size-4" />
+                    <span className="text-sm font-medium">Procurement Details</span>
+                  </div>
+
+                  {/* Supplier */}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="supplier_id" className="text-xs font-medium">Supplier</Label>
+                    {!showNewSupplier ? (
+                      <div className="flex gap-2">
+                        <select
+                          id="supplier_id"
+                          value={formData.supplier_id}
+                          onChange={(e) => handleChange("supplier_id", e.target.value)}
+                          disabled={isViewOnly}
+                          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+                        >
+                          <option value="">Select supplier...</option>
+                          {suppliers.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.name} ({s.supplier_code})
+                            </option>
+                          ))}
+                        </select>
+                        {!isViewOnly && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-9 shrink-0 text-xs"
+                            onClick={() => setShowNewSupplier(true)}
+                          >
+                            <PlusIcon className="size-3.5" />
+                            New
+                          </Button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-2 p-3 rounded-md border border-dashed border-primary/30 bg-primary/5">
+                        <p className="text-xs font-medium text-primary">New Supplier</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="col-span-2">
+                            <Input
+                              placeholder="Company name *"
+                              value={newSupplierForm.name}
+                              onChange={(e) => setNewSupplierForm((p) => ({ ...p, name: e.target.value }))}
+                              className="h-8 text-sm"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === "Escape") {
+                                  setShowNewSupplier(false);
+                                  setNewSupplierForm({ name: "", contact_person: "", phone: "", email: "" });
+                                }
+                              }}
+                            />
+                          </div>
+                          <Input
+                            placeholder="Contact person"
+                            value={newSupplierForm.contact_person}
+                            onChange={(e) => setNewSupplierForm((p) => ({ ...p, contact_person: e.target.value }))}
+                            className="h-8 text-sm"
+                          />
+                          <Input
+                            placeholder="Phone"
+                            value={newSupplierForm.phone}
+                            onChange={(e) => setNewSupplierForm((p) => ({ ...p, phone: e.target.value }))}
+                            className="h-8 text-sm"
+                          />
+                          <div className="col-span-2">
+                            <Input
+                              placeholder="Email"
+                              type="email"
+                              value={newSupplierForm.email}
+                              onChange={(e) => setNewSupplierForm((p) => ({ ...p, email: e.target.value }))}
+                              className="h-8 text-sm"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="h-7 text-xs"
+                            disabled={!newSupplierForm.name.trim() || isCreatingSupplier}
+                            onClick={async () => {
+                              if (!newSupplierForm.name.trim()) return;
+                              setIsCreatingSupplier(true);
+                              try {
+                                const supabase = createClient();
+                                const code = newSupplierForm.name.trim().toUpperCase()
+                                  .replace(/[^A-Z0-9]+/g, "-").replace(/^-|-$/g, "")
+                                  .slice(0, 20);
+                                const { data, error } = await supabase
+                                  .from("finance_suppliers")
+                                  .insert({
+                                    name: newSupplierForm.name.trim(),
+                                    supplier_code: code,
+                                    contact_person: newSupplierForm.contact_person.trim() || null,
+                                    phone: newSupplierForm.phone.trim() || null,
+                                    email: newSupplierForm.email.trim() || null,
+                                  } as any)
+                                  .select("id, name, supplier_code")
+                                  .single();
+                                if (error) {
+                                  toast.error(error.message);
+                                } else if (data) {
+                                  setSuppliers((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+                                  handleChange("supplier_id", data.id);
+                                  toast.success(`Supplier "${data.name}" created`);
+                                }
+                              } catch {
+                                toast.error("Failed to create supplier");
+                              } finally {
+                                setIsCreatingSupplier(false);
+                                setShowNewSupplier(false);
+                                setNewSupplierForm({ name: "", contact_person: "", phone: "", email: "" });
+                              }
+                            }}
+                          >
+                            {isCreatingSupplier ? <Spinner className="size-3.5" /> : "Create Supplier"}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => {
+                              setShowNewSupplier(false);
+                              setNewSupplierForm({ name: "", contact_person: "", phone: "", email: "" });
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* PO Number + Expected Delivery */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="po_number" className="text-xs font-medium">PO Number</Label>
+                      <Input
+                        id="po_number"
+                        placeholder="e.g., PO-2026-001"
+                        value={formData.po_number}
+                        onChange={(e) => handleChange("po_number", e.target.value)}
+                        disabled={isViewOnly}
+                        className="h-9"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="expected_delivery_date" className="text-xs font-medium">Expected Delivery</Label>
+                      <Input
+                        id="expected_delivery_date"
+                        type="date"
+                        value={formData.expected_delivery_date}
+                        onChange={(e) => handleChange("expected_delivery_date", e.target.value)}
+                        disabled={isViewOnly}
+                        className="h-9"
+                      />
                     </div>
                   </div>
                 </div>

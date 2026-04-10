@@ -2719,6 +2719,7 @@ export type Database = {
           depth: number | null
           description: string | null
           drawing_receival_date: string | null
+          expected_delivery_date: string | null
           height: number | null
           id: string
           images: Json | null
@@ -2736,6 +2737,7 @@ export type Database = {
           notes: string | null
           parent_id: string | null
           planned_completion_date: string | null
+          po_number: string | null
           procurement_status:
             | Database["public"]["Enums"]["procurement_status"]
             | null
@@ -2744,6 +2746,7 @@ export type Database = {
           quantity: number | null
           shipped_at: string | null
           status: Database["public"]["Enums"]["item_status"]
+          supplier_id: string | null
           total_sales_price: number | null
           unit: string | null
           unit_sales_price: number | null
@@ -2758,6 +2761,7 @@ export type Database = {
           depth?: number | null
           description?: string | null
           drawing_receival_date?: string | null
+          expected_delivery_date?: string | null
           height?: number | null
           id?: string
           images?: Json | null
@@ -2775,6 +2779,7 @@ export type Database = {
           notes?: string | null
           parent_id?: string | null
           planned_completion_date?: string | null
+          po_number?: string | null
           procurement_status?:
             | Database["public"]["Enums"]["procurement_status"]
             | null
@@ -2783,6 +2788,7 @@ export type Database = {
           quantity?: number | null
           shipped_at?: string | null
           status?: Database["public"]["Enums"]["item_status"]
+          supplier_id?: string | null
           total_sales_price?: number | null
           unit?: string | null
           unit_sales_price?: number | null
@@ -2797,6 +2803,7 @@ export type Database = {
           depth?: number | null
           description?: string | null
           drawing_receival_date?: string | null
+          expected_delivery_date?: string | null
           height?: number | null
           id?: string
           images?: Json | null
@@ -2814,6 +2821,7 @@ export type Database = {
           notes?: string | null
           parent_id?: string | null
           planned_completion_date?: string | null
+          po_number?: string | null
           procurement_status?:
             | Database["public"]["Enums"]["procurement_status"]
             | null
@@ -2822,6 +2830,7 @@ export type Database = {
           quantity?: number | null
           shipped_at?: string | null
           status?: Database["public"]["Enums"]["item_status"]
+          supplier_id?: string | null
           total_sales_price?: number | null
           unit?: string | null
           unit_sales_price?: number | null

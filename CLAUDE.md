@@ -237,6 +237,8 @@ scope-items/{project_id}/{item_id}/image_1.jpg
     **RLS InitPlan fix migration 058 applied** - `058_fix_rls_initplan_notifications_users.sql` — notifications + users policies use (SELECT auth.uid())
     **RLS recursion fix migration 059 applied** - `059_fix_rls_recursion_security_definer.sql` — get_user_role() and is_assigned_to_project() set to SECURITY DEFINER to prevent infinite recursion
     **Auto-assign creator migration 060 applied** - `060_auto_assign_project_creator.sql` — SECURITY DEFINER trigger on projects INSERT auto-assigns creator to project_assignments. Bypasses RLS chicken-and-egg (PM can't assign to project they're not on yet)
+    **Project SELECT for creator migration 061 applied** - `061_fix_project_select_for_creator.sql` — added `created_by = auth.uid()` to SELECT policy so creator can see their project immediately after INSERT+RETURNING
+    **Supplier fields migration 062 applied** - `062_scope_items_supplier_fields.sql` — added supplier_id (FK to finance_suppliers), po_number, expected_delivery_date to scope_items. Also added PM/admin RLS policies on finance_suppliers for read+insert
 14. **Adjacent panel alignment** - Both header wrappers must set explicit `height` + `box-border`
 15. **Storage paths MUST start with `{projectId}/`** - Migration 040 enforces this via RLS
 16. **Use `useBreakpoint()` not `useIsMobile()`** - Old hook deprecated, use `use-media-query.ts`
@@ -324,6 +326,7 @@ npm run version:major   # 1.0.0 → 2.0.0 (breaking changes)
 ### In Progress
 - Mobile optimization (responsive data views done, Gantt tablet enabled, remaining: full E2E testing)
 - Consider downgrading Supabase from Medium back to Small compute (monitor for 1 week)
+- Gantt dependency date propagation (code written, needs testing — topological sort + cascade)
 
 ### Planned
 - Payments: sequential multi-step approval (plan in memory, deferred)
@@ -334,8 +337,9 @@ npm run version:major   # 1.0.0 → 2.0.0 (breaking changes)
 
 ### Known Issues
 - `shannon_auditfiles/` excluded from tsconfig.json — contains pentest artifacts with TS errors (intentional)
-- Migrations 051-059 applied live but NOT tracked in supabase_migrations table
+- Migrations 051-062 applied live but NOT tracked in supabase_migrations table
 - `authenticated` role timeout set to 30s (Supabase default is 8s) — monitor and consider reverting
+- PostgREST may not recognize new columns immediately after `execute_sql` — use `NOTIFY pgrst, 'reload schema'` or fetch new columns in a separate query with try-catch
 
 **Full changelog:** See [docs/CHANGELOG.md](./docs/CHANGELOG.md)
 

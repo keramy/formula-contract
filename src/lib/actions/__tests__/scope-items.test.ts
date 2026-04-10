@@ -565,7 +565,6 @@ describe("splitScopeItem", () => {
       itemId: ITEM_ID,
       projectId: PROJECT_ID,
       targetPath: "procurement",
-      newQuantity: 5,
       newName: "Marble Supply",
     });
 
@@ -585,39 +584,8 @@ describe("splitScopeItem", () => {
       // parent_id = the original item's ID (which the mock returns as "new-item-001")
       expect(insertData.parent_id).toBe("new-item-001");
       expect(insertData.status).toBe("pending");
-      expect(insertData.quantity).toBe(5);
       expect(insertData.name).toBe("Marble Supply");
     }
-  });
-
-  it("rejects zero quantity", async () => {
-    mockTerminalResult = { data: makeScopeItem(), error: null };
-
-    const result = await splitScopeItem({
-      itemId: ITEM_ID,
-      projectId: PROJECT_ID,
-      targetPath: "production",
-      newQuantity: 0,
-      newName: "Test Item",
-    });
-
-    expect(result.success).toBe(false);
-    expect(result.error).toBe("Quantity must be at least 1");
-  });
-
-  it("rejects negative quantity", async () => {
-    mockTerminalResult = { data: makeScopeItem(), error: null };
-
-    const result = await splitScopeItem({
-      itemId: ITEM_ID,
-      projectId: PROJECT_ID,
-      targetPath: "production",
-      newQuantity: -3,
-      newName: "Test Item",
-    });
-
-    expect(result.success).toBe(false);
-    expect(result.error).toBe("Quantity must be at least 1");
   });
 
   it("rejects empty name", async () => {
@@ -627,7 +595,6 @@ describe("splitScopeItem", () => {
       itemId: ITEM_ID,
       projectId: PROJECT_ID,
       targetPath: "production",
-      newQuantity: 1,
       newName: "",
     });
 
@@ -642,7 +609,6 @@ describe("splitScopeItem", () => {
       itemId: ITEM_ID,
       projectId: PROJECT_ID,
       targetPath: "production",
-      newQuantity: 1,
       newName: "   ",
     });
 
@@ -657,7 +623,6 @@ describe("splitScopeItem", () => {
       itemId: ITEM_ID,
       projectId: PROJECT_ID,
       targetPath: "procurement",
-      newQuantity: 1,
       newName: "Test",
     });
 

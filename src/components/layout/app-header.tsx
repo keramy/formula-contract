@@ -40,12 +40,15 @@ export function PageHeaderProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// No-op fallback for SSR — context isn't available until client hydration
+const PAGE_HEADER_FALLBACK: PageHeaderContextType = {
+  content: {},
+  setContent: () => {},
+};
+
 export function usePageHeader() {
   const context = useContext(PageHeaderContext);
-  if (!context) {
-    throw new Error("usePageHeader must be used within PageHeaderProvider");
-  }
-  return context;
+  return context ?? PAGE_HEADER_FALLBACK;
 }
 
 // ============================================================================

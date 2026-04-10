@@ -143,6 +143,7 @@ interface ScopeItem {
   images: string[] | null;
   parent_id: string | null; // References parent item when created via split
   area_id: string | null;
+  supplier_id?: string | null;
 }
 
 interface AreaOption {
@@ -173,6 +174,7 @@ interface ScopeItemsTableProps {
   items: ScopeItem[];
   materials: Material[];
   areas?: AreaOption[];
+  suppliers?: { id: string; name: string; supplier_code: string }[];
   currency?: string;
   isClient?: boolean; // Hide sensitive cost data from clients
   userRole?: string; // User role for permission checks
@@ -254,6 +256,7 @@ const COLUMNS: ColumnConfig[] = [
   { id: "floor", label: "Floor", defaultVisible: true },
   { id: "area_code", label: "Area Code", defaultVisible: true },
   { id: "area_name", label: "Area Name", defaultVisible: true },
+  { id: "supplier", label: "Supplier", defaultVisible: false },
   { id: "path", label: "Path", defaultVisible: true },
   { id: "status", label: "Status", defaultVisible: true },
   { id: "quantity", label: "Qty", defaultVisible: true },
@@ -283,6 +286,7 @@ const DEFAULT_COL_WIDTHS: Record<string, number> = {
   floor: 100,
   area_code: 100,
   area_name: 140,
+  supplier: 140,
   path: 90,
   status: 130,
   quantity: 80,
@@ -425,6 +429,7 @@ interface ScopeItemRowProps {
   isColumnVisible: (columnId: string) => boolean;
   formatCurrency: (value: number | null) => string;
   areaMap: Map<string, AreaOption>;
+  supplierMap: Map<string, { id: string; name: string; supplier_code: string }>;
   onToggleSelect: (id: string) => void;
   onOpenSplitDialog: (item: ScopeItem) => void;
   onOpenDeleteDialog: (item: HierarchicalScopeItem) => void;
@@ -440,6 +445,7 @@ const ScopeItemRow = memo(function ScopeItemRow({
   isColumnVisible,
   formatCurrency,
   areaMap,
+  supplierMap,
   onToggleSelect,
   onOpenSplitDialog,
   onOpenDeleteDialog,
@@ -539,6 +545,15 @@ const ScopeItemRow = memo(function ScopeItemRow({
       {isColumnVisible("area_name") && (
         <TableCell className="text-sm">
           {item.area_id && areaMap.get(item.area_id)?.name || <span className="text-base-300">—</span>}
+        </TableCell>
+      )}
+      {isColumnVisible("supplier") && (
+        <TableCell className="text-sm">
+          {item.supplier_id && supplierMap.get(item.supplier_id) ? (
+            supplierMap.get(item.supplier_id)!.name
+          ) : (
+            <span className="text-base-300">—</span>
+          )}
         </TableCell>
       )}
       {isColumnVisible("path") && (
@@ -811,9 +826,9 @@ function dialogReducer(state: DialogState, action: DialogAction): DialogState {
         ...state,
         activeDialog: "split",
         itemToSplit: item,
-        splitTargetPath: item.item_path === "production" ? "procurement" : "production",
-        splitQuantity: Math.max(1, Math.floor(item.quantity / 2)).toString(),
-        splitName: item.name,
+        splitTargetPath: item.item_path === "production" ? "procurement" : "procurement",
+        splitQuantity: "",
+        splitName: "",
       };
     }
     case "OPEN_DELETE_DIALOG":
@@ -925,7 +940,9 @@ function organizeHierarchically(items: ScopeItem[]): HierarchicalScopeItem[] {
 
 const EMPTY_AREAS: AreaOption[] = [];
 
-export function ScopeItemsTable({ projectId, items, materials, areas = EMPTY_AREAS, currency = "TRY", isClient = false, userRole = "pm" }: ScopeItemsTableProps) {
+const EMPTY_SUPPLIERS: { id: string; name: string; supplier_code: string }[] = [];
+
+export function ScopeItemsTable({ projectId, items, materials, areas = EMPTY_AREAS, suppliers = EMPTY_SUPPLIERS, currency = "TRY", isClient = false, userRole = "pm" }: ScopeItemsTableProps) {
   const { isMobile } = useBreakpoint();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -941,6 +958,8 @@ export function ScopeItemsTable({ projectId, items, materials, areas = EMPTY_ARE
 
   // Area lookup map for resolving area_id → area_code
   const areaMap = useMemo(() => new Map(areas.map((a) => [a.id, a])), [areas]);
+  // Supplier lookup map for resolving supplier_id → name
+  const supplierMap = useMemo(() => new Map(suppliers.map((s) => [s.id, s])), [suppliers]);
 
   // Column resize state
   const [colWidths, setColWidths] = useState<Record<string, number>>({});
@@ -1220,14 +1239,8 @@ export function ScopeItemsTable({ projectId, items, materials, areas = EMPTY_ARE
   const handleSplitSubmit = useCallback(() => {
     if (!itemToSplit) return;
 
-    const qty = parseInt(splitQuantity);
-    if (isNaN(qty) || qty <= 0) {
-      toast.error("Quantity must be at least 1");
-      return;
-    }
-
     if (!splitName.trim()) {
-      toast.error("Please enter a name for the split item");
+      toast.error("Please enter a name for the component");
       return;
     }
 
@@ -1236,19 +1249,18 @@ export function ScopeItemsTable({ projectId, items, materials, areas = EMPTY_ARE
         itemId: itemToSplit.id,
         projectId,
         targetPath: splitTargetPath,
-        newQuantity: qty,
         newName: splitName.trim(),
       });
 
       if (result.success) {
         dispatch({ type: "CLOSE_DIALOG" });
         queryClient.invalidateQueries({ queryKey: scopeItemKeys.list(projectId) });
-        toast.success(`Item split successfully! New ${splitTargetPath} item created.`);
+        toast.success(`Component created! ${splitName.trim()} (${splitTargetPath})`);
       } else {
         toast.error(result.error || "Failed to split item");
       }
     });
-  }, [itemToSplit, splitQuantity, splitName, projectId, splitTargetPath, queryClient]);
+  }, [itemToSplit, splitName, projectId, splitTargetPath, queryClient]);
 
   // Handle delete item
   const handleDelete = useCallback(() => {
@@ -1630,6 +1642,7 @@ export function ScopeItemsTable({ projectId, items, materials, areas = EMPTY_ARE
                     {isColumnVisible("floor") && <ResizableHead columnId="floor" width={getColWidth("floor")} onResizeStart={handleResizeStart}>Floor</ResizableHead>}
                     {isColumnVisible("area_code") && <ResizableHead columnId="area_code" width={getColWidth("area_code")} onResizeStart={handleResizeStart}>Area Code</ResizableHead>}
                     {isColumnVisible("area_name") && <ResizableHead columnId="area_name" width={getColWidth("area_name")} onResizeStart={handleResizeStart}>Area Name</ResizableHead>}
+                    {isColumnVisible("supplier") && <ResizableHead columnId="supplier" width={getColWidth("supplier")} onResizeStart={handleResizeStart}>Supplier</ResizableHead>}
                     {isColumnVisible("path") && <ResizableHead columnId="path" width={getColWidth("path")} onResizeStart={handleResizeStart}>Path</ResizableHead>}
                     {isColumnVisible("status") && <ResizableHead columnId="status" width={getColWidth("status")} onResizeStart={handleResizeStart}>Status</ResizableHead>}
                     {isColumnVisible("quantity") && <ResizableHead columnId="quantity" width={getColWidth("quantity")} onResizeStart={handleResizeStart} className="text-right">Qty</ResizableHead>}
@@ -1696,6 +1709,7 @@ export function ScopeItemsTable({ projectId, items, materials, areas = EMPTY_ARE
                       isColumnVisible={isColumnVisible}
                       formatCurrency={formatCurrency}
                       areaMap={areaMap}
+                      supplierMap={supplierMap}
                       onToggleSelect={toggleSelect}
                       onOpenSplitDialog={openSplitDialog}
                       onOpenDeleteDialog={openDeleteDialog}
@@ -1781,10 +1795,10 @@ export function ScopeItemsTable({ projectId, items, materials, areas = EMPTY_ARE
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <SplitIcon className="size-5" />
-              Split Item
+              Split into Component
             </DialogTitle>
             <DialogDescription>
-              Create a related item with a different path. For example, split "Cabinet" into "Cabinet" (production) and "Marble Supply" (procurement).
+              Create a component with the same quantity but a different manufacturing path. For example, "Low Table" → "Wood Structure" (production) + "Marble Top" (procurement).
             </DialogDescription>
           </DialogHeader>
           {itemToSplit && (
@@ -1808,33 +1822,35 @@ export function ScopeItemsTable({ projectId, items, materials, areas = EMPTY_ARE
                 </div>
               </div>
 
-              {/* New Item Name */}
+              {/* Component Name */}
               <div className="space-y-2">
-                <Label htmlFor="splitName">New item name *</Label>
+                <Label htmlFor="splitName">Component name *</Label>
                 <Input
                   id="splitName"
                   value={splitName}
                   onChange={(e) => dispatch({ type: "SET_SPLIT_NAME", value: e.target.value })}
-                  placeholder="e.g., Marble Supply, Door Handle, etc."
+                  placeholder="e.g., Marble Top, Wood Structure, Door Handle"
                 />
                 <p className="text-xs text-muted-foreground">
-                  New code will be: <strong>{itemToSplit.item_code}.1</strong> (or .2, .3, etc.)
+                  Code: <strong>{itemToSplit.item_code}.1</strong> (or next available) · Quantity: <strong>{itemToSplit.quantity} {itemToSplit.unit}</strong> (same as parent)
                 </p>
               </div>
 
               {/* Target Path Selection */}
               <div className="space-y-2">
-                <Label>Path for new item</Label>
+                <Label>Path for component</Label>
                 <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant={splitTargetPath === "production" ? "default" : "outline"}
-                    className={splitTargetPath === "production" ? "bg-purple-600 hover:bg-purple-700" : ""}
-                    onClick={() => dispatch({ type: "SET_SPLIT_PATH", path: "production" })}
-                  >
-                    <FactoryIcon className="size-4 mr-2" />
-                    Production
-                  </Button>
+                  {itemToSplit.item_path === "production" && (
+                    <Button
+                      type="button"
+                      variant={splitTargetPath === "production" ? "default" : "outline"}
+                      className={splitTargetPath === "production" ? "bg-purple-600 hover:bg-purple-700" : ""}
+                      onClick={() => dispatch({ type: "SET_SPLIT_PATH", path: "production" })}
+                    >
+                      <FactoryIcon className="size-4 mr-2" />
+                      Production
+                    </Button>
+                  )}
                   <Button
                     type="button"
                     variant={splitTargetPath === "procurement" ? "default" : "outline"}
@@ -1845,11 +1861,16 @@ export function ScopeItemsTable({ projectId, items, materials, areas = EMPTY_ARE
                     Procurement
                   </Button>
                 </div>
+                {itemToSplit.item_path === "procurement" && (
+                  <p className="text-xs text-muted-foreground">
+                    Procurement items can only be split into procurement components.
+                  </p>
+                )}
               </div>
 
               {/* Summary */}
               <div className="p-3 rounded-lg bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 text-sm space-y-1">
-                <p className="font-medium text-primary-800 dark:text-primary-300">New item will be created:</p>
+                <p className="font-medium text-primary-800 dark:text-primary-300">Component will be created:</p>
                 <p className="text-primary-700 dark:text-primary-400">
                   • Code: <strong>{itemToSplit.item_code}.1</strong> (or next available)
                 </p>
@@ -1860,7 +1881,7 @@ export function ScopeItemsTable({ projectId, items, materials, areas = EMPTY_ARE
                   • Path: <strong>{splitTargetPath}</strong>
                 </p>
                 <p className="text-primary-700 dark:text-primary-400">
-                  • Quantity: <strong>{parseInt(splitQuantity) || 0} {itemToSplit.unit}</strong>
+                  • Quantity: <strong>{itemToSplit.quantity} {itemToSplit.unit}</strong> (inherited from parent)
                 </p>
               </div>
             </div>
@@ -1871,7 +1892,7 @@ export function ScopeItemsTable({ projectId, items, materials, areas = EMPTY_ARE
             </Button>
             <Button
               onClick={handleSplitSubmit}
-              disabled={isPending || !splitName.trim() || !splitQuantity || parseInt(splitQuantity) <= 0}
+              disabled={isPending || !splitName.trim()}
             >
               {isPending ? (
                 <>
