@@ -215,7 +215,8 @@ export default async function ProjectDetailPage({
 
   // Calculate totals
   const totalValue = scopeItems.reduce((sum, item) => sum + (item.total_sales_price || 0), 0);
-  const productionItems = scopeItems.filter((item) => item.item_path === "production");
+  // All scope items can have drawings (both production and procurement)
+  const drawableItems = scopeItems;
 
   return (
     <div className="px-4 md:px-6 pt-2 pb-6 flex flex-col min-h-full">
@@ -340,7 +341,7 @@ export default async function ProjectDetailPage({
             projectId={projectId}
             projectCode={project.project_code}
             projectName={project.name}
-            productionItems={productionItems.map((item) => ({
+            productionItems={drawableItems.map((item) => ({
               id: item.id,
               item_code: item.item_code,
               name: item.name,
