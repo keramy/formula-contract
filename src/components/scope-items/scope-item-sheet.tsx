@@ -1072,7 +1072,7 @@ export function ScopeItemSheet({
                     )}
 
                     {/* Drawing Status */}
-                    {formData.item_path === "production" && (
+                    {(
                       <div className="p-3 rounded-lg bg-sky-50 border border-sky-100">
                         <div className="flex items-center gap-2 mb-2 text-sky-700">
                           <FileIcon className="size-4" />

@@ -7,6 +7,7 @@ import { projectTabKeys } from "@/lib/react-query/project-tabs";
 import { scopeItemKeys } from "@/lib/react-query/scope-items";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ResponsiveDataView } from "@/components/ui/responsive-data-view";
 import {
   Table,
@@ -39,6 +40,7 @@ import {
   CheckCircle2Icon,
   MoreHorizontalIcon,
   TrashIcon,
+  XIcon,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -123,6 +125,9 @@ export function DrawingsOverview({ projectId, projectCode, projectName, producti
   // Download all state
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState<{ done: number; total: number } | null>(null);
+
+  // Selection state for bulk download
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Delete drawing state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -277,6 +282,80 @@ export function DrawingsOverview({ projectId, projectCode, projectName, producti
     }
   };
 
+  // Download selected drawings as ZIP
+  const handleDownloadSelected = async () => {
+    setIsDownloading(true);
+    setDownloadProgress(null);
+    try {
+      const urls = await getDrawingDownloadUrls(projectId);
+      // Filter to only selected items that have drawings
+      const selectedUrls = urls.filter((u) => {
+        const item = itemsWithDrawings.find((i) => i.drawing?.id && selectedIds.has(i.id));
+        // Match by item_code from the URL data
+        return item && selectedIds.has(item.id) && u.item_code === item.item_code;
+      });
+
+      if (selectedUrls.length === 0) {
+        toast.info("No drawings available for selected items");
+        setIsDownloading(false);
+        return;
+      }
+
+      setDownloadProgress({ done: 0, total: selectedUrls.length });
+      const zip = new JSZip();
+
+      for (let i = 0; i < selectedUrls.length; i++) {
+        const { file_url, item_code, file_name } = selectedUrls[i];
+        try {
+          const response = await fetch(file_url);
+          const blob = await response.blob();
+          zip.file(file_name, blob);
+        } catch {
+          console.error(`Failed to fetch ${item_code}`);
+        }
+        setDownloadProgress({ done: i + 1, total: selectedUrls.length });
+      }
+
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      const blobUrl = window.URL.createObjectURL(zipBlob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      const safeName = (projectName || "Project").replace(/[^a-zA-Z0-9-_ ]/g, "").replace(/\s+/g, "-");
+      const date = new Date().toLocaleDateString("en-CA");
+      link.download = `${projectCode || "Project"}_${safeName}_Selected_${selectedUrls.length}files_${date}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+
+      toast.success(`${selectedUrls.length} drawing${selectedUrls.length !== 1 ? "s" : ""} downloaded`);
+      setSelectedIds(new Set());
+    } catch {
+      toast.error("Failed to download drawings");
+    } finally {
+      setIsDownloading(false);
+      setDownloadProgress(null);
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    const withDrawings = visibleItems.filter((i) => i.drawing);
+    if (selectedIds.size === withDrawings.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(withDrawings.map((i) => i.id)));
+    }
+  };
+
   if (productionItems.length === 0) {
     return (
       <EmptyState
@@ -408,6 +487,29 @@ export function DrawingsOverview({ projectId, projectCode, projectName, producti
         </div>
       </div>
 
+      {/* Selection Actions */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-muted-foreground">
+            {selectedIds.size} selected
+          </span>
+          <Button variant="outline" size="sm" className="h-8" onClick={() => setSelectedIds(new Set())}>
+            <XIcon className="size-3.5 mr-1" />
+            Clear
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8"
+            onClick={handleDownloadSelected}
+            disabled={isDownloading}
+          >
+            <DownloadIcon className="size-3.5 mr-1" />
+            {isDownloading ? "Downloading..." : `Download (${selectedIds.size})`}
+          </Button>
+        </div>
+      )}
+
       <ResponsiveDataView
         data={visibleItems}
         cardsClassName="grid grid-cols-1 gap-2.5"
@@ -417,6 +519,12 @@ export function DrawingsOverview({ projectId, projectCode, projectName, producti
               <Table>
               <TableHeader>
                 <TableRow className="bg-gray-50/50">
+                  <TableHead className="w-10">
+                    <Checkbox
+                      checked={visibleItems.filter((i) => i.drawing).length > 0 && selectedIds.size === visibleItems.filter((i) => i.drawing).length}
+                      onCheckedChange={toggleSelectAll}
+                    />
+                  </TableHead>
                   <TableHead className="w-12 text-center">#</TableHead>
                   <TableHead>Code</TableHead>
                   <TableHead>Name</TableHead>
@@ -431,6 +539,13 @@ export function DrawingsOverview({ projectId, projectCode, projectName, producti
                   const config = statusConfig[status] || { variant: "default" as StatusVariant, label: status };
                   return (
                     <TableRow key={item.id} className="hover:bg-primary/5 transition-colors">
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selectedIds.has(item.id)}
+                          onCheckedChange={() => toggleSelect(item.id)}
+                          disabled={!item.drawing}
+                        />
+                      </TableCell>
                       <TableCell className="text-center">
                         <span className="text-sm font-medium text-muted-foreground">
                           {index + 1}
