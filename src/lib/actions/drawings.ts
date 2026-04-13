@@ -356,19 +356,18 @@ export async function getDrawingDownloadUrls(
 }
 
 /**
- * Get all drawings for a project's production scope items.
+ * Get all drawings for a project's scope items (both production and procurement).
  * Used by the drawings tab and overview for lazy loading.
  */
 export async function getProjectDrawings(projectId: string, ctx?: RequestContext) {
   const supabase = ctx?.supabase ?? await createClient();
 
-  // Get production scope item IDs for this project
+  // Get all scope item IDs for this project (both production and procurement)
   const { data: items } = await supabase
     .from("scope_items")
     .select("id")
     .eq("project_id", projectId)
-    .eq("is_deleted", false)
-    .eq("item_path", "production");
+    .eq("is_deleted", false);
 
   const itemIds = (items || []).map((i: { id: string }) => i.id);
   if (itemIds.length === 0) return [];
