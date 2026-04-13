@@ -8,6 +8,13 @@ import { scopeItemKeys } from "@/lib/react-query/scope-items";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ResponsiveDataView } from "@/components/ui/responsive-data-view";
 import {
   Table,
@@ -129,6 +136,9 @@ export function DrawingsOverview({ projectId, projectCode, projectName, producti
   // Selection state for bulk download
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
+  // Status filter
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+
   // Delete drawing state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [pendingDeleteDrawingId, setPendingDeleteDrawingId] = useState<string | null>(null);
@@ -172,7 +182,7 @@ export function DrawingsOverview({ projectId, projectCode, projectName, producti
   };
 
   // Client-side filtering: hide unsent drawings from clients
-  const visibleItems = isClient
+  const clientFiltered = isClient
     ? itemsWithDrawings.filter((i) => {
         const s = i.drawing?.status;
         return (
@@ -183,6 +193,16 @@ export function DrawingsOverview({ projectId, projectCode, projectName, producti
         );
       })
     : itemsWithDrawings;
+
+  // Apply status filter
+  const visibleItems = statusFilter === "all"
+    ? clientFiltered
+    : clientFiltered.filter((i) => {
+        const s = i.drawing?.status || "not_uploaded";
+        if (statusFilter === "need_upload") return s === "not_uploaded" || !i.drawing;
+        if (statusFilter === "approved") return s === "approved" || s === "approved_with_comments" || s === "not_required";
+        return s === statusFilter;
+      });
 
   // Compute "ready to send" count (uploaded but not yet sent)
   const readyToSendCount = itemsWithDrawings.filter(
@@ -432,7 +452,22 @@ export function DrawingsOverview({ projectId, projectCode, projectName, producti
             <><span>&middot;</span><span className="text-amber-600">{stats.awaitingClient} awaiting your review</span></>
           )}
         </div>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-1.5 items-center">
+          {/* Status Filter */}
+          <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setSelectedIds(new Set()); }}>
+            <SelectTrigger className="h-8 w-[130px] text-xs md:h-9 md:w-[140px] md:text-sm">
+              <SelectValue placeholder="All Statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="need_upload">Need Upload ({stats.needDrawing})</SelectItem>
+              <SelectItem value="uploaded">Uploaded</SelectItem>
+              <SelectItem value="sent_to_client">Awaiting Client ({stats.awaitingClient})</SelectItem>
+              <SelectItem value="rejected">Rejected ({stats.rejected})</SelectItem>
+              <SelectItem value="approved">Approved ({stats.approved})</SelectItem>
+            </SelectContent>
+          </Select>
+
           {/* Download All — visible to both clients and PMs */}
           {visibleItems.some((i) => i.drawing) && (
             <Button
