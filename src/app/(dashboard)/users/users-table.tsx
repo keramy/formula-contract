@@ -129,10 +129,13 @@ export function UsersTable({ users }: UsersTableProps) {
     setIsLoading(true);
     try {
       const result = await toggleUserActive(user.id, !user.is_active);
-      if (!result.success) {
+      if (result.success) {
+        // Update local state to reflect the change without router.refresh()
+        // which can cause middleware race conditions and redirect away
+        window.location.reload();
+      } else {
         console.error("Failed to update user status:", result.error);
       }
-      router.refresh();
     } catch (error) {
       console.error("Failed to update user status:", error);
     } finally {
