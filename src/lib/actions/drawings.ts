@@ -333,7 +333,7 @@ export async function getDrawingDownloadUrls(
     `)
     .eq("scope_items.project_id", projectId)
     .eq("scope_items.is_deleted", false)
-    .in("status", ["sent_to_client", "approved", "approved_with_comments", "rejected"]);
+    .in("status", ["uploaded", "sent_to_client", "approved", "approved_with_comments", "rejected"]);
 
   if (!data || data.length === 0) return [];
 

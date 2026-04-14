@@ -308,12 +308,13 @@ export function DrawingsOverview({ projectId, projectCode, projectName, producti
     setDownloadProgress(null);
     try {
       const urls = await getDrawingDownloadUrls(projectId);
-      // Filter to only selected items that have drawings
-      const selectedUrls = urls.filter((u) => {
-        const item = itemsWithDrawings.find((i) => i.drawing?.id && selectedIds.has(i.id));
-        // Match by item_code from the URL data
-        return item && selectedIds.has(item.id) && u.item_code === item.item_code;
-      });
+      // Build a set of item_codes for selected items
+      const selectedItemCodes = new Set(
+        itemsWithDrawings
+          .filter((i) => selectedIds.has(i.id) && i.drawing)
+          .map((i) => i.item_code)
+      );
+      const selectedUrls = urls.filter((u) => selectedItemCodes.has(u.item_code));
 
       if (selectedUrls.length === 0) {
         toast.info("No drawings available for selected items");
