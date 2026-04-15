@@ -414,6 +414,38 @@ export async function updateUserRole(
  * Activate or deactivate a user
  * Also bans/unbans in Supabase Auth and syncs to JWT metadata
  */
+/**
+ * Touch last_active_at for the current user (throttled — skips if updated within 5 min).
+ * Called from PresenceProvider on mount to keep "last seen" accurate.
+ */
+export async function touchLastActive(): Promise<void> {
+  try {
+    const supabase = await createServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    // Throttle: only update if last_active_at is older than 5 minutes
+    const { data } = await supabase
+      .from("users")
+      .select("last_active_at")
+      .eq("id", user.id)
+      .single();
+
+    if (data?.last_active_at) {
+      const lastActive = new Date(data.last_active_at).getTime();
+      const fiveMinAgo = Date.now() - 5 * 60 * 1000;
+      if (lastActive > fiveMinAgo) return; // Already fresh, skip
+    }
+
+    await supabase
+      .from("users")
+      .update({ last_active_at: new Date().toISOString() })
+      .eq("id", user.id);
+  } catch {
+    // Silently fail — presence tracking is non-critical
+  }
+}
+
 export async function toggleUserActive(
   userId: string,
   isActive: boolean

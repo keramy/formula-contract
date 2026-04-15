@@ -5,6 +5,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { CommandMenu } from "@/components/layout/command-menu";
 import { AppHeader, PageHeaderProvider } from "@/components/layout/app-header";
 import { ErrorBoundary } from "@/components/error-boundary";
+import { PresenceProvider } from "@/components/presence-provider";
 
 export default async function DashboardLayout({
   children,
@@ -26,6 +27,7 @@ export default async function DashboardLayout({
 
   return (
     <PageHeaderProvider>
+      <PresenceProvider userId={user.id} />
       <SidebarProvider>
         <AppSidebar user={userData} />
         <SidebarInset className="flex flex-col overflow-hidden">

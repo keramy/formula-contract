@@ -38,10 +38,12 @@ import {
   PlusIcon,
   FilterIcon,
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { UserFormDialog } from "./user-form-dialog";
 import { toggleUserActive } from "@/lib/actions/users";
 import { GlassCard, EmptyState, GradientAvatar, StatusBadge } from "@/components/ui/ui-helpers";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useOnlineUsers } from "@/hooks/use-online-users";
 
 interface User {
   id: string;
@@ -90,6 +92,7 @@ export function UsersTable({ users }: UsersTableProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [search, setSearch] = useState(searchParams.get("search") || "");
+  const onlineUsers = useOnlineUsers();
   const [isLoading, setIsLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editUser, setEditUser] = useState<User | null>(null);
@@ -274,13 +277,36 @@ export function UsersTable({ users }: UsersTableProps) {
                             {statusConf.label}
                           </StatusBadge>
                         </TableCell>
-                        <TableCell className="text-muted-foreground text-sm">
-                          {(() => {
-                            const dates = [user.last_active_at, user.last_login_at].filter(Boolean) as string[];
-                            if (dates.length === 0) return "Never";
-                            const latest = dates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0];
-                            return format(new Date(latest), "MMM d, yyyy 'at' h:mm a");
-                          })()}
+                        <TableCell className="text-sm">
+                          {onlineUsers.has(user.id) ? (
+                            <div className="flex items-center gap-1.5">
+                              <span className="relative flex size-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                                <span className="relative inline-flex rounded-full size-2 bg-emerald-500" />
+                              </span>
+                              <span className="text-emerald-600 font-medium">Online</span>
+                            </div>
+                          ) : (
+                            (() => {
+                              const dates = [user.last_active_at, user.last_login_at].filter(Boolean) as string[];
+                              if (dates.length === 0) return <span className="text-muted-foreground">Never</span>;
+                              const latest = dates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0];
+                              return (
+                                <TooltipProvider delayDuration={200}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="text-muted-foreground cursor-help">
+                                        {formatDistanceToNow(new Date(latest), { addSuffix: true })}
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" className="text-xs">
+                                      {format(new Date(latest), "MMM d, yyyy 'at' h:mm a")}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              );
+                            })()
+                          )}
                         </TableCell>
                         <TableCell>
                           <DropdownMenu>
@@ -379,13 +405,27 @@ export function UsersTable({ users }: UsersTableProps) {
                 <StatusBadge variant={statusConf.variant} dot>{statusConf.label}</StatusBadge>
                 <Badge variant="outline" className="font-mono">{user.employee_code || "—"}</Badge>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Last active: {(() => {
-                  const dates = [user.last_active_at, user.last_login_at].filter(Boolean) as string[];
-                  if (dates.length === 0) return "Never";
-                  const latest = dates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0];
-                  return format(new Date(latest), "MMM d, yyyy 'at' h:mm a");
-                })()}
+              <p className="text-xs">
+                {onlineUsers.has(user.id) ? (
+                  <span className="text-emerald-600 font-medium flex items-center gap-1">
+                    <span className="inline-flex rounded-full size-1.5 bg-emerald-500" />
+                    Online
+                  </span>
+                ) : (
+                  (() => {
+                    const dates = [user.last_active_at, user.last_login_at].filter(Boolean) as string[];
+                    if (dates.length === 0) return <span className="text-muted-foreground">Never</span>;
+                    const latest = dates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0];
+                    return (
+                      <span className="text-muted-foreground">
+                        {formatDistanceToNow(new Date(latest), { addSuffix: true })}
+                        <span className="text-[10px] ml-1 opacity-60">
+                          ({format(new Date(latest), "MMM d, h:mm a")})
+                        </span>
+                      </span>
+                    );
+                  })()
+                )}
               </p>
             </GlassCard>
           );
