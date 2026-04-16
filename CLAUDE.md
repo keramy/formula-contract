@@ -263,6 +263,9 @@ scope-items/{project_id}/{item_id}/image_1.jpg
 50. **Online presence uses Supabase Realtime Presence** — `PresenceProvider` in dashboard layout joins `presence:online` channel. `useOnlineUsers()` hook reads state. Zero DB writes for presence — DB only touched by `touchLastActive()` every 5 min for "last seen" fallback.
 51. **Drawings tab shows all scope items** — Both production and procurement items appear in drawings. Removed `.eq("item_path", "production")` filter from `getProjectDrawings()` and parent page prop.
 52. **Invoice status "overdue" is computed, not stored** — DB never stores `status = 'overdue'`. It stays `pending`/`approved`. `days_overdue` is computed at query time. Status filter dropdown routes "Overdue" to `overdue_only` flag (date comparison), not `.eq("status", "overdue")`.
+53. **Drawing/material approval uses server actions** — `approveOrRejectDrawing()` and `approveOrRejectMaterial()` in `lib/actions/drawings.ts`. Migrated from client-side Supabase calls to server actions for notification support. Never approve/reject via raw client-side update.
+54. **`notifyProjectPMs()` uses service role** — Client users can't query `project_assignments` for PM user IDs due to RLS. The helper in `lib/notifications/actions.ts` uses `createServiceRoleClient()` to bypass RLS for cross-user notification inserts.
+55. **Notification titles exclude project name** — The dropdown and `/notifications` page append `" on {projectName}"` from the joined project data. Don't include project name in the `title` field when creating notifications — it will duplicate.
 
 ### React Code Health (React Doctor score: 96/100)
 21. **Never define components inside other components** - Nested components get recreated every render, destroying state and killing performance. Extract to module scope or a separate file with explicit props.
@@ -321,6 +324,7 @@ npm run version:major   # 1.0.0 → 2.0.0 (breaking changes)
 ## Current Status (Apr 2026)
 
 ### Recently Completed
+- Notification Overhaul + Drawings UX (Apr 16, 2026): Drawing/material approve/reject migrated to server actions with PM notifications, `notifyProjectPMs()` helper (service role), drawing upload notifications to other PMs, `/notifications` page (filters, pagination, grouped batches), "View all" link in dropdown, fix notification navigation (drawings→drawings tab, materials→materials tab), fix phantom `link` field in project-assignments, missing icon configs added, drawing email now includes item names, drawings tab: uploaded-by column, sortable columns (Code/Name/Status/Uploaded with # reset), selection bar merged with action bar.
 - Payments & Drawings UX Overhaul (Apr 15, 2026): Invoice due date overflow fix, updateInvoice missing fields (vat_rate, project_id, installments), file upload on edit, finance-documents storage RLS (migration 063), invoice delete (single + bulk), overdue status filter fix, pagination (50/page + Load More), status badge colors (orange=action, green=done, red=overdue), Access tab admin-only, pinned Save/Cancel in all payment sheets, drawings for procurement items, select + bulk download on drawings tab, status filter dropdown on drawings tab, user deactivate redirect fix, real-time online presence (Supabase Realtime Presence + touchLastActive throttled), last seen with hover tooltip.
 - DB Performance & RLS Recursion Fix (Apr 3, 2026): Root cause of Supabase IO budget depletion was recursive RLS (missing SECURITY DEFINER on helper functions). Fixed with migration 059. Also: shared request context (React cache), thin project pages (9→2 queries), replaced 31 revalidatePath with React Query invalidation, removed Gantt drag/resize, removed middleware DB writes, staged dashboard queries, error states on list pages. 676 tests, React Doctor 96/100.
 - Gantt Chart Rewrite (Apr 1, 2026): Complete clean rewrite — 13 new files, single ganttRows array with absolute Y positioning, table view, dependency arrows, baselines, critical path. Migrations 056-057. Drag/resize removed for DB safety — edit via dialogs.
@@ -335,7 +339,7 @@ npm run version:major   # 1.0.0 → 2.0.0 (breaking changes)
 
 ### Planned
 - Drawing review reminder system: WhatsApp-style ticks (sent/opened/viewed), 2-day auto-reminders, per-drawing tracking, max 3 reminders then escalate, manual resend button, team notification on send (plan in memory)
-- Notification system overhaul: missing approval notifications (drawing/material approve/reject), dead code cleanup, /notifications page, Supabase Realtime for instant delivery (audit in memory)
+- Notifications remaining: Supabase Realtime for instant delivery, clean up `email_sent` vestigial field
 - Payments: sequential multi-step approval (plan in memory, deferred)
 - Global capacity view (cross-project phase workload overview)
 - Command menu (Cmd+K)
