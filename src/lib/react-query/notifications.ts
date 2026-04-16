@@ -4,16 +4,20 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import {
   getNotifications,
+  getFilteredNotifications,
   getUnreadCount,
   markAsRead,
   markAllAsRead,
   type Notification,
 } from "@/lib/notifications/actions";
 
+export type { Notification };
+
 // Query keys for cache management
 export const notificationKeys = {
   all: ["notifications"] as const,
   list: (limit?: number) => [...notificationKeys.all, "list", limit] as const,
+  filtered: (filters?: Record<string, unknown>) => [...notificationKeys.all, "filtered", filters] as const,
   unreadCount: () => [...notificationKeys.all, "unreadCount"] as const,
 };
 
@@ -75,6 +79,24 @@ export function useUnreadCount() {
     // Keep data fresh for 30 seconds (was 15s)
     staleTime: 30 * 1000,
     // Refetch immediately when window regains focus
+    refetchOnWindowFocus: true,
+  });
+}
+
+/**
+ * Hook for fetching filtered notifications with pagination (for /notifications page)
+ */
+export function useFilteredNotifications(filters?: {
+  unreadOnly?: boolean;
+  type?: string;
+  projectId?: string;
+  limit?: number;
+  offset?: number;
+}) {
+  return useQuery({
+    queryKey: notificationKeys.filtered(filters as Record<string, unknown>),
+    queryFn: () => getFilteredNotifications(filters),
+    staleTime: 30 * 1000,
     refetchOnWindowFocus: true,
   });
 }

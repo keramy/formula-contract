@@ -11,6 +11,7 @@
 import { createClient, type RequestContext } from "@/lib/supabase/server";
 import { logActivity } from "@/lib/activity-log/actions";
 import { ACTIVITY_ACTIONS } from "@/lib/activity-log/constants";
+import { notifyProjectPMs } from "@/lib/notifications/actions";
 import { Resend } from "resend";
 import { DrawingSentToClientEmail } from "@/emails/drawing-sent-to-client-email";
 
@@ -131,6 +132,9 @@ export async function sendDrawingsToClient(
       const itemCodes = drawingsData
         .map((d) => itemMap.get(d.item_id)?.item_code)
         .filter((code): code is string => !!code);
+      const itemNames = drawingsData
+        .map((d) => itemMap.get(d.item_id)?.name)
+        .filter((name): name is string => !!name);
 
       // 6. Create in-app notifications for client users
       const notifications = clients.map((client) => ({
@@ -167,6 +171,7 @@ export async function sendDrawingsToClient(
               projectCode,
               drawingCount: drawingIds.length,
               itemCodes,
+              itemNames,
               senderName,
               drawingsPageUrl,
             }),
@@ -374,10 +379,24 @@ export async function getProjectDrawings(projectId: string, ctx?: RequestContext
 
   const { data } = await supabase
     .from("drawings")
-    .select("id, item_id, status, current_revision, sent_to_client_at")
-    .in("item_id", itemIds);
+    .select(`
+      id, item_id, status, current_revision, sent_to_client_at, created_at, updated_at,
+      drawing_revisions(uploaded_by, created_at, users:uploaded_by(name))
+    `)
+    .in("item_id", itemIds)
+    .order("created_at", { referencedTable: "drawing_revisions", ascending: false });
 
-  return data || [];
+  // Extract the latest revision's uploader for each drawing
+  return (data || []).map((d) => {
+    const revisions = (d.drawing_revisions || []) as { uploaded_by: string; created_at: string; users: { name: string } | null }[];
+    const latestRev = revisions[0] || null;
+    return {
+      ...d,
+      uploaded_by_name: latestRev?.users?.name || null,
+      uploaded_revision_at: latestRev?.created_at || null,
+      drawing_revisions: undefined,
+    };
+  });
 }
 
 /**
@@ -469,4 +488,257 @@ export async function deleteDrawing(
   });
 
   return { success: true };
+}
+
+// ============================================================================
+// Drawing Approval (client action → server action migration)
+// ============================================================================
+
+/**
+ * Approve or reject a drawing. Called by the client user.
+ * Creates notifications for all PMs on the project.
+ */
+export async function approveOrRejectDrawing(input: {
+  drawingId: string;
+  projectId: string;
+  scopeItemId: string;
+  itemCode: string;
+  action: "approved" | "approved_with_comments" | "rejected";
+  comments?: string;
+  currentRevision: string;
+  markupFileData?: { name: string; data: string; type: string };
+}): Promise<{ success: boolean; error?: string; newItemStatus?: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "Not authenticated" };
+
+  // Upload markup file if provided
+  let markupUrl: string | null = null;
+  if (input.markupFileData) {
+    const base64Data = input.markupFileData.data.split(",")[1] || input.markupFileData.data;
+    const buffer = Buffer.from(base64Data, "base64");
+    const timestamp = Date.now();
+    const storagePath = `${input.projectId}/${input.scopeItemId}/markup_${input.currentRevision}_${timestamp}_${input.markupFileData.name}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("drawings")
+      .upload(storagePath, buffer, { contentType: input.markupFileData.type });
+
+    if (uploadError) {
+      console.error("[approveOrRejectDrawing] Markup upload failed:", uploadError.message);
+    } else {
+      const { data: urlData } = supabase.storage.from("drawings").getPublicUrl(storagePath);
+      markupUrl = urlData?.publicUrl || null;
+    }
+  }
+
+  // Update drawing status
+  const { error: drawingError } = await supabase
+    .from("drawings")
+    .update({
+      status: input.action,
+      client_response_at: new Date().toISOString(),
+      client_comments: input.comments || null,
+      approved_by: input.action !== "rejected" ? user.id : null,
+    })
+    .eq("id", input.drawingId);
+
+  if (drawingError) return { success: false, error: drawingError.message };
+
+  // Save markup to revision
+  if (markupUrl) {
+    await supabase
+      .from("drawing_revisions")
+      .update({ client_markup_url: markupUrl })
+      .eq("drawing_id", input.drawingId)
+      .eq("revision", input.currentRevision);
+  }
+
+  // Update scope item status
+  type ItemStatus = "awaiting_approval" | "approved" | "in_design";
+  let newItemStatus: ItemStatus = "awaiting_approval";
+  if (input.action === "approved" || input.action === "approved_with_comments") {
+    newItemStatus = "approved";
+  } else if (input.action === "rejected") {
+    newItemStatus = "in_design";
+  }
+
+  await supabase
+    .from("scope_items")
+    .update({ status: newItemStatus })
+    .eq("id", input.scopeItemId);
+
+  // Log activity
+  const activityAction = input.action === "rejected"
+    ? ACTIVITY_ACTIONS.DRAWING_REJECTED
+    : ACTIVITY_ACTIONS.DRAWING_APPROVED;
+
+  await logActivity({
+    action: activityAction,
+    entityType: "drawing",
+    entityId: input.drawingId,
+    projectId: input.projectId,
+    details: {
+      item_code: input.itemCode,
+      revision: input.currentRevision,
+      status: input.action,
+      comments: input.comments || undefined,
+      has_markup: !!markupUrl,
+    },
+  });
+
+  // Get project info for notification message
+  const { data: project } = await supabase
+    .from("projects")
+    .select("name, project_code")
+    .eq("id", input.projectId)
+    .single();
+
+  const projectName = project?.name || "project";
+  const clientName = user.user_metadata?.name || "Client";
+
+  // Notify all PMs on the project
+  try {
+    if (input.action === "rejected") {
+      const reason = input.comments ? ` — "${input.comments}"` : "";
+      await notifyProjectPMs({
+        projectId: input.projectId,
+        type: "drawing_rejected",
+        title: `${clientName} rejected drawing for ${input.itemCode}${reason}`,
+        drawingId: input.drawingId,
+        itemId: input.scopeItemId,
+      });
+    } else {
+      await notifyProjectPMs({
+        projectId: input.projectId,
+        type: "drawing_approved",
+        title: `${clientName} approved drawing for ${input.itemCode}`,
+        drawingId: input.drawingId,
+        itemId: input.scopeItemId,
+      });
+    }
+  } catch (notifError) {
+    console.error("[approveOrRejectDrawing] Notification failed:", notifError);
+  }
+
+  return { success: true, newItemStatus };
+}
+
+// ============================================================================
+// Material Approval (client action → server action migration)
+// ============================================================================
+
+/**
+ * Approve or reject a material. Called by the client user.
+ * Creates notifications for all PMs on the project.
+ */
+export async function approveOrRejectMaterial(input: {
+  materialId: string;
+  projectId: string;
+  materialCode: string;
+  materialName: string;
+  action: "approve" | "reject";
+  comments?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "Not authenticated" };
+
+  const newStatus = input.action === "approve" ? "approved" : "rejected";
+
+  const { error } = await supabase
+    .from("materials")
+    .update({
+      status: newStatus,
+      client_response_at: new Date().toISOString(),
+      client_comments: input.comments?.trim() || null,
+      approved_by: input.action === "approve" ? user.id : null,
+    })
+    .eq("id", input.materialId);
+
+  if (error) return { success: false, error: error.message };
+
+  // Log activity
+  const activityAction = input.action === "reject"
+    ? ACTIVITY_ACTIONS.MATERIAL_REJECTED
+    : ACTIVITY_ACTIONS.MATERIAL_APPROVED;
+
+  await logActivity({
+    action: activityAction,
+    entityType: "material",
+    entityId: input.materialId,
+    projectId: input.projectId,
+    details: {
+      material_code: input.materialCode,
+      name: input.materialName,
+      status: newStatus,
+      comments: input.comments || undefined,
+    },
+  });
+
+  // Get project info for notification message
+  const { data: project } = await supabase
+    .from("projects")
+    .select("name, project_code")
+    .eq("id", input.projectId)
+    .single();
+
+  const projectName = project?.name || "project";
+  const clientName = user.user_metadata?.name || "Client";
+
+  // Notify all PMs on the project
+  try {
+    if (input.action === "reject") {
+      const reason = input.comments ? ` — "${input.comments}"` : "";
+      await notifyProjectPMs({
+        projectId: input.projectId,
+        type: "material_rejected",
+        title: `${clientName} rejected material ${input.materialCode}${reason}`,
+        materialId: input.materialId,
+      });
+    } else {
+      await notifyProjectPMs({
+        projectId: input.projectId,
+        type: "material_approved",
+        title: `${clientName} approved material ${input.materialCode}`,
+        materialId: input.materialId,
+      });
+    }
+  } catch (notifError) {
+    console.error("[approveOrRejectMaterial] Notification failed:", notifError);
+  }
+
+  return { success: true };
+}
+
+// ============================================================================
+// Drawing Upload Notification
+// ============================================================================
+
+/**
+ * Notify other PMs on the project that a drawing was uploaded.
+ * Called from drawing-upload-sheet after successful upload.
+ * Excludes the uploader from the notification.
+ */
+export async function notifyDrawingUploaded(input: {
+  projectId: string;
+  itemCode: string;
+  revision: string;
+}): Promise<void> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const uploaderName = user.user_metadata?.name || "A team member";
+
+  try {
+    await notifyProjectPMs({
+      projectId: input.projectId,
+      excludeUserId: user.id,
+      type: "drawing_uploaded",
+      title: `${uploaderName} uploaded drawing for ${input.itemCode} (Rev ${input.revision})`,
+    });
+  } catch (err) {
+    console.error("[notifyDrawingUploaded] Failed:", err);
+  }
 }

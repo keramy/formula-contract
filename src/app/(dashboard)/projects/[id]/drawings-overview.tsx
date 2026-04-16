@@ -48,6 +48,7 @@ import {
   MoreHorizontalIcon,
   TrashIcon,
   XIcon,
+  ArrowUpDownIcon,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -59,6 +60,9 @@ import { DrawingUploadSheet } from "@/components/drawings/drawing-upload-sheet";
 import { ScopeItemSheet } from "@/components/scope-items/scope-item-sheet";
 import { sendDrawingsToClient, getDrawingDownloadUrls, deleteDrawing } from "@/lib/actions/drawings";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { format, formatDistanceToNow } from "date-fns";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { DownloadIcon } from "lucide-react";
 import JSZip from "jszip";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -70,6 +74,10 @@ interface Drawing {
   status: string;
   current_revision: string | null;
   sent_to_client_at: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  uploaded_by_name: string | null;
+  uploaded_revision_at: string | null;
 }
 
 interface ProductionItem {
@@ -139,6 +147,10 @@ export function DrawingsOverview({ projectId, projectCode, projectName, producti
   // Status filter
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
+  // Sort state
+  const [sortBy, setSortBy] = useState<"code" | "name" | "status" | "uploaded">("code");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
   // Delete drawing state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [pendingDeleteDrawingId, setPendingDeleteDrawingId] = useState<string | null>(null);
@@ -195,7 +207,7 @@ export function DrawingsOverview({ projectId, projectCode, projectName, producti
     : itemsWithDrawings;
 
   // Apply status filter
-  const visibleItems = statusFilter === "all"
+  const filtered = statusFilter === "all"
     ? clientFiltered
     : clientFiltered.filter((i) => {
         const s = i.drawing?.status || "not_uploaded";
@@ -203,6 +215,39 @@ export function DrawingsOverview({ projectId, projectCode, projectName, producti
         if (statusFilter === "approved") return s === "approved" || s === "approved_with_comments" || s === "not_required";
         return s === statusFilter;
       });
+
+  // Original position map — each item keeps its # from the unsorted list
+  const originalPositionMap = new Map(
+    itemsWithDrawings.map((item, idx) => [item.id, idx + 1])
+  );
+
+  // Apply sorting — items without drawings always at bottom
+  const visibleItems = [...filtered].sort((a, b) => {
+    const dir = sortDir === "asc" ? 1 : -1;
+    switch (sortBy) {
+      case "code":
+        return dir * a.item_code.localeCompare(b.item_code);
+      case "name":
+        return dir * a.name.localeCompare(b.name);
+      case "status": {
+        const sa = a.drawing?.status || "zzz";
+        const sb = b.drawing?.status || "zzz";
+        if (sa === "zzz" && sb !== "zzz") return 1;
+        if (sb === "zzz" && sa !== "zzz") return -1;
+        return dir * sa.localeCompare(sb);
+      }
+      case "uploaded": {
+        const ta = a.drawing?.uploaded_revision_at || "";
+        const tb = b.drawing?.uploaded_revision_at || "";
+        if (!ta && tb) return 1;
+        if (ta && !tb) return -1;
+        if (!ta && !tb) return 0;
+        return dir * ta.localeCompare(tb);
+      }
+      default:
+        return 0;
+    }
+  });
 
   // Compute "ready to send" count (uploaded but not yet sent)
   const readyToSendCount = itemsWithDrawings.filter(
@@ -369,11 +414,12 @@ export function DrawingsOverview({ projectId, projectCode, projectName, producti
   };
 
   const toggleSelectAll = () => {
-    const withDrawings = visibleItems.filter((i) => i.drawing);
-    if (selectedIds.size === withDrawings.length) {
+    // Select all visible items that have a drawing (any status except not_uploaded)
+    const selectable = visibleItems.filter((i) => i.drawing && i.drawing.status !== "not_uploaded");
+    if (selectedIds.size === selectable.length && selectable.length > 0) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(withDrawings.map((i) => i.id)));
+      setSelectedIds(new Set(selectable.map((i) => i.id)));
     }
   };
 
@@ -469,29 +515,51 @@ export function DrawingsOverview({ projectId, projectCode, projectName, producti
             </SelectContent>
           </Select>
 
-          {/* Download All — visible to both clients and PMs */}
-          {visibleItems.some((i) => i.drawing) && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 px-2.5 text-xs md:h-9 md:px-3 md:text-sm"
-              onClick={handleDownloadAll}
-              disabled={isDownloading}
-            >
-              {isDownloading ? (
-                <>
-                  <Spinner className="size-3.5" />
-                  {downloadProgress
-                    ? `${downloadProgress.done}/${downloadProgress.total}`
-                    : "Preparing..."}
-                </>
-              ) : (
-                <>
-                  <DownloadIcon className="size-3.5" />
-                  Download All
-                </>
-              )}
-            </Button>
+          {/* Selection actions OR Download All */}
+          {selectedIds.size > 0 ? (
+            <>
+              <span className="text-xs font-medium text-muted-foreground">
+                {selectedIds.size} selected
+              </span>
+              <Button variant="outline" size="sm" className="h-8 px-2.5 text-xs md:h-9 md:px-3 md:text-sm" onClick={() => setSelectedIds(new Set())}>
+                <XIcon className="size-3.5 mr-1" />
+                Clear
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 px-2.5 text-xs md:h-9 md:px-3 md:text-sm"
+                onClick={handleDownloadSelected}
+                disabled={isDownloading}
+              >
+                <DownloadIcon className="size-3.5 mr-1" />
+                {isDownloading ? "Downloading..." : `Download (${selectedIds.size})`}
+              </Button>
+            </>
+          ) : (
+            visibleItems.some((i) => i.drawing) && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 px-2.5 text-xs md:h-9 md:px-3 md:text-sm"
+                onClick={handleDownloadAll}
+                disabled={isDownloading}
+              >
+                {isDownloading ? (
+                  <>
+                    <Spinner className="size-3.5" />
+                    {downloadProgress
+                      ? `${downloadProgress.done}/${downloadProgress.total}`
+                      : "Preparing..."}
+                  </>
+                ) : (
+                  <>
+                    <DownloadIcon className="size-3.5" />
+                    Download All
+                  </>
+                )}
+              </Button>
+            )
           )}
         {!isClient && (
           <>
@@ -523,29 +591,6 @@ export function DrawingsOverview({ projectId, projectCode, projectName, producti
         </div>
       </div>
 
-      {/* Selection Actions */}
-      {selectedIds.size > 0 && (
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-muted-foreground">
-            {selectedIds.size} selected
-          </span>
-          <Button variant="outline" size="sm" className="h-8" onClick={() => setSelectedIds(new Set())}>
-            <XIcon className="size-3.5 mr-1" />
-            Clear
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8"
-            onClick={handleDownloadSelected}
-            disabled={isDownloading}
-          >
-            <DownloadIcon className="size-3.5 mr-1" />
-            {isDownloading ? "Downloading..." : `Download (${selectedIds.size})`}
-          </Button>
-        </div>
-      )}
-
       <ResponsiveDataView
         data={visibleItems}
         cardsClassName="grid grid-cols-1 gap-2.5"
@@ -555,18 +600,46 @@ export function DrawingsOverview({ projectId, projectCode, projectName, producti
               <Table>
               <TableHeader>
                 <TableRow className="bg-gray-50/50">
-                  <TableHead className="w-10">
+                  <TableHead className="w-9 px-2">
                     <Checkbox
-                      checked={visibleItems.filter((i) => i.drawing).length > 0 && selectedIds.size === visibleItems.filter((i) => i.drawing).length}
+                      checked={(() => {
+                        const selectable = visibleItems.filter((i) => i.drawing && i.drawing.status !== "not_uploaded");
+                        return selectable.length > 0 && selectedIds.size === selectable.length;
+                      })()}
                       onCheckedChange={toggleSelectAll}
                     />
                   </TableHead>
-                  <TableHead className="w-12 text-center">#</TableHead>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Revision</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-[100px]"></TableHead>
+                  <TableHead className="w-8 px-1 text-center">
+                    <button
+                      className={cn("hover:text-foreground transition-colors text-xs", sortBy !== "code" && "text-primary")}
+                      onClick={() => { setSortBy("code"); setSortDir("asc"); }}
+                      title="Reset sort"
+                    >
+                      #
+                    </button>
+                  </TableHead>
+                  <TableHead className="w-16 px-2">
+                    <button className="flex items-center gap-0.5 hover:text-foreground transition-colors text-xs" onClick={() => { setSortBy("code"); setSortDir(sortBy === "code" && sortDir === "asc" ? "desc" : "asc"); }}>
+                      Code <ArrowUpDownIcon className={cn("size-2.5", sortBy === "code" ? "opacity-100" : "opacity-30")} />
+                    </button>
+                  </TableHead>
+                  <TableHead className="px-2">
+                    <button className="flex items-center gap-0.5 hover:text-foreground transition-colors text-xs" onClick={() => { setSortBy("name"); setSortDir(sortBy === "name" && sortDir === "asc" ? "desc" : "asc"); }}>
+                      Name <ArrowUpDownIcon className={cn("size-2.5", sortBy === "name" ? "opacity-100" : "opacity-30")} />
+                    </button>
+                  </TableHead>
+                  <TableHead className="w-16 px-2 text-center text-xs">Rev</TableHead>
+                  <TableHead className="w-24 px-2 text-center">
+                    <button className="flex items-center gap-0.5 hover:text-foreground transition-colors text-xs mx-auto" onClick={() => { setSortBy("status"); setSortDir(sortBy === "status" && sortDir === "asc" ? "desc" : "asc"); }}>
+                      Status <ArrowUpDownIcon className={cn("size-2.5", sortBy === "status" ? "opacity-100" : "opacity-30")} />
+                    </button>
+                  </TableHead>
+                  <TableHead className="w-32 px-2">
+                    <button className="flex items-center gap-0.5 hover:text-foreground transition-colors text-xs" onClick={() => { setSortBy("uploaded"); setSortDir(sortBy === "uploaded" && sortDir === "asc" ? "desc" : "asc"); }}>
+                      Uploaded <ArrowUpDownIcon className={cn("size-2.5", sortBy === "uploaded" ? "opacity-100" : "opacity-30")} />
+                    </button>
+                  </TableHead>
+                  <TableHead className="w-36 px-2"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -579,21 +652,21 @@ export function DrawingsOverview({ projectId, projectCode, projectName, producti
                         <Checkbox
                           checked={selectedIds.has(item.id)}
                           onCheckedChange={() => toggleSelect(item.id)}
-                          disabled={!item.drawing}
+                          disabled={!item.drawing || item.drawing.status === "not_uploaded"}
                         />
                       </TableCell>
-                      <TableCell className="text-center">
-                        <span className="text-sm font-medium text-muted-foreground">
-                          {index + 1}
+                      <TableCell className="text-center px-1">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          {originalPositionMap.get(item.id) || index + 1}
                         </span>
                       </TableCell>
-                      <TableCell>
-                        <span className="font-mono text-sm bg-gray-100 px-2 py-0.5 rounded">
+                      <TableCell className="px-2">
+                        <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded">
                           {item.item_code}
                         </span>
                       </TableCell>
-                      <TableCell className="font-medium">{item.name}</TableCell>
-                      <TableCell>
+                      <TableCell className="px-2 font-medium text-sm truncate">{item.name}</TableCell>
+                      <TableCell className="text-center px-2">
                         {item.drawing?.current_revision ? (
                           <Badge variant="outline" className="font-mono bg-teal-50 text-teal-700 border-teal-200">
                             Rev {item.drawing.current_revision}
@@ -602,10 +675,33 @@ export function DrawingsOverview({ projectId, projectCode, projectName, producti
                           <span className="text-muted-foreground">-</span>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-center px-2">
                         <StatusBadge variant={config.variant}>
                           {config.label}
                         </StatusBadge>
+                      </TableCell>
+                      <TableCell className="text-xs px-2">
+                        {item.drawing?.uploaded_revision_at ? (
+                          <div>
+                            {item.drawing.uploaded_by_name && (
+                              <div className="font-medium text-foreground">{item.drawing.uploaded_by_name}</div>
+                            )}
+                            <TooltipProvider delayDuration={200}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="text-muted-foreground cursor-help">
+                                    {formatDistanceToNow(new Date(item.drawing.uploaded_revision_at), { addSuffix: true })}
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="text-xs">
+                                  {format(new Date(item.drawing.uploaded_revision_at), "MMM d, yyyy 'at' h:mm a")}
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
@@ -615,6 +711,7 @@ export function DrawingsOverview({ projectId, projectCode, projectName, producti
                               <Button
                                 variant="ghost"
                                 size="sm"
+                                className={isApproved ? "hover:text-amber-600 hover:bg-amber-50" : "hover:text-teal-600 hover:bg-teal-50"}
                                 onClick={() => {
                                   if (isApproved) {
                                     setPendingNewRevItemId(item.id);
@@ -624,7 +721,6 @@ export function DrawingsOverview({ projectId, projectCode, projectName, producti
                                     setUploadSheetOpen(true);
                                   }
                                 }}
-                                className={isApproved ? "hover:text-amber-600 hover:bg-amber-50" : "hover:text-teal-600 hover:bg-teal-50"}
                               >
                                 <UploadIcon className="size-3 mr-1" />
                                 {item.drawing ? "New Rev" : "Upload"}
@@ -634,8 +730,8 @@ export function DrawingsOverview({ projectId, projectCode, projectName, producti
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => openViewSheet(item.id)}
                             className="hover:text-teal-600 hover:bg-teal-50"
+                            onClick={() => openViewSheet(item.id)}
                           >
                             <EyeIcon className="size-3 mr-1" />
                             View
@@ -644,12 +740,12 @@ export function DrawingsOverview({ projectId, projectCode, projectName, producti
                             <Button
                               variant="ghost"
                               size="sm"
+                              className="hover:text-destructive hover:bg-destructive/10"
                               onClick={() => {
                                 setPendingDeleteDrawingId(item.drawing!.id);
                                 setPendingDeleteItemName(`${item.item_code} — ${item.name}`);
                                 setDeleteDialogOpen(true);
                               }}
-                              className="hover:text-destructive hover:bg-destructive/10"
                             >
                               <TrashIcon className="size-3" />
                             </Button>

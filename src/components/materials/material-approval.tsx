@@ -1,10 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { materialKeys } from "@/lib/react-query/materials";
-import { createClient } from "@/lib/supabase/client";
+import { approveOrRejectMaterial } from "@/lib/actions/drawings";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,6 +21,8 @@ import { CheckCircleIcon, XCircleIcon } from "lucide-react";
 interface MaterialApprovalProps {
   materialId: string;
   materialName: string;
+  materialCode: string;
+  projectId: string;
   action: "approve" | "reject";
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -30,11 +31,12 @@ interface MaterialApprovalProps {
 export function MaterialApproval({
   materialId,
   materialName,
+  materialCode,
+  projectId,
   action,
   open,
   onOpenChange,
 }: MaterialApprovalProps) {
-  const router = useRouter();
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
   const [comments, setComments] = useState("");
@@ -46,23 +48,17 @@ export function MaterialApproval({
 
   const handleSubmit = async () => {
     setIsLoading(true);
-    const supabase = createClient();
-
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      const userId = userData?.user?.id;
+      const result = await approveOrRejectMaterial({
+        materialId,
+        projectId,
+        materialCode,
+        materialName,
+        action,
+        comments: comments.trim() || undefined,
+      });
 
-      const { error } = await supabase
-        .from("materials")
-        .update({
-          status: action === "approve" ? "approved" : "rejected",
-          client_response_at: new Date().toISOString(),
-          client_comments: comments.trim() || null,
-          approved_by: action === "approve" ? userId : null,
-        })
-        .eq("id", materialId);
-
-      if (error) throw error;
+      if (!result.success) throw new Error(result.error);
 
       handleClose();
       queryClient.invalidateQueries({ queryKey: materialKeys.all });

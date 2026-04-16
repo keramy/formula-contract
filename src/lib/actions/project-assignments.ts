@@ -203,9 +203,8 @@ export async function assignUserToProject(
     await supabase.from("notifications").insert({
       user_id: userId,
       type: "project_assigned",
-      title: `You've been assigned to ${project.name}`,
-      message: `${assigner?.name || "Someone"} added you to project ${project.project_code}`,
-      link: `/projects/${projectId}`,
+      title: `${assigner?.name || "Someone"} assigned you to ${project.project_code}`,
+      message: null,
       project_id: projectId,
     });
 

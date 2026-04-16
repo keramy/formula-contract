@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { logActivity } from "@/lib/activity-log/actions";
 import { ACTIVITY_ACTIONS } from "@/lib/activity-log/constants";
-import { sendDrawingsToClient, overrideDrawingApproval } from "@/lib/actions/drawings";
+import { sendDrawingsToClient, overrideDrawingApproval, approveOrRejectDrawing } from "@/lib/actions/drawings";
 import { toast } from "sonner";
 import { validateFile, DRAWING_CONFIG, CAD_CONFIG, sanitizeFileName } from "@/lib/file-validation";
 import {
@@ -150,99 +150,45 @@ export function DrawingApproval({
   };
 
   const handleApproval = async () => {
-    if (!drawingId) return; // Safety check - should never happen for this action
+    if (!drawingId || !projectId || !currentRevision) return;
 
     setIsLoading(true);
     setError(null);
 
     try {
-      const supabase = createClient();
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
-      // Upload client markup file if provided
-      let markupUrl: string | null = null;
-      if (markupFile && projectId) {
-        const timestamp = Date.now();
-        const sanitizedName = sanitizeFileName(markupFile.name);
-        const storagePath = `${projectId}/${scopeItemId}/markup_${currentRevision}_${timestamp}_${sanitizedName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from("drawings")
-          .upload(storagePath, markupFile);
-
-        if (uploadError) throw uploadError;
-
-        const { data: urlData } = supabase.storage
-          .from("drawings")
-          .getPublicUrl(storagePath);
-
-        markupUrl = urlData.publicUrl;
+      // Convert markup file to base64 data URI if provided
+      let markupFileData: { name: string; data: string; type: string } | undefined;
+      if (markupFile) {
+        const buffer = await markupFile.arrayBuffer();
+        const base64 = btoa(
+          new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), "")
+        );
+        markupFileData = {
+          name: sanitizeFileName(markupFile.name),
+          data: `data:${markupFile.type};base64,${base64}`,
+          type: markupFile.type,
+        };
       }
 
-      const drawingUpdate: DrawingUpdate = {
-        status: approvalType as DrawingStatus,
-        client_response_at: new Date().toISOString(),
-        client_comments: clientComments || null,
-        approved_by: approvalType !== "rejected" ? user.id : null,
-      };
-      const { error: updateError } = await supabase
-        .from("drawings")
-        .update(drawingUpdate)
-        .eq("id", drawingId);
+      const result = await approveOrRejectDrawing({
+        drawingId,
+        projectId,
+        scopeItemId,
+        itemCode: itemCode || "—",
+        action: approvalType as "approved" | "approved_with_comments" | "rejected",
+        comments: clientComments || undefined,
+        currentRevision,
+        markupFileData,
+      });
 
-      if (updateError) throw updateError;
-
-      // Save markup URL to the current revision record
-      if (markupUrl && currentRevision) {
-        await supabase
-          .from("drawing_revisions")
-          .update({ client_markup_url: markupUrl })
-          .eq("drawing_id", drawingId)
-          .eq("revision", currentRevision);
-      }
-
-      // Update scope item status
-      let newItemStatus: "awaiting_approval" | "approved" | "in_design" = "awaiting_approval";
-      if (approvalType === "approved" || approvalType === "approved_with_comments") {
-        newItemStatus = "approved";
-      } else if (approvalType === "rejected") {
-        newItemStatus = "in_design";
-      }
-
-      const scopeItemUpdate: ScopeItemUpdate = { status: newItemStatus };
-      await supabase
-        .from("scope_items")
-        .update(scopeItemUpdate)
-        .eq("id", scopeItemId);
-
-      // Log activity
-      if (projectId) {
-        const activityAction = approvalType === "rejected"
-          ? ACTIVITY_ACTIONS.DRAWING_REJECTED
-          : ACTIVITY_ACTIONS.DRAWING_APPROVED;
-        await logActivity({
-          action: activityAction,
-          entityType: "drawing",
-          entityId: drawingId,
-          projectId,
-          details: {
-            item_code: itemCode,
-            revision: currentRevision,
-            status: approvalType,
-            comments: clientComments || undefined,
-            has_markup: !!markupUrl,
-          },
-        });
-      }
+      if (!result.success) throw new Error(result.error || "Failed to record approval");
 
       setIsApprovalDialogOpen(false);
       setClientComments("");
       setMarkupFile(null);
       const statusLabel = approvalType === "rejected" ? "Drawing rejected" : "Drawing approved";
       toast.success(statusLabel);
-      onStatusChange?.(newItemStatus);
+      onStatusChange?.(result.newItemStatus || "awaiting_approval");
       invalidateDrawingCaches();
     } catch (err) {
       toast.error("Failed to record approval");

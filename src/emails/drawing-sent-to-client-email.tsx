@@ -17,6 +17,7 @@ interface DrawingSentToClientEmailProps {
   projectCode: string;
   drawingCount: number;
   itemCodes: string[];
+  itemNames?: string[];
   senderName: string;
   drawingsPageUrl: string;
 }
@@ -27,6 +28,7 @@ export function DrawingSentToClientEmail({
   projectCode,
   drawingCount,
   itemCodes,
+  itemNames,
   senderName,
   drawingsPageUrl,
 }: DrawingSentToClientEmailProps) {
@@ -65,12 +67,15 @@ export function DrawingSentToClientEmail({
       <Text className="text-gray-500 text-[12px] uppercase tracking-wider m-0 mb-[4px] mt-[16px]">
         Items
       </Text>
-      {displayedCodes.map((code) => (
+      {displayedCodes.map((code, idx) => (
         <Text
           key={code}
-          className="text-gray-900 text-[14px] font-mono m-0 mb-[4px]"
+          className="text-gray-900 text-[14px] m-0 mb-[4px]"
         >
-          {code}
+          <span style={{ fontFamily: "monospace", fontWeight: 600 }}>{code}</span>
+          {itemNames?.[idx] && (
+            <span style={{ color: "#6b7280", fontWeight: 400 }}> — {itemNames[idx]}</span>
+          )}
         </Text>
       ))}
       {remainingCount > 0 && (
@@ -92,6 +97,7 @@ DrawingSentToClientEmail.PreviewProps = {
   projectCode: "HA-2026",
   drawingCount: 5,
   itemCodes: ["HA-001", "HA-002", "HA-003", "HA-004", "HA-005"],
+  itemNames: ["Reception Desk", "Wall Panel A", "Cabinet Unit", "Door Frame", "Ceiling Panel"],
   senderName: "Jane Smith",
   drawingsPageUrl: "https://formulacontractpm.com/projects/abc123?tab=drawings",
 } satisfies DrawingSentToClientEmailProps;

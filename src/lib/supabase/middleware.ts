@@ -12,6 +12,7 @@ const routePermissions: Record<string, string[]> = {
   "/crm": ["admin", "management"],
   "/settings": ["admin"],
   "/profile": ["admin", "pm", "production", "procurement", "management", "client"], // All users can access their profile
+  "/notifications": ["admin", "pm", "production", "procurement", "management", "client"], // All users see their notifications
 };
 
 // Check if user role can access a path

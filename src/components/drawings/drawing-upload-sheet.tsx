@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { projectTabKeys } from "@/lib/react-query/project-tabs";
 import { scopeItemKeys } from "@/lib/react-query/scope-items";
 import { createClient } from "@/lib/supabase/client";
+import { notifyDrawingUploaded } from "@/lib/actions/drawings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -257,6 +258,15 @@ export function DrawingUploadSheet({
         .update(scopeItemUpdate)
         .eq("id", selectedItemId)
         .eq("status", "pending");
+
+      // Notify other PMs about the upload (fire-and-forget)
+      if (selectedItem) {
+        notifyDrawingUploaded({
+          projectId,
+          itemCode: selectedItem.item_code,
+          revision: nextRevision,
+        });
+      }
 
       // Reset form and close sheet
       handleReset();

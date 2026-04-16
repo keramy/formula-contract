@@ -413,6 +413,8 @@ export function MaterialsOverview({
         <MaterialApproval
           materialId={approvalMaterial.id}
           materialName={approvalMaterial.name}
+          materialCode={approvalMaterial.material_code}
+          projectId={projectId}
           action={approvalAction}
           open={approvalDialogOpen}
           onOpenChange={setApprovalDialogOpen}

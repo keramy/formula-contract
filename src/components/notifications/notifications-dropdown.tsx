@@ -39,7 +39,11 @@ const typeConfig: Record<string, { icon: React.ReactNode; color: GradientColor }
   material_rejected: { icon: <AlertCircleIcon className="size-3.5" />, color: "rose" },
   project_assigned: { icon: <FileIcon className="size-3.5" />, color: "primary" },
   milestone_due: { icon: <ClockIcon className="size-3.5" />, color: "coral" },
+  milestone_overdue: { icon: <AlertCircleIcon className="size-3.5" />, color: "rose" },
   report_published: { icon: <FileIcon className="size-3.5" />, color: "teal" },
+  finance_weekly_digest: { icon: <FileIcon className="size-3.5" />, color: "amber" },
+  finance_manual_summary: { icon: <FileIcon className="size-3.5" />, color: "amber" },
+  finance_urgent_notify: { icon: <AlertCircleIcon className="size-3.5" />, color: "rose" },
   default: { icon: <BellIcon className="size-3.5" />, color: "slate" },
 };
 
@@ -68,9 +72,14 @@ export function NotificationsDropdown() {
 
     // Navigate to relevant page based on notification type
     if (notification.project_id) {
-      if (notification.item_id) {
-        router.push(`/projects/${notification.project_id}/scope/${notification.item_id}`);
-      } else if (notification.report_id || notification.type === "report_published") {
+      const type = notification.type;
+      if (type === "drawing_approved" || type === "drawing_rejected" || type === "drawing_uploaded" || type === "drawing_sent") {
+        router.push(`/projects/${notification.project_id}?tab=drawings`);
+      } else if (type === "material_approved" || type === "material_rejected") {
+        router.push(`/projects/${notification.project_id}?tab=materials`);
+      } else if (type === "milestone_due" || type === "milestone_overdue") {
+        router.push(`/projects/${notification.project_id}?tab=milestones`);
+      } else if (notification.report_id || type === "report_published") {
         router.push(`/projects/${notification.project_id}?tab=reports`);
       } else {
         router.push(`/projects/${notification.project_id}`);
@@ -155,6 +164,16 @@ export function NotificationsDropdown() {
             </div>
           )}
         </ScrollArea>
+
+        {/* View All link */}
+        <div className="border-t border-base-200 px-4 py-2.5 bg-base-50">
+          <button
+            className="w-full text-center text-xs font-medium text-primary hover:underline"
+            onClick={() => { setIsOpen(false); router.push("/notifications"); }}
+          >
+            View all notifications
+          </button>
+        </div>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -192,7 +211,10 @@ function NotificationItem({ notification, config, onClick }: NotificationItemPro
           )}>
             {notification.title}
             {projectName && (
-              <span className="text-primary font-medium"> on {projectName}</span>
+              <>
+                <span> on </span>
+                <span className="text-primary font-medium">{projectName}</span>
+              </>
             )}
           </p>
           <div className="flex items-center gap-2 mt-1">
