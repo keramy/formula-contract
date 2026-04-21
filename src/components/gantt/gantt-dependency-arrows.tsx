@@ -125,7 +125,7 @@ export function GanttDependencyArrows({
         if (!source || !target) return null;
 
         const offsetIdx = fanOutIndex.get(dep.id) ?? 0;
-        const path = buildPath(dep.type, source, target, offsetIdx);
+        const path = buildPath(dep.type, source, target, offsetIdx, barPositions);
         if (!path) return null;
 
         const color = DEPENDENCY_COLORS[dep.type];
@@ -196,7 +196,8 @@ function buildPath(
   type: DependencyType,
   source: BarPosition,
   target: BarPosition,
-  fanIdx: number = 0
+  fanIdx: number,
+  barPositions: Map<string, BarPosition>
 ): string | null {
   const sy = source.y;
   const ty = target.y;
@@ -231,21 +232,74 @@ function buildPath(
     return `M${sx},${sy} L${tx},${ty}`;
   }
 
+  // For each routing type, compute a "clear" base X that avoids bars in
+  // intervening rows, then add the fan-out offset.
   switch (type) {
-    case 0:
-      return buildFSPath(sx, sy, tx, ty, fanOffset);
-    case 1:
-      return buildSSPath(sx, sy, tx, ty, fanOffset);
-    case 2:
-      return buildFFPath(sx, sy, tx, ty, fanOffset);
-    default:
-      return buildGenericPath(sx, sy, tx, ty, fanOffset);
+    case 0: {
+      const baseMid = findClearX(sx + GAP, source, target, barPositions, "right");
+      return buildFSPath(sx, sy, tx, ty, baseMid + fanOffset);
+    }
+    case 1: {
+      const preferredLeft = Math.min(sx, tx) - GAP;
+      const baseLeft = findClearX(preferredLeft, source, target, barPositions, "left");
+      return buildSSPath(sx, sy, tx, ty, baseLeft - fanOffset);
+    }
+    case 2: {
+      const preferredRight = Math.max(sx, tx) + GAP;
+      const baseRight = findClearX(preferredRight, source, target, barPositions, "right");
+      return buildFFPath(sx, sy, tx, ty, baseRight + fanOffset);
+    }
+    default: {
+      const baseMid = findClearX((sx + tx) / 2, source, target, barPositions, "right");
+      return buildGenericPath(sx, sy, tx, ty, baseMid + fanOffset);
+    }
   }
 }
 
-/** FS: right of source → left of target, L-shape or S-shape */
-function buildFSPath(sx: number, sy: number, tx: number, ty: number, fanOffset: number): string {
-  const midX = sx + GAP + fanOffset;
+/** Find an x coordinate for the arrow's vertical segment that doesn't cross
+ *  bars in any intervening row. Shift past obstructing bars by GAP in the
+ *  requested direction. Caps iterations to guard against pathological cases. */
+function findClearX(
+  preferredX: number,
+  source: BarPosition,
+  target: BarPosition,
+  barPositions: Map<string, BarPosition>,
+  direction: "right" | "left"
+): number {
+  const PADDING = 4;
+  const minRow = Math.min(source.rowIndex, target.rowIndex);
+  const maxRow = Math.max(source.rowIndex, target.rowIndex);
+
+  // Collect padded x-ranges of bars in rows between source and target (exclusive)
+  const obstacles: Array<{ left: number; right: number }> = [];
+  barPositions.forEach((bar) => {
+    if (bar.rowIndex > minRow && bar.rowIndex < maxRow) {
+      obstacles.push({
+        left: bar.left - PADDING,
+        right: bar.left + bar.width + PADDING,
+      });
+    }
+  });
+
+  if (obstacles.length === 0) return preferredX;
+
+  let x = preferredX;
+  for (let i = 0; i < 20; i++) {
+    let shifted = false;
+    for (const ob of obstacles) {
+      if (x >= ob.left && x <= ob.right) {
+        x = direction === "right" ? ob.right + GAP : ob.left - GAP;
+        shifted = true;
+      }
+    }
+    if (!shifted) break;
+  }
+  return x;
+}
+
+/** FS: right of source → left of target, L-shape or S-shape.
+ *  `midX` is the precomputed vertical-segment x (already bar-avoiding + fan-staggered). */
+function buildFSPath(sx: number, sy: number, tx: number, ty: number, midX: number): string {
   const dy = ty - sy;
   const yDir = dy > 0 ? 1 : -1;
   const r = Math.min(RADIUS, Math.abs(dy) / 2);
@@ -263,7 +317,7 @@ function buildFSPath(sx: number, sy: number, tx: number, ty: number, fanOffset: 
 
   // S-shape when target is to the left
   const halfY = sy + dy / 2;
-  const leftX = Math.min(midX, tx - GAP - fanOffset);
+  const leftX = Math.min(midX, tx - GAP);
 
   return [
     `M${sx},${sy}`,
@@ -279,12 +333,11 @@ function buildFSPath(sx: number, sy: number, tx: number, ty: number, fanOffset: 
   ].join(" ");
 }
 
-/** SS: left of source → left of target */
-function buildSSPath(sx: number, sy: number, tx: number, ty: number, fanOffset: number): string {
+/** SS: left of source → left of target. `leftX` is precomputed. */
+function buildSSPath(sx: number, sy: number, tx: number, ty: number, leftX: number): string {
   const dy = ty - sy;
   const yDir = dy > 0 ? 1 : -1;
   const r = Math.min(RADIUS, Math.abs(dy) / 2);
-  const leftX = Math.min(sx, tx) - GAP - fanOffset;
 
   return [
     `M${sx},${sy}`,
@@ -296,12 +349,11 @@ function buildSSPath(sx: number, sy: number, tx: number, ty: number, fanOffset: 
   ].join(" ");
 }
 
-/** FF: right of source → right of target */
-function buildFFPath(sx: number, sy: number, tx: number, ty: number, fanOffset: number): string {
+/** FF: right of source → right of target. `rightX` is precomputed. */
+function buildFFPath(sx: number, sy: number, tx: number, ty: number, rightX: number): string {
   const dy = ty - sy;
   const yDir = dy > 0 ? 1 : -1;
   const r = Math.min(RADIUS, Math.abs(dy) / 2);
-  const rightX = Math.max(sx, tx) + GAP + fanOffset;
 
   return [
     `M${sx},${sy}`,
@@ -313,11 +365,10 @@ function buildFFPath(sx: number, sy: number, tx: number, ty: number, fanOffset: 
   ].join(" ");
 }
 
-/** Generic fallback (SF and edge cases) */
-function buildGenericPath(sx: number, sy: number, tx: number, ty: number, fanOffset: number): string {
+/** Generic fallback (SF and edge cases). `midX` is precomputed. */
+function buildGenericPath(sx: number, sy: number, tx: number, ty: number, midX: number): string {
   const dy = ty - sy;
   const yDir = dy > 0 ? 1 : -1;
-  const midX = (sx + tx) / 2 + fanOffset;
   const r = Math.min(RADIUS, Math.abs(dy) / 2, Math.abs(tx - sx) / 4 || RADIUS);
 
   return [
