@@ -77,7 +77,12 @@ export function GanttDependencyArrows({
       width={containerWidth}
       height={containerHeight}
     >
-      {/* CSS animations for arrow draw-in and hover effects */}
+      {/* CSS animations + hover focus
+          - Draw-in animation on initial render
+          - Hover: thicken stroke + add glow for the hovered arrow
+          - Focus mode: when any arrow is hovered, dim the siblings so the
+            hovered path is unambiguous (useful when arrows overlap or
+            fan out densely) */}
       <style>{`
         @keyframes gantt-draw-in {
           from { stroke-dashoffset: var(--path-length); }
@@ -88,16 +93,21 @@ export function GanttDependencyArrows({
           stroke-dasharray: var(--path-length);
           stroke-dashoffset: var(--path-length);
         }
+        .gantt-arrow-visible {
+          transition: stroke-width 0.15s ease, filter 0.15s ease, opacity 0.15s ease, stroke 0.15s ease;
+        }
         .gantt-arrow-group:hover .gantt-arrow-visible {
-          stroke-width: 2.5;
-          filter: drop-shadow(0 0 4px var(--arrow-color));
-          transition: stroke-width 0.2s ease, filter 0.2s ease;
+          stroke: var(--arrow-color-hover, #2563eb);
+          stroke-width: 3;
+          filter: drop-shadow(0 0 6px var(--arrow-color-hover, #2563eb));
         }
         .gantt-arrow-group:hover .gantt-arrow-hit {
           cursor: pointer;
         }
-        .gantt-arrow-visible {
-          transition: stroke-width 0.2s ease, filter 0.2s ease, opacity 0.3s ease;
+        /* When an arrow is hovered, fade the rest so the active path
+           reads clearly. Uses :has() — broadly supported in modern browsers. */
+        svg:has(.gantt-arrow-group:hover) .gantt-arrow-group:not(:hover) .gantt-arrow-visible {
+          opacity: 0.18;
         }
       `}</style>
 
@@ -234,24 +244,38 @@ function buildPath(
 
   // For each routing type, compute a "clear" base X that avoids bars in
   // intervening rows, then add the fan-out offset.
+  //
+  // Safety cap: if bar-avoidance would shift the vertical segment past a
+  // point that would break the routing (e.g., FS midX > target.left would
+  // trigger an S-shape loop), fall back to the preferred X and accept the
+  // visual overlap rather than drawing a confusing loop.
   switch (type) {
     case 0: {
-      const baseMid = findClearX(sx + GAP, source, target, barPositions, "right");
-      return buildFSPath(sx, sy, tx, ty, baseMid + fanOffset);
+      const preferred = sx + GAP + fanOffset;
+      const cleared = findClearX(sx + GAP, source, target, barPositions, "right") + fanOffset;
+      // FS L-shape requires midX < tx - small buffer; otherwise S-shape loop triggers
+      const midX = cleared < tx - GAP ? cleared : preferred;
+      return buildFSPath(sx, sy, tx, ty, midX);
     }
     case 1: {
-      const preferredLeft = Math.min(sx, tx) - GAP;
-      const baseLeft = findClearX(preferredLeft, source, target, barPositions, "left");
-      return buildSSPath(sx, sy, tx, ty, baseLeft - fanOffset);
+      const preferredLeft = Math.min(sx, tx) - GAP - fanOffset;
+      const clearedLeft = findClearX(Math.min(sx, tx) - GAP, source, target, barPositions, "left") - fanOffset;
+      // SS routes left of both bars; floor at zero to avoid negative x
+      const leftX = clearedLeft > 0 ? clearedLeft : Math.max(preferredLeft, 0);
+      return buildSSPath(sx, sy, tx, ty, leftX);
     }
     case 2: {
-      const preferredRight = Math.max(sx, tx) + GAP;
-      const baseRight = findClearX(preferredRight, source, target, barPositions, "right");
-      return buildFFPath(sx, sy, tx, ty, baseRight + fanOffset);
+      const preferredRight = Math.max(sx, tx) + GAP + fanOffset;
+      const clearedRight = findClearX(Math.max(sx, tx) + GAP, source, target, barPositions, "right") + fanOffset;
+      // FF routes right of both bars; no upper bound in practice, but sanity-check
+      const rightX = clearedRight < preferredRight + 400 ? clearedRight : preferredRight;
+      return buildFFPath(sx, sy, tx, ty, rightX);
     }
     default: {
-      const baseMid = findClearX((sx + tx) / 2, source, target, barPositions, "right");
-      return buildGenericPath(sx, sy, tx, ty, baseMid + fanOffset);
+      const preferred = (sx + tx) / 2 + fanOffset;
+      const cleared = findClearX((sx + tx) / 2, source, target, barPositions, "right") + fanOffset;
+      const midX = cleared < Math.max(sx, tx) + GAP ? cleared : preferred;
+      return buildGenericPath(sx, sy, tx, ty, midX);
     }
   }
 }
