@@ -232,12 +232,27 @@ export function TimelineFormDialog({
     return dependencies.filter((d) => d.source_id === editItem.id);
   }, [dependencies, editItem]);
 
+  // Tasks that have children (parents/summary tasks). Dependencies should
+  // connect leaf tasks only — parent dates come from aggregation, so a dep
+  // pointing at a parent silently has no effect.
+  const tasksWithChildren = useMemo(() => {
+    const set = new Set<string>();
+    timelineItems.forEach((t) => {
+      if (t.parent_id) set.add(t.parent_id);
+    });
+    return set;
+  }, [timelineItems]);
+
+  // Available tasks to link via dependency: non-phase leaves only (no children)
   const otherTasks = useMemo(() => {
     if (!editItem) return [];
     return timelineItems.filter(
-      (t) => t.id !== editItem.id && t.item_type !== "phase"
+      (t) =>
+        t.id !== editItem.id &&
+        t.item_type !== "phase" &&
+        !tasksWithChildren.has(t.id)
     );
-  }, [timelineItems, editItem]);
+  }, [timelineItems, editItem, tasksWithChildren]);
 
   const taskNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -246,6 +261,10 @@ export function TimelineFormDialog({
   }, [timelineItems]);
 
   const depCount = incomingDeps.length + outgoingDeps.length;
+  // If the task being edited is itself a parent, disable dep management
+  // (its dates are derived from children — adding/editing deps wouldn't
+  // have any visible effect).
+  const editItemIsParent = editItem ? tasksWithChildren.has(editItem.id) : false;
 
   // Sync form with editItem
   useEffect(() => {
@@ -678,9 +697,17 @@ export function TimelineFormDialog({
               <div className="text-center py-8 text-sm text-muted-foreground">
                 Save this item first to add dependencies.
               </div>
+            ) : editItemIsParent ? (
+              <div className="text-center py-8 text-sm text-muted-foreground space-y-2">
+                <p className="font-medium">This task has subtasks.</p>
+                <p className="text-xs max-w-sm mx-auto">
+                  Dependencies should connect individual work tasks, not summary parents.
+                  Open one of the subtasks to link it to another task.
+                </p>
+              </div>
             ) : otherTasks.length === 0 ? (
               <div className="text-center py-8 text-sm text-muted-foreground">
-                Create at least one other task to add a dependency.
+                Create at least one other leaf task to add a dependency.
               </div>
             ) : (
               <>

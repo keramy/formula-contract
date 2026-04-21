@@ -868,6 +868,35 @@ export async function createTimelineDependency(
     return { success: false, error: "Cannot create a dependency to itself" };
   }
 
+  // Validate endpoints: must be leaf tasks (no children) and not phase items.
+  // Parent tasks have dates derived from their children via aggregation, so a
+  // dependency pointing at them would be silently overridden. Enforcing this
+  // here surfaces the issue instead of letting it fail invisibly.
+  const [
+    { data: sourceItem },
+    { data: targetItem },
+    { data: sourceChildren },
+    { data: targetChildren },
+  ] = await Promise.all([
+    supabase.from("gantt_items").select("id, item_type").eq("id", input.source_id).single(),
+    supabase.from("gantt_items").select("id, item_type").eq("id", input.target_id).single(),
+    supabase.from("gantt_items").select("id").eq("parent_id", input.source_id).limit(1),
+    supabase.from("gantt_items").select("id").eq("parent_id", input.target_id).limit(1),
+  ]);
+
+  if (!sourceItem || !targetItem) {
+    return { success: false, error: "One or both tasks no longer exist" };
+  }
+  if (sourceItem.item_type === "phase" || targetItem.item_type === "phase") {
+    return { success: false, error: "Dependencies cannot connect phase items" };
+  }
+  if ((sourceChildren && sourceChildren.length > 0) || (targetChildren && targetChildren.length > 0)) {
+    return {
+      success: false,
+      error: "Dependencies must connect individual work tasks, not summary/parent tasks. Link specific subtasks instead.",
+    };
+  }
+
   // Cycle detection: load existing deps and check if this would create a loop
   const { data: existingDeps } = await supabase
     .from("gantt_dependencies")

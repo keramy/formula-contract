@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { createPortal } from "react-dom";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -346,6 +347,13 @@ export function GanttChart({
       if (!linkMode) return;
       // Don't allow phases as dependency endpoints
       if (item.type === "phase") return;
+      // Don't allow summary/parent tasks — deps must connect leaf work items
+      if (item.children && item.children.length > 0) {
+        toast.info(
+          "Dependencies connect individual tasks, not summary/parent tasks. Pick a specific subtask."
+        );
+        return;
+      }
 
       const itemId = item.id;
 
