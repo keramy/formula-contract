@@ -421,7 +421,6 @@ export default async function ProjectDetailPage({
         <TabsContent value="timeline" className="flex-1 flex flex-col">
           <TimelineOverview
             projectId={projectId}
-            projectUrlId={projectUrlId}
             scopeItems={scopeItems.map((item) => ({
               id: item.id,
               item_code: item.item_code,

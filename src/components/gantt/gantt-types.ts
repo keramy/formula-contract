@@ -51,12 +51,29 @@ export type Priority = 1 | 2 | 3 | 4;
 // ---------------------------------------------------------------------------
 
 export const PHASE_COLORS: Record<string, string> = {
-  design: "#0d9488",       // teal-600 (Figma uses this for Design & Engineering)
+  design: "#0d9488",       // teal-600
   production: "#3b82f6",   // blue-500
   procurement: "#f97316",  // orange-500
   shipping: "#64748b",     // slate-500
   installation: "#16a34a", // green-600
 };
+
+export const PHASE_LABELS: Record<string, string> = {
+  design: "Design/Shopdrawing",
+  production: "Production",
+  procurement: "Procurement",
+  shipping: "Shipment",
+  installation: "Installation",
+};
+
+/** Ordered list for picker UIs — matches project flow */
+export const PHASE_ORDER: PhaseKey[] = [
+  "design",
+  "production",
+  "procurement",
+  "shipping",
+  "installation",
+];
 
 /** Resolve color for any item — explicit color → phase color → default */
 export function resolveItemColor(item: GanttItem): string {
@@ -123,7 +140,8 @@ export interface GanttItem {
   startDate: Date;
   endDate: Date;
   progress: number; // 0-100
-  color: string;
+  /** User-set color override. null means "inherit phase color from hierarchy". */
+  color: string | null;
   phaseKey?: PhaseKey;
   priority: Priority;
   isEditable: boolean;
@@ -131,7 +149,6 @@ export interface GanttItem {
   parentId: string | null;
   children: GanttItem[];
   description?: string | null;
-  isOnCriticalPath: boolean;
   isCompleted: boolean;
   status?: string;
 }
@@ -262,7 +279,6 @@ export interface GanttStats {
   total: number;
   completed: number;
   milestones: number;
-  critical: number;
   avgProgress: number;
 }
 
@@ -271,11 +287,10 @@ export function computeStats(rows: GanttRow[]): GanttStats {
   const total = tasks.length;
   const completed = tasks.filter((r) => r.item.progress >= 100 || r.item.isCompleted).length;
   const milestones = tasks.filter((r) => r.type === "milestone").length;
-  const critical = tasks.filter((r) => r.item.isOnCriticalPath).length;
   const avgProgress =
     total > 0 ? Math.round(tasks.reduce((sum, r) => sum + r.item.progress, 0) / total) : 0;
 
-  return { total, completed, milestones, critical, avgProgress };
+  return { total, completed, milestones, avgProgress };
 }
 
 // ---------------------------------------------------------------------------

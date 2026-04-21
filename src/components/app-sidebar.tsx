@@ -14,6 +14,7 @@ import {
   WalletIcon,
   TargetIcon,
   BanknoteIcon,
+  GanttChartIcon,
 } from "lucide-react";
 import { getVersionDisplay } from "@/lib/version";
 
@@ -44,6 +45,7 @@ interface AppSidebarProps {
 const routePermissions: Record<string, string[]> = {
   "/dashboard": ["admin", "pm", "production", "procurement", "management", "client"],
   "/projects": ["admin", "pm", "production", "procurement", "management", "client"], // Clients see assigned projects
+  "/timeline": ["admin", "pm", "production", "procurement", "management"], // Hidden for clients
   "/clients": ["admin", "pm"],
   "/crm": ["admin", "management"],
   "/finance": ["admin", "management"],
@@ -57,6 +59,7 @@ const routePermissions: Record<string, string[]> = {
 const navItemColors: Record<string, string> = {
   "/dashboard": "teal",
   "/projects": "teal",
+  "/timeline": "teal",
   "/clients": "slate",
   "/crm": "amber",
   "/finance": "teal",
@@ -76,6 +79,11 @@ const mainNavItems = [
     title: "Projects",
     href: "/projects",
     icon: FolderKanbanIcon,
+  },
+  {
+    title: "Timeline",
+    href: "/timeline",
+    icon: GanttChartIcon,
   },
   {
     title: "Clients",

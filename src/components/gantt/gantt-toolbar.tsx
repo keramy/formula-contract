@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,24 +17,18 @@ import {
   CalendarIcon,
   ZoomInIcon,
   ZoomOutIcon,
-  ExternalLinkIcon,
   IndentIncreaseIcon,
   IndentDecreaseIcon,
-  FlagIcon,
   SearchIcon,
-  BookmarkIcon,
-  SaveIcon,
   TrashIcon,
-  CheckIcon,
   ChevronDownIcon,
+  LayersIcon,
 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
@@ -53,6 +46,8 @@ interface GanttToolbarProps {
   onGridToggle: () => void;
   showDependencies: boolean;
   onDependenciesToggle: () => void;
+  showPhases?: boolean;
+  onPhasesToggle?: () => void;
   linkMode?: boolean;
   onLinkModeToggle?: () => void;
   linkSourceId?: string | null;
@@ -62,20 +57,11 @@ interface GanttToolbarProps {
   onOutdent?: () => void;
   hasSelection?: boolean;
   selectedCount?: number;
-  showCriticalPath?: boolean;
-  onCriticalPathToggle?: () => void;
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
-  // Baseline
-  baselines?: { id: string; name: string; created_at: string }[];
-  activeBaselineId?: string | null;
-  onBaselineSelect?: (id: string | null) => void;
-  onBaselineSave?: () => void;
-  onBaselineDelete?: (id: string) => void;
   onExpandAll: () => void;
   onCollapseAll: () => void;
   onScrollToToday?: () => void;
-  fullViewUrl?: string;
   onZoomIn?: () => void;
   onZoomOut?: () => void;
   canZoomIn?: boolean;
@@ -94,6 +80,8 @@ export function GanttToolbar({
   onGridToggle,
   showDependencies,
   onDependenciesToggle,
+  showPhases,
+  onPhasesToggle,
   linkMode,
   onLinkModeToggle,
   linkSourceId,
@@ -103,19 +91,11 @@ export function GanttToolbar({
   onOutdent,
   hasSelection,
   selectedCount,
-  showCriticalPath,
-  onCriticalPathToggle,
   searchQuery,
   onSearchChange,
-  baselines,
-  activeBaselineId,
-  onBaselineSelect,
-  onBaselineSave,
-  onBaselineDelete,
   onExpandAll,
   onCollapseAll,
   onScrollToToday,
-  fullViewUrl,
   onZoomIn,
   onZoomOut,
   canZoomIn = true,
@@ -285,18 +265,17 @@ export function GanttToolbar({
             <ToolbarIcon onClick={onScrollToToday} tooltip="Scroll to today">
               <CalendarIcon className="size-3.5" />
             </ToolbarIcon>
-          </div>
 
-          {/* Critical path toggle */}
-          {onCriticalPathToggle && (
-            <ToolbarIcon
-              active={showCriticalPath}
-              onClick={onCriticalPathToggle}
-              tooltip="Toggle critical path"
-            >
-              <FlagIcon className="size-3.5" />
-            </ToolbarIcon>
-          )}
+            {onPhasesToggle && (
+              <ToolbarIcon
+                active={showPhases}
+                onClick={onPhasesToggle}
+                tooltip="Focus on phases (dim individual tasks)"
+              >
+                <LayersIcon className="size-3.5" />
+              </ToolbarIcon>
+            )}
+          </div>
 
           {/* Zoom controls */}
           {onZoomIn && onZoomOut && (
@@ -339,67 +318,8 @@ export function GanttToolbar({
         </div>
       )}
 
-      {/* Baseline dropdown */}
-      {onBaselineSave && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant={activeBaselineId ? "secondary" : "outline"}
-              size="sm"
-              className="h-7 text-xs gap-1.5"
-            >
-              <BookmarkIcon className="size-3" />
-              Baseline
-              <ChevronDownIcon className="size-3 opacity-50" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-56">
-            <DropdownMenuRadioGroup
-              value={activeBaselineId ?? "none"}
-              onValueChange={(v) => onBaselineSelect?.(v === "none" ? null : v)}
-            >
-              <DropdownMenuRadioItem value="none">
-                No baseline
-              </DropdownMenuRadioItem>
-              {baselines?.map((b) => (
-                <DropdownMenuRadioItem key={b.id} value={b.id} className="flex items-center justify-between">
-                  <span className="truncate">{b.name}</span>
-                  {onBaselineDelete && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onBaselineDelete(b.id);
-                      }}
-                      className="ml-2 text-muted-foreground hover:text-destructive"
-                    >
-                      <TrashIcon className="size-3" />
-                    </button>
-                  )}
-                </DropdownMenuRadioItem>
-              ))}
-            </DropdownMenuRadioGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onBaselineSave}>
-              <SaveIcon className="size-3.5 mr-2" />
-              Save Current as Baseline
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
-
       {/* Spacer */}
       <div className="flex-1" />
-
-      {/* Open Full View — only when embedded in project tab */}
-      {fullViewUrl && (
-        <Link
-          href={fullViewUrl}
-          className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ExternalLinkIcon className="size-3" />
-          Full View
-        </Link>
-      )}
 
       {/* Expand / Collapse */}
       <button

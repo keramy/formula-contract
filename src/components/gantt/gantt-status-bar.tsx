@@ -14,7 +14,7 @@ interface GanttStatusBarProps {
 }
 
 export function GanttStatusBar({ stats, className }: GanttStatusBarProps) {
-  const { total, completed, milestones, critical, avgProgress } = stats;
+  const { total, completed, milestones, avgProgress } = stats;
 
   return (
     <div
@@ -29,8 +29,6 @@ export function GanttStatusBar({ stats, className }: GanttStatusBarProps) {
         <span>{completed} completed</span>
         <Sep />
         <span>{milestones} milestones</span>
-        <Sep />
-        <span>{critical} critical</span>
         <Sep />
         <span>{avgProgress}% average progress</span>
       </div>

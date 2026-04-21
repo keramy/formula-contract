@@ -6,6 +6,7 @@ import {
   type GanttRow,
   type GanttItem,
   type Priority,
+  type PhaseKey,
   resolveItemColor,
   formatDuration,
   SIDEBAR_WIDTH,
@@ -15,7 +16,13 @@ import {
   totalRowsHeight,
 } from "./gantt-types";
 import { GanttContextMenu } from "./gantt-context-menu";
-import { ChevronRightIcon } from "lucide-react";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import { ChevronRightIcon, PlusIcon, FlagIcon } from "lucide-react";
 
 // ============================================================================
 // GANTT SIDEBAR — Left panel using ganttRows for absolute positioning
@@ -39,7 +46,11 @@ interface GanttSidebarProps {
   onAddSubtask?: (parentId: string) => void;
   onConvertToMilestone?: (item: GanttItem) => void;
   onSetPriority?: (item: GanttItem, priority: Priority) => void;
-  onToggleCriticalPath?: (item: GanttItem) => void;
+  onSetPhase?: (item: GanttItem, phase: PhaseKey) => void;
+  onSetColor?: (item: GanttItem, color: string | null) => void;
+  // Empty-area context menu actions
+  onAddItem?: () => void;
+  onAddMilestone?: () => void;
   className?: string;
 }
 
@@ -55,7 +66,10 @@ export function GanttSidebar({
   onAddSubtask,
   onConvertToMilestone,
   onSetPriority,
-  onToggleCriticalPath,
+  onSetPhase,
+  onSetColor,
+  onAddItem,
+  onAddMilestone,
   width,
   onWidthChange,
   linkMode,
@@ -112,40 +126,64 @@ export function GanttSidebar({
         <span className="w-[52px] px-2 text-center shrink-0 border-l border-border/40">Days</span>
       </div>
 
-      {/* Scrollable row area — offset by scrollTop to sync with timeline */}
-      <div className="overflow-hidden" style={{ position: "relative" }}>
-        <div
-          style={{
-            height: contentHeight,
-            position: "relative",
-            transform: `translateY(-${scrollTop}px)`,
-          }}
-        >
-          {rows.map((row) => (
-            <GanttContextMenu
-              key={row.id}
-              item={row.item}
-              onEdit={onEditItem}
-              onDelete={onDeleteItem}
-              onAddSubtask={onAddSubtask}
-              onConvertToMilestone={onConvertToMilestone}
-              onSetPriority={onSetPriority}
-              onToggleCriticalPath={onToggleCriticalPath}
+      {/* Scrollable row area — offset by scrollTop to sync with timeline.
+          The outer ContextMenu fires when right-clicking empty space (below
+          the last row). Row-level menus are nested inside each row and take
+          precedence when their trigger captures the event. */}
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <div className="overflow-hidden flex-1" style={{ position: "relative", minHeight: "100%" }}>
+            <div
+              style={{
+                height: contentHeight,
+                position: "relative",
+                transform: `translateY(-${scrollTop}px)`,
+              }}
             >
-              <SidebarRow
-                row={row}
-                isSelected={selectedIds.has(row.id)}
-                onToggleCollapse={onToggleCollapse}
-                onSelect={onSelectItem}
-                onDoubleClick={onDoubleClickItem}
-                linkMode={linkMode}
-                isLinkSource={linkMode && linkSourceId === row.id}
-                sidebarWidth={width}
-              />
-            </GanttContextMenu>
-          ))}
-        </div>
-      </div>
+              {rows.map((row) => (
+                <GanttContextMenu
+                  key={row.id}
+                  item={row.item}
+                  onEdit={onEditItem}
+                  onDelete={onDeleteItem}
+                  onAddSubtask={onAddSubtask}
+                  onConvertToMilestone={onConvertToMilestone}
+                  onSetPriority={onSetPriority}
+                  onSetPhase={onSetPhase}
+                  onSetColor={onSetColor}
+                >
+                  <SidebarRow
+                    row={row}
+                    isSelected={selectedIds.has(row.id)}
+                    onToggleCollapse={onToggleCollapse}
+                    onSelect={onSelectItem}
+                    onDoubleClick={onDoubleClickItem}
+                    linkMode={linkMode}
+                    isLinkSource={linkMode && linkSourceId === row.id}
+                    sidebarWidth={width}
+                  />
+                </GanttContextMenu>
+              ))}
+            </div>
+          </div>
+        </ContextMenuTrigger>
+        {(onAddItem || onAddMilestone) && (
+          <ContextMenuContent className="w-44">
+            {onAddItem && (
+              <ContextMenuItem onClick={onAddItem}>
+                <PlusIcon className="size-3.5 mr-2" />
+                Add Task
+              </ContextMenuItem>
+            )}
+            {onAddMilestone && (
+              <ContextMenuItem onClick={onAddMilestone}>
+                <FlagIcon className="size-3.5 mr-2" />
+                Add Milestone
+              </ContextMenuItem>
+            )}
+          </ContextMenuContent>
+        )}
+      </ContextMenu>
 
       {/* Resize handle — drag to change sidebar width */}
       <div
@@ -183,6 +221,8 @@ function SidebarRow({
   const isPhase = type === "phase";
   const isMilestone = type === "milestone";
   const indent = depth * 20;
+  // User-set item.color takes priority; falls back to inherited phase color.
+  const dotColor = item.color || phaseColor;
 
   const style: React.CSSProperties = {
     position: "absolute",
@@ -261,7 +301,7 @@ function SidebarRow({
         <div
           className="size-2.5 rotate-45 shrink-0"
           style={{
-            backgroundColor: phaseColor,
+            backgroundColor: dotColor,
             opacity: depth === 0 ? 1 : depth === 1 ? 0.45 : 0.3,
           }}
         />
@@ -269,13 +309,13 @@ function SidebarRow({
         // Grandchild+ : dashed border ring, no fill
         <span
           className="shrink-0 rounded-full size-2.5 border border-dashed bg-transparent"
-          style={{ borderColor: phaseColor, opacity: depth > 2 ? 0.5 : 0.7 }}
+          style={{ borderColor: dotColor, opacity: depth > 2 ? 0.5 : 0.7 }}
         />
       ) : (
         <span
           className="shrink-0 rounded-full size-2.5"
           style={{
-            backgroundColor: phaseColor,
+            backgroundColor: dotColor,
             opacity: isPhase ? 1 : depth === 1 ? 0.45 : 1,
           }}
         />

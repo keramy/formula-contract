@@ -16,9 +16,8 @@ export interface GanttState {
   zoomLevel: number;
   showGrid: boolean;
   showDependencies: boolean;
-  showCriticalPath: boolean;
+  showPhases: boolean;
   searchQuery: string;
-  activeBaselineId: string | null;
 
   // Link mode (dependency creation)
   linkMode: boolean;
@@ -42,9 +41,8 @@ export interface GanttActions {
   zoomOut: () => void;
   toggleGrid: () => void;
   toggleDependencies: () => void;
-  toggleCriticalPath: () => void;
+  togglePhases: () => void;
   setSearchQuery: (query: string) => void;
-  setActiveBaselineId: (id: string | null) => void;
 
   // Link mode
   toggleLinkMode: () => void;
@@ -70,9 +68,8 @@ export function useGanttState(
   const [zoomIndex, setZoomIndex] = React.useState(DEFAULT_ZOOM_INDEX);
   const [showGrid, setShowGrid] = React.useState(true);
   const [showDependencies, setShowDependencies] = React.useState(true);
-  const [showCriticalPath, setShowCriticalPath] = React.useState(false);
+  const [showPhases, setShowPhases] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
-  const [activeBaselineId, setActiveBaselineId] = React.useState<string | null>(null);
   const [linkMode, setLinkMode] = React.useState(false);
   const [linkSourceId, setLinkSourceId] = React.useState<string | null>(null);
   const [sidebarWidth, setSidebarWidth] = React.useState(440);
@@ -153,9 +150,8 @@ export function useGanttState(
     zoomLevel,
     showGrid,
     showDependencies,
-    showCriticalPath,
+    showPhases,
     searchQuery,
-    activeBaselineId,
     linkMode,
     linkSourceId,
     sidebarWidth,
@@ -176,9 +172,8 @@ export function useGanttState(
     ),
     toggleGrid: React.useCallback(() => setShowGrid((v) => !v), []),
     toggleDependencies: React.useCallback(() => setShowDependencies((v) => !v), []),
-    toggleCriticalPath: React.useCallback(() => setShowCriticalPath((v) => !v), []),
+    togglePhases: React.useCallback(() => setShowPhases((v) => !v), []),
     setSearchQuery,
-    setActiveBaselineId,
     toggleLinkMode: React.useCallback(() => {
       setLinkMode((v) => {
         if (v) setLinkSourceId(null); // exiting → clear source

@@ -35,7 +35,7 @@ interface GanttTimelineProps {
   columnWidth: number;
   showGrid: boolean;
   showDependencies: boolean;
-  showCriticalPath: boolean;
+  showPhases?: boolean;
   selectedIds: Set<string>;
   dependencies: GanttDependency[];
   onItemDoubleClick: (item: GanttItem) => void;
@@ -43,7 +43,6 @@ interface GanttTimelineProps {
   onDependencyClick?: (dep: GanttDependency) => void;
   linkMode?: boolean;
   linkSourceId?: string | null;
-  baselineItems?: { gantt_item_id: string; start_date: string; end_date: string }[];
   scrollRef: React.RefObject<HTMLDivElement | null>;
   onScroll: (e: React.UIEvent) => void;
   className?: string;
@@ -56,7 +55,7 @@ export function GanttTimeline({
   columnWidth,
   showGrid,
   showDependencies,
-  showCriticalPath,
+  showPhases,
   selectedIds,
   dependencies,
   onItemDoubleClick,
@@ -64,7 +63,6 @@ export function GanttTimeline({
   onDependencyClick,
   linkMode,
   linkSourceId,
-  baselineItems,
   scrollRef,
   onScroll,
   className,
@@ -93,21 +91,6 @@ export function GanttTimeline({
     }
     return map;
   }, [rows, dateRange, totalWidth]);
-
-  // Baseline bar positions (ghost bars)
-  const baselineMap = React.useMemo(() => {
-    if (!baselineItems || baselineItems.length === 0) return null;
-    const map = new Map<string, { left: number; width: number }>();
-    for (const bi of baselineItems) {
-      const fakeItem = {
-        startDate: new Date(bi.start_date),
-        endDate: new Date(bi.end_date),
-      } as any;
-      const pos = calculateBarPosition(fakeItem, dateRange, totalWidth);
-      map.set(bi.gantt_item_id, pos);
-    }
-    return map;
-  }, [baselineItems, dateRange, totalWidth]);
 
   // Today line X position — centered in the day column
   const todayX = React.useMemo(() => {
@@ -177,10 +160,23 @@ export function GanttTimeline({
             />
           ))}
 
-          {/* Task bars */}
+          {/* Task bars (and phase bars when showPhases is on) */}
           {rows.map((row) => {
-            if (row.type === "phase") return null;
-            const pos = barPositions.get(row.id);
+            // Phase rows only render when showPhases is on; computed here
+            // so calculateBarPosition gets called for them.
+            if (row.type === "phase" && !showPhases) return null;
+
+            let pos = barPositions.get(row.id);
+            if (!pos && row.type === "phase") {
+              const p = calculateBarPosition(row.item, dateRange, totalWidth);
+              pos = {
+                id: row.id,
+                left: p.left,
+                width: p.width,
+                y: row.y + ROW_HEIGHT / 2,
+                rowIndex: row.rowIndex,
+              };
+            }
             if (!pos) return null;
 
             return (
@@ -190,14 +186,12 @@ export function GanttTimeline({
                 left={pos.left}
                 width={pos.width}
                 y={row.y}
-                color={row.phaseColor}
+                color={row.item.color || row.phaseColor}
                 depth={row.depth}
                 hasChildren={row.hasChildren}
                 isSelected={selectedIds.has(row.id)}
                 isEditable={row.item.isEditable}
-                showCriticalPath={showCriticalPath}
-                baselineLeft={baselineMap?.get(row.id)?.left}
-                baselineWidth={baselineMap?.get(row.id)?.width}
+                showPhases={showPhases}
                 onDoubleClick={onItemDoubleClick}
                 onClick={onItemClick}
                 linkMode={linkMode}

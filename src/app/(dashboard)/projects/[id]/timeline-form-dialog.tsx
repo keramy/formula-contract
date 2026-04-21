@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { Badge } from "@/components/ui/badge";
@@ -34,17 +35,28 @@ import { toast } from "sonner";
 import {
   useCreateTimelineItem,
   useUpdateTimelineItem,
+  useCreateTimelineDependency,
+  useUpdateTimelineDependency,
+  useDeleteTimelineDependency,
 } from "@/lib/react-query/timelines";
 import {
   type GanttItem as TimelineItem,
   type GanttItemType,
   type Priority,
+  type DependencyType,
+  type GanttDependency as TimelineDependency,
+  type PhaseKey,
 } from "@/lib/actions/timelines";
+import { PHASE_ORDER, PHASE_LABELS, PHASE_COLORS } from "@/components/gantt/gantt-types";
 import {
   ListTodoIcon,
   LinkIcon,
   SearchIcon,
   FlagIcon,
+  GitBranchIcon,
+  PlusIcon,
+  TrashIcon,
+  XIcon,
 } from "lucide-react";
 
 // ============================================================================
@@ -84,7 +96,15 @@ interface TimelineFormDialogProps {
   editItem: TimelineItem | null;
   scopeItems: ScopeItem[];
   timelineItems: TimelineItem[];
+  dependencies?: TimelineDependency[];
 }
+
+const DEP_TYPE_LABEL: Record<DependencyType, string> = {
+  0: "FS",
+  1: "SS",
+  2: "FF",
+  3: "SF",
+};
 
 // ============================================================================
 // Component
@@ -97,21 +117,28 @@ export function TimelineFormDialog({
   editItem,
   scopeItems,
   timelineItems,
+  dependencies = [],
 }: TimelineFormDialogProps) {
   // React Query mutations
   const createMutation = useCreateTimelineItem(projectId);
   const updateMutation = useUpdateTimelineItem(projectId);
+  const createDepMutation = useCreateTimelineDependency(projectId);
+  const updateDepMutation = useUpdateTimelineDependency(projectId);
+  const deleteDepMutation = useDeleteTimelineDependency(projectId);
 
   const isLoading = createMutation.isPending || updateMutation.isPending;
 
   // Form state
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [itemType, setItemType] = useState<GanttItemType>("task");
   const [priority, setPriority] = useState<Priority>(2); // Default to Normal
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [linkedScopeItemIds, setLinkedScopeItemIds] = useState<string[]>([]);
-  const [phaseId, setPhaseId] = useState<string>("");
+  // Phase is a LABEL (phase_key), not a parent relationship. A task keeps its
+  // parent_id hierarchy independent of phase labeling.
+  const [phaseKey, setPhaseKey] = useState<PhaseKey | "">("");
   const [parentTaskId, setParentTaskId] = useState<string>("");
 
   // Duration mode state
@@ -168,43 +195,64 @@ export function TimelineFormDialog({
     );
   }, [scopeItems, scopeSearch]);
 
-  const phases = useMemo(() => {
-    return timelineItems.filter((i) => i.item_type === "phase");
-  }, [timelineItems]);
-
   const itemById = useMemo(() => {
     return new Map(timelineItems.map((i) => [i.id, i]));
   }, [timelineItems]);
 
-  const getPhaseIdForTask = (task: TimelineItem): string => {
+  // Backward-compat: derive phase_key from ancestor phase item if not set on the task itself
+  const derivePhaseKey = (task: TimelineItem): PhaseKey | "" => {
+    if (task.phase_key) return task.phase_key as PhaseKey;
     let currentParentId = task.parent_id;
     while (currentParentId) {
       const parent = itemById.get(currentParentId);
       if (!parent) break;
-      if (parent.item_type === "phase") return parent.id;
+      if (parent.item_type === "phase" && parent.phase_key) return parent.phase_key as PhaseKey;
       currentParentId = parent.parent_id || null;
     }
     return "";
   };
 
-  const tasksByPhase = useMemo(() => {
-    if (phaseId) {
-      return timelineItems.filter(
-        (i) => i.item_type === "task" && i.parent_id === phaseId && i.id !== editItem?.id
-      );
-    }
-
-    // No phase selected: only show top-level tasks as potential parents
+  // Parent-task dropdown candidates: any task that isn't the current item nor a phase.
+  // We no longer filter by phase because phase is a label, not hierarchy — a task can
+  // be nested under any parent regardless of its phase label.
+  const parentTaskCandidates = useMemo(() => {
     return timelineItems.filter(
-      (i) => i.item_type === "task" && !i.parent_id && i.id !== editItem?.id
+      (i) => i.item_type === "task" && i.id !== editItem?.id
     );
-  }, [timelineItems, phaseId, editItem]);
+  }, [timelineItems, editItem]);
+
+  // Dependencies — incoming (predecessors) and outgoing (successors)
+  const incomingDeps = useMemo(() => {
+    if (!editItem) return [];
+    return dependencies.filter((d) => d.target_id === editItem.id);
+  }, [dependencies, editItem]);
+
+  const outgoingDeps = useMemo(() => {
+    if (!editItem) return [];
+    return dependencies.filter((d) => d.source_id === editItem.id);
+  }, [dependencies, editItem]);
+
+  const otherTasks = useMemo(() => {
+    if (!editItem) return [];
+    return timelineItems.filter(
+      (t) => t.id !== editItem.id && t.item_type !== "phase"
+    );
+  }, [timelineItems, editItem]);
+
+  const taskNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    timelineItems.forEach((t) => map.set(t.id, t.name));
+    return map;
+  }, [timelineItems]);
+
+  const depCount = incomingDeps.length + outgoingDeps.length;
 
   // Sync form with editItem
   useEffect(() => {
     if (open) {
       if (editItem) {
         setName(editItem.name);
+        setDescription(editItem.description || "");
         setItemType(editItem.item_type);
         setPriority((editItem.priority || 2) as Priority);
         setStartDate(format(new Date(editItem.start_date), "yyyy-MM-dd"));
@@ -214,23 +262,23 @@ export function TimelineFormDialog({
         );
         if (editItem.item_type === "task") {
           const directParent = editItem.parent_id ? itemById.get(editItem.parent_id) : null;
-          const phaseForTask = getPhaseIdForTask(editItem);
-          setPhaseId(phaseForTask || phases[0]?.id || "");
+          setPhaseKey(derivePhaseKey(editItem));
           setParentTaskId(directParent?.item_type === "task" ? directParent.id : "");
         } else {
-          setPhaseId("");
+          setPhaseKey("");
           setParentTaskId("");
         }
         setUseDuration(false); // Edit mode uses direct dates
       } else {
         // Reset form for new item
         setName("");
+        setDescription("");
         setItemType("task");
         setPriority(2); // Normal
         setStartDate("");
         setEndDate("");
         setLinkedScopeItemIds([]);
-        setPhaseId("");
+        setPhaseKey("");
         setParentTaskId("");
         setUseDuration(false);
         setDuration(7);
@@ -238,7 +286,10 @@ export function TimelineFormDialog({
       }
       setScopeSearch("");
     }
-  }, [open, editItem, phases, itemById]);
+    // itemById is used via derivePhaseKey; exhaustive-deps isn't enforced here,
+    // and re-running on itemById changes is fine (idempotent reset).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editItem, itemById]);
 
   // Auto-set end date when start date changes (for new items)
   useEffect(() => {
@@ -269,11 +320,15 @@ export function TimelineFormDialog({
     const data = {
       project_id: projectId,
       name: name.trim(),
+      description: description.trim() || null,
       item_type: itemType,
       priority,
       start_date: startDate,
       end_date: itemType === "milestone" ? startDate : endDate,
-      parent_id: itemType === "task" ? (parentTaskId || phaseId || null) : null,
+      // Parent is strictly hierarchical — never the phase item.
+      parent_id: itemType === "task" ? (parentTaskId || null) : null,
+      // Phase is a label — completely independent of parent_id.
+      phase_key: itemType === "task" ? (phaseKey || null) : null,
       linked_scope_item_ids: itemType === "task" ? linkedScopeItemIds : [],
       is_completed: itemType === "milestone" ? false : undefined,
     };
@@ -293,20 +348,20 @@ export function TimelineFormDialog({
 
   return (
     <Sheet open={open} onOpenChange={handleClose}>
-      <SheetContent side="right" className="w-full sm:max-w-xl lg:max-w-2xl p-6">
-        <SheetHeader>
-          <SheetTitle>
+      <SheetContent side="right" className="w-full sm:max-w-xl lg:max-w-2xl p-0 gap-0 flex flex-col">
+        <SheetHeader className="px-6 pt-5 pb-2 shrink-0">
+          <SheetTitle className="text-base">
             {isEditing ? "Edit Timeline Item" : "Add Timeline Item"}
           </SheetTitle>
-          <SheetDescription>
+          <SheetDescription className="sr-only">
             {isEditing
               ? "Update the timeline item details and linked items"
               : "Create a new task or milestone for your project timeline"}
           </SheetDescription>
         </SheetHeader>
 
-        <Tabs defaultValue="details" className="w-full mt-4">
-          <TabsList className="grid w-full grid-cols-2">
+        <Tabs defaultValue="details" className="flex flex-col flex-1 min-h-0 overflow-hidden w-full">
+          <TabsList className="mx-6 shrink-0 grid grid-cols-3">
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="links" className="gap-1.5">
               <LinkIcon className="size-3.5" />
@@ -317,122 +372,155 @@ export function TimelineFormDialog({
                 </Badge>
               )}
             </TabsTrigger>
+            <TabsTrigger value="dependencies" className="gap-1.5">
+              <GitBranchIcon className="size-3.5" />
+              Dependencies
+              {depCount > 0 && (
+                <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">
+                  {depCount}
+                </Badge>
+              )}
+            </TabsTrigger>
           </TabsList>
 
+          <div className="flex-1 overflow-y-auto px-6 py-4">
+
           {/* Details Tab */}
-          <TabsContent value="details" className="space-y-4 mt-4">
+          <TabsContent value="details" className="space-y-3 mt-0">
             {/* Type Selection */}
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label>Type *</Label>
               <div className="flex gap-2">
                 <Button
                   type="button"
                   variant={itemType === "task" ? "default" : "outline"}
-                  className="flex-1"
+                  className="flex-1 h-8"
                   onClick={() => setItemType("task")}
                 >
-                  <ListTodoIcon className="size-4 mr-2" />
+                  <ListTodoIcon className="size-3.5 mr-1.5" />
                   Task
                 </Button>
                 <Button
                   type="button"
                   variant={itemType === "milestone" ? "default" : "outline"}
-                  className="flex-1"
+                  className="flex-1 h-8"
                   onClick={() => setItemType("milestone")}
                 >
-                  <FlagIcon className="size-4 mr-2" />
+                  <FlagIcon className="size-3.5 mr-1.5" />
                   Milestone
                 </Button>
               </div>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <div
-                  className="size-3 rounded"
-                  style={{ backgroundColor: typeColor }}
-                />
-                <span>
-                  {itemType === "milestone"
-                    ? "Milestones are single dates (e.g., Client Approval)"
-                    : "Tasks belong under fixed phases (Design/Production/Shipping/Installation)"}
-                </span>
-              </div>
             </div>
 
-            {/* Phase selection (tasks only) */}
-            {itemType === "task" && (
-              <div className="space-y-2">
-                <Label>Phase (optional)</Label>
-                <Select value={phaseId || NO_PARENT_VALUE} onValueChange={(v) => setPhaseId(v === NO_PARENT_VALUE ? "" : v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="No phase (ungrouped)" />
+            {/* Phase / Parent / Priority — 3-col grid for tasks, Priority alone for milestones */}
+            {itemType === "task" ? (
+              <div className="grid grid-cols-3 gap-2">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Phase</Label>
+                  <Select
+                    value={phaseKey || NO_PARENT_VALUE}
+                    onValueChange={(v) => setPhaseKey(v === NO_PARENT_VALUE ? "" : (v as PhaseKey))}
+                  >
+                    <SelectTrigger className="h-8">
+                      <SelectValue placeholder="No phase" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_PARENT_VALUE}>No phase</SelectItem>
+                      {PHASE_ORDER.map((key) => (
+                        <SelectItem key={key} value={key}>
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="size-2.5 rounded-full"
+                              style={{ backgroundColor: PHASE_COLORS[key] }}
+                            />
+                            {PHASE_LABELS[key]}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Parent</Label>
+                  <Select
+                    value={parentTaskId || NO_PARENT_VALUE}
+                    onValueChange={(value) =>
+                      setParentTaskId(value === NO_PARENT_VALUE ? "" : value)
+                    }
+                  >
+                    <SelectTrigger className="h-8">
+                      <SelectValue placeholder="No parent" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_PARENT_VALUE}>No parent</SelectItem>
+                      {parentTaskCandidates.map((t) => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Priority</Label>
+                  <Select
+                    value={priority.toString()}
+                    onValueChange={(v) => setPriority(parseInt(v, 10) as Priority)}
+                  >
+                    <SelectTrigger className="h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PRIORITY_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value.toString()}>
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="size-2.5 rounded-full"
+                              style={{ backgroundColor: opt.color }}
+                            />
+                            {opt.label}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <Label className="text-xs">Priority</Label>
+                <Select
+                  value={priority.toString()}
+                  onValueChange={(v) => setPriority(parseInt(v, 10) as Priority)}
+                >
+                  <SelectTrigger className="h-8">
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={NO_PARENT_VALUE}>No phase</SelectItem>
-                    {phases.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
+                    {PRIORITY_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value.toString()}>
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="size-2.5 rounded-full"
+                            style={{ backgroundColor: opt.color }}
+                          />
+                          {opt.label}
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
             )}
-
-            {/* Parent task (optional, tasks only) */}
-            {itemType === "task" && (
-              <div className="space-y-2">
-                <Label>Parent Task (optional)</Label>
-                <Select
-                  value={parentTaskId || NO_PARENT_VALUE}
-                  onValueChange={(value) =>
-                    setParentTaskId(value === NO_PARENT_VALUE ? "" : value)
-                  }
-                >
-                  <SelectTrigger>
-                  <SelectValue placeholder="No parent (top-level task)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NO_PARENT_VALUE}>No parent</SelectItem>
-                  {tasksByPhase.map((t) => (
-                      <SelectItem key={t.id} value={t.id}>
-                        {t.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {/* Priority */}
-            <div className="space-y-2">
-              <Label>Priority</Label>
-              <Select
-                value={priority.toString()}
-                onValueChange={(v) => setPriority(parseInt(v, 10) as Priority)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select priority" />
-                </SelectTrigger>
-                <SelectContent>
-                  {PRIORITY_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value.toString()}>
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="size-2.5 rounded-full"
-                          style={{ backgroundColor: opt.color }}
-                        />
-                        {opt.label}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
 
             {/* Name */}
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor="name">Name *</Label>
               <Input
                 id="name"
+                className="h-8"
                 placeholder={
                   itemType === "milestone"
                     ? "e.g., Client Approval"
@@ -443,19 +531,32 @@ export function TimelineFormDialog({
               />
             </div>
 
+            {/* Description */}
+            <div className="space-y-1.5">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                placeholder="Optional notes, context, or blockers"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={2}
+              />
+            </div>
+
             {/* Date Range */}
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
                   <Label htmlFor="start_date">{itemType === "milestone" ? "Date *" : "Start Date *"}</Label>
                   <Input
                     id="start_date"
                     type="date"
+                    className="h-8"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <Label htmlFor="end_date">
                       {useDuration ? "Duration *" : "End Date *"}
@@ -478,13 +579,13 @@ export function TimelineFormDialog({
                         min={1}
                         value={duration}
                         onChange={(e) => setDuration(parseInt(e.target.value) || 1)}
-                        className="w-20"
+                        className="w-20 h-8"
                       />
                       <Select
                         value={durationUnit}
                         onValueChange={(v) => setDurationUnit(v as "days" | "weeks")}
                       >
-                        <SelectTrigger className="flex-1">
+                        <SelectTrigger className="flex-1 h-8">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -497,6 +598,7 @@ export function TimelineFormDialog({
                     <Input
                       id="end_date"
                       type="date"
+                      className="h-8"
                       value={endDate}
                       min={startDate}
                       onChange={(e) => setEndDate(e.target.value)}
@@ -514,7 +616,7 @@ export function TimelineFormDialog({
           </TabsContent>
 
           {/* Links Tab */}
-          <TabsContent value="links" className="space-y-4 mt-4">
+          <TabsContent value="links" className="space-y-4 mt-0">
             {/* Scope Items Section */}
             {itemType === "task" && (
               <div className="space-y-2">
@@ -569,9 +671,73 @@ export function TimelineFormDialog({
             </div>
             )}
           </TabsContent>
+
+          {/* Dependencies Tab */}
+          <TabsContent value="dependencies" className="space-y-5 mt-0">
+            {!editItem ? (
+              <div className="text-center py-8 text-sm text-muted-foreground">
+                Save this item first to add dependencies.
+              </div>
+            ) : otherTasks.length === 0 ? (
+              <div className="text-center py-8 text-sm text-muted-foreground">
+                Create at least one other task to add a dependency.
+              </div>
+            ) : (
+              <>
+                <DepSection
+                  title="Predecessors"
+                  subtitle="Tasks this one depends on"
+                  emptyText="Click + Add to link a task that must happen before this one."
+                  deps={incomingDeps}
+                  getOtherTaskId={(d) => d.source_id}
+                  otherTasks={otherTasks}
+                  taskNameById={taskNameById}
+                  direction="incoming"
+                  onCreate={(otherId, type, lag) => {
+                    createDepMutation.mutate({
+                      project_id: projectId,
+                      source_id: otherId,
+                      target_id: editItem.id,
+                      dependency_type: type,
+                      lag_days: lag,
+                    });
+                  }}
+                  onUpdate={(depId, updates) => {
+                    updateDepMutation.mutate({ dependencyId: depId, updates });
+                  }}
+                  onDelete={(depId) => deleteDepMutation.mutate(depId)}
+                />
+
+                <DepSection
+                  title="Successors"
+                  subtitle="Tasks that depend on this one"
+                  emptyText="Click + Add to link a task that depends on this one."
+                  deps={outgoingDeps}
+                  getOtherTaskId={(d) => d.target_id}
+                  otherTasks={otherTasks}
+                  taskNameById={taskNameById}
+                  direction="outgoing"
+                  onCreate={(otherId, type, lag) => {
+                    createDepMutation.mutate({
+                      project_id: projectId,
+                      source_id: editItem.id,
+                      target_id: otherId,
+                      dependency_type: type,
+                      lag_days: lag,
+                    });
+                  }}
+                  onUpdate={(depId, updates) => {
+                    updateDepMutation.mutate({ dependencyId: depId, updates });
+                  }}
+                  onDelete={(depId) => deleteDepMutation.mutate(depId)}
+                />
+              </>
+            )}
+          </TabsContent>
+          </div>
         </Tabs>
 
-        <SheetFooter className="mt-6 gap-2">
+        <SheetFooter className="px-6 py-4 border-t shrink-0 gap-2">
           <Button variant="outline" onClick={handleClose} disabled={isLoading}>
             Cancel
           </Button>
@@ -585,5 +751,198 @@ export function TimelineFormDialog({
         </SheetFooter>
       </SheetContent>
     </Sheet>
+  );
+}
+
+// ============================================================================
+// Dependency sub-components
+// ============================================================================
+
+function DepSection({
+  title,
+  subtitle,
+  emptyText,
+  deps,
+  getOtherTaskId,
+  otherTasks,
+  taskNameById,
+  direction,
+  onCreate,
+  onUpdate,
+  onDelete,
+}: {
+  title: string;
+  subtitle: string;
+  emptyText: string;
+  deps: TimelineDependency[];
+  getOtherTaskId: (d: TimelineDependency) => string;
+  otherTasks: TimelineItem[];
+  taskNameById: Map<string, string>;
+  direction: "incoming" | "outgoing";
+  onCreate: (otherId: string, type: DependencyType, lag: number) => void;
+  onUpdate: (depId: string, updates: { dependency_type?: DependencyType; lag_days?: number }) => void;
+  onDelete: (depId: string) => void;
+}) {
+  const [isAdding, setIsAdding] = useState(false);
+  const [addTaskId, setAddTaskId] = useState("");
+  const [addType, setAddType] = useState<DependencyType>(0);
+  const [addLag, setAddLag] = useState(0);
+
+  const usedIds = new Set(deps.map(getOtherTaskId));
+  const availableTasks = otherTasks.filter((t) => !usedIds.has(t.id));
+
+  const resetAddForm = () => {
+    setIsAdding(false);
+    setAddTaskId("");
+    setAddType(0);
+    setAddLag(0);
+  };
+
+  const handleSubmitAdd = () => {
+    if (!addTaskId) return;
+    onCreate(addTaskId, addType, addLag);
+    resetAddForm();
+  };
+
+  return (
+    <div className="space-y-2">
+      <div>
+        <Label>{title}</Label>
+        <p className="text-xs text-muted-foreground">{subtitle}</p>
+      </div>
+
+      {deps.length === 0 && !isAdding && (
+        <p className="text-xs text-muted-foreground italic px-2">{emptyText}</p>
+      )}
+
+      {deps.map((dep) => (
+        <DepRow
+          key={dep.id}
+          dep={dep}
+          otherTaskName={taskNameById.get(getOtherTaskId(dep)) || "(deleted task)"}
+          onUpdateType={(type) => onUpdate(dep.id, { dependency_type: type })}
+          onUpdateLag={(lag) => onUpdate(dep.id, { lag_days: lag })}
+          onDelete={() => onDelete(dep.id)}
+        />
+      ))}
+
+      {isAdding ? (
+        <div className="flex items-center gap-2 p-2 rounded-md border bg-muted/30">
+          <Select value={addTaskId} onValueChange={setAddTaskId}>
+            <SelectTrigger className="flex-1 h-8 text-xs">
+              <SelectValue placeholder="Pick task..." />
+            </SelectTrigger>
+            <SelectContent>
+              {availableTasks.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={String(addType)}
+            onValueChange={(v) => setAddType(Number(v) as DependencyType)}
+          >
+            <SelectTrigger className="w-[72px] h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="0">FS</SelectItem>
+              <SelectItem value="1">SS</SelectItem>
+              <SelectItem value="2">FF</SelectItem>
+              <SelectItem value="3">SF</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input
+            type="number"
+            value={addLag}
+            onChange={(e) => setAddLag(parseInt(e.target.value) || 0)}
+            className="w-16 h-8 text-xs"
+            placeholder="Lag"
+          />
+          <Button
+            size="sm"
+            className="h-8 px-2 text-xs"
+            onClick={handleSubmitAdd}
+            disabled={!addTaskId}
+          >
+            Add
+          </Button>
+          <Button size="icon" variant="ghost" className="size-8" onClick={resetAddForm}>
+            <XIcon className="size-3.5" />
+          </Button>
+        </div>
+      ) : (
+        availableTasks.length > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full gap-1.5 text-xs"
+            onClick={() => setIsAdding(true)}
+          >
+            <PlusIcon className="size-3.5" />
+            Add {direction === "incoming" ? "predecessor" : "successor"}
+          </Button>
+        )
+      )}
+    </div>
+  );
+}
+
+function DepRow({
+  dep,
+  otherTaskName,
+  onUpdateType,
+  onUpdateLag,
+  onDelete,
+}: {
+  dep: TimelineDependency;
+  otherTaskName: string;
+  onUpdateType: (type: DependencyType) => void;
+  onUpdateLag: (lag: number) => void;
+  onDelete: () => void;
+}) {
+  const [localLag, setLocalLag] = useState(dep.lag_days);
+  useEffect(() => {
+    setLocalLag(dep.lag_days);
+  }, [dep.lag_days]);
+
+  const commitLag = () => {
+    if (localLag !== dep.lag_days) onUpdateLag(localLag);
+  };
+
+  return (
+    <div className="flex items-center gap-2 p-2 rounded-md border bg-background">
+      <span className="text-sm flex-1 truncate">{otherTaskName}</span>
+      <Select
+        value={String(dep.dependency_type)}
+        onValueChange={(v) => onUpdateType(Number(v) as DependencyType)}
+      >
+        <SelectTrigger className="w-[72px] h-7 text-xs">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="0">FS</SelectItem>
+          <SelectItem value="1">SS</SelectItem>
+          <SelectItem value="2">FF</SelectItem>
+          <SelectItem value="3">SF</SelectItem>
+        </SelectContent>
+      </Select>
+      <Input
+        type="number"
+        value={localLag}
+        onChange={(e) => setLocalLag(parseInt(e.target.value) || 0)}
+        onBlur={commitLag}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+        }}
+        className="w-16 h-7 text-xs"
+        title="Lag days"
+      />
+      <Button size="icon" variant="ghost" onClick={onDelete} className="size-7">
+        <TrashIcon className="size-3.5" />
+      </Button>
+    </div>
   );
 }

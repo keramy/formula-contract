@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { format } from "date-fns";
+import { toast } from "sonner";
 import { useBreakpoint } from "@/hooks/use-media-query";
 import { GanttChart, type GanttItem, type GanttDependency } from "@/components/gantt";
 import { GlassCard, EmptyState } from "@/components/ui/ui-helpers";
@@ -27,12 +28,9 @@ import {
   useCreateTimelineDependency,
   useUpdateTimelineDependency,
   useDeleteTimelineDependency,
-  useBaselines,
-  useBaselineItems,
-  useSaveBaseline,
-  useDeleteBaseline,
+  useSetTaskPhase,
 } from "@/lib/react-query/timelines";
-import type { GanttItem as TimelineItem, DependencyType } from "@/lib/actions/timelines";
+import type { GanttItem as TimelineItem, DependencyType, PhaseKey } from "@/lib/actions/timelines";
 
 // ============================================================================
 // CONSTANTS
@@ -65,8 +63,6 @@ interface TimelineClientProps {
   projectId: string;
   scopeItems: ScopeItem[];
   canEdit?: boolean;
-  /** URL for "Open Full View" button inside the gantt stats bar */
-  fullViewUrl?: string;
   /** @deprecated Kept for backwards compat — header is now inside GanttChart */
   showHeader?: boolean;
   /** @deprecated Kept for backwards compat */
@@ -81,7 +77,6 @@ export function TimelineClient({
   projectId,
   scopeItems,
   canEdit = false,
-  fullViewUrl,
 }: TimelineClientProps) {
   const { isMobile } = useBreakpoint();
   // React Query hooks for timeline data
@@ -95,13 +90,7 @@ export function TimelineClient({
   const createDependency = useCreateTimelineDependency(projectId);
   const updateDependency = useUpdateTimelineDependency(projectId);
   const deleteDependency = useDeleteTimelineDependency(projectId);
-
-  // Baseline hooks
-  const { data: baselines = [] } = useBaselines(projectId);
-  const [activeBaselineId, setActiveBaselineId] = React.useState<string | null>(null);
-  const { data: baselineItems = [] } = useBaselineItems(activeBaselineId);
-  const saveBaselineMutation = useSaveBaseline(projectId);
-  const deleteBaselineMutation = useDeleteBaseline(projectId);
+  const setPhaseMutation = useSetTaskPhase(projectId);
 
   // Form dialog state
   const [formOpen, setFormOpen] = React.useState(false);
@@ -109,7 +98,7 @@ export function TimelineClient({
 
   // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
-  const [deleteItemId, setDeleteItemId] = React.useState<string | null>(null);
+  const [deleteItemIds, setDeleteItemIds] = React.useState<string[]>([]);
 
   // Convert timeline items to Gantt items (tree structure)
   const ganttItems = React.useMemo<GanttItem[]>(() => {
@@ -159,7 +148,10 @@ export function TimelineClient({
           startDate: new Date(item.start_date),
           endDate: new Date(item.end_date),
           progress: item.progress || 0,
-          color: displayColor,
+          // For milestones, display color is status-based (completed/overdue/upcoming).
+          // For tasks & phases, preserve the raw DB color (null if user hasn't set one)
+          // so rendering can fall back to the phase-inherited color.
+          color: isMilestone ? displayColor : (item.color ?? null),
           priority: (item.priority || 2) as 1 | 2 | 3 | 4,
           status,
           isEditable: canEdit && item.item_type !== "phase",
@@ -167,7 +159,6 @@ export function TimelineClient({
           phaseKey: (item.phase_key || undefined) as GanttItem["phaseKey"],
           children: [],
           description: (item as any).description || null,
-          isOnCriticalPath: (item as any).is_on_critical_path || false,
           isCompleted: item.is_completed || false,
         };
 
@@ -238,6 +229,15 @@ export function TimelineClient({
     deleteDependency.mutate(dependencyId);
   };
 
+  // Auto-increment "New Task" / "New Subtask" names to avoid collisions
+  const nextAutoName = (base: string): string => {
+    const existing = new Set(timelineItems.map((t) => t.name));
+    if (!existing.has(base)) return base;
+    let i = 2;
+    while (existing.has(`${base} ${i}`)) i++;
+    return `${base} ${i}`;
+  };
+
   // Handle add new item — creates instantly with defaults, user edits via double-click
   // Guard: ignore if previous create is still pending (prevents rapid-fire DB hits)
   const handleAddItem = () => {
@@ -248,7 +248,7 @@ export function TimelineClient({
 
     createItem.mutate({
       project_id: projectId,
-      name: "New Task",
+      name: nextAutoName("New Task"),
       item_type: "task",
       start_date: format(today, "yyyy-MM-dd"),
       end_date: format(endDate, "yyyy-MM-dd"),
@@ -256,9 +256,32 @@ export function TimelineClient({
     });
   };
 
+  // Handle add new milestone — single-day item
+  const handleAddMilestone = () => {
+    if (createItem.isPending) return;
+    const today = new Date();
+    createItem.mutate({
+      project_id: projectId,
+      name: nextAutoName("New Milestone"),
+      item_type: "milestone",
+      start_date: format(today, "yyyy-MM-dd"),
+      end_date: format(today, "yyyy-MM-dd"),
+      priority: 2,
+    });
+  };
+
+  // Optimistic temp IDs aren't valid UUIDs — reject server-bound operations
+  // until the create has resolved and the real UUID is in cache.
+  const isPending = (id?: string | null) => !id || id.startsWith("temp-");
+  const PENDING_MSG = "Still saving this task — give it a second and try again";
+
   // Handle edit item
   const handleEditItem = (ganttItem: GanttItem) => {
     if (!ganttItem.timelineId) return;
+    if (isPending(ganttItem.timelineId)) {
+      toast.info(PENDING_MSG);
+      return;
+    }
 
     const timeline = timelineItems.find((t) => t.id === ganttItem.timelineId);
     if (timeline) {
@@ -269,13 +292,17 @@ export function TimelineClient({
 
   // Handle add subtask — creates a child task under the given parent
   const handleAddSubtask = (parentId: string) => {
+    if (isPending(parentId)) {
+      toast.info(PENDING_MSG);
+      return;
+    }
     const today = new Date();
     const endDate = new Date(today);
     endDate.setDate(endDate.getDate() + 14);
 
     createItem.mutate({
       project_id: projectId,
-      name: "New Subtask",
+      name: nextAutoName("New Subtask"),
       item_type: "task",
       parent_id: parentId,
       start_date: format(today, "yyyy-MM-dd"),
@@ -287,6 +314,10 @@ export function TimelineClient({
   // Handle convert to milestone
   const handleConvertToMilestone = (ganttItem: GanttItem) => {
     if (!ganttItem.timelineId) return;
+    if (isPending(ganttItem.timelineId)) {
+      toast.info(PENDING_MSG);
+      return;
+    }
     const startDate = format(ganttItem.startDate, "yyyy-MM-dd");
     updateItem.mutate({
       timelineId: ganttItem.timelineId,
@@ -301,34 +332,73 @@ export function TimelineClient({
   // Handle set priority
   const handleSetPriority = (ganttItem: GanttItem, priority: number) => {
     if (!ganttItem.timelineId) return;
+    if (isPending(ganttItem.timelineId)) {
+      toast.info(PENDING_MSG);
+      return;
+    }
     updateItem.mutate({
       timelineId: ganttItem.timelineId,
       input: { priority: priority as 1 | 2 | 3 | 4 },
     });
   };
 
-  // Handle toggle critical path
-  const handleToggleCriticalPath = (ganttItem: GanttItem) => {
+  // Handle set phase (cascades to descendants server-side)
+  const handleSetPhase = (ganttItem: GanttItem, phase: PhaseKey) => {
     if (!ganttItem.timelineId) return;
+    if (isPending(ganttItem.timelineId)) {
+      toast.info(PENDING_MSG);
+      return;
+    }
+    setPhaseMutation.mutate({ taskId: ganttItem.timelineId, phaseKey: phase });
+  };
+
+  // Handle set color
+  const handleSetColor = (ganttItem: GanttItem, color: string | null) => {
+    if (!ganttItem.timelineId) return;
+    if (isPending(ganttItem.timelineId)) {
+      toast.info(PENDING_MSG);
+      return;
+    }
     updateItem.mutate({
       timelineId: ganttItem.timelineId,
-      input: { is_on_critical_path: !ganttItem.isOnCriticalPath },
+      input: { color },
     });
   };
 
-  // Handle delete click
+  // Single-item delete (from context menu or double-click → delete)
   const handleDeleteClick = (ganttItem: GanttItem) => {
     if (!ganttItem.timelineId) return;
-    setDeleteItemId(ganttItem.timelineId);
+    if (isPending(ganttItem.timelineId)) {
+      toast.info(PENDING_MSG);
+      return;
+    }
+    setDeleteItemIds([ganttItem.timelineId]);
     setDeleteDialogOpen(true);
   };
 
-  // Handle delete confirm
+  // Bulk delete (from toolbar "Delete selected" or Delete key with multi-select)
+  const handleDeleteMany = (items: GanttItem[]) => {
+    const ids = items
+      .map((i) => i.timelineId)
+      .filter((id): id is string => !!id && !isPending(id));
+    if (ids.length === 0) {
+      if (items.some((i) => i.timelineId && isPending(i.timelineId))) {
+        toast.info(PENDING_MSG);
+      }
+      return;
+    }
+    setDeleteItemIds(ids);
+    setDeleteDialogOpen(true);
+  };
+
+  // Confirm — deletes every queued ID. Mutation hook handles optimistic removal + toast.
   const handleDeleteConfirm = async () => {
-    if (!deleteItemId) return;
-    deleteItem.mutate(deleteItemId);
+    if (deleteItemIds.length === 0) return;
+    for (const id of deleteItemIds) {
+      deleteItem.mutate(id);
+    }
     setDeleteDialogOpen(false);
-    setDeleteItemId(null);
+    setDeleteItemIds([]);
   };
 
   // Loading state
@@ -378,21 +448,16 @@ export function TimelineClient({
           items={ganttItems}
           dependencies={ganttDependencies}
           showAddButton={canEdit}
-          fullViewUrl={fullViewUrl}
-          onAddItem={handleAddItem}
+          onAddItem={canEdit ? handleAddItem : undefined}
+          onAddMilestone={canEdit ? handleAddMilestone : undefined}
           onItemEdit={handleEditItem}
           onItemDelete={handleDeleteClick}
+          onDeleteMany={canEdit ? handleDeleteMany : undefined}
           onAddSubtask={canEdit ? handleAddSubtask : undefined}
           onConvertToMilestone={canEdit ? handleConvertToMilestone : undefined}
           onSetPriority={canEdit ? handleSetPriority : undefined}
-          onToggleCriticalPath={canEdit ? handleToggleCriticalPath : undefined}
-          baselines={baselines}
-          baselineItems={baselineItems}
-          onSaveBaseline={canEdit ? () => {
-            const name = `Baseline ${baselines.length + 1} — ${new Date().toLocaleDateString()}`;
-            saveBaselineMutation.mutate(name);
-          } : undefined}
-          onDeleteBaseline={canEdit ? (id: string) => deleteBaselineMutation.mutate(id) : undefined}
+          onSetPhase={canEdit ? handleSetPhase : undefined}
+          onSetColor={canEdit ? handleSetColor : undefined}
           onItemParentChange={canEdit ? handleParentChange : undefined}
           onCreateDependency={canEdit ? handleCreateDependency : undefined}
           onUpdateDependency={canEdit ? handleUpdateDependency : undefined}
@@ -409,15 +474,22 @@ export function TimelineClient({
         editItem={editItem}
         scopeItems={scopeItems}
         timelineItems={timelineItems}
+        dependencies={timelineDependencies}
       />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Timeline Item</AlertDialogTitle>
+            <AlertDialogTitle>
+              {deleteItemIds.length === 1
+                ? "Delete Timeline Item"
+                : `Delete ${deleteItemIds.length} Timeline Items`}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this item? This action cannot be undone.
+              {deleteItemIds.length === 1
+                ? "Are you sure you want to delete this item? This action cannot be undone."
+                : `Are you sure you want to delete all ${deleteItemIds.length} selected items? This action cannot be undone.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -435,8 +507,10 @@ export function TimelineClient({
                   <Spinner className="size-4 mr-2" />
                   Deleting...
                 </>
-              ) : (
+              ) : deleteItemIds.length === 1 ? (
                 "Delete"
+              ) : (
+                `Delete ${deleteItemIds.length}`
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

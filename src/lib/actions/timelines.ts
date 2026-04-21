@@ -19,7 +19,7 @@ import { createClient } from "@/lib/supabase/server";
 // ============================================================================
 
 export type GanttItemType = "phase" | "task" | "milestone";
-export type PhaseKey = "design" | "production" | "shipping" | "installation";
+export type PhaseKey = "design" | "production" | "procurement" | "shipping" | "installation";
 export type DependencyType = 0 | 1 | 2 | 3;
 export type Priority = 1 | 2 | 3 | 4;
 
@@ -39,7 +39,6 @@ export interface GanttItem {
   completed_at: string | null;
   color: string | null;
   description?: string | null;
-  is_on_critical_path?: boolean;
   created_by: string | null;
   created_at: string | null;
   updated_at: string | null;
@@ -73,7 +72,6 @@ export interface GanttItemInput {
   progress_override?: number | null;
   is_completed?: boolean;
   description?: string | null;
-  is_on_critical_path?: boolean;
   linked_scope_item_ids?: string[];
 }
 
@@ -96,10 +94,11 @@ export interface ActionResult<T = void> {
 // ============================================================================
 
 const FIXED_PHASES: Array<{ key: PhaseKey; name: string; order: number; color: string }> = [
-  { key: "design", name: "Design", order: 1, color: "#64748b" },
-  { key: "production", name: "Production", order: 2, color: "#3b82f6" },
-  { key: "shipping", name: "Shipping", order: 3, color: "#f59e0b" },
-  { key: "installation", name: "Installation", order: 4, color: "#8b5cf6" },
+  { key: "design",       name: "Design/Shopdrawing", order: 1, color: "#0d9488" },
+  { key: "production",   name: "Production",         order: 2, color: "#3b82f6" },
+  { key: "procurement",  name: "Procurement",        order: 3, color: "#f97316" },
+  { key: "shipping",     name: "Shipment",           order: 4, color: "#64748b" },
+  { key: "installation", name: "Installation",       order: 5, color: "#16a34a" },
 ];
 
 function average(values: number[]): number {
@@ -210,17 +209,54 @@ export async function getTimelineItems(projectId: string): Promise<GanttItem[]> 
     computeProgress(item.id);
   });
 
-  // Recompute parent dates from children (phases and parent tasks)
+  // Build phase_key → non-phase items map for label-based aggregation.
+  // Phase is a LABEL, not a hierarchy, so a phase's date window = MIN/MAX
+  // across every task with matching phase_key, regardless of parent_id.
+  const tasksByPhaseKey = new Map<string, GanttItem[]>();
   itemsById.forEach((item) => {
-    const children = (childrenMap.get(item.id) || []).map((c) => itemsById.get(c.id)).filter(Boolean) as GanttItem[];
+    if (item.item_type === "phase") return;
+    if (!item.phase_key) return;
+    const arr = tasksByPhaseKey.get(item.phase_key) || [];
+    arr.push(item);
+    tasksByPhaseKey.set(item.phase_key, arr);
+  });
+
+  // Recompute dates:
+  // - Phase items → from phase_key matches (label-based aggregation)
+  // - Parent tasks (non-phase with children) → from direct parent_id children (hierarchy)
+  itemsById.forEach((item) => {
+    if (item.item_type === "phase") {
+      const phaseTasks = item.phase_key ? (tasksByPhaseKey.get(item.phase_key) || []) : [];
+      if (phaseTasks.length === 0) return;
+      const minStart = phaseTasks.reduce(
+        (min, c) => (c.start_date < min ? c.start_date : min),
+        phaseTasks[0].start_date
+      );
+      const maxEnd = phaseTasks.reduce(
+        (max, c) => (c.end_date > max ? c.end_date : max),
+        phaseTasks[0].end_date
+      );
+      item.start_date = minStart;
+      item.end_date = maxEnd;
+      item.progress = average(phaseTasks.map((c) => c.progress || 0));
+      return;
+    }
+
+    // Parent task: aggregate from hierarchical children (subtasks under this task)
+    const children = (childrenMap.get(item.id) || [])
+      .map((c) => itemsById.get(c.id))
+      .filter(Boolean) as GanttItem[];
     if (children.length === 0) return;
-    const minStart = children.reduce((min, c) => (c.start_date < min ? c.start_date : min), children[0].start_date);
-    const maxEnd = children.reduce((max, c) => (c.end_date > max ? c.end_date : max), children[0].end_date);
+    const minStart = children.reduce(
+      (min, c) => (c.start_date < min ? c.start_date : min),
+      children[0].start_date
+    );
+    const maxEnd = children.reduce(
+      (max, c) => (c.end_date > max ? c.end_date : max),
+      children[0].end_date
+    );
     item.start_date = minStart;
     item.end_date = maxEnd;
-    if (item.item_type === "phase") {
-      item.progress = average(children.map((c) => c.progress || 0));
-    }
   });
 
   // Build ordered list: phases (fixed order) -> their children -> milestones -> orphans
@@ -320,8 +356,8 @@ export async function createTimelineItem(input: GanttItemInput): Promise<ActionR
 
   const nextOrder = (maxOrder?.sort_order || 0) + 1;
 
-  const { data: created, error } = await supabase
-    .from("gantt_items")
+  const { data: created, error } = await (supabase
+    .from("gantt_items") as any)
     .insert({
       project_id: input.project_id,
       name: input.name,
@@ -336,7 +372,6 @@ export async function createTimelineItem(input: GanttItemInput): Promise<ActionR
       is_completed: input.is_completed ?? false,
       color: input.color || null,
       description: input.description || null,
-      is_on_critical_path: input.is_on_critical_path ?? false,
       created_by: user.id,
     })
     .select()
@@ -414,10 +449,10 @@ export async function updateTimelineItem(
   if (input.is_completed !== undefined) updateData.is_completed = input.is_completed;
   if (input.color !== undefined) updateData.color = input.color;
   if (input.description !== undefined) updateData.description = input.description;
-  if (input.is_on_critical_path !== undefined) updateData.is_on_critical_path = input.is_on_critical_path;
+  if (input.phase_key !== undefined) updateData.phase_key = input.phase_key;
 
-  const { data: updated, error } = await supabase
-    .from("gantt_items")
+  const { data: updated, error } = await (supabase
+    .from("gantt_items") as any)
     .update(updateData)
     .eq("id", timelineId)
     .select()
@@ -426,6 +461,29 @@ export async function updateTimelineItem(
   if (error || !updated) {
     console.error("Error updating gantt item:", error);
     return { success: false, error: error?.message || "Update failed" };
+  }
+
+  // If phase_key changed, cascade the label to all descendants (subtask tree).
+  // This matches the right-click Set Phase behavior and keeps parent-selects-children
+  // consistency regardless of which UI surface triggered the change.
+  if (input.phase_key !== undefined) {
+    const descendantIds: string[] = [];
+    let frontier: string[] = [timelineId];
+    while (frontier.length > 0) {
+      const { data: children } = await supabase
+        .from("gantt_items")
+        .select("id")
+        .in("parent_id", frontier);
+      if (!children || children.length === 0) break;
+      const ids = children.map((c) => c.id);
+      descendantIds.push(...ids);
+      frontier = ids;
+    }
+    if (descendantIds.length > 0) {
+      await (supabase.from("gantt_items") as any)
+        .update({ phase_key: input.phase_key })
+        .in("id", descendantIds);
+    }
   }
 
   if (input.linked_scope_item_ids !== undefined) {
@@ -465,17 +523,10 @@ export async function deleteTimelineItem(timelineId: string): Promise<ActionResu
     return { success: false, error: "Fixed phases cannot be deleted" };
   }
 
-  // Reparent children to the deleted item's parent (grandparent) before deleting
-  const { error: reparentError } = await supabase
-    .from("gantt_items")
-    .update({ parent_id: existing.parent_id })
-    .eq("parent_id", timelineId);
-
-  if (reparentError) {
-    console.error("Error reparenting children:", reparentError);
-    return { success: false, error: "Failed to reparent children" };
-  }
-
+  // No manual reparent: the parent_id FK is ON DELETE SET NULL, so children
+  // automatically become top-level when their parent is deleted. This avoids
+  // RLS/UPDATE race conditions when bulk-deleting a parent + its children in
+  // parallel. Dependencies and scope-item links cascade-delete via their own FKs.
   const { error } = await supabase.from("gantt_items").delete().eq("id", timelineId);
   if (error) {
     console.error("Error deleting gantt item:", error);
@@ -484,6 +535,66 @@ export async function deleteTimelineItem(timelineId: string): Promise<ActionResu
 
   // revalidatePath removed — React Query handles cache
   return { success: true };
+}
+
+/**
+ * Set a task's phase and cascade the label to all descendants.
+ *
+ * Phase is purely a LABEL, never a parent relationship. This function only
+ * updates phase_key — it never touches parent_id. Hierarchy is preserved as-is.
+ *
+ * Aggregation (for overlap view): MIN(start), MAX(end) across every task whose
+ * phase_key = X, regardless of where they sit in the parent_id tree.
+ *
+ * Cascade: when a parent's phase changes, all descendants inherit the new
+ * phase_key automatically (same rule, parent_id untouched).
+ */
+export async function setTaskPhase(
+  taskId: string,
+  phaseKey: PhaseKey
+): Promise<ActionResult<{ updatedCount: number }>> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "Not authenticated" };
+
+  const { data: userData } = await supabase.from("users").select("role").eq("id", user.id).single();
+  if (!userData || !["admin", "pm"].includes(userData.role)) {
+    return { success: false, error: "Only PM and Admin can change phase" };
+  }
+
+  const { data: task } = await supabase
+    .from("gantt_items")
+    .select("id, item_type")
+    .eq("id", taskId)
+    .single();
+  if (!task) return { success: false, error: "Task not found" };
+  if (task.item_type === "phase") {
+    return { success: false, error: "Cannot change phase of a phase item" };
+  }
+
+  // Collect all descendants via BFS on parent_id
+  const descendantIds: string[] = [];
+  let frontier: string[] = [taskId];
+  while (frontier.length > 0) {
+    const { data: children } = await supabase
+      .from("gantt_items")
+      .select("id")
+      .in("parent_id", frontier);
+    if (!children || children.length === 0) break;
+    const ids = children.map((c) => c.id);
+    descendantIds.push(...ids);
+    frontier = ids;
+  }
+
+  // Update target + descendants with the new phase_key in one go
+  const allIds = [taskId, ...descendantIds];
+  const { error } = await (supabase
+    .from("gantt_items") as any)
+    .update({ phase_key: phaseKey })
+    .in("id", allIds);
+  if (error) return { success: false, error: error.message };
+
+  return { success: true, data: { updatedCount: allIds.length } };
 }
 
 // ============================================================================
@@ -669,9 +780,14 @@ export async function propagateDependencyDates(
     let newStart = item.start;
     let newEnd = item.end;
 
-    // Apply all incoming constraints
-    // FS/SS: constrain start date (target can't start before the constraint)
-    // FF/SF: align end date exactly (target end = source end + lag)
+    // Align semantics: target snaps exactly to the tightest constraint across
+    // all incoming dependencies. For multi-source conflicts, the most
+    // restrictive (latest) constraint wins. Start-based constraints win over
+    // end-based when both are present — duration is fixed, so setting the
+    // start determines the end.
+    let tightestStart: Date | null = null;
+    let tightestEnd: Date | null = null;
+
     for (const dep of incoming) {
       const source = itemMap.get(dep.source_id);
       if (!source) continue;
@@ -684,21 +800,23 @@ export async function propagateDependencyDates(
       );
 
       if (constraint.constrainedStart) {
-        // FS/SS: target can't start before the constrained date
-        if (constraint.constrainedStart > newStart) {
-          newStart = constraint.constrainedStart;
-          newEnd = new Date(newStart.getTime() + duration);
+        if (!tightestStart || constraint.constrainedStart > tightestStart) {
+          tightestStart = constraint.constrainedStart;
         }
       }
-
       if (constraint.constrainedEnd) {
-        // FF/SF: target end aligns with source end (not just a floor)
-        const constrainedEnd = constraint.constrainedEnd;
-        if (constrainedEnd.getTime() !== newEnd.getTime()) {
-          newEnd = constrainedEnd;
-          newStart = new Date(newEnd.getTime() - duration);
+        if (!tightestEnd || constraint.constrainedEnd > tightestEnd) {
+          tightestEnd = constraint.constrainedEnd;
         }
       }
+    }
+
+    if (tightestStart) {
+      newStart = tightestStart;
+      newEnd = new Date(newStart.getTime() + duration);
+    } else if (tightestEnd) {
+      newEnd = tightestEnd;
+      newStart = new Date(newEnd.getTime() - duration);
     }
 
     // Only record if dates actually changed
@@ -847,106 +965,3 @@ export async function deleteTimelineDependency(dependencyId: string): Promise<Ac
   return { success: true };
 }
 
-// ============================================================================
-// Baselines
-// ============================================================================
-
-export interface GanttBaseline {
-  id: string;
-  project_id: string;
-  name: string;
-  created_by: string | null;
-  created_at: string;
-}
-
-export interface GanttBaselineItem {
-  id: string;
-  baseline_id: string;
-  gantt_item_id: string;
-  start_date: string;
-  end_date: string;
-  progress: number;
-}
-
-/** Save a baseline snapshot: copies all gantt_items dates for a project */
-export async function saveBaseline(
-  projectId: string,
-  name: string
-): Promise<ActionResult<GanttBaseline>> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { success: false, error: "Not authenticated" };
-
-  const { data: userData } = await supabase.from("users").select("role").eq("id", user.id).single();
-  if (!userData || !["admin", "pm"].includes(userData.role)) {
-    return { success: false, error: "Only PM and Admin can save baselines" };
-  }
-
-  // Create baseline header
-  const { data: baselineRaw, error: baselineError } = await supabase
-    .from("gantt_baselines" as any)
-    .insert({ project_id: projectId, name, created_by: user.id })
-    .select()
-    .single();
-
-  const baseline = baselineRaw as GanttBaseline | null;
-  if (baselineError || !baseline) {
-    return { success: false, error: baselineError?.message || "Failed to create baseline" };
-  }
-
-  // Copy all gantt items for this project
-  const { data: items } = await supabase
-    .from("gantt_items")
-    .select("id, start_date, end_date, progress_override")
-    .eq("project_id", projectId);
-
-  if (items && items.length > 0) {
-    const baselineItems = items.map((item) => ({
-      baseline_id: baseline.id,
-      gantt_item_id: item.id,
-      start_date: item.start_date,
-      end_date: item.end_date,
-      progress: item.progress_override ?? 0,
-    }));
-
-    await supabase.from("gantt_baseline_items" as any).insert(baselineItems);
-  }
-
-  // revalidatePath removed — React Query handles cache
-  return { success: true, data: baseline };
-}
-
-/** List all baselines for a project */
-export async function getBaselines(projectId: string): Promise<GanttBaseline[]> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("gantt_baselines" as any)
-    .select("*")
-    .eq("project_id", projectId)
-    .order("created_at", { ascending: false });
-
-  return (data ?? []) as unknown as GanttBaseline[];
-}
-
-/** Get baseline items for a specific baseline */
-export async function getBaselineItems(baselineId: string): Promise<GanttBaselineItem[]> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("gantt_baseline_items" as any)
-    .select("*")
-    .eq("baseline_id", baselineId);
-
-  return (data ?? []) as unknown as GanttBaselineItem[];
-}
-
-/** Delete a baseline and its items (cascade) */
-export async function deleteBaseline(baselineId: string): Promise<ActionResult> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { success: false, error: "Not authenticated" };
-
-  const { error } = await supabase.from("gantt_baselines" as any).delete().eq("id", baselineId);
-  if (error) return { success: false, error: error.message };
-
-  return { success: true };
-}

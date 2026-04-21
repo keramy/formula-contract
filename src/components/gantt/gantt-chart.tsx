@@ -42,6 +42,7 @@ export interface GanttChartProps {
   onItemEdit?: (item: GanttItem) => void;
   onItemDelete?: (item: GanttItem) => void;
   onAddItem?: () => void;
+  onAddMilestone?: () => void;
   onItemParentChange?: (itemId: string, newParentId: string | null) => void;
   onCreateDependency?: (
     sourceId: string,
@@ -58,15 +59,12 @@ export interface GanttChartProps {
   onAddSubtask?: (parentId: string) => void;
   onConvertToMilestone?: (item: GanttItem) => void;
   onSetPriority?: (item: GanttItem, priority: number) => void;
-  onToggleCriticalPath?: (item: GanttItem) => void;
+  onSetPhase?: (item: GanttItem, phase: import("./gantt-types").PhaseKey) => void;
+  onSetColor?: (item: GanttItem, color: string | null) => void;
+  /** Bulk delete — receives all editable selected items. Preferred over calling
+   *  onItemDelete in a loop because per-call state overwrites break multi-delete. */
+  onDeleteMany?: (items: GanttItem[]) => void;
   onExport?: () => void;
-  // Baseline
-  baselines?: { id: string; name: string; created_at: string }[];
-  baselineItems?: { gantt_item_id: string; start_date: string; end_date: string }[];
-  onSaveBaseline?: () => void;
-  onDeleteBaseline?: (id: string) => void;
-  /** URL for "Open Full View" link in the stats bar */
-  fullViewUrl?: string;
   className?: string;
   showAddButton?: boolean;
 }
@@ -79,6 +77,7 @@ export function GanttChart({
   onItemEdit,
   onItemDelete,
   onAddItem,
+  onAddMilestone,
   onItemParentChange,
   onCreateDependency,
   onUpdateDependency,
@@ -86,13 +85,10 @@ export function GanttChart({
   onAddSubtask,
   onConvertToMilestone,
   onSetPriority,
-  onToggleCriticalPath,
+  onSetPhase,
+  onSetColor,
+  onDeleteMany,
   onExport,
-  baselines,
-  baselineItems,
-  onSaveBaseline,
-  onDeleteBaseline,
-  fullViewUrl,
   className,
   showAddButton = false,
 }: GanttChartProps) {
@@ -114,10 +110,12 @@ export function GanttChart({
     selectedIds,
     collapsedIds,
     scrollTop,
+    showPhases,
     setPanel,
     setViewMode,
     toggleGrid,
     toggleDependencies,
+    togglePhases,
     toggleLinkMode,
     setLinkSourceId,
     exitLinkMode,
@@ -213,15 +211,20 @@ export function GanttChart({
   }, [items]);
 
   // ---------------------------------------------------------------------------
-  // Selected item helpers (for indent/outdent)
+  // Selected item helpers
   // ---------------------------------------------------------------------------
-  /** Selected items in visible order (for indent/outdent) */
-  const selectedItemsOrdered = React.useMemo(() => {
-    if (selectedIds.size === 0 || !onItemParentChange) return [];
+  /** Editable, non-phase selected items in visible order.
+   *  Drives both delete button visibility and indent/outdent operations —
+   *  decoupled from onItemParentChange so delete works even if indent isn't wired. */
+  const editableSelectedItems = React.useMemo(() => {
+    if (selectedIds.size === 0) return [];
     return ganttRows
       .filter((r) => selectedIds.has(r.id) && r.item.isEditable && r.type !== "phase")
       .map((r) => r.item);
-  }, [selectedIds, ganttRows, onItemParentChange]);
+  }, [selectedIds, ganttRows]);
+
+  // Alias kept for indent/outdent readability
+  const selectedItemsOrdered = editableSelectedItems;
 
   /**
    * Find the correct indent target for the first selected item.
@@ -466,17 +469,20 @@ export function GanttChart({
     [onItemEdit]
   );
 
-  // Delete selected items
+  // Delete selected items — routes to onDeleteMany (bulk) if wired, else
+  // falls back to per-item onItemDelete for a single selection.
   const handleDeleteSelected = React.useCallback(() => {
-    if (!onItemDelete || selectedIds.size === 0) return;
-    const editableSelected = ganttRows.filter(
-      (r) => selectedIds.has(r.id) && r.item.isEditable && r.type !== "phase"
-    );
-    for (const row of editableSelected) {
-      onItemDelete(row.item);
+    if (editableSelectedItems.length === 0) return;
+    if (onDeleteMany) {
+      onDeleteMany(editableSelectedItems);
+    } else if (onItemDelete) {
+      // Fallback for single item — avoids the per-loop overwrite bug.
+      if (editableSelectedItems.length === 1) {
+        onItemDelete(editableSelectedItems[0]);
+      }
     }
     clearSelection();
-  }, [onItemDelete, selectedIds, ganttRows, clearSelection]);
+  }, [editableSelectedItems, onDeleteMany, onItemDelete, clearSelection]);
 
   // Delete key shortcut
   React.useEffect(() => {
@@ -509,28 +515,22 @@ export function GanttChart({
           onGridToggle={toggleGrid}
           showDependencies={showDependencies}
           onDependenciesToggle={toggleDependencies}
+          showPhases={showPhases}
+          onPhasesToggle={togglePhases}
           linkMode={linkMode}
           onLinkModeToggle={onCreateDependency ? toggleLinkMode : undefined}
           linkSourceId={linkSourceId}
           onAddItem={showAddButton ? onAddItem : undefined}
-          onDeleteSelected={onItemDelete && selectedIds.size > 0 ? handleDeleteSelected : undefined}
+          onDeleteSelected={(onItemDelete || onDeleteMany) && editableSelectedItems.length > 0 ? handleDeleteSelected : undefined}
           onIndent={canIndent ? handleIndent : undefined}
           onOutdent={canOutdent ? handleOutdent : undefined}
           hasSelection={selectedItemsOrdered.length > 0}
           selectedCount={selectedIds.size}
-          showCriticalPath={ganttState.showCriticalPath}
-          onCriticalPathToggle={ganttState.toggleCriticalPath}
           searchQuery={ganttState.searchQuery}
           onSearchChange={ganttState.setSearchQuery}
-          baselines={baselines}
-          activeBaselineId={ganttState.activeBaselineId}
-          onBaselineSelect={ganttState.setActiveBaselineId}
-          onBaselineSave={onSaveBaseline}
-          onBaselineDelete={onDeleteBaseline}
           onExpandAll={expandAll}
           onCollapseAll={() => collapseAll(collapsibleIds)}
           onScrollToToday={scrollToToday}
-          fullViewUrl={fullViewUrl}
           onZoomIn={ganttState.zoomIn}
           onZoomOut={ganttState.zoomOut}
           canZoomIn={ganttState.zoomIndex < 5}
@@ -558,7 +558,10 @@ export function GanttChart({
               onAddSubtask={onAddSubtask}
               onConvertToMilestone={onConvertToMilestone}
               onSetPriority={onSetPriority}
-              onToggleCriticalPath={onToggleCriticalPath}
+              onSetPhase={onSetPhase}
+              onSetColor={onSetColor}
+              onAddItem={onAddItem}
+              onAddMilestone={onAddMilestone}
             />
             <GanttTimeline
               rows={ganttRows}
@@ -567,7 +570,7 @@ export function GanttChart({
               columnWidth={columnWidth}
               showGrid={showGrid}
               showDependencies={showDependencies}
-              showCriticalPath={ganttState.showCriticalPath}
+              showPhases={showPhases}
               selectedIds={selectedIds}
               dependencies={dependencies}
               onItemDoubleClick={handleDoubleClick}
@@ -575,7 +578,6 @@ export function GanttChart({
               onDependencyClick={onUpdateDependency ? handleDependencyClick : undefined}
               linkMode={linkMode}
               linkSourceId={linkSourceId}
-              baselineItems={ganttState.activeBaselineId ? baselineItems : undefined}
               scrollRef={scrollRef}
               onScroll={handleTimelineScroll}
             />

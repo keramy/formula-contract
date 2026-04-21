@@ -184,6 +184,8 @@ function TaskRow({
 }) {
   const { item, phaseColor } = row;
   const progress = Math.min(Math.max(item.progress, 0), 100);
+  // User-set color overrides inherited phase color for task-level visuals
+  const dotColor = item.color || phaseColor;
 
   return (
     <tr
@@ -207,23 +209,18 @@ function TaskRow({
             {item.type === "milestone" ? (
               <div
                 className="size-2 rotate-45 shrink-0"
-                style={{ backgroundColor: phaseColor }}
+                style={{ backgroundColor: dotColor }}
               />
             ) : (
               <span
                 className="size-2 rounded-full shrink-0"
-                style={{ backgroundColor: phaseColor }}
+                style={{ backgroundColor: dotColor }}
               />
             )}
             <span className="font-medium text-xs text-foreground truncate">
               {item.name}
             </span>
           </div>
-          {item.isOnCriticalPath && (
-            <span className="text-[10px] font-medium text-red-600 bg-red-50 dark:bg-red-950/30 px-2 py-0.5 rounded-full w-fit">
-              Critical Path
-            </span>
-          )}
         </div>
       </td>
 
@@ -243,7 +240,7 @@ function TaskRow({
           <div className="h-1.5 w-[30px] rounded-full bg-muted overflow-hidden">
             <div
               className="h-full rounded-full"
-              style={{ width: `${progress}%`, backgroundColor: phaseColor }}
+              style={{ width: `${progress}%`, backgroundColor: dotColor }}
             />
           </div>
         </div>

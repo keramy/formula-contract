@@ -12,17 +12,13 @@ import {
   updateTimelineDependency,
   deleteTimelineDependency,
   propagateDependencyDates,
-  getBaselines,
-  getBaselineItems,
-  saveBaseline,
-  deleteBaseline,
+  setTaskPhase,
   type GanttItem as TimelineItem,
   type GanttItemInput as TimelineItemInput,
   type GanttDependency as TimelineDependency,
   type GanttDependencyInput as TimelineDependencyInput,
-  type GanttBaseline,
-  type GanttBaselineItem,
   type DependencyType,
+  type PhaseKey,
 } from "@/lib/actions/timelines";
 
 // ============================================================================
@@ -39,9 +35,6 @@ export const timelineKeys = {
   list: (projectId: string) => [...timelineKeys.lists(), projectId] as const,
   dependencies: () => [...timelineKeys.all, "dependencies"] as const,
   dependencyList: (projectId: string) => [...timelineKeys.dependencies(), projectId] as const,
-  baselines: () => [...timelineKeys.all, "baselines"] as const,
-  baselineList: (projectId: string) => [...timelineKeys.baselines(), projectId] as const,
-  baselineItems: (baselineId: string) => [...timelineKeys.all, "baseline-items", baselineId] as const,
 };
 
 // ============================================================================
@@ -120,7 +113,6 @@ export function useCreateTimelineItem(projectId: string) {
         updated_at: new Date().toISOString(),
         progress: 0,
         description: input.description || null,
-        is_on_critical_path: input.is_on_critical_path ?? false,
         linked_scope_item_ids: input.linked_scope_item_ids || [],
       };
 
@@ -187,8 +179,10 @@ export function useUpdateTimelineItem(projectId: string) {
                   item_type: input.item_type ?? item.item_type,
                   start_date: input.start_date ?? item.start_date,
                   end_date: input.end_date ?? item.end_date,
-                  parent_id: input.parent_id ?? item.parent_id,
-                  color: input.color ?? item.color,
+                  parent_id: input.parent_id !== undefined ? input.parent_id : item.parent_id,
+                  // Allow explicit null for color (reset-to-phase) and phase_key (unset)
+                  color: input.color !== undefined ? input.color : item.color,
+                  phase_key: input.phase_key !== undefined ? input.phase_key : item.phase_key,
                   priority: input.priority ?? item.priority,
                   progress_override: input.progress_override ?? item.progress_override,
                   is_completed: input.is_completed ?? item.is_completed,
@@ -207,8 +201,44 @@ export function useUpdateTimelineItem(projectId: string) {
       }
       toast.error(error.message);
     },
-    onSuccess: () => {
-      toast.success("Timeline item updated");
+    onSuccess: async () => {
+      // Magnetic chain: propagate date changes to dependent tasks
+      const result = await propagateDependencyDates(projectId);
+      if (result.success && result.data && result.data.updatedCount > 0) {
+        toast.success(`Timeline item updated — ${result.data.updatedCount} dependent task${result.data.updatedCount !== 1 ? "s" : ""} rescheduled`);
+      } else {
+        toast.success("Timeline item updated");
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: timelineKeys.list(projectId) });
+    },
+  });
+}
+
+/**
+ * Hook for setting a task's phase with cascade to descendants
+ */
+export function useSetTaskPhase(projectId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ taskId, phaseKey }: { taskId: string; phaseKey: PhaseKey }) => {
+      const result = await setTaskPhase(taskId, phaseKey);
+      if (!result.success) {
+        throw new Error(result.error || "Failed to change phase");
+      }
+      return result.data!;
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+    onSuccess: (data) => {
+      if (data.updatedCount > 1) {
+        toast.success(`Phase updated — ${data.updatedCount} tasks affected`);
+      } else {
+        toast.success("Phase updated");
+      }
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: timelineKeys.list(projectId) });
@@ -253,8 +283,14 @@ export function useDeleteTimelineItem(projectId: string) {
       }
       toast.error(error.message);
     },
-    onSuccess: () => {
-      toast.success("Timeline item deleted");
+    onSuccess: async () => {
+      // Magnetic consistency: re-align after task removal (cascades delete its deps too)
+      const result = await propagateDependencyDates(projectId);
+      if (result.success && result.data && result.data.updatedCount > 0) {
+        toast.success(`Timeline item deleted — ${result.data.updatedCount} task${result.data.updatedCount !== 1 ? "s" : ""} rescheduled`);
+      } else {
+        toast.success("Timeline item deleted");
+      }
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: timelineKeys.list(projectId) });
@@ -454,70 +490,19 @@ export function useDeleteTimelineDependency(projectId: string) {
       }
       toast.error(error.message);
     },
-    onSuccess: () => {
-      toast.success("Dependency deleted");
+    onSuccess: async () => {
+      // Magnetic consistency: re-align remaining constraints after removal
+      const result = await propagateDependencyDates(projectId);
+      if (result.success && result.data && result.data.updatedCount > 0) {
+        toast.success(`Dependency deleted — ${result.data.updatedCount} task${result.data.updatedCount !== 1 ? "s" : ""} rescheduled`);
+      } else {
+        toast.success("Dependency deleted");
+      }
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: timelineKeys.dependencyList(projectId) });
+      queryClient.invalidateQueries({ queryKey: timelineKeys.list(projectId) });
     },
   });
 }
 
-// ============================================================================
-// Baseline Hooks
-// ============================================================================
-
-export function useBaselines(projectId: string) {
-  return useQuery({
-    queryKey: timelineKeys.baselineList(projectId),
-    queryFn: () => getBaselines(projectId),
-    staleTime: 60_000,
-  });
-}
-
-export function useBaselineItems(baselineId: string | null) {
-  return useQuery({
-    queryKey: timelineKeys.baselineItems(baselineId ?? "none"),
-    queryFn: () => (baselineId ? getBaselineItems(baselineId) : Promise.resolve([])),
-    enabled: !!baselineId,
-    staleTime: 60_000,
-  });
-}
-
-export function useSaveBaseline(projectId: string) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (name: string) => saveBaseline(projectId, name),
-    onSuccess: (result) => {
-      if (result.success) {
-        toast.success("Baseline saved");
-        queryClient.invalidateQueries({ queryKey: timelineKeys.baselineList(projectId) });
-      } else {
-        toast.error(result.error || "Failed to save baseline");
-      }
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
-}
-
-export function useDeleteBaseline(projectId: string) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (baselineId: string) => deleteBaseline(baselineId),
-    onSuccess: (result) => {
-      if (result.success) {
-        toast.success("Baseline deleted");
-        queryClient.invalidateQueries({ queryKey: timelineKeys.baselineList(projectId) });
-      } else {
-        toast.error(result.error || "Failed to delete baseline");
-      }
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
-}

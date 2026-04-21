@@ -15,13 +15,11 @@ import {
 } from "./gantt-types";
 
 // ============================================================================
-// GANTT BAR — Three shapes: bracket (parent), rectangle (task), diamond (milestone)
+// GANTT BAR — Three shapes: phase (thick rounded), rectangle (task), diamond (milestone)
 // ============================================================================
 
-/** Half-height bar for bracket/summary shape */
-const BRACKET_BAR_HEIGHT = Math.round(TASK_BAR_HEIGHT * 0.45);
-/** Triangle cap width for bracket shape */
-const TRIANGLE_WIDTH = 8;
+/** Phase bar — taller than task bars so phases pop visually when toggled on */
+const PHASE_BAR_HEIGHT = TASK_BAR_HEIGHT + 6;
 
 export interface GanttBarProps {
   item: GanttItem;
@@ -33,9 +31,7 @@ export interface GanttBarProps {
   hasChildren: boolean;
   isSelected: boolean;
   isEditable: boolean;
-  showCriticalPath?: boolean;
-  baselineLeft?: number;
-  baselineWidth?: number;
+  showPhases?: boolean;
   onDoubleClick?: (item: GanttItem) => void;
   onClick?: (item: GanttItem) => void;
   onContextMenu?: (e: React.MouseEvent, item: GanttItem) => void;
@@ -53,9 +49,7 @@ export function GanttBar({
   hasChildren,
   isSelected,
   isEditable,
-  showCriticalPath,
-  baselineLeft,
-  baselineWidth,
+  showPhases,
   onDoubleClick,
   onClick,
   onContextMenu,
@@ -64,10 +58,8 @@ export function GanttBar({
 }: GanttBarProps) {
   const barTop = y + (ROW_HEIGHT - TASK_BAR_HEIGHT) / 2;
 
-  // Critical path mode: dim non-critical, force red for critical
-  const isCritical = item.isOnCriticalPath;
-  const dimmed = showCriticalPath && !isCritical;
-  const effectiveColor = showCriticalPath && isCritical ? "#dc2626" : color;
+  // Phase-focus mode: dim everything that isn't a phase
+  const dimmed = showPhases && item.type !== "phase";
 
   // Link mode: handle single-click to select source/target
   const handleClick = React.useCallback(
@@ -113,11 +105,11 @@ export function GanttBar({
           >
             <div
               className="size-2.5 rotate-45"
-              style={{ backgroundColor: effectiveColor }}
+              style={{ backgroundColor: color }}
             />
             <span
               className="text-[9px] font-medium italic whitespace-nowrap"
-              style={{ color: effectiveColor }}
+              style={{ color: color }}
             >
               {item.name}
             </span>
@@ -137,28 +129,67 @@ export function GanttBar({
     );
   }
 
-  // ── Phase: no bar ──
-  if (item.type === "phase") return null;
-
-  // ── Summary/Bracket bar: parent tasks with children ──
-  if (hasChildren) {
-    return <BracketBar
-      item={item}
-      left={left}
-      width={width}
-      y={y}
-      color={effectiveColor}
-      dimmed={dimmed}
-      isSelected={isSelected}
-      baselineLeft={baselineLeft}
-      baselineWidth={baselineWidth}
-      onDoubleClick={onDoubleClick}
-      onClick={handleClick}
-      onContextMenu={onContextMenu}
-      linkMode={linkMode}
-      isLinkSource={isLinkSource}
-    />;
+  // ── Phase: only render when phase-focus mode is on. Distinctive thick bar. ──
+  if (item.type === "phase") {
+    if (!showPhases) return null;
+    const phaseBarTop = y + (ROW_HEIGHT - PHASE_BAR_HEIGHT) / 2;
+    const showLabelInside = width > 120;
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div
+            role="button"
+            tabIndex={0}
+            className={cn(
+              "absolute rounded-md select-none z-10 cursor-pointer shadow-sm overflow-hidden",
+              "transition-shadow duration-150",
+              isSelected && "ring-2 ring-primary/70",
+              linkMode && "cursor-crosshair",
+              isLinkSource && "ring-2 ring-blue-500 ring-offset-1"
+            )}
+            style={{
+              left,
+              top: phaseBarTop,
+              width,
+              height: PHASE_BAR_HEIGHT,
+              backgroundColor: color,
+              opacity: 0.9,
+            }}
+            onClick={handleClick}
+            onDoubleClick={() => onDoubleClick?.(item)}
+            onKeyDown={(e) => { if (e.key === "Enter") onDoubleClick?.(item); }}
+            onContextMenu={(e) => onContextMenu?.(e, item)}
+          >
+            {showLabelInside && (
+              <span
+                className="absolute inset-0 flex items-center justify-center text-[10px] font-semibold uppercase tracking-wide pointer-events-none"
+                style={{
+                  color: "rgba(255,255,255,0.95)",
+                  textShadow: "0 1px 2px rgba(0,0,0,0.35)",
+                }}
+              >
+                {item.name}
+              </span>
+            )}
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="text-xs">
+          <p className="font-medium">{item.name}</p>
+          <p className="text-muted-foreground">
+            {item.startDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+            {" → "}
+            {item.endDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+            {" · "}
+            {formatDuration(item)}
+          </p>
+        </TooltipContent>
+      </Tooltip>
+    );
   }
+
+  // Non-phase items (tasks + parent tasks with children) all fall through to the
+  // regular bar rendering below. Bracket/triangle shape removed — parent tasks
+  // now render as standard bars spanning their children's aggregate range.
 
   // ── Regular task bar ──
   const progress = Math.min(Math.max(item.progress, 0), 100);
@@ -175,20 +206,6 @@ export function GanttBar({
 
   return (
     <>
-      {/* Baseline ghost bar */}
-      {baselineLeft !== undefined && baselineWidth !== undefined && (
-        <div
-          className="absolute rounded-[2px] pointer-events-none z-[9]"
-          style={{
-            left: baselineLeft,
-            top: barTop + TASK_BAR_HEIGHT - 3,
-            width: baselineWidth,
-            height: 3,
-            backgroundColor: "#9ca3af60",
-          }}
-        />
-      )}
-
       <Tooltip>
         <TooltipTrigger asChild>
           <div
@@ -209,7 +226,7 @@ export function GanttBar({
               top: barTop,
               width,
               height: TASK_BAR_HEIGHT,
-              backgroundColor: `${effectiveColor}${bgAlpha}`,
+              backgroundColor: `${color}${bgAlpha}`,
             }}
             onClick={handleClick}
             onDoubleClick={() => onDoubleClick?.(item)}
@@ -222,7 +239,7 @@ export function GanttBar({
               className="h-full rounded-[3px] transition-all duration-300"
               style={{
                 width: `${progress}%`,
-                backgroundColor: `${effectiveColor}${fillAlpha}`,
+                backgroundColor: `${color}${fillAlpha}`,
               }}
             />
 
@@ -232,7 +249,7 @@ export function GanttBar({
                 className="absolute inset-0 flex items-center justify-center text-[9px] font-medium pointer-events-none"
                 style={{
                   color: "rgba(255,255,255,0.85)",
-                  textShadow: `0 0 3px ${effectiveColor}, 0 1px 2px rgba(0,0,0,0.4)`,
+                  textShadow: `0 0 3px ${color}, 0 1px 2px rgba(0,0,0,0.4)`,
                 }}
               >
                 {dateLabel}
@@ -246,7 +263,7 @@ export function GanttBar({
                 className="absolute inset-0 flex items-center justify-center text-[9px] font-semibold pointer-events-none"
                 style={{
                   color: "rgba(255,255,255,0.85)",
-                  textShadow: `0 0 3px ${effectiveColor}, 0 1px 2px rgba(0,0,0,0.4)`,
+                  textShadow: `0 0 3px ${color}, 0 1px 2px rgba(0,0,0,0.4)`,
                 }}
               >
                 {Math.round(progress)}%
@@ -275,122 +292,3 @@ export function GanttBar({
   );
 }
 
-// ---------------------------------------------------------------------------
-// BracketBar — Summary/parent task: thin bar + triangle caps at each end
-// ---------------------------------------------------------------------------
-
-function BracketBar({
-  item,
-  left,
-  width,
-  y,
-  color,
-  dimmed,
-  isSelected,
-  baselineLeft,
-  baselineWidth,
-  onDoubleClick,
-  onClick,
-  onContextMenu,
-  linkMode,
-  isLinkSource,
-}: {
-  item: GanttItem;
-  left: number;
-  width: number;
-  y: number;
-  color: string;
-  dimmed?: boolean;
-  isSelected: boolean;
-  baselineLeft?: number;
-  baselineWidth?: number;
-  onDoubleClick?: (item: GanttItem) => void;
-  onClick?: (e: React.MouseEvent) => void;
-  onContextMenu?: (e: React.MouseEvent, item: GanttItem) => void;
-  linkMode?: boolean;
-  isLinkSource?: boolean;
-}) {
-  const bracketTop = y + (ROW_HEIGHT - TASK_BAR_HEIGHT) / 2;
-  const barY = bracketTop;
-  const progress = Math.min(Math.max(item.progress, 0), 100);
-
-  // Triangle points: downward-pointing from bottom of thin bar
-  const leftTriangle = `${left},${barY + BRACKET_BAR_HEIGHT} ${left},${barY + TASK_BAR_HEIGHT} ${left + TRIANGLE_WIDTH},${barY + BRACKET_BAR_HEIGHT}`;
-  const rightTriangle = `${left + width},${barY + BRACKET_BAR_HEIGHT} ${left + width},${barY + TASK_BAR_HEIGHT} ${left + width - TRIANGLE_WIDTH},${barY + BRACKET_BAR_HEIGHT}`;
-
-  return (
-    <>
-      {/* Baseline ghost bar */}
-      {baselineLeft !== undefined && baselineWidth !== undefined && (
-        <div
-          className="absolute rounded-[1px] pointer-events-none z-[9]"
-          style={{
-            left: baselineLeft,
-            top: barY + TASK_BAR_HEIGHT - 3,
-            width: baselineWidth,
-            height: 3,
-            backgroundColor: "#9ca3af60",
-          }}
-        />
-      )}
-
-      {/* SVG bracket shape */}
-      <svg
-        className={cn(
-          "absolute pointer-events-none z-10",
-          dimmed && "opacity-25"
-        )}
-        style={{ left: 0, top: 0, width: "100%", height: "100%", overflow: "visible" }}
-      >
-        {/* Thin bar */}
-        <rect
-          x={left}
-          y={barY}
-          width={width}
-          height={BRACKET_BAR_HEIGHT}
-          fill={`${color}90`}
-          rx={1}
-        />
-        {/* Progress fill */}
-        {progress > 0 && (
-          <rect
-            x={left}
-            y={barY}
-            width={width * (progress / 100)}
-            height={BRACKET_BAR_HEIGHT}
-            fill={color}
-            rx={1}
-          />
-        )}
-        {/* Left triangle cap */}
-        <polygon points={leftTriangle} fill={color} />
-        {/* Right triangle cap */}
-        <polygon points={rightTriangle} fill={color} />
-      </svg>
-
-      {/* Clickable overlay for interactions */}
-      <div
-        role="button"
-        tabIndex={0}
-        className={cn(
-          "absolute select-none z-11 cursor-pointer",
-          isSelected && "ring-1 ring-primary/70 rounded-sm",
-          linkMode && "cursor-crosshair hover:ring-2 hover:ring-blue-400/60",
-          isLinkSource && "ring-2 ring-blue-500 ring-offset-1"
-        )}
-        style={{
-          left,
-          top: barY,
-          width,
-          height: TASK_BAR_HEIGHT,
-        }}
-        onClick={onClick}
-        onDoubleClick={() => onDoubleClick?.(item)}
-        onKeyDown={(e) => { if (e.key === "Enter") onDoubleClick?.(item); }}
-        onContextMenu={(e) => onContextMenu?.(e, item)}
-      />
-
-      {/* No outside labels — names are in the sidebar */}
-    </>
-  );
-}

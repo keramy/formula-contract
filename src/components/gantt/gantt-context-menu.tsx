@@ -13,20 +13,40 @@ import {
 import {
   type GanttItem,
   type Priority,
+  type PhaseKey,
   PRIORITY_LABELS,
+  PHASE_LABELS,
+  PHASE_COLORS,
+  PHASE_ORDER,
 } from "./gantt-types";
 import {
   PencilIcon,
   TrashIcon,
   PlusIcon,
   DiamondIcon,
-  FlagIcon,
   AlertTriangleIcon,
+  LayersIcon,
+  PaletteIcon,
 } from "lucide-react";
 
 // ============================================================================
 // GANTT CONTEXT MENU — Right-click menu for task actions
 // ============================================================================
+
+// Curated task-color palette. First entry ("none") resets to phase color.
+const COLOR_PALETTE: Array<{ value: string | null; name: string; swatch: string }> = [
+  { value: null, name: "None (phase color)", swatch: "transparent" },
+  { value: "#0d9488", name: "Teal", swatch: "#0d9488" },
+  { value: "#3b82f6", name: "Blue", swatch: "#3b82f6" },
+  { value: "#6366f1", name: "Indigo", swatch: "#6366f1" },
+  { value: "#a855f7", name: "Purple", swatch: "#a855f7" },
+  { value: "#ec4899", name: "Pink", swatch: "#ec4899" },
+  { value: "#ef4444", name: "Red", swatch: "#ef4444" },
+  { value: "#f97316", name: "Orange", swatch: "#f97316" },
+  { value: "#f59e0b", name: "Amber", swatch: "#f59e0b" },
+  { value: "#16a34a", name: "Green", swatch: "#16a34a" },
+  { value: "#64748b", name: "Slate", swatch: "#64748b" },
+];
 
 export interface GanttContextMenuProps {
   children: React.ReactNode;
@@ -36,7 +56,8 @@ export interface GanttContextMenuProps {
   onAddSubtask?: (parentId: string) => void;
   onConvertToMilestone?: (item: GanttItem) => void;
   onSetPriority?: (item: GanttItem, priority: Priority) => void;
-  onToggleCriticalPath?: (item: GanttItem) => void;
+  onSetPhase?: (item: GanttItem, phase: PhaseKey) => void;
+  onSetColor?: (item: GanttItem, color: string | null) => void;
 }
 
 export function GanttContextMenu({
@@ -47,7 +68,8 @@ export function GanttContextMenu({
   onAddSubtask,
   onConvertToMilestone,
   onSetPriority,
-  onToggleCriticalPath,
+  onSetPhase,
+  onSetColor,
 }: GanttContextMenuProps) {
   if (!item || !item.isEditable) {
     return <>{children}</>;
@@ -56,7 +78,7 @@ export function GanttContextMenu({
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        {children}
+        <div>{children}</div>
       </ContextMenuTrigger>
       <ContextMenuContent className="w-52">
         {/* Edit */}
@@ -85,6 +107,62 @@ export function GanttContextMenu({
           </ContextMenuItem>
         )}
 
+        {/* Set Phase submenu */}
+        {onSetPhase && item.type !== "milestone" && (
+          <ContextMenuSub>
+            <ContextMenuSubTrigger>
+              <LayersIcon className="size-3.5 mr-2" />
+              Set Phase
+            </ContextMenuSubTrigger>
+            <ContextMenuSubContent className="w-52">
+              {PHASE_ORDER.map((key) => (
+                <ContextMenuItem
+                  key={key}
+                  onClick={() => onSetPhase(item, key)}
+                  className={item.phaseKey === key ? "bg-muted" : ""}
+                >
+                  <span
+                    className="size-2.5 rounded-full mr-2 shrink-0"
+                    style={{ backgroundColor: PHASE_COLORS[key] }}
+                  />
+                  {PHASE_LABELS[key]}
+                  {item.phaseKey === key && (
+                    <span className="ml-auto text-xs text-muted-foreground">current</span>
+                  )}
+                </ContextMenuItem>
+              ))}
+            </ContextMenuSubContent>
+          </ContextMenuSub>
+        )}
+
+        {/* Set Color submenu */}
+        {onSetColor && (
+          <ContextMenuSub>
+            <ContextMenuSubTrigger>
+              <PaletteIcon className="size-3.5 mr-2" />
+              Set Color
+            </ContextMenuSubTrigger>
+            <ContextMenuSubContent className="w-48">
+              {COLOR_PALETTE.map((c) => (
+                <ContextMenuItem
+                  key={c.name}
+                  onClick={() => onSetColor(item, c.value)}
+                  className={item.color === c.value ? "bg-muted" : ""}
+                >
+                  <span
+                    className="size-3 rounded-full mr-2 shrink-0 border"
+                    style={{
+                      backgroundColor: c.swatch,
+                      borderColor: c.value === null ? "#9ca3af" : c.swatch,
+                    }}
+                  />
+                  {c.name}
+                </ContextMenuItem>
+              ))}
+            </ContextMenuSubContent>
+          </ContextMenuSub>
+        )}
+
         {/* Priority submenu */}
         {onSetPriority && (
           <ContextMenuSub>
@@ -107,14 +185,6 @@ export function GanttContextMenu({
               ))}
             </ContextMenuSubContent>
           </ContextMenuSub>
-        )}
-
-        {/* Toggle Critical Path */}
-        {onToggleCriticalPath && (
-          <ContextMenuItem onClick={() => onToggleCriticalPath(item)}>
-            <FlagIcon className="size-3.5 mr-2" />
-            {item.isOnCriticalPath ? "Remove from Critical Path" : "Mark as Critical Path"}
-          </ContextMenuItem>
         )}
 
         <ContextMenuSeparator />
