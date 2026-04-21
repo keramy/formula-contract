@@ -26,6 +26,9 @@ interface GanttDependencyArrowsProps {
 const ARROW_SIZE = 5;
 const RADIUS = 8;
 const GAP = 12; // horizontal gap from bar edge before turning
+/** Per-index offset for multiple arrows from the same source — keeps vertical
+ *  segments from overlapping when one task has several outgoing deps. */
+const FAN_OUT_OFFSET = 6;
 
 export function GanttDependencyArrows({
   dependencies,
@@ -34,6 +37,38 @@ export function GanttDependencyArrows({
   containerHeight,
   onDependencyClick,
 }: GanttDependencyArrowsProps) {
+  // Pre-compute fan-out index per dependency.
+  // Arrows from the same source are sorted by target Y (top to bottom) and
+  // assigned index 0, 1, 2... Each index translates to a small x-offset on
+  // the vertical segment of the arrow, so they don't all overlap.
+  const fanOutIndex = React.useMemo(() => {
+    const bySource = new Map<string, GanttDependency[]>();
+    for (const dep of dependencies) {
+      const arr = bySource.get(dep.sourceId) || [];
+      arr.push(dep);
+      bySource.set(dep.sourceId, arr);
+    }
+    const index = new Map<string, number>();
+    bySource.forEach((deps, sourceId) => {
+      const sourcePos = barPositions.get(sourceId);
+      // Stable sort: primarily by target Y, tiebreak by target X. Undefined
+      // targets go last.
+      const sorted = [...deps].sort((a, b) => {
+        const ta = barPositions.get(a.targetId);
+        const tb = barPositions.get(b.targetId);
+        if (!ta && !tb) return 0;
+        if (!ta) return 1;
+        if (!tb) return -1;
+        const dya = sourcePos ? Math.abs(ta.y - sourcePos.y) : ta.y;
+        const dyb = sourcePos ? Math.abs(tb.y - sourcePos.y) : tb.y;
+        if (dya !== dyb) return dya - dyb;
+        return ta.left - tb.left;
+      });
+      sorted.forEach((d, i) => index.set(d.id, i));
+    });
+    return index;
+  }, [dependencies, barPositions]);
+
   if (dependencies.length === 0) return null;
 
   return (
@@ -89,7 +124,8 @@ export function GanttDependencyArrows({
         const target = barPositions.get(dep.targetId);
         if (!source || !target) return null;
 
-        const path = buildPath(dep.type, source, target);
+        const offsetIdx = fanOutIndex.get(dep.id) ?? 0;
+        const path = buildPath(dep.type, source, target, offsetIdx);
         if (!path) return null;
 
         const color = DEPENDENCY_COLORS[dep.type];
@@ -159,7 +195,8 @@ function estimatePathLength(
 function buildPath(
   type: DependencyType,
   source: BarPosition,
-  target: BarPosition
+  target: BarPosition,
+  fanIdx: number = 0
 ): string | null {
   const sy = source.y;
   const ty = target.y;
@@ -187,34 +224,33 @@ function buildPath(
   }
 
   const dy = ty - sy;
+  const fanOffset = fanIdx * FAN_OUT_OFFSET;
 
-  // Same row — straight line
+  // Same row — straight line (no routing needed, no overlap possible)
   if (Math.abs(dy) < 2) {
     return `M${sx},${sy} L${tx},${ty}`;
   }
 
-  // Route based on type
   switch (type) {
     case 0:
-      return buildFSPath(sx, sy, tx, ty);
+      return buildFSPath(sx, sy, tx, ty, fanOffset);
     case 1:
-      return buildSSPath(sx, sy, tx, ty);
+      return buildSSPath(sx, sy, tx, ty, fanOffset);
     case 2:
-      return buildFFPath(sx, sy, tx, ty);
+      return buildFFPath(sx, sy, tx, ty, fanOffset);
     default:
-      return buildGenericPath(sx, sy, tx, ty);
+      return buildGenericPath(sx, sy, tx, ty, fanOffset);
   }
 }
 
 /** FS: right of source → left of target, L-shape or S-shape */
-function buildFSPath(sx: number, sy: number, tx: number, ty: number): string {
-  const midX = sx + GAP;
+function buildFSPath(sx: number, sy: number, tx: number, ty: number, fanOffset: number): string {
+  const midX = sx + GAP + fanOffset;
   const dy = ty - sy;
   const yDir = dy > 0 ? 1 : -1;
   const r = Math.min(RADIUS, Math.abs(dy) / 2);
 
   if (tx > midX) {
-    // Clean L-shape
     return [
       `M${sx},${sy}`,
       `L${midX - r},${sy}`,
@@ -227,7 +263,7 @@ function buildFSPath(sx: number, sy: number, tx: number, ty: number): string {
 
   // S-shape when target is to the left
   const halfY = sy + dy / 2;
-  const leftX = Math.min(midX, tx - GAP);
+  const leftX = Math.min(midX, tx - GAP - fanOffset);
 
   return [
     `M${sx},${sy}`,
@@ -244,11 +280,11 @@ function buildFSPath(sx: number, sy: number, tx: number, ty: number): string {
 }
 
 /** SS: left of source → left of target */
-function buildSSPath(sx: number, sy: number, tx: number, ty: number): string {
+function buildSSPath(sx: number, sy: number, tx: number, ty: number, fanOffset: number): string {
   const dy = ty - sy;
   const yDir = dy > 0 ? 1 : -1;
   const r = Math.min(RADIUS, Math.abs(dy) / 2);
-  const leftX = Math.min(sx, tx) - GAP;
+  const leftX = Math.min(sx, tx) - GAP - fanOffset;
 
   return [
     `M${sx},${sy}`,
@@ -261,11 +297,11 @@ function buildSSPath(sx: number, sy: number, tx: number, ty: number): string {
 }
 
 /** FF: right of source → right of target */
-function buildFFPath(sx: number, sy: number, tx: number, ty: number): string {
+function buildFFPath(sx: number, sy: number, tx: number, ty: number, fanOffset: number): string {
   const dy = ty - sy;
   const yDir = dy > 0 ? 1 : -1;
   const r = Math.min(RADIUS, Math.abs(dy) / 2);
-  const rightX = Math.max(sx, tx) + GAP;
+  const rightX = Math.max(sx, tx) + GAP + fanOffset;
 
   return [
     `M${sx},${sy}`,
@@ -278,10 +314,10 @@ function buildFFPath(sx: number, sy: number, tx: number, ty: number): string {
 }
 
 /** Generic fallback (SF and edge cases) */
-function buildGenericPath(sx: number, sy: number, tx: number, ty: number): string {
+function buildGenericPath(sx: number, sy: number, tx: number, ty: number, fanOffset: number): string {
   const dy = ty - sy;
   const yDir = dy > 0 ? 1 : -1;
-  const midX = (sx + tx) / 2;
+  const midX = (sx + tx) / 2 + fanOffset;
   const r = Math.min(RADIUS, Math.abs(dy) / 2, Math.abs(tx - sx) / 4 || RADIUS);
 
   return [
