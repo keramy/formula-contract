@@ -66,9 +66,6 @@ export interface GanttChartProps {
    *  onItemDelete in a loop because per-call state overwrites break multi-delete. */
   onDeleteMany?: (items: GanttItem[]) => void;
   onExport?: () => void;
-  /** Project calendar: skip Sat/Sun in duration display + dep arithmetic */
-  skipWeekends?: boolean;
-  onSkipWeekendsToggle?: (next: boolean) => void;
   className?: string;
   showAddButton?: boolean;
 }
@@ -93,8 +90,6 @@ export function GanttChart({
   onSetColor,
   onDeleteMany,
   onExport,
-  skipWeekends,
-  onSkipWeekendsToggle,
   className,
   showAddButton = false,
 }: GanttChartProps) {
@@ -530,8 +525,6 @@ export function GanttChart({
           onDependenciesToggle={toggleDependencies}
           showPhases={showPhases}
           onPhasesToggle={togglePhases}
-          skipWeekends={skipWeekends}
-          onSkipWeekendsToggle={onSkipWeekendsToggle}
           linkMode={linkMode}
           onLinkModeToggle={onCreateDependency ? toggleLinkMode : undefined}
           linkSourceId={linkSourceId}
@@ -588,7 +581,6 @@ export function GanttChart({
               onSetColor={onSetColor}
               onAddItem={onAddItem}
               onAddMilestone={onAddMilestone}
-              skipWeekends={skipWeekends}
             />
             <GanttTimeline
               rows={ganttRows}
@@ -616,7 +608,6 @@ export function GanttChart({
             onToggleCollapse={toggleCollapse}
             onSelectItem={handleSelectItem}
             onDoubleClickItem={handleDoubleClick}
-            skipWeekends={skipWeekends}
           />
         )}
 

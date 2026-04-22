@@ -19,7 +19,6 @@ interface Project {
   slug: string | null;
   status: string;
   installation_date: string | null;
-  gantt_skip_weekends: boolean;
   client: { company_name: string } | null;
 }
 
@@ -64,7 +63,7 @@ export default async function TimelineDetailPage({
   const [projectResult, scopeItemsResult, assignmentsResult, allProjectsResult] = await Promise.all([
     supabase
       .from("projects")
-      .select(`id, project_code, name, slug, status, installation_date, gantt_skip_weekends, client:clients(company_name)`)
+      .select(`id, project_code, name, slug, status, installation_date, client:clients(company_name)`)
       .eq("id", projectId)
       .single(),
     supabase
@@ -85,7 +84,7 @@ export default async function TimelineDetailPage({
 
   if (projectResult.error || !projectResult.data) notFound();
 
-  const project = projectResult.data as unknown as Project;
+  const project = projectResult.data as Project;
   const scopeItems = (scopeItemsResult.data || []) as ScopeItem[];
 
   // Role-based filter for switcher list — admin/management see all; else only assigned
@@ -117,7 +116,6 @@ export default async function TimelineDetailPage({
           scopeItems={scopeItems}
           canEdit={canEdit}
           showHeader={false}
-          skipWeekends={project.gantt_skip_weekends}
         />
       </div>
     </div>

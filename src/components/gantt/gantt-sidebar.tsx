@@ -51,8 +51,6 @@ interface GanttSidebarProps {
   // Empty-area context menu actions
   onAddItem?: () => void;
   onAddMilestone?: () => void;
-  /** Used by formatDuration to render working-day count when enabled */
-  skipWeekends?: boolean;
   className?: string;
 }
 
@@ -72,7 +70,6 @@ export function GanttSidebar({
   onSetColor,
   onAddItem,
   onAddMilestone,
-  skipWeekends,
   width,
   onWidthChange,
   linkMode,
@@ -164,7 +161,6 @@ export function GanttSidebar({
                     linkMode={linkMode}
                     isLinkSource={linkMode && linkSourceId === row.id}
                     sidebarWidth={width}
-                    skipWeekends={!!skipWeekends}
                   />
                 </GanttContextMenu>
               ))}
@@ -211,7 +207,6 @@ function SidebarRow({
   linkMode,
   isLinkSource,
   sidebarWidth,
-  skipWeekends,
 }: {
   row: GanttRow;
   isSelected: boolean;
@@ -221,7 +216,6 @@ function SidebarRow({
   linkMode?: boolean;
   isLinkSource?: boolean;
   sidebarWidth: number;
-  skipWeekends: boolean;
 }) {
   const { item, depth, hasChildren, isCollapsed, phaseColor, type } = row;
   const isPhase = type === "phase";
@@ -358,7 +352,7 @@ function SidebarRow({
           isPhase ? "font-semibold text-green-600" : "text-muted-foreground"
         )}
       >
-        {formatDuration(item, skipWeekends)}
+        {formatDuration(item)}
       </span>
     </div>
   );

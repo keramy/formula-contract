@@ -13,7 +13,6 @@ import {
   deleteTimelineDependency,
   propagateDependencyDates,
   setTaskPhase,
-  setProjectSkipWeekends,
   type GanttItem as TimelineItem,
   type GanttItemInput as TimelineItemInput,
   type GanttDependency as TimelineDependency,
@@ -240,36 +239,6 @@ export function useSetTaskPhase(projectId: string) {
       } else {
         toast.success("Phase updated");
       }
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: timelineKeys.list(projectId) });
-    },
-  });
-}
-
-/**
- * Hook for toggling the project's "skip weekends" setting.
- * Triggers propagation after the setting changes so dep dates re-align
- * under the new calendar.
- */
-export function useSetProjectSkipWeekends(projectId: string) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (skipWeekends: boolean) => {
-      const result = await setProjectSkipWeekends(projectId, skipWeekends);
-      if (!result.success) {
-        throw new Error(result.error || "Failed to update setting");
-      }
-      return skipWeekends;
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-    onSuccess: async (skipWeekends) => {
-      // Re-run propagation so dep dates follow the new working-day rule
-      await propagateDependencyDates(projectId);
-      toast.success(skipWeekends ? "Weekends now skipped" : "Weekends counted");
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: timelineKeys.list(projectId) });

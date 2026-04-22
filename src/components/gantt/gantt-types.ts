@@ -303,45 +303,6 @@ export function daysBetween(start: Date, end: Date): number {
   return Math.round(Math.abs((end.getTime() - start.getTime()) / oneDay)) + 1;
 }
 
-/** Working days (Mon-Fri) between two dates (inclusive), used when a project
- *  is configured to skip weekends. When skipWeekends is false, falls back to
- *  calendar-day counting for consistency. */
-export function workingDaysBetween(start: Date, end: Date, skipWeekends: boolean): number {
-  if (!skipWeekends) return daysBetween(start, end);
-  const a = new Date(start);
-  a.setHours(0, 0, 0, 0);
-  const b = new Date(end);
-  b.setHours(0, 0, 0, 0);
-  if (a > b) return 0;
-  let count = 0;
-  const cursor = new Date(a);
-  while (cursor <= b) {
-    const day = cursor.getDay();
-    if (day !== 0 && day !== 6) count++;
-    cursor.setDate(cursor.getDate() + 1);
-  }
-  return count;
-}
-
-/** Add N working days to a date, skipping Sat/Sun when skipWeekends is true.
- *  Supports negative offsets. When skipWeekends is false, falls back to
- *  calendar-day addition. */
-export function addWorkingDays(date: Date, days: number, skipWeekends: boolean): Date {
-  const result = new Date(date);
-  if (!skipWeekends || days === 0) {
-    result.setDate(result.getDate() + days);
-    return result;
-  }
-  const direction = days > 0 ? 1 : -1;
-  let remaining = Math.abs(days);
-  while (remaining > 0) {
-    result.setDate(result.getDate() + direction);
-    const day = result.getDay();
-    if (day !== 0 && day !== 6) remaining--;
-  }
-  return result;
-}
-
 export function isToday(date: Date): boolean {
   const today = new Date();
   return (
@@ -385,11 +346,10 @@ export function getBarHealthColor(item: GanttItem): string | null {
   return null; // on track — use default color
 }
 
-/** Format duration: "45d" for tasks, "M" for milestones.
- *  When skipWeekends is true, the number reflects working days only. */
-export function formatDuration(item: GanttItem, skipWeekends = false): string {
+/** Format duration: "45d" for tasks, "M" for milestones */
+export function formatDuration(item: GanttItem): string {
   if (item.type === "milestone") return "M";
-  return `${workingDaysBetween(item.startDate, item.endDate, skipWeekends)}d`;
+  return `${daysBetween(item.startDate, item.endDate)}d`;
 }
 
 // ---------------------------------------------------------------------------

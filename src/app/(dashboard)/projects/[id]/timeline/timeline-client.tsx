@@ -29,7 +29,6 @@ import {
   useUpdateTimelineDependency,
   useDeleteTimelineDependency,
   useSetTaskPhase,
-  useSetProjectSkipWeekends,
 } from "@/lib/react-query/timelines";
 import type { GanttItem as TimelineItem, DependencyType, PhaseKey } from "@/lib/actions/timelines";
 import { UndoRedoProvider, useUndoRedo } from "@/hooks/use-undo-redo";
@@ -65,8 +64,6 @@ interface TimelineClientProps {
   projectId: string;
   scopeItems: ScopeItem[];
   canEdit?: boolean;
-  /** Project's skip-weekends setting — drives duration display + dep arithmetic */
-  skipWeekends?: boolean;
   /** @deprecated Kept for backwards compat — header is now inside GanttChart */
   showHeader?: boolean;
   /** @deprecated Kept for backwards compat */
@@ -91,21 +88,9 @@ function TimelineClientInner({
   projectId,
   scopeItems,
   canEdit = false,
-  skipWeekends: initialSkipWeekends = false,
 }: TimelineClientProps) {
   const { isMobile } = useBreakpoint();
   const { record } = useUndoRedo();
-
-  // Optimistic local state for the weekends toggle — server writes follow.
-  // Seeded from the server-fetched value; changes immediately on toggle click.
-  const [skipWeekends, setSkipWeekends] = React.useState(initialSkipWeekends);
-  const skipWeekendsMutation = useSetProjectSkipWeekends(projectId);
-  const handleSkipWeekendsToggle = React.useCallback((next: boolean) => {
-    setSkipWeekends(next);
-    skipWeekendsMutation.mutate(next, {
-      onError: () => setSkipWeekends(!next), // revert on failure
-    });
-  }, [skipWeekendsMutation]);
   // React Query hooks for timeline data
   const { data: timelineItems = [], isLoading: isLoadingItems } = useTimelineItems(projectId);
   const { data: timelineDependencies = [], isLoading: isLoadingDeps } = useTimelineDependencies(projectId);
@@ -535,8 +520,6 @@ function TimelineClientInner({
           onSetPriority={canEdit ? handleSetPriority : undefined}
           onSetPhase={canEdit ? handleSetPhase : undefined}
           onSetColor={canEdit ? handleSetColor : undefined}
-          skipWeekends={skipWeekends}
-          onSkipWeekendsToggle={canEdit ? handleSkipWeekendsToggle : undefined}
           onItemParentChange={canEdit ? handleParentChange : undefined}
           onCreateDependency={canEdit ? handleCreateDependency : undefined}
           onUpdateDependency={canEdit ? handleUpdateDependency : undefined}
