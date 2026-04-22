@@ -31,6 +31,7 @@ import {
   useSetTaskPhase,
 } from "@/lib/react-query/timelines";
 import type { GanttItem as TimelineItem, DependencyType, PhaseKey } from "@/lib/actions/timelines";
+import { UndoRedoProvider, useUndoRedo } from "@/hooks/use-undo-redo";
 
 // ============================================================================
 // CONSTANTS
@@ -73,12 +74,23 @@ interface TimelineClientProps {
 // COMPONENT
 // ============================================================================
 
-export function TimelineClient({
+export function TimelineClient(props: TimelineClientProps) {
+  // UndoRedoProvider wraps the actual logic so handlers inside can call
+  // useUndoRedo() to record inverse actions.
+  return (
+    <UndoRedoProvider>
+      <TimelineClientInner {...props} />
+    </UndoRedoProvider>
+  );
+}
+
+function TimelineClientInner({
   projectId,
   scopeItems,
   canEdit = false,
 }: TimelineClientProps) {
   const { isMobile } = useBreakpoint();
+  const { record } = useUndoRedo();
   // React Query hooks for timeline data
   const { data: timelineItems = [], isLoading: isLoadingItems } = useTimelineItems(projectId);
   const { data: timelineDependencies = [], isLoading: isLoadingDeps } = useTimelineDependencies(projectId);
@@ -275,6 +287,10 @@ export function TimelineClient({
   const isPending = (id?: string | null) => !id || id.startsWith("temp-");
   const PENDING_MSG = "Still saving this task — give it a second and try again";
 
+  const priorityLabel = (p: 1 | 2 | 3 | 4): string => {
+    return ["", "Low", "Normal", "High", "Critical"][p];
+  };
+
   // Handle edit item
   const handleEditItem = (ganttItem: GanttItem) => {
     if (!ganttItem.timelineId) return;
@@ -329,39 +345,72 @@ export function TimelineClient({
     });
   };
 
-  // Handle set priority
+  // Handle set priority — recorded for undo
   const handleSetPriority = (ganttItem: GanttItem, priority: number) => {
     if (!ganttItem.timelineId) return;
     if (isPending(ganttItem.timelineId)) {
       toast.info(PENDING_MSG);
       return;
     }
-    updateItem.mutate({
-      timelineId: ganttItem.timelineId,
-      input: { priority: priority as 1 | 2 | 3 | 4 },
+    const timelineId = ganttItem.timelineId;
+    const oldPriority = ganttItem.priority;
+    const newPriority = priority as 1 | 2 | 3 | 4;
+    updateItem.mutate({ timelineId, input: { priority: newPriority } });
+    record({
+      description: `Set priority to ${priorityLabel(newPriority)}`,
+      forward: async () => {
+        await updateItem.mutateAsync({ timelineId, input: { priority: newPriority } });
+      },
+      inverse: async () => {
+        await updateItem.mutateAsync({ timelineId, input: { priority: oldPriority } });
+      },
     });
   };
 
-  // Handle set phase (cascades to descendants server-side)
+  // Handle set phase — records undo WITHOUT cascading restoration (descendants stay)
   const handleSetPhase = (ganttItem: GanttItem, phase: PhaseKey) => {
     if (!ganttItem.timelineId) return;
     if (isPending(ganttItem.timelineId)) {
       toast.info(PENDING_MSG);
       return;
     }
-    setPhaseMutation.mutate({ taskId: ganttItem.timelineId, phaseKey: phase });
+    const taskId = ganttItem.timelineId;
+    const oldPhase = (ganttItem.phaseKey as PhaseKey | undefined) ?? null;
+    setPhaseMutation.mutate({ taskId, phaseKey: phase });
+    record({
+      description: `Changed phase`,
+      forward: async () => {
+        await setPhaseMutation.mutateAsync({ taskId, phaseKey: phase });
+      },
+      inverse: async () => {
+        if (oldPhase) {
+          await setPhaseMutation.mutateAsync({ taskId, phaseKey: oldPhase });
+        } else {
+          // Clear phase_key entirely via updateItem
+          await updateItem.mutateAsync({ timelineId: taskId, input: { phase_key: null } });
+        }
+      },
+    });
   };
 
-  // Handle set color
+  // Handle set color — recorded for undo
   const handleSetColor = (ganttItem: GanttItem, color: string | null) => {
     if (!ganttItem.timelineId) return;
     if (isPending(ganttItem.timelineId)) {
       toast.info(PENDING_MSG);
       return;
     }
-    updateItem.mutate({
-      timelineId: ganttItem.timelineId,
-      input: { color },
+    const timelineId = ganttItem.timelineId;
+    const oldColor = ganttItem.color;
+    updateItem.mutate({ timelineId, input: { color } });
+    record({
+      description: color ? `Changed color` : `Reset color`,
+      forward: async () => {
+        await updateItem.mutateAsync({ timelineId, input: { color } });
+      },
+      inverse: async () => {
+        await updateItem.mutateAsync({ timelineId, input: { color: oldColor } });
+      },
     });
   };
 

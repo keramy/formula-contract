@@ -104,6 +104,10 @@ export default async function TimelineDetailPage({
         clientName={project.client?.company_name || null}
         status={project.status}
         switcherProjects={switcherProjects}
+        currentUser={{
+          id: user.id,
+          name: (user.user_metadata?.name as string | undefined) || user.email?.split("@")[0] || "You",
+        }}
       />
 
       <div className="flex-1 overflow-hidden px-3 md:px-4 pt-4 pb-2">
