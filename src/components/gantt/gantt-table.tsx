@@ -23,6 +23,7 @@ interface GanttTableProps {
   onToggleCollapse: (id: string) => void;
   onSelectItem: (id: string, e: React.MouseEvent) => void;
   onDoubleClickItem: (item: GanttItem) => void;
+  skipWeekends?: boolean;
   className?: string;
 }
 
@@ -32,8 +33,10 @@ export function GanttTable({
   onToggleCollapse,
   onSelectItem,
   onDoubleClickItem,
+  skipWeekends,
   className,
 }: GanttTableProps) {
+  const skip = !!skipWeekends;
   return (
     <div className={cn("flex-1 overflow-auto", className)}>
       <table className="w-full text-[11px] border-collapse min-w-[1100px]">
@@ -68,6 +71,7 @@ export function GanttTable({
                 isSelected={selectedIds.has(row.id)}
                 onSelect={onSelectItem}
                 onDoubleClick={onDoubleClickItem}
+                skipWeekends={skip}
               />
             )
           )}
@@ -176,12 +180,15 @@ function TaskRow({
   isSelected,
   onSelect,
   onDoubleClick,
+  skipWeekends,
 }: {
   row: GanttRow;
   isSelected: boolean;
   onSelect: (id: string, e: React.MouseEvent) => void;
   onDoubleClick: (item: GanttItem) => void;
+  skipWeekends: boolean;
 }) {
+  const skip = skipWeekends;
   const { item, phaseColor } = row;
   const progress = Math.min(Math.max(item.progress, 0), 100);
   // User-set color overrides inherited phase color for task-level visuals
@@ -231,7 +238,7 @@ function TaskRow({
       <td className="px-3 text-muted-foreground tabular-nums">{fmtDate(item.endDate)}</td>
 
       {/* Duration */}
-      <td className="px-3 text-muted-foreground tabular-nums">{formatDuration(item)}</td>
+      <td className="px-3 text-muted-foreground tabular-nums">{formatDuration(item, skip)}</td>
 
       {/* Progress */}
       <td className="px-3">

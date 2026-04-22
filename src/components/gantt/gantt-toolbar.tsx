@@ -23,12 +23,16 @@ import {
   TrashIcon,
   ChevronDownIcon,
   LayersIcon,
+  SettingsIcon,
 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
@@ -48,6 +52,10 @@ interface GanttToolbarProps {
   onDependenciesToggle: () => void;
   showPhases?: boolean;
   onPhasesToggle?: () => void;
+  /** Project calendar: when true, weekends are treated as non-working days
+   *  for duration display and dep date arithmetic. */
+  skipWeekends?: boolean;
+  onSkipWeekendsToggle?: (next: boolean) => void;
   linkMode?: boolean;
   onLinkModeToggle?: () => void;
   linkSourceId?: string | null;
@@ -82,6 +90,8 @@ export function GanttToolbar({
   onDependenciesToggle,
   showPhases,
   onPhasesToggle,
+  skipWeekends,
+  onSkipWeekendsToggle,
   linkMode,
   onLinkModeToggle,
   linkSourceId,
@@ -274,6 +284,39 @@ export function GanttToolbar({
               >
                 <LayersIcon className="size-3.5" />
               </ToolbarIcon>
+            )}
+
+            {/* Timeline settings — currently just weekends toggle; can grow */}
+            {onSkipWeekendsToggle && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className={cn(
+                      "inline-flex items-center justify-center size-7 rounded-md border transition-colors",
+                      skipWeekends
+                        ? "bg-muted border-border text-foreground"
+                        : "bg-background border-border text-muted-foreground hover:text-foreground"
+                    )}
+                    title="Timeline settings"
+                  >
+                    <SettingsIcon className="size-3.5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-56">
+                  <DropdownMenuLabel>Working days</DropdownMenuLabel>
+                  <DropdownMenuCheckboxItem
+                    checked={!!skipWeekends}
+                    onCheckedChange={(v) => onSkipWeekendsToggle(!!v)}
+                  >
+                    Skip weekends (Sat + Sun)
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuSeparator />
+                  <div className="px-2 py-1.5 text-[10px] text-muted-foreground">
+                    Durations and dependency dates use only working days when
+                    enabled.
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
 

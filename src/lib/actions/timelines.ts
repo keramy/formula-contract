@@ -539,6 +539,31 @@ export async function deleteTimelineItem(timelineId: string): Promise<ActionResu
 }
 
 /**
+ * Toggle a project's "skip weekends" setting. Affects duration display and
+ * dependency date propagation. PM/Admin only.
+ */
+export async function setProjectSkipWeekends(
+  projectId: string,
+  skipWeekends: boolean
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "Not authenticated" };
+
+  const { data: userData } = await supabase.from("users").select("role").eq("id", user.id).single();
+  if (!userData || !["admin", "pm"].includes(userData.role)) {
+    return { success: false, error: "Only PM and Admin can change timeline settings" };
+  }
+
+  const { error } = await (supabase.from("projects") as any)
+    .update({ gantt_skip_weekends: skipWeekends })
+    .eq("id", projectId);
+
+  if (error) return { success: false, error: error.message };
+  return { success: true };
+}
+
+/**
  * Set a task's phase and cascade the label to all descendants.
  *
  * Phase is purely a LABEL, never a parent relationship. This function only
@@ -686,11 +711,23 @@ function calculateConstrainedDate(
   depType: number,
   lagDays: number,
   sourceStart: Date,
-  sourceEnd: Date
+  sourceEnd: Date,
+  skipWeekends: boolean
 ): { constrainedStart?: Date; constrainedEnd?: Date } {
   const addDays = (d: Date, days: number) => {
     const result = new Date(d);
-    result.setDate(result.getDate() + days);
+    if (!skipWeekends || days === 0) {
+      result.setDate(result.getDate() + days);
+      return result;
+    }
+    // Working-day arithmetic: skip Sat (6) and Sun (0) when stepping
+    const direction = days > 0 ? 1 : -1;
+    let remaining = Math.abs(days);
+    while (remaining > 0) {
+      result.setDate(result.getDate() + direction);
+      const day = result.getDay();
+      if (day !== 0 && day !== 6) remaining--;
+    }
     return result;
   };
 
@@ -717,6 +754,14 @@ export async function propagateDependencyDates(
   projectId: string
 ): Promise<ActionResult<{ updatedCount: number }>> {
   const supabase = await createClient();
+
+  // Query 1a: project config — skip_weekends toggles working-day arithmetic
+  const { data: projectRow } = await supabase
+    .from("projects")
+    .select("gantt_skip_weekends")
+    .eq("id", projectId)
+    .single() as { data: { gantt_skip_weekends: boolean } | null };
+  const skipWeekends = projectRow?.gantt_skip_weekends ?? false;
 
   // Query 1: all items for this project
   const { data: items, error: itemsError } = await supabase
@@ -797,7 +842,8 @@ export async function propagateDependencyDates(
         dep.dependency_type,
         dep.lag_days,
         source.start,
-        source.end
+        source.end,
+        skipWeekends
       );
 
       if (constraint.constrainedStart) {
