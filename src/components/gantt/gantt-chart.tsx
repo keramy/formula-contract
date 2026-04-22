@@ -25,7 +25,7 @@ import { GanttTable } from "./gantt-table";
 import { GanttStatusBar } from "./gantt-status-bar";
 import { GanttDependencyDialog } from "./gantt-dependency-dialog";
 import { GanttContextMenu } from "./gantt-context-menu";
-import { XIcon, PlusIcon } from "lucide-react";
+import { XIcon, PlusIcon, GanttChartIcon } from "lucide-react";
 
 // ============================================================================
 // GANTT CHART — Main orchestrator
@@ -547,8 +547,19 @@ export function GanttChart({
           rowCount={ganttRows.length}
         />
 
-        {/* Main content */}
-        {panel === "timeline" ? (
+        {/* Main content — either empty state or the active panel, never both */}
+        {items.length === 0 ? (
+          <div className="flex flex-col items-center justify-center flex-1 text-muted-foreground gap-3 py-16">
+            <GanttChartIcon className="size-10 text-muted-foreground/40" />
+            <p className="text-sm">No timeline items yet</p>
+            {showAddButton && onAddItem && (
+              <Button variant="outline" size="sm" onClick={onAddItem}>
+                <PlusIcon className="h-4 w-4 mr-1.5" />
+                Add your first task
+              </Button>
+            )}
+          </div>
+        ) : panel === "timeline" ? (
           <div className="flex flex-1 min-h-0 overflow-hidden">
             <GanttSidebar
               rows={ganttRows}
@@ -598,19 +609,6 @@ export function GanttChart({
             onSelectItem={handleSelectItem}
             onDoubleClickItem={handleDoubleClick}
           />
-        )}
-
-        {/* Empty state */}
-        {items.length === 0 && (
-          <div className="flex flex-col items-center justify-center flex-1 text-muted-foreground gap-2 py-16">
-            <p>No timeline items yet</p>
-            {showAddButton && onAddItem && (
-              <Button variant="outline" size="sm" onClick={onAddItem}>
-                <PlusIcon className="h-4 w-4 mr-1.5" />
-                Add your first task
-              </Button>
-            )}
-          </div>
         )}
 
         {/* Status bar */}
