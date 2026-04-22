@@ -128,10 +128,23 @@ function TimelineClientInner({
       timelineItems.filter((i) => (childrenMap.get(i.id) || 0) > 0).map((i) => i.id)
     );
 
+    // Show a phase item only when at least one task in the project carries
+    // its phase_key as a label. Phases are labels now (not parents), so
+    // parent_id-based filtering would always exclude them.
+    const phaseKeysInUse = new Set<string>();
+    timelineItems.forEach((i) => {
+      if (i.item_type !== "phase" && i.phase_key) phaseKeysInUse.add(i.phase_key);
+    });
+
     // Convert flat items to GanttItem (without children first)
     const itemById = new Map<string, GanttItem>();
     const allItems: GanttItem[] = timelineItems
-      .filter((item) => item.item_type !== "phase" || parentIds.has(item.id))
+      .filter((item) => {
+        if (item.item_type !== "phase") return true;
+        // Phase: include if any task labels this phase, OR if it still has
+        // legacy parent_id children (for projects created before the label refactor).
+        return (item.phase_key && phaseKeysInUse.has(item.phase_key)) || parentIds.has(item.id);
+      })
       .map((item) => {
         const color = item.color || TIMELINE_COLORS[item.item_type] || "#64748b";
         const isMilestone = item.item_type === "milestone";

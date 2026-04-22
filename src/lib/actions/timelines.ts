@@ -441,6 +441,7 @@ export async function updateTimelineItem(
 
   const updateData: Record<string, unknown> = {};
   if (input.name !== undefined) updateData.name = input.name;
+  if (input.item_type !== undefined) updateData.item_type = input.item_type;
   if (input.start_date !== undefined) updateData.start_date = input.start_date;
   if (input.end_date !== undefined) updateData.end_date = input.end_date;
   if (input.parent_id !== undefined) updateData.parent_id = input.parent_id;
