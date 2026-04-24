@@ -1254,13 +1254,16 @@ export function ScopeItemsTable({ projectId, items, materials, areas = EMPTY_ARE
 
       if (result.success) {
         dispatch({ type: "CLOSE_DIALOG" });
+        // Same SSR prop refresh as delete — router.refresh() is what actually
+        // brings the new row into the visible list.
         queryClient.invalidateQueries({ queryKey: scopeItemKeys.list(projectId) });
+        router.refresh();
         toast.success(`Component created! ${splitName.trim()} (${splitTargetPath})`);
       } else {
         toast.error(result.error || "Failed to split item");
       }
     });
-  }, [itemToSplit, splitName, projectId, splitTargetPath, queryClient]);
+  }, [itemToSplit, splitName, projectId, splitTargetPath, queryClient, router]);
 
   // Handle delete item
   const handleDelete = useCallback(() => {
@@ -1271,13 +1274,17 @@ export function ScopeItemsTable({ projectId, items, materials, areas = EMPTY_ARE
 
       if (result.success) {
         dispatch({ type: "CLOSE_DIALOG" });
+        // `items` is a server-fetched prop (SSR), not a React Query subscriber,
+        // so invalidateQueries alone won't refresh the visible list. router.refresh()
+        // re-runs the server component and sends fresh props down.
         queryClient.invalidateQueries({ queryKey: scopeItemKeys.list(projectId) });
+        router.refresh();
         toast.success(`"${itemToDelete.name}" deleted successfully`);
       } else {
         toast.error(result.error || "Failed to delete item");
       }
     });
-  }, [itemToDelete, projectId, queryClient]);
+  }, [itemToDelete, projectId, queryClient, router]);
 
   // ============================================================================
   // PERFORMANCE: Memoize summary statistics
