@@ -1,6 +1,6 @@
 # Formula Contract - Project Intelligence
 
-> **Last Updated:** April 3, 2026
+> **Last Updated:** April 24, 2026
 > **Version:** 1.2.0
 > **Supabase Project:** `lsuiaqrpkhejeavsrsqc` (contract-eu, eu-central-1)
 
@@ -240,6 +240,7 @@ scope-items/{project_id}/{item_id}/image_1.jpg
     **Project SELECT for creator migration 061 applied** - `061_fix_project_select_for_creator.sql` — added `created_by = auth.uid()` to SELECT policy so creator can see their project immediately after INSERT+RETURNING
     **Supplier fields migration 062 applied** - `062_scope_items_supplier_fields.sql` — added supplier_id (FK to finance_suppliers), po_number, expected_delivery_date to scope_items. Also added PM/admin RLS policies on finance_suppliers for read+insert
     **Finance storage RLS migration 063 applied** - `063_finance_storage_rls.sql` — added INSERT/SELECT/UPDATE/DELETE storage policies for `finance-documents` bucket using `has_finance_access()`. Bucket existed but had zero RLS policies, silently blocking all uploads
+    **Gantt working-days migration 069 applied** - `069_project_gantt_working_days.sql` — replaced reverted `gantt_skip_weekends` boolean with `gantt_working_days SMALLINT NOT NULL DEFAULT 62` bitmask. See gotcha #58.
 14. **Adjacent panel alignment** - Both header wrappers must set explicit `height` + `box-border`
 15. **Storage paths MUST start with `{projectId}/`** - Migration 040 enforces this via RLS
 16. **Use `useBreakpoint()` not `useIsMobile()`** - Old hook deprecated, use `use-media-query.ts`
@@ -266,6 +267,9 @@ scope-items/{project_id}/{item_id}/image_1.jpg
 53. **Drawing/material approval uses server actions** — `approveOrRejectDrawing()` and `approveOrRejectMaterial()` in `lib/actions/drawings.ts`. Migrated from client-side Supabase calls to server actions for notification support. Never approve/reject via raw client-side update.
 54. **`notifyProjectPMs()` uses service role** — Client users can't query `project_assignments` for PM user IDs due to RLS. The helper in `lib/notifications/actions.ts` uses `createServiceRoleClient()` to bypass RLS for cross-user notification inserts.
 55. **Notification titles exclude project name** — The dropdown and `/notifications` page append `" on {projectName}"` from the joined project data. Don't include project name in the `title` field when creating notifications — it will duplicate.
+56. **Prop-driven lists + `invalidateQueries` = silent no-op** — If a component renders from an SSR prop (`items={scopeItems}`) and is not a `useQuery` subscriber, `queryClient.invalidateQueries(...)` has nothing to refetch. Symptom: mutation toast fires, list stays stale until manual reload. Fix: make the component subscribe via `useX(id, { initialData: propData })` so the cache is seeded from SSR and invalidations actually refetch. `router.refresh()` is a fallback but it's SSR re-render, not React Query — prefer the subscriber pattern. `scope-items-table.tsx` was the one holdout from the Apr 3 "lazy tabs via React Query" refactor.
+57. **Migration ordering — deploy code BEFORE applying schema changes** — If you ALTER/DROP a column that live code references, every query using that column starts failing immediately (PostgREST returns a column-not-found error, app pages hit `notFound()` or show empty state). Applying a migration via MCP while live still runs old code broke production pages for ~24h (commit 9a5a3ec referenced `gantt_skip_weekends` after migration 069 dropped it; revert b7832a4 + feat aa13858 fixed it). Correct order: (a) deploy code that handles both schemas, (b) run migration, (c) deploy code that uses new schema only. Or use additive-only migrations.
+58. **Per-day working-days mask on Gantt** — `projects.gantt_working_days` (SMALLINT) is a bitmask where bit 0 = Sun, bit 1 = Mon, ..., bit 6 = Sat (matches JS `Date.getDay()`). Default 62 (0b0111110 = Mon-Fri). Helpers in `gantt-types.ts`: `isWorkingDay(d, mask)`, `workingDaysBetween(s, e, mask)` (inclusive count), `addWorkingDays(d, n, mask)`. `formatDuration(item, mask)` uses the mask — callers pass project's mask or default 127 (all days). `setProjectWorkingDays(id, mask)` server action auto-adjusts each task's `end_date` to preserve its working-day count under the new mask. Dependency `lag_days` is interpreted as **working days** under the mask, not calendar days. Migration 069 replaced the reverted `gantt_skip_weekends` boolean.
 
 ### React Code Health (React Doctor score: 96/100)
 21. **Never define components inside other components** - Nested components get recreated every render, destroying state and killing performance. Extract to module scope or a separate file with explicit props.
@@ -324,6 +328,7 @@ npm run version:major   # 1.0.0 → 2.0.0 (breaking changes)
 ## Current Status (Apr 2026)
 
 ### Recently Completed
+- Per-day Working-Days Calendar + Scope-Items Refresh Fix (Apr 24, 2026): New `projects.gantt_working_days` bitmask (migration 069) replaces reverted `gantt_skip_weekends` boolean. Gantt toolbar has a gear dropdown with 7 day checkboxes; toggling auto-adjusts each task's `end_date` to preserve working-day count under the new mask. Duration labels + dependency `lag_days` are mask-aware. `formatDuration(item, mask)` / `workingDaysBetween` / `addWorkingDays` helpers in `gantt-types.ts`. Scope-items table now subscribes to `useScopeItems(projectId, { initialData })` — previously it was prop-driven and invalidateQueries was a silent no-op (delete/split toasts fired but list stayed stale until manual reload). Also: emergency revert of 9a5a3ec (per-project skip-weekends boolean) after migration 069 dropped its column while live code still referenced it. See gotchas #56, #57, #58.
 - Notification Overhaul + Drawings UX (Apr 16, 2026): Drawing/material approve/reject migrated to server actions with PM notifications, `notifyProjectPMs()` helper (service role), drawing upload notifications to other PMs, `/notifications` page (filters, pagination, grouped batches), "View all" link in dropdown, fix notification navigation (drawings→drawings tab, materials→materials tab), fix phantom `link` field in project-assignments, missing icon configs added, drawing email now includes item names, drawings tab: uploaded-by column, sortable columns (Code/Name/Status/Uploaded with # reset), selection bar merged with action bar.
 - Payments & Drawings UX Overhaul (Apr 15, 2026): Invoice due date overflow fix, updateInvoice missing fields (vat_rate, project_id, installments), file upload on edit, finance-documents storage RLS (migration 063), invoice delete (single + bulk), overdue status filter fix, pagination (50/page + Load More), status badge colors (orange=action, green=done, red=overdue), Access tab admin-only, pinned Save/Cancel in all payment sheets, drawings for procurement items, select + bulk download on drawings tab, status filter dropdown on drawings tab, user deactivate redirect fix, real-time online presence (Supabase Realtime Presence + touchLastActive throttled), last seen with hover tooltip.
 - DB Performance & RLS Recursion Fix (Apr 3, 2026): Root cause of Supabase IO budget depletion was recursive RLS (missing SECURITY DEFINER on helper functions). Fixed with migration 059. Also: shared request context (React cache), thin project pages (9→2 queries), replaced 31 revalidatePath with React Query invalidation, removed Gantt drag/resize, removed middleware DB writes, staged dashboard queries, error states on list pages. 676 tests, React Doctor 96/100.
@@ -348,7 +353,7 @@ npm run version:major   # 1.0.0 → 2.0.0 (breaking changes)
 
 ### Known Issues
 - `shannon_auditfiles/` excluded from tsconfig.json — contains pentest artifacts with TS errors (intentional)
-- Migrations 051-063 applied live but NOT tracked in supabase_migrations table
+- Migrations 051-063 + 069 applied live but NOT tracked in supabase_migrations table
 - `authenticated` role timeout set to 30s (Supabase default is 8s) — monitor and consider reverting
 - PostgREST may not recognize new columns immediately after `execute_sql` — use `NOTIFY pgrst, 'reload schema'` or fetch new columns in a separate query with try-catch
 
