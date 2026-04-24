@@ -40,14 +40,17 @@ export const scopeItemKeys = {
 // ============================================================================
 
 /**
- * Hook for fetching all scope items for a project
+ * Hook for fetching all scope items for a project.
  *
- * Features:
- * - Automatic caching with 60-second stale time
- * - Deduplication (multiple components won't cause multiple fetches)
- * - Background refetching when data becomes stale
+ * Pass SSR-loaded data as `initialData` to avoid a loading spinner on first
+ * render — the hook seeds the cache so consumers render immediately, while
+ * still becoming a React Query subscriber so `invalidateQueries` triggers a
+ * background refetch after mutations.
  */
-export function useScopeItems(projectId: string) {
+export function useScopeItems(
+  projectId: string,
+  options?: { initialData?: ScopeItem[] }
+) {
   return useQuery({
     queryKey: scopeItemKeys.list(projectId),
     queryFn: async () => {
@@ -59,6 +62,7 @@ export function useScopeItems(projectId: string) {
     },
     enabled: !!projectId,
     staleTime: 60 * 1000, // 60 seconds
+    initialData: options?.initialData,
   });
 }
 

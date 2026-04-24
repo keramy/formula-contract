@@ -1,12 +1,11 @@
 "use client";
 
 import { useState, useTransition, useEffect, useCallback, useMemo, memo, useReducer, useRef } from "react";
-import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { scopeItemKeys } from "@/lib/react-query/scope-items";
+import { scopeItemKeys, useScopeItems } from "@/lib/react-query/scope-items";
 import Link from "next/link";
 import Image from "next/image";
-import { bulkUpdateScopeItems, bulkAssignMaterials, splitScopeItem, deleteScopeItem, type ScopeItemField } from "@/lib/actions/scope-items";
+import { bulkUpdateScopeItems, bulkAssignMaterials, splitScopeItem, deleteScopeItem, type ScopeItemField, type ScopeItem as ActionScopeItem } from "@/lib/actions/scope-items";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -942,10 +941,21 @@ const EMPTY_AREAS: AreaOption[] = [];
 
 const EMPTY_SUPPLIERS: { id: string; name: string; supplier_code: string }[] = [];
 
-export function ScopeItemsTable({ projectId, items, materials, areas = EMPTY_AREAS, suppliers = EMPTY_SUPPLIERS, currency = "TRY", isClient = false, userRole = "pm" }: ScopeItemsTableProps) {
+export function ScopeItemsTable({ projectId, items: initialItems, materials, areas = EMPTY_AREAS, suppliers = EMPTY_SUPPLIERS, currency = "TRY", isClient = false, userRole = "pm" }: ScopeItemsTableProps) {
   const { isMobile } = useBreakpoint();
-  const router = useRouter();
   const queryClient = useQueryClient();
+
+  // Subscribe to the scope-items React Query cache seeded with SSR data.
+  // This makes every `invalidateQueries({ queryKey: scopeItemKeys.list(...) })`
+  // actually refetch, so mutations elsewhere (delete, split, mutation hooks)
+  // keep the visible list in sync without needing router.refresh().
+  // Two ScopeItem types coexist: the table declares a narrow local one; the
+  // action/hook returns the full DB row (a superset). Runtime payloads are
+  // identical supersets — we just cast at the boundary.
+  const { data: fetchedItems } = useScopeItems(projectId, {
+    initialData: initialItems as unknown as ActionScopeItem[],
+  });
+  const items: ScopeItem[] = ((fetchedItems ?? initialItems) as unknown) as ScopeItem[];
   const [isPending, startTransition] = useTransition();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -1254,16 +1264,13 @@ export function ScopeItemsTable({ projectId, items, materials, areas = EMPTY_ARE
 
       if (result.success) {
         dispatch({ type: "CLOSE_DIALOG" });
-        // Same SSR prop refresh as delete — router.refresh() is what actually
-        // brings the new row into the visible list.
         queryClient.invalidateQueries({ queryKey: scopeItemKeys.list(projectId) });
-        router.refresh();
         toast.success(`Component created! ${splitName.trim()} (${splitTargetPath})`);
       } else {
         toast.error(result.error || "Failed to split item");
       }
     });
-  }, [itemToSplit, splitName, projectId, splitTargetPath, queryClient, router]);
+  }, [itemToSplit, splitName, projectId, splitTargetPath, queryClient]);
 
   // Handle delete item
   const handleDelete = useCallback(() => {
@@ -1274,17 +1281,13 @@ export function ScopeItemsTable({ projectId, items, materials, areas = EMPTY_ARE
 
       if (result.success) {
         dispatch({ type: "CLOSE_DIALOG" });
-        // `items` is a server-fetched prop (SSR), not a React Query subscriber,
-        // so invalidateQueries alone won't refresh the visible list. router.refresh()
-        // re-runs the server component and sends fresh props down.
         queryClient.invalidateQueries({ queryKey: scopeItemKeys.list(projectId) });
-        router.refresh();
         toast.success(`"${itemToDelete.name}" deleted successfully`);
       } else {
         toast.error(result.error || "Failed to delete item");
       }
     });
-  }, [itemToDelete, projectId, queryClient, router]);
+  }, [itemToDelete, projectId, queryClient]);
 
   // ============================================================================
   // PERFORMANCE: Memoize summary statistics

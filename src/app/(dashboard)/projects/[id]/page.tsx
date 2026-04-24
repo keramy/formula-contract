@@ -163,7 +163,7 @@ export default async function ProjectDetailPage({
       const start = performance.now();
       const result = await supabase
         .from("scope_items")
-        .select("id, item_code, name, description, width, depth, height, item_path, status, quantity, unit, initial_unit_cost, initial_total_cost, actual_unit_cost, actual_total_cost, unit_sales_price, total_sales_price, production_percentage, is_shipped, is_installation_started, is_installed, notes, images, created_at, parent_id, area_id, supplier_id")
+        .select("*")
         .eq("project_id", projectId)
         .eq("is_deleted", false)
         .order("item_code", { ascending: true });
