@@ -13,6 +13,7 @@ import {
   deleteTimelineDependency,
   propagateDependencyDates,
   setTaskPhase,
+  setProjectWorkingDays,
   type GanttItem as TimelineItem,
   type GanttItemInput as TimelineItemInput,
   type GanttDependency as TimelineDependency,
@@ -212,6 +213,43 @@ export function useUpdateTimelineItem(projectId: string) {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: timelineKeys.list(projectId) });
+    },
+  });
+}
+
+/**
+ * Hook for updating the project's working-days bitmask.
+ * Auto-adjusts task end dates to preserve each task's working-day duration
+ * under the new mask (server-side).
+ */
+export function useSetProjectWorkingDays(projectId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (mask: number) => {
+      const result = await setProjectWorkingDays(projectId, mask);
+      if (!result.success) {
+        throw new Error(result.error || "Failed to update working days");
+      }
+      return result.data!;
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+    onSuccess: async (data) => {
+      // Re-align dependency chain under the new mask so lag/duration stay consistent.
+      await propagateDependencyDates(projectId);
+      if (data.updatedCount > 0) {
+        toast.success(
+          `Working days updated — ${data.updatedCount} task${data.updatedCount !== 1 ? "s" : ""} re-scheduled`
+        );
+      } else {
+        toast.success("Working days updated");
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: timelineKeys.list(projectId) });
+      queryClient.invalidateQueries({ queryKey: timelineKeys.dependencyList(projectId) });
     },
   });
 }

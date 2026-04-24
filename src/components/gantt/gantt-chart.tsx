@@ -66,6 +66,10 @@ export interface GanttChartProps {
    *  onItemDelete in a loop because per-call state overwrites break multi-delete. */
   onDeleteMany?: (items: GanttItem[]) => void;
   onExport?: () => void;
+  /** Per-project working-days bitmask (bit 0=Sun..bit 6=Sat). When undefined
+   *  duration labels show calendar days; when provided they show working days. */
+  workingDaysMask?: number;
+  onWorkingDaysChange?: (mask: number) => void;
   className?: string;
   showAddButton?: boolean;
 }
@@ -90,6 +94,8 @@ export function GanttChart({
   onSetColor,
   onDeleteMany,
   onExport,
+  workingDaysMask,
+  onWorkingDaysChange,
   className,
   showAddButton = false,
 }: GanttChartProps) {
@@ -545,6 +551,8 @@ export function GanttChart({
           canZoomOut={ganttState.zoomIndex > 0}
           zoomPercent={Math.round(ganttState.zoomLevel * 100)}
           rowCount={ganttRows.length}
+          workingDaysMask={workingDaysMask}
+          onWorkingDaysChange={onWorkingDaysChange}
         />
 
         {/* Main content — either empty state or the active panel, never both */}
@@ -581,6 +589,7 @@ export function GanttChart({
               onSetColor={onSetColor}
               onAddItem={onAddItem}
               onAddMilestone={onAddMilestone}
+              workingDaysMask={workingDaysMask}
             />
             <GanttTimeline
               rows={ganttRows}
@@ -599,6 +608,7 @@ export function GanttChart({
               linkSourceId={linkSourceId}
               scrollRef={scrollRef}
               onScroll={handleTimelineScroll}
+              workingDaysMask={workingDaysMask}
             />
           </div>
         ) : (
@@ -608,6 +618,7 @@ export function GanttChart({
             onToggleCollapse={toggleCollapse}
             onSelectItem={handleSelectItem}
             onDoubleClickItem={handleDoubleClick}
+            workingDaysMask={workingDaysMask}
           />
         )}
 

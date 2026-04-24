@@ -51,6 +51,8 @@ interface GanttSidebarProps {
   // Empty-area context menu actions
   onAddItem?: () => void;
   onAddMilestone?: () => void;
+  /** Working-days bitmask for duration labels. Falls back to all-days (127). */
+  workingDaysMask?: number;
   className?: string;
 }
 
@@ -74,6 +76,7 @@ export function GanttSidebar({
   onWidthChange,
   linkMode,
   linkSourceId,
+  workingDaysMask,
   className,
 }: GanttSidebarProps) {
   const contentHeight = totalRowsHeight(rows);
@@ -161,6 +164,7 @@ export function GanttSidebar({
                     linkMode={linkMode}
                     isLinkSource={linkMode && linkSourceId === row.id}
                     sidebarWidth={width}
+                    workingDaysMask={workingDaysMask}
                   />
                 </GanttContextMenu>
               ))}
@@ -207,6 +211,7 @@ function SidebarRow({
   linkMode,
   isLinkSource,
   sidebarWidth,
+  workingDaysMask,
 }: {
   row: GanttRow;
   isSelected: boolean;
@@ -216,6 +221,7 @@ function SidebarRow({
   linkMode?: boolean;
   isLinkSource?: boolean;
   sidebarWidth: number;
+  workingDaysMask?: number;
 }) {
   const { item, depth, hasChildren, isCollapsed, phaseColor, type } = row;
   const isPhase = type === "phase";
@@ -352,7 +358,7 @@ function SidebarRow({
           isPhase ? "font-semibold text-green-600" : "text-muted-foreground"
         )}
       >
-        {formatDuration(item)}
+        {formatDuration(item, workingDaysMask ?? 127)}
       </span>
     </div>
   );

@@ -8,6 +8,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { GanttViewMode, GanttPanel } from "./gantt-types";
+import { DAY_LABELS, formatWorkingDaysMask } from "./gantt-types";
 import { Input } from "@/components/ui/input";
 import {
   PlusIcon,
@@ -23,6 +24,7 @@ import {
   TrashIcon,
   ChevronDownIcon,
   LayersIcon,
+  SettingsIcon,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -30,6 +32,9 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
+  DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 
 // ============================================================================
@@ -68,6 +73,8 @@ interface GanttToolbarProps {
   canZoomOut?: boolean;
   zoomPercent?: number;
   rowCount?: number;
+  workingDaysMask?: number;
+  onWorkingDaysChange?: (mask: number) => void;
   className?: string;
 }
 
@@ -102,6 +109,8 @@ export function GanttToolbar({
   canZoomOut = true,
   zoomPercent,
   rowCount,
+  workingDaysMask,
+  onWorkingDaysChange,
   className,
 }: GanttToolbarProps) {
   return (
@@ -301,6 +310,14 @@ export function GanttToolbar({
               </button>
             </div>
           )}
+
+          {/* Working-days settings — per-day bitmask stored on project */}
+          {onWorkingDaysChange && workingDaysMask !== undefined && (
+            <WorkingDaysMenu
+              mask={workingDaysMask}
+              onChange={onWorkingDaysChange}
+            />
+          )}
         </>
       )}
 
@@ -370,6 +387,60 @@ function PillButton({
     >
       {children}
     </button>
+  );
+}
+
+function WorkingDaysMenu({
+  mask,
+  onChange,
+}: {
+  mask: number;
+  onChange: (mask: number) => void;
+}) {
+  // Render days in Mon-Sun order (JS getDay uses 0=Sun; our mask bit 0=Sun,
+  // bit 1=Mon, ..., bit 6=Sat). Toggle bit, refuse all-off.
+  const toggleDay = (dayIndex: number) => {
+    const next = mask ^ (1 << dayIndex);
+    if ((next & 127) === 0) return; // don't allow zero working days
+    onChange(next & 127);
+  };
+
+  return (
+    <DropdownMenu>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 px-2 text-[11px] gap-1.5"
+            >
+              <SettingsIcon className="size-3.5" />
+              <span className="hidden sm:inline capitalize">{formatWorkingDaysMask(mask)}</span>
+            </Button>
+          </DropdownMenuTrigger>
+        </TooltipTrigger>
+        <TooltipContent>Working days — counts toward task duration</TooltipContent>
+      </Tooltip>
+      <DropdownMenuContent align="start" className="w-48">
+        <DropdownMenuLabel className="text-[11px] text-muted-foreground">
+          Working days
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {/* Mon..Sun order */}
+        {[1, 2, 3, 4, 5, 6, 0].map((dayIndex) => (
+          <DropdownMenuCheckboxItem
+            key={dayIndex}
+            checked={(mask & (1 << dayIndex)) !== 0}
+            onCheckedChange={() => toggleDay(dayIndex)}
+            onSelect={(e) => e.preventDefault()}
+            className="text-xs"
+          >
+            {DAY_LABELS[dayIndex]}
+          </DropdownMenuCheckboxItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

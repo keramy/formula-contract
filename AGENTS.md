@@ -2,7 +2,56 @@
 
 ## Current Status
 Last updated by: Claude Code
-Timestamp: 2026-04-03
+Timestamp: 2026-04-22
+
+---
+
+## Per-Day Working-Days Calendar on Gantt Toolbar — Apr 22, 2026
+Agent: Claude Code
+Status: **IMPLEMENTED — NOT pushed. Awaiting user test.**
+
+### What changed
+Per-day working-days bitmask for Gantt, stored per-project at `projects.gantt_working_days` (SMALLINT NOT NULL DEFAULT 62). Bit 0=Sun, bit 1=Mon, ..., bit 6=Sat — matches JS `Date.getDay()`. Default 62 (0b0111110) = Mon-Fri.
+
+UI: gear button in Gantt toolbar opens a checkbox list (Mon..Sun) per-project. Toggling a day runs `setProjectWorkingDays()` which **auto-adjusts each task's end_date** so the task's pre-existing working-day count is preserved under the new mask.
+
+Duration labels (sidebar, table, bar tooltip) use `formatDuration(item, mask)` so a Mon→Fri task reads "5d" under Mon-Fri but "6d" if Sat becomes working (6 working days Mon→Sat calendar stays — user can shrink manually).
+
+Dependency propagation math now working-day aware: lag_days is interpreted as **working days**, `calculateConstrainedDate` uses `addWorkingDaysServer(..., mask)` rather than raw calendar days.
+
+### Files changed
+- `supabase/migrations/069_project_gantt_working_days.sql` (NEW — DROPs the reverted `gantt_skip_weekends`, adds `gantt_working_days SMALLINT DEFAULT 62`)
+- `src/components/gantt/gantt-types.ts` — `DEFAULT_WORKING_DAYS_MASK`, `DAY_LABELS`, `isWorkingDay`, `workingDaysBetween(start,end,mask)`, `addWorkingDays(date,days,mask)`, `formatWorkingDaysMask(mask)`. `formatDuration(item, mask=127)` accepts mask.
+- `src/lib/actions/timelines.ts` — `getProjectWorkingDays()`, `setProjectWorkingDays(projectId, mask)` server action with auto-adjust. `propagateDependencyDates` loads mask and passes it to `calculateConstrainedDate(depType, lag, srcStart, srcEnd, mask)`. Added `addWorkingDaysServer()` + `workingDaysBetweenServer()` helpers (can't import from "use client" gantt-types into "use server").
+- `src/lib/react-query/timelines.ts` — `useSetProjectWorkingDays(projectId)`.
+- `src/components/gantt/gantt-toolbar.tsx` — new `WorkingDaysMenu` sub-component (gear icon + 7 checkboxes, guards against all-off).
+- `src/components/gantt/gantt-chart.tsx` — new `workingDaysMask` + `onWorkingDaysChange` props, forwarded to toolbar / sidebar / timeline / table.
+- `src/components/gantt/gantt-sidebar.tsx`, `gantt-table.tsx`, `gantt-timeline.tsx`, `gantt-bar.tsx` — accept `workingDaysMask?` and pass it to `formatDuration(item, mask ?? 127)` calls.
+- `src/app/(dashboard)/projects/[id]/timeline/timeline-client.tsx` — reads `workingDaysMask` prop, owns local optimistic state, wires `useSetProjectWorkingDays`.
+- `src/app/(dashboard)/projects/[id]/timeline-overview.tsx` — passes prop through.
+- `src/app/(dashboard)/projects/[id]/page.tsx` — SELECT adds `gantt_working_days`; passes through with `(project as any)?.gantt_working_days ?? 62` since generated types lag.
+- `src/app/(dashboard)/timeline/[projectId]/page.tsx` — SELECT adds `gantt_working_days`, `Project` interface adds the field, result cast via `unknown` to bypass stale types.
+
+### Prior reverted attempt (commit 9a5a3ec)
+The first stab was a project-wide **skip_weekends boolean** with its own migration 068. User rejected — wanted per-timeline UI with per-day granularity. Revert: `git revert --no-edit 9a5a3ec` → local commit `b7832a4`. DB column `gantt_skip_weekends` was dropped as part of migration 069 (`DROP COLUMN IF EXISTS`).
+
+### Duration math (per user spec)
+Inclusive count of days where the bit is set: Mon→Fri under Mon-Fri = 5d, Mon→Sat under Mon-Sat = 6d, Mon→Mon under Mon-Sat = 7d, Mon→Mon under all-days = 8d.
+
+### Warnings for next agent
+- **DO NOT PUSH** until the user tests locally. Memory file `feedback_test_before_push_strict.md` and user's direct instruction: "dont keep pushing things without testing it". Commit b7832a4 (revert) is also unpushed.
+- Migration 069 IS applied live on Supabase (via MCP `apply_migration`, name: `project_gantt_working_days`), so the DB column already exists. The on-disk `supabase/migrations/069_project_gantt_working_days.sql` mirrors it but is NOT tracked in `supabase_migrations` table (same as 051-063).
+- Generated Supabase TS types (`src/types/database.ts` likely) DO NOT yet know about `gantt_working_days`. Regenerate via `npx supabase gen types typescript` when convenient and drop the `as unknown` / `as any` casts in the two page files.
+- TypeScript tree: clean (`tsc --noEmit` exits 0).
+- Lint: 4 NEW `no-explicit-any` errors in timelines.ts at the `(supabase as any)` casts used to read `gantt_working_days`. These match the pre-existing pattern in the same file (lines 360/456/484/593) — not gating the build. Same reason as above.
+- `propagateDependencyDates` now treats `lag_days` as **working days** under the mask. If anyone finds an older dependency whose lag was intended as calendar days, they'll see a shift after the next propagation run. Behavioral change, worth flagging.
+
+### Testing checklist for user
+- Toolbar gear shows current mask label ("Mon-Fri" / "Mon-Sat" / etc).
+- Toggling Sat on should shorten a Mon-Fri-5d task's calendar span (still 5d of working, but now compresses out Fri→Sat). Check with `/timeline/[projectId]` and also the Timeline tab on project page.
+- Dropdown refuses to let you turn off the last checked day (no-working-days guard).
+- Non-admin/non-PM should not see working-days mutations (`onWorkingDaysChange` gated on `canEdit`).
+- Dependency chains rebuild using mask-aware lag after toggles (toast reports "N tasks re-scheduled").
 
 ---
 

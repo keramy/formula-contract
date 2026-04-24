@@ -45,6 +45,8 @@ interface GanttTimelineProps {
   linkSourceId?: string | null;
   scrollRef: React.RefObject<HTMLDivElement | null>;
   onScroll: (e: React.UIEvent) => void;
+  /** Working-days bitmask for duration tooltips on bars. */
+  workingDaysMask?: number;
   className?: string;
 }
 
@@ -65,6 +67,7 @@ export function GanttTimeline({
   linkSourceId,
   scrollRef,
   onScroll,
+  workingDaysMask,
   className,
 }: GanttTimelineProps) {
   const columns = React.useMemo(
@@ -196,6 +199,7 @@ export function GanttTimeline({
                 onClick={onItemClick}
                 linkMode={linkMode}
                 isLinkSource={linkMode && linkSourceId === row.id}
+                workingDaysMask={workingDaysMask}
               />
             );
           })}

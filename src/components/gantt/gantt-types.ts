@@ -303,6 +303,80 @@ export function daysBetween(start: Date, end: Date): number {
   return Math.round(Math.abs((end.getTime() - start.getTime()) / oneDay)) + 1;
 }
 
+// ---------------------------------------------------------------------------
+// Working-day calendar
+//
+// Per-project bitmask stored in `projects.gantt_working_days`. Bit index
+// matches JavaScript Date.getDay():
+//   bit 0 = Sun, bit 1 = Mon, bit 2 = Tue, ..., bit 6 = Sat
+// Default mask 62 (0b0111110) = Mon-Fri.
+// ---------------------------------------------------------------------------
+
+/** Mon-Fri (0b0111110 = 62). Default when no project setting loaded. */
+export const DEFAULT_WORKING_DAYS_MASK = 62;
+
+export const DAY_LABELS: string[] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/** Is the given date a working day under this mask? */
+export function isWorkingDay(date: Date, mask: number): boolean {
+  return (mask & (1 << date.getDay())) !== 0;
+}
+
+/** Count working days between two dates (inclusive) under the given mask.
+ *  When all 7 bits are set, collapses to daysBetween(start, end). */
+export function workingDaysBetween(start: Date, end: Date, mask: number): number {
+  const fullMask = 127;
+  if ((mask & fullMask) === fullMask) return daysBetween(start, end);
+  const a = new Date(start);
+  a.setHours(0, 0, 0, 0);
+  const b = new Date(end);
+  b.setHours(0, 0, 0, 0);
+  if (a > b) return 0;
+  let count = 0;
+  const cursor = new Date(a);
+  while (cursor <= b) {
+    if (isWorkingDay(cursor, mask)) count++;
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return count;
+}
+
+/** Advance (or rewind) a date by N working days under the given mask.
+ *  When days is 0, returns a clone of the input date unchanged.
+ *  When mask is all-days, falls back to simple calendar-day arithmetic. */
+export function addWorkingDays(date: Date, days: number, mask: number): Date {
+  const result = new Date(date);
+  const fullMask = 127;
+  if (days === 0) return result;
+  if ((mask & fullMask) === fullMask) {
+    result.setDate(result.getDate() + days);
+    return result;
+  }
+  const direction = days > 0 ? 1 : -1;
+  let remaining = Math.abs(days);
+  while (remaining > 0) {
+    result.setDate(result.getDate() + direction);
+    if (isWorkingDay(result, mask)) remaining--;
+  }
+  return result;
+}
+
+/** Human-readable summary of a working-days mask.
+ *  "Mon-Fri", "Mon-Sat", "Every day", or explicit list like "Mon, Wed, Fri". */
+export function formatWorkingDaysMask(mask: number): string {
+  if ((mask & 127) === 127) return "Every day";
+  if (mask === 62) return "Mon-Fri";
+  if (mask === 126) return "Mon-Sat";
+  if (mask === 127) return "Every day";
+  if (mask === 0) return "No working days";
+  const labels: string[] = [];
+  // Show Mon-Sun order (bit 1..6, then bit 0) for readability
+  for (const day of [1, 2, 3, 4, 5, 6, 0]) {
+    if (mask & (1 << day)) labels.push(DAY_LABELS[day]);
+  }
+  return labels.join(", ");
+}
+
 export function isToday(date: Date): boolean {
   const today = new Date();
   return (
@@ -346,10 +420,12 @@ export function getBarHealthColor(item: GanttItem): string | null {
   return null; // on track — use default color
 }
 
-/** Format duration: "45d" for tasks, "M" for milestones */
-export function formatDuration(item: GanttItem): string {
+/** Format duration: "45d" for tasks, "M" for milestones.
+ *  Counts working days under the given mask (defaults to every day for
+ *  backwards compat — call sites pass the project's mask to respect weekends). */
+export function formatDuration(item: GanttItem, mask: number = 127): string {
   if (item.type === "milestone") return "M";
-  return `${daysBetween(item.startDate, item.endDate)}d`;
+  return `${workingDaysBetween(item.startDate, item.endDate, mask)}d`;
 }
 
 // ---------------------------------------------------------------------------

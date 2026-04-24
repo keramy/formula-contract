@@ -150,7 +150,7 @@ export default async function ProjectDetailPage({
       const result = await supabase
         .from("projects")
         .select(`
-          id, project_code, name, slug, description, status, installation_date, contract_value_manual, currency,
+          id, project_code, name, slug, description, status, installation_date, contract_value_manual, currency, gantt_working_days,
           client:clients(id, company_name, contact_person, email, phone)
         `)
         .eq("id", projectId)
@@ -428,6 +428,7 @@ export default async function ProjectDetailPage({
               production_percentage: item.production_percentage,
             }))}
             canEdit={canEdit}
+            workingDaysMask={(project as any)?.gantt_working_days ?? 62}
           />
         </TabsContent>
 

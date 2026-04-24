@@ -679,30 +679,68 @@ function topologicalSort(
 }
 
 /**
+ * Advance a date by N WORKING days under the given bitmask.
+ * Mirrors `addWorkingDays` from gantt-types.ts — duplicated here because this
+ * file is "use server" and can't import client-side modules freely.
+ */
+function addWorkingDaysServer(date: Date, days: number, mask: number): Date {
+  const result = new Date(date);
+  const fullMask = 127;
+  if (days === 0) return result;
+  if ((mask & fullMask) === fullMask) {
+    result.setDate(result.getDate() + days);
+    return result;
+  }
+  const direction = days > 0 ? 1 : -1;
+  let remaining = Math.abs(days);
+  while (remaining > 0) {
+    result.setDate(result.getDate() + direction);
+    if ((mask & (1 << result.getDay())) !== 0) remaining--;
+  }
+  return result;
+}
+
+/** Count working days between two dates (inclusive) under the given mask. */
+function workingDaysBetweenServer(start: Date, end: Date, mask: number): number {
+  const fullMask = 127;
+  const a = new Date(start); a.setHours(0, 0, 0, 0);
+  const b = new Date(end); b.setHours(0, 0, 0, 0);
+  if (a > b) return 0;
+  if ((mask & fullMask) === fullMask) {
+    return Math.round((b.getTime() - a.getTime()) / 86400000) + 1;
+  }
+  let count = 0;
+  const cursor = new Date(a);
+  while (cursor <= b) {
+    if ((mask & (1 << cursor.getDay())) !== 0) count++;
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return count;
+}
+
+/**
  * Calculate the constrained date for a target based on dependency type + lag.
  * Returns the earliest allowed start or end date for the target.
+ *
+ * `lagDays` is interpreted as WORKING days under the given mask — this matches
+ * how users think about dependency lag ("2-day buffer" = two working days).
  */
 function calculateConstrainedDate(
   depType: number,
   lagDays: number,
   sourceStart: Date,
-  sourceEnd: Date
+  sourceEnd: Date,
+  mask: number
 ): { constrainedStart?: Date; constrainedEnd?: Date } {
-  const addDays = (d: Date, days: number) => {
-    const result = new Date(d);
-    result.setDate(result.getDate() + days);
-    return result;
-  };
-
   switch (depType) {
     case 0: // FS: target starts after source finishes
-      return { constrainedStart: addDays(sourceEnd, lagDays) };
+      return { constrainedStart: addWorkingDaysServer(sourceEnd, lagDays, mask) };
     case 1: // SS: target starts when source starts
-      return { constrainedStart: addDays(sourceStart, lagDays) };
+      return { constrainedStart: addWorkingDaysServer(sourceStart, lagDays, mask) };
     case 2: // FF: target finishes when source finishes
-      return { constrainedEnd: addDays(sourceEnd, lagDays) };
+      return { constrainedEnd: addWorkingDaysServer(sourceEnd, lagDays, mask) };
     case 3: // SF: target finishes when source starts
-      return { constrainedEnd: addDays(sourceStart, lagDays) };
+      return { constrainedEnd: addWorkingDaysServer(sourceStart, lagDays, mask) };
     default:
       return {};
   }
@@ -717,6 +755,14 @@ export async function propagateDependencyDates(
   projectId: string
 ): Promise<ActionResult<{ updatedCount: number }>> {
   const supabase = await createClient();
+
+  // Query 0: project working-days mask (defaults to Mon-Fri = 62 if column absent)
+  const { data: projectRow } = await (supabase as any)
+    .from("projects")
+    .select("gantt_working_days")
+    .eq("id", projectId)
+    .maybeSingle();
+  const mask: number = projectRow?.gantt_working_days ?? 62;
 
   // Query 1: all items for this project
   const { data: items, error: itemsError } = await supabase
@@ -777,7 +823,13 @@ export async function propagateDependencyDates(
     const incoming = incomingDeps.get(itemId);
     if (!incoming || incoming.length === 0) continue;
 
-    const duration = item.end.getTime() - item.start.getTime();
+    // Preserve working-day duration under the active mask. If mask was set
+    // after the task was created, we honor the original intent (how many
+    // working days the task spans), not the raw calendar gap.
+    const workingDuration = Math.max(
+      1,
+      workingDaysBetweenServer(item.start, item.end, mask)
+    );
     let newStart = item.start;
     let newEnd = item.end;
 
@@ -797,7 +849,8 @@ export async function propagateDependencyDates(
         dep.dependency_type,
         dep.lag_days,
         source.start,
-        source.end
+        source.end,
+        mask
       );
 
       if (constraint.constrainedStart) {
@@ -814,10 +867,12 @@ export async function propagateDependencyDates(
 
     if (tightestStart) {
       newStart = tightestStart;
-      newEnd = new Date(newStart.getTime() + duration);
+      // End = start + (workingDuration - 1) working days, so end inclusive
+      // matches the original working-day count.
+      newEnd = addWorkingDaysServer(newStart, workingDuration - 1, mask);
     } else if (tightestEnd) {
       newEnd = tightestEnd;
-      newStart = new Date(newEnd.getTime() - duration);
+      newStart = addWorkingDaysServer(newEnd, -(workingDuration - 1), mask);
     }
 
     // Only record if dates actually changed
@@ -993,5 +1048,118 @@ export async function deleteTimelineDependency(dependencyId: string): Promise<Ac
 
   // revalidatePath removed — React Query handles cache
   return { success: true };
+}
+
+// ============================================================================
+// Project Working Days (per-day bitmask)
+//
+// Stored in projects.gantt_working_days as SMALLINT bitmask.
+// Bit index matches JS Date.getDay(): bit 0 = Sun, 1 = Mon, ..., 6 = Sat.
+// Default 62 (0b0111110) = Mon-Fri.
+// ============================================================================
+
+export async function getProjectWorkingDays(projectId: string): Promise<number> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return 62;
+
+  const { data } = await (supabase as any)
+    .from("projects")
+    .select("gantt_working_days")
+    .eq("id", projectId)
+    .maybeSingle();
+
+  return data?.gantt_working_days ?? 62;
+}
+
+/**
+ * Update the per-project working-days bitmask and auto-adjust each task's
+ * end_date so that its working-day duration (under the OLD mask) is preserved
+ * under the NEW mask.
+ *
+ * Example: a 5-working-day task (Mon→Fri under Mon-Fri mask). If Sat becomes a
+ * working day, the 5-day count is recomputed under the new mask — task still
+ * spans 5 working days, but may now finish earlier on the calendar.
+ */
+export async function setProjectWorkingDays(
+  projectId: string,
+  newMask: number
+): Promise<ActionResult<{ updatedCount: number }>> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "Not authenticated" };
+
+  const { data: userData } = await supabase.from("users").select("role").eq("id", user.id).single();
+  if (!userData || !["admin", "pm"].includes(userData.role)) {
+    return { success: false, error: "Only PM and Admin can change working days" };
+  }
+
+  // Sanitize: 7-bit range, non-zero (all-off would make every task zero-length)
+  const clamped = newMask & 127;
+  if (clamped === 0) {
+    return { success: false, error: "At least one day must be a working day" };
+  }
+
+  // Load current mask so we can compute each task's pre-existing working-day count
+  const { data: projectRow } = await (supabase as any)
+    .from("projects")
+    .select("gantt_working_days")
+    .eq("id", projectId)
+    .maybeSingle();
+  const oldMask: number = projectRow?.gantt_working_days ?? 62;
+
+  // Load all non-phase items (phases are derived, don't auto-adjust)
+  const { data: items, error: itemsError } = await supabase
+    .from("gantt_items")
+    .select("id, start_date, end_date, item_type")
+    .eq("project_id", projectId)
+    .neq("item_type", "phase");
+
+  if (itemsError) {
+    return { success: false, error: itemsError.message };
+  }
+
+  // Compute new end_date for each task. Milestones are zero-width (start==end),
+  // so we skip them — no duration to preserve.
+  const updates: { id: string; end_date: string }[] = [];
+  for (const item of items || []) {
+    if (item.item_type === "milestone") continue;
+
+    const start = new Date(item.start_date);
+    const end = new Date(item.end_date);
+    const oldDuration = workingDaysBetweenServer(start, end, oldMask);
+    if (oldDuration <= 0) continue;
+
+    const newEnd = addWorkingDaysServer(start, oldDuration - 1, clamped);
+    const newEndStr = newEnd.toISOString().split("T")[0];
+    if (newEndStr !== item.end_date) {
+      updates.push({ id: item.id, end_date: newEndStr });
+    }
+  }
+
+  // Persist the new mask first so subsequent dependency propagation sees it
+  const { error: updErr } = await (supabase as any)
+    .from("projects")
+    .update({ gantt_working_days: clamped })
+    .eq("id", projectId);
+
+  if (updErr) {
+    return { success: false, error: updErr.message };
+  }
+
+  // Apply date adjustments in parallel
+  if (updates.length > 0) {
+    const results = await Promise.all(
+      updates.map((u) =>
+        supabase.from("gantt_items").update({ end_date: u.end_date }).eq("id", u.id)
+      )
+    );
+    const failed = results.filter((r) => r.error);
+    if (failed.length > 0) {
+      console.error("Working-days adjust: some updates failed", failed.map((f) => f.error));
+    }
+  }
+
+  return { success: true, data: { updatedCount: updates.length } };
 }
 

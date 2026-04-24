@@ -37,6 +37,7 @@ export interface GanttBarProps {
   onContextMenu?: (e: React.MouseEvent, item: GanttItem) => void;
   linkMode?: boolean;
   isLinkSource?: boolean;
+  workingDaysMask?: number;
 }
 
 export function GanttBar({
@@ -55,6 +56,7 @@ export function GanttBar({
   onContextMenu,
   linkMode,
   isLinkSource,
+  workingDaysMask,
 }: GanttBarProps) {
   const barTop = y + (ROW_HEIGHT - TASK_BAR_HEIGHT) / 2;
 
@@ -180,7 +182,7 @@ export function GanttBar({
             {" → "}
             {item.endDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
             {" · "}
-            {formatDuration(item)}
+            {formatDuration(item, workingDaysMask ?? 127)}
           </p>
         </TooltipContent>
       </Tooltip>
@@ -283,7 +285,7 @@ export function GanttBar({
         <TooltipContent side="top" align="start" alignOffset={mouseX - 40} sideOffset={8} className="text-xs">
           <p className="font-medium">{item.name}</p>
           <p className="text-muted-foreground">{dateLabel}</p>
-          <p className="text-muted-foreground">{formatDuration(item)} · {Math.round(progress)}%</p>
+          <p className="text-muted-foreground">{formatDuration(item, workingDaysMask ?? 127)} · {Math.round(progress)}%</p>
         </TooltipContent>
       </Tooltip>
 

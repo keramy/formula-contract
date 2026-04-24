@@ -13,12 +13,14 @@ interface TimelineOverviewProps {
   projectId: string;
   scopeItems: ScopeItem[];
   canEdit?: boolean;
+  workingDaysMask?: number;
 }
 
 export function TimelineOverview({
   projectId,
   scopeItems,
   canEdit = false,
+  workingDaysMask,
 }: TimelineOverviewProps) {
   return (
     <div className="flex-1 h-full min-h-[500px]">
@@ -26,6 +28,7 @@ export function TimelineOverview({
         projectId={projectId}
         scopeItems={scopeItems}
         canEdit={canEdit}
+        workingDaysMask={workingDaysMask}
       />
     </div>
   );

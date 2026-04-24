@@ -23,6 +23,8 @@ interface GanttTableProps {
   onToggleCollapse: (id: string) => void;
   onSelectItem: (id: string, e: React.MouseEvent) => void;
   onDoubleClickItem: (item: GanttItem) => void;
+  /** Working-days bitmask for duration column. Falls back to all-days (127). */
+  workingDaysMask?: number;
   className?: string;
 }
 
@@ -32,6 +34,7 @@ export function GanttTable({
   onToggleCollapse,
   onSelectItem,
   onDoubleClickItem,
+  workingDaysMask,
   className,
 }: GanttTableProps) {
   return (
@@ -68,6 +71,7 @@ export function GanttTable({
                 isSelected={selectedIds.has(row.id)}
                 onSelect={onSelectItem}
                 onDoubleClick={onDoubleClickItem}
+                workingDaysMask={workingDaysMask}
               />
             )
           )}
@@ -176,11 +180,13 @@ function TaskRow({
   isSelected,
   onSelect,
   onDoubleClick,
+  workingDaysMask,
 }: {
   row: GanttRow;
   isSelected: boolean;
   onSelect: (id: string, e: React.MouseEvent) => void;
   onDoubleClick: (item: GanttItem) => void;
+  workingDaysMask?: number;
 }) {
   const { item, phaseColor } = row;
   const progress = Math.min(Math.max(item.progress, 0), 100);
@@ -231,7 +237,7 @@ function TaskRow({
       <td className="px-3 text-muted-foreground tabular-nums">{fmtDate(item.endDate)}</td>
 
       {/* Duration */}
-      <td className="px-3 text-muted-foreground tabular-nums">{formatDuration(item)}</td>
+      <td className="px-3 text-muted-foreground tabular-nums">{formatDuration(item, workingDaysMask ?? 127)}</td>
 
       {/* Progress */}
       <td className="px-3">

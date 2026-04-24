@@ -29,6 +29,7 @@ import {
   useUpdateTimelineDependency,
   useDeleteTimelineDependency,
   useSetTaskPhase,
+  useSetProjectWorkingDays,
 } from "@/lib/react-query/timelines";
 import type { GanttItem as TimelineItem, DependencyType, PhaseKey } from "@/lib/actions/timelines";
 import { UndoRedoProvider, useUndoRedo } from "@/hooks/use-undo-redo";
@@ -64,6 +65,8 @@ interface TimelineClientProps {
   projectId: string;
   scopeItems: ScopeItem[];
   canEdit?: boolean;
+  /** Per-project working-days bitmask (bit 0 = Sun..bit 6 = Sat). Defaults to 62 (Mon-Fri). */
+  workingDaysMask?: number;
   /** @deprecated Kept for backwards compat — header is now inside GanttChart */
   showHeader?: boolean;
   /** @deprecated Kept for backwards compat */
@@ -88,7 +91,11 @@ function TimelineClientInner({
   projectId,
   scopeItems,
   canEdit = false,
+  workingDaysMask: initialMask = 62,
 }: TimelineClientProps) {
+  // Optimistic local copy so the toolbar toggles feel instant; server reconciles via invalidate.
+  const [workingDaysMask, setWorkingDaysMask] = React.useState<number>(initialMask);
+  React.useEffect(() => setWorkingDaysMask(initialMask), [initialMask]);
   const { isMobile } = useBreakpoint();
   const { record } = useUndoRedo();
   // React Query hooks for timeline data
@@ -103,6 +110,16 @@ function TimelineClientInner({
   const updateDependency = useUpdateTimelineDependency(projectId);
   const deleteDependency = useDeleteTimelineDependency(projectId);
   const setPhaseMutation = useSetTaskPhase(projectId);
+  const setWorkingDays = useSetProjectWorkingDays(projectId);
+
+  const handleWorkingDaysChange = React.useCallback(
+    (mask: number) => {
+      if (!canEdit) return;
+      setWorkingDaysMask(mask); // optimistic
+      setWorkingDays.mutate(mask);
+    },
+    [canEdit, setWorkingDays]
+  );
 
   // Form dialog state
   const [formOpen, setFormOpen] = React.useState(false);
@@ -524,6 +541,8 @@ function TimelineClientInner({
           onCreateDependency={canEdit ? handleCreateDependency : undefined}
           onUpdateDependency={canEdit ? handleUpdateDependency : undefined}
           onDeleteDependency={canEdit ? handleDeleteDependency : undefined}
+          workingDaysMask={workingDaysMask}
+          onWorkingDaysChange={canEdit ? handleWorkingDaysChange : undefined}
           className="h-full"
         />
       </div>
