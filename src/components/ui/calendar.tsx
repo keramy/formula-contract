@@ -70,15 +70,13 @@ function Calendar({
   const [displayYears, setDisplayYears] = React.useState<{
     from: number;
     to: number;
-  }>(
-    React.useMemo(() => {
-      const currentYear = new Date().getFullYear();
-      return {
-        from: currentYear - Math.floor(yearRange / 2 - 1),
-        to: currentYear + Math.ceil(yearRange / 2)
-      };
-    }, [yearRange])
-  );
+  }>(() => {
+    const currentYear = new Date().getFullYear();
+    return {
+      from: currentYear - Math.floor(yearRange / 2 - 1),
+      to: currentYear + Math.ceil(yearRange / 2)
+    };
+  });
 
   const { onNextClick, onPrevClick, startMonth, endMonth } = props;
 
@@ -207,7 +205,6 @@ function Calendar({
         ),
         MonthGrid: ({ className, children, ...props }) => (
           <MonthGrid
-            children={children}
             className={className}
             displayYears={displayYears}
             startMonth={startMonth}
@@ -215,7 +212,9 @@ function Calendar({
             navView={navView}
             setNavView={setNavView}
             {...props}
-          />
+          >
+            {children}
+          </MonthGrid>
         )
       }}
       numberOfMonths={columnsDisplayed}
@@ -423,7 +422,7 @@ function YearGrid({
         const isDisabled = isBefore || isAfter;
         return (
           <Button
-            key={i}
+            key={`year-${displayYears.from + i}`}
             className={cn(
               "text-foreground h-7 w-full text-sm font-normal",
               displayYears.from + i === new Date().getFullYear() &&

@@ -669,8 +669,8 @@ export function ProjectOverview({
           </div>
           <TooltipProvider delayDuration={200}>
             <div className="flex flex-wrap items-center gap-2">
-              {attentionItems.map((item, idx) => (
-                <Tooltip key={idx}>
+              {attentionItems.map((item) => (
+                <Tooltip key={item.label}>
                   <TooltipTrigger asChild>
                     <button
                       onClick={() => {
@@ -691,7 +691,7 @@ export function ProjectOverview({
                       </p>
                       <ul className="space-y-0.5">
                         {item.details.slice(0, 5).map((detail, i) => (
-                          <li key={i} className="truncate">• {detail}</li>
+                          <li key={`detail-${i}`} className="truncate">• {detail}</li>
                         ))}
                         {item.details.length > 5 && (
                           <li className="text-muted-foreground">+{item.details.length - 5} more...</li>

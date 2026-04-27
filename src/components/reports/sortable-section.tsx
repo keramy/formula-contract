@@ -113,7 +113,7 @@ export function SortableSection({
             <div className="flex gap-1.5 mt-2 flex-wrap">
               {section.photos.map((url, idx) => (
                 <div
-                  key={idx}
+                  key={url}
                   className="relative w-12 h-9 rounded overflow-hidden bg-slate-100"
                 >
                   <Image

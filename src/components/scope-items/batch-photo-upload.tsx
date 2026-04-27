@@ -264,10 +264,18 @@ export function BatchPhotoUpload({
               className="hidden"
             />
             <div
+              role="button"
+              tabIndex={0}
               onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
               onDragLeave={() => setIsDragOver(false)}
               onDrop={handleDrop}
               onClick={() => inputRef.current?.click()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  inputRef.current?.click();
+                }
+              }}
               className={`flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-10 cursor-pointer transition-colors ${
                 isDragOver
                   ? "border-primary bg-primary/5"
@@ -309,9 +317,11 @@ export function BatchPhotoUpload({
                 </TableHeader>
                 <TableBody>
                   {matched.map((m, i) => (
-                    <TableRow key={i} className={!m.item ? "bg-destructive/5" : ""}>
+                    <TableRow key={m.fileName + "-" + i} className={!m.item ? "bg-destructive/5" : ""}>
                       <TableCell>
                         <div className="size-10 rounded overflow-hidden bg-muted">
+                          {/* Blob URL preview of user-uploaded file — next/image cannot optimize client-side object URLs */}
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={m.previewUrl}
                             alt={m.fileName}

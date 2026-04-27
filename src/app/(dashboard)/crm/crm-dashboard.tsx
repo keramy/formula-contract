@@ -174,7 +174,7 @@ export function CrmDashboard({ userRole }: CrmDashboardProps) {
             {isLoading ? (
               <div className="space-y-3">
                 {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="flex items-center gap-3">
+                  <div key={`skel-${i}`} className="flex items-center gap-3">
                     <Skeleton className="size-2.5 rounded-full shrink-0" />
                     <Skeleton className="h-4 w-24 shrink-0" />
                     <Skeleton className="h-2 flex-1" />

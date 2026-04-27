@@ -162,7 +162,7 @@ export function MaterialsExcelImport({
                     <ScrollArea className="max-h-[100px] mt-2">
                       <ul className="text-xs space-y-1">
                         {parseResult.errors.map((err, i) => (
-                          <li key={i}>
+                          <li key={`mat-err-${err.row}-${i}`}>
                             Row {err.row}: {err.message}
                           </li>
                         ))}
@@ -181,7 +181,7 @@ export function MaterialsExcelImport({
                     <ScrollArea className="max-h-[100px] mt-2">
                       <ul className="text-xs space-y-1">
                         {parseResult.warnings.map((warn, i) => (
-                          <li key={i}>
+                          <li key={`mat-warn-${warn.row}-${i}`}>
                             Row {warn.row}: {warn.message}
                           </li>
                         ))}
@@ -198,7 +198,7 @@ export function MaterialsExcelImport({
                   <ScrollArea className="max-h-[150px]">
                     <div className="space-y-1 text-xs">
                       {parseResult.items.slice(0, 5).map((item, i) => (
-                        <div key={i} className="p-2 bg-muted rounded">
+                        <div key={item.material_code || `mat-preview-${i}`} className="p-2 bg-muted rounded">
                           <div className="flex items-center gap-2">
                             <span className="font-mono text-muted-foreground">{item.material_code}</span>
                             <span className="font-medium">{item.name}</span>

@@ -457,7 +457,7 @@ export function ExcelImport({ projectId, projectCode, compact = false }: ExcelIm
                 </div>
                 <ul className="text-sm space-y-1">
                   {parseResult.errors.slice(0, 5).map((err, i) => (
-                    <li key={i}>Row {err.row}: {err.message}</li>
+                    <li key={`err-${err.row}-${i}`}>Row {err.row}: {err.message}</li>
                   ))}
                   {parseResult.errors.length > 5 && (
                     <li className="text-muted-foreground">
@@ -477,7 +477,7 @@ export function ExcelImport({ projectId, projectCode, compact = false }: ExcelIm
                 </div>
                 <ul className="text-sm space-y-1">
                   {parseResult.warnings.slice(0, 3).map((warn, i) => (
-                    <li key={i}>Row {warn.row}: {warn.message}</li>
+                    <li key={`warn-${warn.row}-${i}`}>Row {warn.row}: {warn.message}</li>
                   ))}
                   {parseResult.warnings.length > 3 && (
                     <li className="text-muted-foreground">
@@ -505,7 +505,7 @@ export function ExcelImport({ projectId, projectCode, compact = false }: ExcelIm
                   </TableHeader>
                   <TableBody>
                     {parseResult.items.map((item, i) => (
-                      <TableRow key={i}>
+                      <TableRow key={`row-${item.item_code || ""}-${i}`}>
                         <TableCell>
                           {item.area_code ? (
                             <Badge variant="outline" className="text-[10px] font-mono">
@@ -598,7 +598,7 @@ export function ExcelImport({ projectId, projectCode, compact = false }: ExcelIm
                 <p className="font-medium text-destructive mb-2">Failed items:</p>
                 <ul className="text-sm space-y-1">
                   {importResults.errors.slice(0, 5).map((err, i) => (
-                    <li key={i}>{err}</li>
+                    <li key={`imp-err-${i}`}>{err}</li>
                   ))}
                   {importResults.errors.length > 5 && (
                     <li className="text-muted-foreground">

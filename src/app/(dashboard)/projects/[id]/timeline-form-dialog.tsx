@@ -71,6 +71,8 @@ const TIMELINE_COLORS = {
 
 const NO_PARENT_VALUE = "__none__";
 
+const EMPTY_DEPENDENCIES: TimelineDependency[] = [];
+
 const PRIORITY_OPTIONS: { value: Priority; label: string; color: string }[] = [
   { value: 1, label: "Low", color: "#94a3b8" },
   { value: 2, label: "Normal", color: "#3b82f6" },
@@ -117,7 +119,7 @@ export function TimelineFormDialog({
   editItem,
   scopeItems,
   timelineItems,
-  dependencies = [],
+  dependencies = EMPTY_DEPENDENCIES,
 }: TimelineFormDialogProps) {
   // React Query mutations
   const createMutation = useCreateTimelineItem(projectId);

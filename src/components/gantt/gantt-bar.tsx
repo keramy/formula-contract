@@ -89,6 +89,9 @@ export function GanttBar({
       <Tooltip>
         <TooltipTrigger asChild>
           <div
+            role="button"
+            tabIndex={0}
+            aria-label={item.name}
             className={cn(
               "absolute flex items-center gap-1.5 select-none z-10 cursor-pointer",
               isSelected && "ring-1 ring-primary/50 rounded-sm",
@@ -102,6 +105,12 @@ export function GanttBar({
               height: TASK_BAR_HEIGHT,
             }}
             onClick={handleClick}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                handleClick(e as unknown as React.MouseEvent);
+              }
+            }}
             onDoubleClick={() => onDoubleClick?.(item)}
             onContextMenu={(e) => onContextMenu?.(e, item)}
           >

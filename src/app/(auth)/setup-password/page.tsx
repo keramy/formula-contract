@@ -77,7 +77,7 @@ export default function SetupPasswordPage() {
       {/* Logo */}
       <div className="flex flex-col items-center gap-2">
         <Image src="/icons/icon-192x192.png" alt="Formula Contract" width={48} height={48} className="w-12 h-12 rounded-xl" />
-        <h1 className="text-xl font-semibold bg-gradient-to-r from-orange-600 to-rose-600 bg-clip-text text-transparent">
+        <h1 className="text-xl font-semibold text-foreground">
           Formula Contract
         </h1>
       </div>

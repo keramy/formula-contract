@@ -37,7 +37,7 @@ export function ScrollIndicator() {
 
   return (
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
-      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/90 backdrop-blur border border-gray-200 shadow-lg text-xs text-muted-foreground animate-bounce">
+      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/90 backdrop-blur border border-gray-200 shadow-lg text-xs text-muted-foreground animate-pulse">
         <ChevronDownIcon className="size-3.5" />
         <span>Scroll for more</span>
       </div>

@@ -56,7 +56,7 @@ export function ProjectsSkeleton() {
 
           {/* Table Rows */}
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="border-b border-gray-50 p-4">
+            <div key={`skel-${i}`} className="border-b border-gray-50 p-4">
               <div className="grid grid-cols-6 gap-4 items-center">
                 <div className="h-5 w-20 bg-gray-100 rounded animate-pulse" />
                 <div className="space-y-1">

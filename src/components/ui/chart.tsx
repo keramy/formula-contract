@@ -73,6 +73,9 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
 
   return (
     <style
+      // Safe: content derives only from typed ChartConfig (theme prefix, chart id, config keys,
+      // color values). No user input reaches this string. This is shadcn's standard pattern for
+      // injecting per-chart CSS custom properties.
       dangerouslySetInnerHTML={{
         __html: Object.entries(THEMES)
           .map(

@@ -123,7 +123,7 @@ export function RecurringTable() {
         <GlassCard className="overflow-hidden">
           <div className="divide-y divide-base-100">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="flex gap-4 p-4">
+              <div key={`skel-${i}`} className="flex gap-4 p-4">
                 <Skeleton className="h-4 w-20" />
                 <Skeleton className="h-4 w-40" />
                 <Skeleton className="h-4 w-24" />

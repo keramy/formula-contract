@@ -86,10 +86,15 @@ export default function NotificationsPage() {
     return () => setContent({});
   }, [setContent, unreadCount]);
 
-  // Reset offset when filters change
-  useEffect(() => {
+  const handleTypeFilterChange = (value: string) => {
+    setTypeFilter(value);
     setOffset(0);
-  }, [typeFilter, unreadOnly]);
+  };
+
+  const handleUnreadOnlyChange = (value: boolean) => {
+    setUnreadOnly(value);
+    setOffset(0);
+  };
 
   const { data, isLoading } = useFilteredNotifications({
     unreadOnly,
@@ -138,7 +143,7 @@ export default function NotificationsPage() {
         <GlassCard>
           <div className="divide-y divide-base-100">
             {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="flex gap-3 p-4">
+              <div key={`skel-${i}`} className="flex gap-3 p-4">
                 <Skeleton className="size-8 rounded-lg shrink-0" />
                 <div className="flex-1 space-y-2">
                   <Skeleton className="h-4 w-3/4" />
@@ -156,7 +161,7 @@ export default function NotificationsPage() {
     <div className="p-4 md:p-6 space-y-4">
       {/* Filters */}
       <div className="flex flex-wrap gap-2 items-center">
-        <Select value={unreadOnly ? "unread" : "all"} onValueChange={(v) => setUnreadOnly(v === "unread")}>
+        <Select value={unreadOnly ? "unread" : "all"} onValueChange={(v) => handleUnreadOnlyChange(v === "unread")}>
           <SelectTrigger className="w-[120px] h-9">
             <SelectValue />
           </SelectTrigger>
@@ -166,7 +171,7 @@ export default function NotificationsPage() {
           </SelectContent>
         </Select>
 
-        <Select value={typeFilter} onValueChange={setTypeFilter}>
+        <Select value={typeFilter} onValueChange={handleTypeFilterChange}>
           <SelectTrigger className="w-[170px] h-9">
             <FilterIcon className="size-3.5 mr-1.5 text-muted-foreground" />
             <SelectValue />
@@ -219,8 +224,17 @@ export default function NotificationsPage() {
                           <>
                             <span> on </span>
                             <span
+                              role="button"
+                              tabIndex={0}
                               className="text-primary font-medium hover:underline cursor-pointer"
                               onClick={(e) => { e.stopPropagation(); router.push(`/projects/${n.project_id}`); }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  router.push(`/projects/${n.project_id}`);
+                                }
+                              }}
                             >{projectName}</span>
                           </>
                         )}
@@ -266,8 +280,17 @@ export default function NotificationsPage() {
                           <>
                             <span> on </span>
                             <span
+                              role="button"
+                              tabIndex={0}
                               className="text-primary font-medium hover:underline cursor-pointer"
                               onClick={(e) => { e.stopPropagation(); router.push(`/projects/${first.project_id}`); }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  router.push(`/projects/${first.project_id}`);
+                                }
+                              }}
                             >{projectName}</span>
                           </>
                         )}
@@ -321,12 +344,12 @@ export default function NotificationsPage() {
           </span>
           <div className="flex gap-2">
             {offset > 0 && (
-              <Button variant="outline" size="sm" onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}>
+              <Button variant="outline" size="sm" onClick={() => setOffset((prev) => Math.max(0, prev - PAGE_SIZE))}>
                 Previous
               </Button>
             )}
             {hasMore && (
-              <Button variant="outline" size="sm" onClick={() => setOffset(offset + PAGE_SIZE)}>
+              <Button variant="outline" size="sm" onClick={() => setOffset((prev) => prev + PAGE_SIZE)}>
                 Next
               </Button>
             )}

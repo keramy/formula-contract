@@ -397,13 +397,13 @@ export function ContactsTable({ userRole }: ContactsTableProps) {
           <div className="border-b border-base-200 px-4 py-3">
             <div className="flex gap-6">
               {Array.from({ length: 6 }).map((_, i) => (
-                <Skeleton key={i} className="h-4 w-16" />
+                <Skeleton key={`skel-${i}`} className="h-4 w-16" />
               ))}
             </div>
           </div>
           <div className="divide-y divide-base-100">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-6 px-4 py-3">
+              <div key={`skel-${i}`} className="flex items-center gap-6 px-4 py-3">
                 <Skeleton className="h-4 w-14" />
                 <Skeleton className="h-4 w-24" />
                 <Skeleton className="h-4 w-20" />

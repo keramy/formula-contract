@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -14,27 +14,23 @@ import { GlassCard } from "@/components/ui/ui-helpers";
 import { AlertCircleIcon, EyeIcon, EyeOffIcon, ShieldAlertIcon, SparklesIcon } from "lucide-react";
 import { loginAction } from "@/lib/actions/auth";
 
+const ERROR_PARAM_MESSAGES: Record<string, string> = {
+  account_deactivated: "Your account has been deactivated. Please contact an administrator.",
+  auth_callback_error: "Authentication failed. Please try again.",
+  auth_link_expired: "Your password reset link has expired. Please request a new one.",
+};
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    () => ERROR_PARAM_MESSAGES[searchParams.get("error") ?? ""] ?? null
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [isRateLimited, setIsRateLimited] = useState(false);
-
-  // Check for error query parameter
-  useEffect(() => {
-    const errorParam = searchParams.get("error");
-    if (errorParam === "account_deactivated") {
-      setError("Your account has been deactivated. Please contact an administrator.");
-    } else if (errorParam === "auth_callback_error") {
-      setError("Authentication failed. Please try again.");
-    } else if (errorParam === "auth_link_expired") {
-      setError("Your password reset link has expired. Please request a new one.");
-    }
-  }, [searchParams]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

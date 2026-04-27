@@ -882,7 +882,6 @@ export function ScopeItemSheet({
                               value={newSupplierForm.name}
                               onChange={(e) => setNewSupplierForm((p) => ({ ...p, name: e.target.value }))}
                               className="h-8 text-sm"
-                              autoFocus
                               onKeyDown={(e) => {
                                 if (e.key === "Escape") {
                                   setShowNewSupplier(false);
@@ -1023,7 +1022,7 @@ export function ScopeItemSheet({
                     <div className="flex flex-wrap gap-2">
                       {images.map((url, idx) => (
                         <Image
-                          key={idx}
+                          key={`${url}-${idx}`}
                           src={url}
                           alt={`Item image ${idx + 1}`}
                           width={80}

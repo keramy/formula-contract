@@ -191,6 +191,9 @@ export function GanttSidebar({
 
       {/* Resize handle — drag to change sidebar width */}
       <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize sidebar"
         className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize z-30 hover:bg-primary/20 active:bg-primary/30 transition-colors"
         onMouseDown={handleMouseDown}
       />

@@ -157,9 +157,11 @@ export function ProjectDetailHeader({
           {SECTION_OPTIONS.map((section) => (
             <label
               key={section.key}
+              htmlFor={`exec-section-${section.key}`}
               className="flex items-start gap-3 p-2.5 rounded-lg hover:bg-base-50 cursor-pointer transition-colors"
             >
               <Checkbox
+                id={`exec-section-${section.key}`}
                 checked={options[section.key]}
                 onCheckedChange={() => toggleOption(section.key)}
                 className="mt-0.5"

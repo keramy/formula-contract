@@ -123,7 +123,7 @@ export function GanttTimeline({
           {/* Column backgrounds + grid lines */}
           {columns.map((col, i) => (
             <div
-              key={i}
+              key={`col-${i}`}
               className={cn(
                 "absolute top-0",
                 col.isWeekend && viewMode === "day" && "bg-muted/30",
@@ -309,7 +309,7 @@ function DayHeader({
       <div className="flex" style={{ height: halfH }}>
         {columns.map((col, i) => (
           <div
-            key={i}
+            key={`day-${i}`}
             className={cn(
               "flex items-center justify-center gap-0.5 text-[10px] border-r border-border/20",
               col.isToday && "text-teal-600 font-bold",
@@ -383,7 +383,7 @@ function WeekHeader({
 
           return (
             <div
-              key={i}
+              key={`week-${i}`}
               className={cn(
                 "flex items-center justify-center text-[10px] font-medium border-r border-border/20",
                 isTodayWeek ? "bg-foreground text-background rounded-sm" : "text-muted-foreground"
@@ -420,7 +420,7 @@ function MonthHeader({
 
           return (
             <div
-              key={i}
+              key={`month-${i}`}
               className={cn(
                 "flex items-center px-2 text-[10px] font-medium border-r border-border/20",
                 isTodayMonth ? "text-foreground" : "text-muted-foreground"

@@ -59,9 +59,11 @@ export function TeamShareSelector({
         {teamMembers.map((member) => (
           <label
             key={member.id}
+            htmlFor={`team-share-${member.id}`}
             className="flex items-center gap-3 p-2 rounded hover:bg-muted/50 cursor-pointer"
           >
             <Checkbox
+              id={`team-share-${member.id}`}
               checked={selectedUserIds.includes(member.id)}
               onCheckedChange={() => onToggleUser(member.id)}
             />

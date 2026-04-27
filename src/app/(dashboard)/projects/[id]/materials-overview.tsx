@@ -113,10 +113,6 @@ export function MaterialsOverview({
   const [approvalAction, setApprovalAction] = useState<"approve" | "reject">("approve");
   const [approvalMaterial, setApprovalMaterial] = useState<Material | null>(null);
 
-  if (hookLoading && !propMaterials) {
-    return <div className="space-y-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-48 w-full" /></div>;
-  }
-
   // OPTIMIZED: Memoize stats calculation to avoid recomputing on every render
   const stats = useMemo(() => ({
     total: materials.length,
@@ -190,6 +186,10 @@ export function MaterialsOverview({
       setApprovalDialogOpen(true);
     }
   }, [materials]);
+
+  if (hookLoading && !propMaterials) {
+    return <div className="space-y-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-48 w-full" /></div>;
+  }
 
   if (materials.length === 0 && scopeItems.length === 0) {
     return (
@@ -360,6 +360,7 @@ export function MaterialsOverview({
       {/* Material Sheet (slide-out drawer) - only mount when open */}
       {formDialogOpen && (
         <MaterialSheet
+          key={editMaterial?.id ?? "new-material"}
           projectId={projectId}
           scopeItems={scopeItems}
           open={formDialogOpen}

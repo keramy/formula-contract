@@ -203,7 +203,7 @@ export function InvoicesTable() {
         <GlassCard className="overflow-hidden">
           <div className="divide-y divide-base-100">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="flex gap-4 p-4">
+              <div key={`skel-${i}`} className="flex gap-4 p-4">
                 <Skeleton className="h-4 w-4" />
                 <Skeleton className="h-4 w-20" />
                 <Skeleton className="h-4 w-32" />
@@ -374,7 +374,18 @@ export function InvoicesTable() {
             filtered.map((inv) => {
               const supplier = inv.supplier as { name: string; supplier_code: string } | null;
               return (
-                <div key={inv.id} onClick={() => setPreviewId(inv.id)}>
+                <div
+                  key={inv.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setPreviewId(inv.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setPreviewId(inv.id);
+                    }
+                  }}
+                >
                   <GlassCard
                     hover="subtle"
                     className={cn("p-4", inv.days_overdue > 0 && "bg-rose-50/30 border-rose-200")}

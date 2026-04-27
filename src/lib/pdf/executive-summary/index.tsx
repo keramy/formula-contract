@@ -188,7 +188,7 @@ const s = StyleSheet.create({
     marginTop: 8,
   },
   sectionBarText: {
-    fontSize: 7.5,
+    fontSize: 8,
     fontFamily: "Helvetica-Bold",
     color: C.white,
     letterSpacing: 1.2,
@@ -221,7 +221,7 @@ const s = StyleSheet.create({
   },
   infoLabel: {
     width: 75,
-    fontSize: 7.5,
+    fontSize: 8,
     color: C.gray600,
     fontFamily: "Helvetica-Bold",
     paddingVertical: 4,
@@ -327,7 +327,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     marginBottom: 5,
   },
-  approvalLabel: { width: 60, fontSize: 7.5, color: C.gray600 },
+  approvalLabel: { width: 60, fontSize: 8, color: C.gray600 },
   approvalBarOuter: {
     flex: 1,
     height: 6,
@@ -342,7 +342,7 @@ const s = StyleSheet.create({
     borderRadius: 3,
   },
   approvalFraction: {
-    fontSize: 7.5,
+    fontSize: 8,
     fontFamily: "Helvetica-Bold",
     color: C.dark,
     width: 36,
@@ -392,7 +392,7 @@ const s = StyleSheet.create({
     paddingVertical: 3,
     paddingHorizontal: 8,
   },
-  statusLabel: { width: 85, fontSize: 7.5, color: C.gray600 },
+  statusLabel: { width: 85, fontSize: 8, color: C.gray600 },
   statusBarOuter: {
     flex: 1,
     height: 8,
@@ -474,7 +474,7 @@ const s = StyleSheet.create({
     borderTopWidth: 0,
   },
   alertText: {
-    fontSize: 7.5,
+    fontSize: 8,
     color: C.gray600,
     flex: 1,
   },
@@ -716,8 +716,8 @@ function ExecutiveSummaryDocument({ data, options }: DocProps) {
                   {/* Snagging */}
                   {options.includeSnagging && data.snaggingTotal > 0 && (
                     <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8, gap: 6 }}>
-                      <Text style={{ fontSize: 7.5, color: C.amber, fontFamily: "Helvetica-Bold" }}>SNAGGING</Text>
-                      <Text style={{ fontSize: 7.5, color: C.gray600 }}>
+                      <Text style={{ fontSize: 8, color: C.amber, fontFamily: "Helvetica-Bold" }}>SNAGGING</Text>
+                      <Text style={{ fontSize: 8, color: C.gray600 }}>
                         {data.snaggingResolved}/{data.snaggingTotal} resolved
                         {data.snaggingTotal - data.snaggingResolved > 0
                           ? ` \u2014 ${data.snaggingTotal - data.snaggingResolved} outstanding`

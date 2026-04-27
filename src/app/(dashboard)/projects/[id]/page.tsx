@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
 import { getRequestContext } from "@/lib/supabase/server";
@@ -230,6 +231,7 @@ export default async function ProjectDetailPage({
 
       {/* Tabs - responsive with "More" dropdown on mobile */}
       {/* Badge counts for deferred data default to 0; they'll appear when tabs self-fetch */}
+      <Suspense fallback={<div className="py-8 text-center text-muted-foreground">Loading...</div>}>
       <ProjectTabs
         scopeItemsCount={scopeItems.length}
         isClient={isClient}
@@ -445,6 +447,7 @@ export default async function ProjectDetailPage({
           <ActivityFeed projectId={projectId} limit={50} maxHeight="600px" />
         </TabsContent>
       </ProjectTabs>
+      </Suspense>
     </div>
   );
 }

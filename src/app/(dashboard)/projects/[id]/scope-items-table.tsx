@@ -410,6 +410,9 @@ function ResizableHead({
     >
       {children}
       <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize column"
         onMouseDown={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -1357,7 +1360,7 @@ export function ScopeItemsTable({ projectId, items: initialItems, materials, are
   // Extract memoized summary values for cleaner JSX
   const { totalSalesPrice, totalActualCost, totalInitialCost, avgProgress } = summaryStats;
 
-  const renderColumnsControl = () => (
+  const columnsControl = (
     <Popover open={columnPopoverOpen} onOpenChange={setColumnPopoverOpen}>
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm" className="h-8 px-2.5">
@@ -1502,7 +1505,7 @@ export function ScopeItemsTable({ projectId, items: initialItems, materials, are
         totalCount={items.length}
         filteredCount={filteredItems.length}
         areas={areas}
-        renderExtraAction={isMobile ? undefined : renderColumnsControl}
+        extraAction={isMobile ? undefined : columnsControl}
       />
 
       {/* Selection Toolbar */}

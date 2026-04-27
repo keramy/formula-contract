@@ -252,10 +252,18 @@ export function ScopeItemImageUpload({
           />
           <div
             ref={dropZoneRef}
+            role="button"
+            tabIndex={0}
             onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
             onDragLeave={() => setIsDragOver(false)}
             onDrop={handleDrop}
             onClick={() => !isUploading && inputRef.current?.click()}
+            onKeyDown={(e) => {
+              if ((e.key === "Enter" || e.key === " ") && !isUploading) {
+                e.preventDefault();
+                inputRef.current?.click();
+              }
+            }}
             className={cn(
               "flex flex-col items-center gap-1.5 p-4 rounded-lg border-2 border-dashed cursor-pointer transition-colors",
               isDragOver

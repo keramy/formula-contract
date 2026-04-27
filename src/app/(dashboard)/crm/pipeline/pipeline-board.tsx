@@ -136,7 +136,7 @@ function PipelineSkeleton() {
       </div>
       <div className="flex gap-3 overflow-x-auto pb-4">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="w-72 shrink-0 space-y-2">
+          <div key={`skel-${i}`} className="w-72 shrink-0 space-y-2">
             <Skeleton className="h-10 w-full rounded-lg" />
             <Skeleton className="h-24 w-full rounded-lg" />
             <Skeleton className="h-24 w-full rounded-lg" />

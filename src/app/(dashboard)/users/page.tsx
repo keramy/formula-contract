@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { UsersTable } from "./users-table";
 import { UsersPageHeader } from "./users-page-header";
@@ -66,7 +67,9 @@ export default async function UsersPage({
       <TeamMembersCard users={allUsers} />
 
       {/* Users Table */}
-      <UsersTable users={allUsers} />
+      <Suspense fallback={<div className="py-8 text-center text-muted-foreground">Loading users...</div>}>
+        <UsersTable users={allUsers} />
+      </Suspense>
     </div>
   );
 }

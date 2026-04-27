@@ -166,7 +166,7 @@ export function FinanceAccessManager() {
           {isLoading ? (
             <div className="space-y-3">
               {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-base-50/50">
+                <div key={`fa-skel-${i}`} className="flex items-center justify-between p-3 rounded-lg bg-base-50/50">
                   <div className="space-y-1.5">
                     <Skeleton className="h-4 w-32" />
                     <Skeleton className="h-3 w-48" />
@@ -248,8 +248,9 @@ export function FinanceAccessManager() {
           ) : (
             <div className="flex flex-col sm:flex-row items-start sm:items-end gap-3">
               <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">Day</label>
+                <label htmlFor="finance-schedule-day" className="text-xs text-muted-foreground">Day</label>
                 <select
+                  id="finance-schedule-day"
                   className="flex h-9 w-full sm:w-36 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   value={scheduleDay}
                   onChange={(e) => setScheduleDay(Number(e.target.value))}
@@ -264,14 +265,15 @@ export function FinanceAccessManager() {
                 </select>
               </div>
               <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">Time (Turkey)</label>
+                <label htmlFor="finance-schedule-hour" className="text-xs text-muted-foreground">Time (Turkey)</label>
                 <select
+                  id="finance-schedule-hour"
                   className="flex h-9 w-full sm:w-32 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   value={scheduleHour + 3}
                   onChange={(e) => setScheduleHour(Number(e.target.value) - 3)}
                 >
                   {Array.from({ length: 24 }, (_, i) => (
-                    <option key={i} value={i}>
+                    <option key={`hour-${i}`} value={i}>
                       {String(i).padStart(2, "0")}:00
                     </option>
                   ))}

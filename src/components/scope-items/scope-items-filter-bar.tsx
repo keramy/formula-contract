@@ -112,7 +112,7 @@ interface ScopeItemsFilterBarProps {
   totalCount: number;
   filteredCount: number;
   areas?: AreaOption[];
-  renderExtraAction?: () => React.ReactNode;
+  extraAction?: React.ReactNode;
   className?: string;
 }
 
@@ -135,7 +135,7 @@ export function ScopeItemsFilterBar({
   totalCount,
   filteredCount,
   areas,
-  renderExtraAction,
+  extraAction,
   className,
 }: ScopeItemsFilterBarProps) {
   const { isMobile } = useBreakpoint();
@@ -231,7 +231,7 @@ export function ScopeItemsFilterBar({
             )}
           </div>
 
-          {renderExtraAction && <div className="shrink-0">{renderExtraAction()}</div>}
+          {extraAction && <div className="shrink-0">{extraAction}</div>}
 
           <Button
             variant="outline"
@@ -613,7 +613,7 @@ export function ScopeItemsFilterBar({
           </DropdownMenu>
         )}
 
-        {renderExtraAction && renderExtraAction()}
+        {extraAction}
 
         {/* Clear all filters */}
         {hasActiveFilters && (
