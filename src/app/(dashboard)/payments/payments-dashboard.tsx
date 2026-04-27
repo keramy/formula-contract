@@ -36,16 +36,7 @@ import {
 } from "@/lib/react-query/finance";
 import type { AgingBucket } from "@/types/finance";
 import { formatCurrency } from "@/lib/utils";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  CartesianGrid,
-} from "recharts";
+import { CashFlowChart } from "./cash-flow-chart";
 
 interface PaymentsDashboardProps {
   userRole: string;
@@ -259,52 +250,7 @@ export function PaymentsDashboard({ userRole }: PaymentsDashboardProps) {
               </p>
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={224}>
-              <BarChart data={cashFlowData} barGap={2} barCategoryGap="20%">
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="hsl(var(--border))"
-                  vertical={false}
-                />
-                <XAxis
-                  dataKey="month"
-                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                  tickLine={false}
-                  axisLine={{ stroke: "hsl(var(--border))" }}
-                  dy={8}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                  tickLine={false}
-                  axisLine={false}
-                  width={55}
-                  tickFormatter={(v: number) => {
-                    if (v === 0) return "0";
-                    if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
-                    if (v >= 1_000) return `${(v / 1_000).toFixed(0)}K`;
-                    return String(v);
-                  }}
-                />
-                <Tooltip
-                  cursor={{ fill: "hsl(var(--muted))", opacity: 0.3, radius: 4 }}
-                  content={<CashFlowTooltip />}
-                />
-                <Bar
-                  dataKey="outgoing"
-                  name="Outgoing"
-                  fill="#f87171"
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={40}
-                />
-                <Bar
-                  dataKey="incoming"
-                  name="Incoming"
-                  fill="#34d399"
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={40}
-                />
-              </BarChart>
-            </ResponsiveContainer>
+            <CashFlowChart data={cashFlowData} />
           )}
         </CardContent>
       </GlassCard>
@@ -329,7 +275,7 @@ export function PaymentsDashboard({ userRole }: PaymentsDashboardProps) {
             {isLoadingPayable ? (
               <div className="space-y-3">
                 {Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="flex items-center gap-3">
+                  <div key={`skel-payable-${i}`} className="flex items-center gap-3">
                     <Skeleton className="h-4 w-20 shrink-0" />
                     <Skeleton className="h-3 flex-1" />
                     <Skeleton className="h-4 w-16" />
@@ -363,7 +309,7 @@ export function PaymentsDashboard({ userRole }: PaymentsDashboardProps) {
             {isLoadingReceivable ? (
               <div className="space-y-3">
                 {Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="flex items-center gap-3">
+                  <div key={`skel-receivable-${i}`} className="flex items-center gap-3">
                     <Skeleton className="h-4 w-20 shrink-0" />
                     <Skeleton className="h-3 flex-1" />
                     <Skeleton className="h-4 w-16" />
@@ -396,6 +342,7 @@ export function PaymentsDashboard({ userRole }: PaymentsDashboardProps) {
                 {SUMMARY_TIMEFRAMES.map((tf) => (
                   <label
                     key={tf.value}
+                    htmlFor={`timeframe-${tf.value}`}
                     className={`flex items-center gap-3 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
                       summaryTimeframe === tf.value
                         ? "border-primary bg-primary/5"
@@ -403,6 +350,7 @@ export function PaymentsDashboard({ userRole }: PaymentsDashboardProps) {
                     }`}
                   >
                     <input
+                      id={`timeframe-${tf.value}`}
                       type="radio"
                       name="timeframe"
                       value={tf.value}
@@ -459,46 +407,6 @@ export function PaymentsDashboard({ userRole }: PaymentsDashboardProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
-  );
-}
-
-// Custom tooltip for cash flow chart (React Doctor rule #21 — module scope)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function CashFlowTooltip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null;
-
-  const outgoing = payload.find((p: { dataKey: string }) => p.dataKey === "outgoing")?.value ?? 0;
-  const incoming = payload.find((p: { dataKey: string }) => p.dataKey === "incoming")?.value ?? 0;
-  const net = incoming - outgoing;
-
-  return (
-    <div className="rounded-lg border border-base-200 bg-card px-3 py-2.5 shadow-lg">
-      <p className="text-xs font-semibold mb-1.5">{label}</p>
-      <div className="space-y-1">
-        <div className="flex items-center justify-between gap-6">
-          <div className="flex items-center gap-1.5">
-            <div className="size-2 rounded-full bg-rose-400" />
-            <span className="text-xs text-muted-foreground">Outgoing</span>
-          </div>
-          <span className="text-xs font-medium tabular-nums">{formatCurrency(outgoing)}</span>
-        </div>
-        <div className="flex items-center justify-between gap-6">
-          <div className="flex items-center gap-1.5">
-            <div className="size-2 rounded-full bg-emerald-400" />
-            <span className="text-xs text-muted-foreground">Incoming</span>
-          </div>
-          <span className="text-xs font-medium tabular-nums">{formatCurrency(incoming)}</span>
-        </div>
-        <div className="border-t border-base-200 pt-1 mt-1">
-          <div className="flex items-center justify-between gap-6">
-            <span className="text-xs font-medium">Net</span>
-            <span className={`text-xs font-semibold tabular-nums ${net >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
-              {net >= 0 ? "+" : ""}{formatCurrency(net)}
-            </span>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
