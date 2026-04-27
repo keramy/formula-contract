@@ -17,11 +17,19 @@
 import { sendWeeklyDigestEmails } from "@/lib/actions/finance";
 
 export async function GET(request: Request) {
-  // Verify cron secret
-  const authHeader = request.headers.get("authorization");
+  // Verify cron secret. Fail closed: a missing CRON_SECRET is a server
+  // configuration error, not a free pass to invoke the digest publicly.
   const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    console.error("[finance-digest] CRON_SECRET is not configured");
+    return Response.json(
+      { error: "Server misconfigured" },
+      { status: 500 },
+    );
+  }
 
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  const authHeader = request.headers.get("authorization");
+  if (authHeader !== `Bearer ${cronSecret}`) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 

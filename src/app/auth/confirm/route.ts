@@ -19,11 +19,12 @@ export async function GET(request: NextRequest) {
   const error_description = requestUrl.searchParams.get("error_description");
   const origin = requestUrl.origin;
 
+  // Log only redacted shape — the PKCE `code` is single-use auth material
+  // and must not be persisted to log aggregators via request.url.
   console.log("Auth confirm received:", {
     code: code ? "present" : "missing",
     error_param,
     error_description,
-    fullUrl: request.url,
   });
 
   // If Supabase returned an error directly
