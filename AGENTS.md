@@ -1099,3 +1099,27 @@ After the initial sweep that landed at 86/100 with 458 warnings, a second round 
 const [name, setName] = useState(() => editItem?.name ?? "");
 const [other, setOther] = useState(() => editItem?.other ?? "");
 ```
+
+### Sweep Result — Committed, Not Pushed (April 27, 2026 EOD)
+
+4 commits landed on `master`, awaiting user testing before push:
+
+```
+7bbdbc4  refactor(dialogs): key-prop remount for form dialog state init   (17 files)
+3ac2957  refactor(auth): server-side check for change-password redirect   (2 files)
+c50fb51  perf(charts): lazy-load recharts via next/dynamic                (13 files)
+c2c29ac  fix(react-doctor): correctness, a11y, and Next.js patterns       (42 files)
+```
+
+**Status:** React Doctor 75 → 86 (errors 8 → 0, warnings 496 → 442). No tests modified, no migrations. Lint baseline unchanged (116 pre-existing errors held constant).
+
+**User feedback received:**
+- Noticed the scroll-indicator pill on `/dashboard` changed motion. This was `animate-bounce` → `animate-pulse` in commit `c2c29ac` (per react-doctor `no-inline-bounce-easing` rule). User confirmed the observation was unrelated to react-doctor; they did not request a revert. Leave as-is unless asked.
+
+**Testing checklist for the user before `git push`:**
+- [ ] `c2c29ac` — Materials tab loads (skeleton flash OK), notification filter resets pagination, scope-items columns popover still works (was renamed `renderColumnsControl` → `columnsControl`)
+- [ ] `c50fb51` — Visit `/finance`, `/reports`, `/payments`. Each chart should show a brief muted-bg pulse skeleton then render. Watch network tab — separate JS chunks should load.
+- [ ] `3ac2957` — `/change-password` while logged out → instant redirect to `/login` (no flash). Logged-in user without `must_change_password` → instant redirect to `/dashboard`.
+- [ ] `7bbdbc4` — Open each refactored dialog (Users, Milestones, Snagging, Materials, Report sections, Drawing upload, Gantt dependency) in create→edit→create sequence. Form should reset cleanly at every transition; no stale fields.
+
+**If something breaks:** `git revert <sha>` rolls back exactly that phase. The cross-cutting ride-along changes (key prop on materials-overview parent, autoFocus removal in scope-item-sheet, etc.) are deliberately ordered so the surviving change is harmless on its own.
