@@ -15,8 +15,9 @@ import { createClient, type RequestContext } from "@/lib/supabase/server";
 import { logActivity } from "@/lib/activity-log/actions";
 import { ACTIVITY_ACTIONS } from "@/lib/activity-log/constants";
 import { sanitizeText, sanitizeHTML } from "@/lib/sanitize";
-import { Resend } from "resend";
 import { ReportPublishedEmail } from "@/emails/report-published-email";
+import { getSiteUrl } from "@/lib/platform/env";
+import { getResendClient } from "@/lib/platform/mail";
 import type { ReportTypeValue } from "@/components/reports/report-types";
 
 // ============================================================================
@@ -143,7 +144,7 @@ async function sendReportPublishedNotification(
   pdfUrl?: string
 ): Promise<{ sent: number; failed: number }> {
   const supabase = await createClient();
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+  const siteUrl = getSiteUrl();
 
   // Get all user IDs assigned to this project
   const { data: assignments, error: assignmentsError } = await supabase
@@ -207,8 +208,8 @@ async function sendReportPublishedNotification(
   }
 
   // 2. Send email notifications using Resend batch API (avoids rate limits)
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
+  const resend = getResendClient();
+  if (!resend) {
     return { sent: users.length, failed: 0 };
   }
 
@@ -237,7 +238,6 @@ async function sendReportPublishedNotification(
   }));
 
   try {
-    const resend = new Resend(apiKey);
     // Batch send - single API call for up to 100 emails
     const { data, error: batchError } = await resend.batch.send(emailRequests);
 

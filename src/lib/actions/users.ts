@@ -13,10 +13,11 @@
 import { createClient } from "@supabase/supabase-js";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { Resend } from "resend";
+import { getResendClient } from "@/lib/platform/mail";
 import { randomBytes } from "crypto";
 import { checkUserCreationRateLimit } from "@/lib/rate-limit";
 import { sanitizeText } from "@/lib/sanitize";
+import { getSiteUrl } from "@/lib/platform/env";
 import { WelcomeEmail } from "@/emails/welcome-email";
 
 // ============================================================================
@@ -66,14 +67,12 @@ async function sendWelcomeEmail(
   name: string,
   tempPassword: string
 ): Promise<{ success: boolean; error?: string }> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    console.log("RESEND_API_KEY not configured, skipping email");
-    return { success: true }; // Not an error, just skip
+  const resend = getResendClient();
+  if (!resend) {
+    return { success: true }; // Not an error, just skip — helper logs warn-once
   }
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-  const resend = new Resend(apiKey);
+  const siteUrl = getSiteUrl();
 
   try {
     await resend.emails.send({

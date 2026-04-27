@@ -12,6 +12,8 @@ import { revalidatePath } from "next/cache";
 import { createClient, getUserRoleFromJWT } from "@/lib/supabase/server";
 import { sanitizeText } from "@/lib/sanitize";
 import { logActivity } from "@/lib/activity-log/actions";
+import { getSiteUrl } from "@/lib/platform/env";
+import { getResendClient } from "@/lib/platform/mail";
 import type {
   FinanceSupplier,
   FinanceSupplierWithStats,
@@ -2114,13 +2116,11 @@ export async function sendWeeklyDigestEmails(): Promise<ActionResult<{ sent: num
   });
 
   // Send emails via Resend
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) return { success: false, error: "RESEND_API_KEY not configured" };
+  const resend = getResendClient();
+  if (!resend) return { success: false, error: "RESEND_API_KEY not configured" };
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-  const { Resend } = await import("resend");
+  const siteUrl = getSiteUrl();
   const { FinanceSummaryEmail } = await import("@/emails/finance-summary-email");
-  const resend = new Resend(apiKey);
 
   const pdfFilename = `Formula_Payment_Schedule_${weekLabel.replace(/\s/g, "_")}.pdf`;
 
@@ -2372,13 +2372,11 @@ export async function sendManualSummary(options: {
   });
 
   // Send emails
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) return { success: false, error: "RESEND_API_KEY not configured" };
+  const resend = getResendClient();
+  if (!resend) return { success: false, error: "RESEND_API_KEY not configured" };
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-  const { Resend } = await import("resend");
+  const siteUrl = getSiteUrl();
   const { FinanceSummaryEmail } = await import("@/emails/finance-summary-email");
-  const resend = new Resend(apiKey);
 
   const weekLabel = getWeekLabel();
   const emailSubject = options.dateRange === "all"
@@ -2528,13 +2526,11 @@ export async function notifyTeamUrgent(
     .filter((u: { email: string }) => u.email);
 
   // Send emails
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) return { success: false, error: "RESEND_API_KEY not configured" };
+  const resend = getResendClient();
+  if (!resend) return { success: false, error: "RESEND_API_KEY not configured" };
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-  const { Resend } = await import("resend");
+  const siteUrl = getSiteUrl();
   const { FinanceUrgentEmail } = await import("@/emails/finance-urgent-email");
-  const resend = new Resend(apiKey);
 
   const totalsText = Object.entries(totalsByurrency)
     .map(([currency, amount]) => {

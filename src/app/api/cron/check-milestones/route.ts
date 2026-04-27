@@ -8,9 +8,10 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
-import { Resend } from "resend";
 import { MilestoneAlertEmail } from "@/emails/milestone-alert-email";
 import { NextResponse } from "next/server";
+import { getSiteUrl } from "@/lib/platform/env";
+import { getResendClient } from "@/lib/platform/mail";
 
 // Use service role key for cron jobs (bypasses RLS)
 const supabase = createClient(
@@ -18,12 +19,8 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const resend = process.env.RESEND_API_KEY
-  ? new Resend(process.env.RESEND_API_KEY)
-  : null;
-
-const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL || "https://formula-contract.vercel.app";
+const resend = getResendClient();
+const siteUrl = getSiteUrl();
 
 interface MilestoneWithProject {
   id: string;

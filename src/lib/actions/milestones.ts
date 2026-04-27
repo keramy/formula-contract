@@ -12,7 +12,8 @@
 import { createClient, type RequestContext } from "@/lib/supabase/server";
 import { logActivity } from "@/lib/activity-log/actions";
 import { ACTIVITY_ACTIONS } from "@/lib/activity-log/constants";
-import { Resend } from "resend";
+import { getSiteUrl } from "@/lib/platform/env";
+import { getResendClient } from "@/lib/platform/mail";
 import { MilestoneAlertEmail } from "@/emails/milestone-alert-email";
 
 // ============================================================================
@@ -423,7 +424,7 @@ async function notifyTeamAboutMilestone(
   }
 ) {
   const supabase = await createClient();
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+  const siteUrl = getSiteUrl();
 
   // Get project details
   const { data: project } = await supabase
@@ -470,8 +471,8 @@ async function notifyTeamAboutMilestone(
   }
 
   // 2. Send email notifications using Resend batch API
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey || !milestoneDetails) {
+  const resend = getResendClient();
+  if (!resend || !milestoneDetails) {
     return;
   }
 
@@ -506,7 +507,6 @@ async function notifyTeamAboutMilestone(
   }));
 
   try {
-    const resend = new Resend(apiKey);
     const { error: batchError } = await resend.batch.send(emailRequests);
 
     if (batchError) {
