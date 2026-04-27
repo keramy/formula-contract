@@ -823,6 +823,7 @@ export function DrawingsOverview({ projectId, projectCode, projectName, producti
 
       {/* Drawing Upload Sheet */}
       <DrawingUploadSheet
+        key={preselectedItemId ?? "no-preselect"}
         projectId={projectId}
         scopeItems={productionItems.map((item) => {
           const drawing = drawingsByItemId.get(item.id);

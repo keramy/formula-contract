@@ -420,6 +420,7 @@ export function MilestoneCards({
 
       {/* Form Dialog */}
       <MilestoneFormDialog
+        key={editItem?.id ?? "new-milestone"}
         projectId={projectId}
         open={formDialogOpen}
         onOpenChange={setFormDialogOpen}

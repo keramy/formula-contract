@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,35 +58,14 @@ export function UserFormDialog({ open, onOpenChange, editUser }: UserFormDialogP
   const [emailSent, setEmailSent] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Form state
-  const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [role, setRole] = useState("pm");
+  // Form state — initialized from editUser. Parent must pass `key={editUser?.id ?? "new-user"}`
+  // so component remounts when switching between create and edit (or between edit targets).
+  const [email, setEmail] = useState(() => editUser?.email ?? "");
+  const [name, setName] = useState(() => editUser?.name ?? "");
+  const [phone, setPhone] = useState(() => editUser?.phone ?? "");
+  const [role, setRole] = useState(() => editUser?.role ?? "pm");
 
   const isEditing = !!editUser;
-
-  // Sync form with editUser
-  useEffect(() => {
-    if (open) {
-      if (editUser) {
-        setEmail(editUser.email);
-        setName(editUser.name);
-        setPhone(editUser.phone || "");
-        setRole(editUser.role);
-      } else {
-        setEmail("");
-        setName("");
-        setPhone("");
-        setRole("pm");
-      }
-      setError(null);
-      setSuccess(false);
-      setTempPassword(null);
-      setEmailSent(false);
-      setCopied(false);
-    }
-  }, [open, editUser]);
 
   const handleClose = () => {
     onOpenChange(false);

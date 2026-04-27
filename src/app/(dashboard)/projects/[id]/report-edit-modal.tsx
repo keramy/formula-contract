@@ -99,12 +99,14 @@ export function ReportEditModal({
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  // Report metadata state
+  // Report metadata state — initialized from report. Parent passes `key={editReport.id}`.
   const [reportType, setReportType] = useState(report.report_type);
   const [shareWithClient, setShareWithClient] = useState(report.share_with_client);
 
   // Sections state (local until save)
-  const [sections, setSections] = useState<LocalSection[]>([]);
+  const [sections, setSections] = useState<LocalSection[]>(() =>
+    linesToSections(report.lines || [])
+  );
   const [deletedSectionIds, setDeletedSectionIds] = useState<string[]>([]);
 
   // Section form state
@@ -129,21 +131,12 @@ export function ReportEditModal({
     })
   );
 
-  // Initialize state from report when modal opens
+  // Log view activity once when the modal opens
   useEffect(() => {
     if (open) {
-      setReportType(report.report_type);
-      setShareWithClient(report.share_with_client);
-      setSections(linesToSections(report.lines || []));
-      setDeletedSectionIds([]);
-      setError(null);
-      setSectionFormOpen(false);
-      setEditingSection(null);
-
-      // Log view activity (fire and forget)
       logReportActivity(report.id, "viewed").catch(console.error);
     }
-  }, [open, report]);
+  }, [open, report.id]);
 
   // Handle modal close
   const handleOpenChange = (newOpen: boolean) => {
@@ -459,6 +452,7 @@ export function ReportEditModal({
 
       {/* Section Add/Edit Dialog */}
       <SectionFormDialog
+        key={editingSection?.id ?? "new-section"}
         open={sectionFormOpen}
         onOpenChange={setSectionFormOpen}
         editingSection={editingSection}

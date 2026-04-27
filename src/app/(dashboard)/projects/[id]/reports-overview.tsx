@@ -163,6 +163,7 @@ export function ReportsOverview({
       {/* Edit Modal - Full editing experience for existing reports */}
       {editReport && (
         <ReportEditModal
+          key={editReport.id}
           projectId={projectId}
           report={editReport}
           open={editDialogOpen}

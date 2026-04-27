@@ -691,6 +691,7 @@ export function ReportCreationModal({
 
       {/* Section Add/Edit Dialog */}
       <SectionFormDialog
+        key={editingSection?.id ?? "new-section"}
         open={sectionFormOpen}
         onOpenChange={setSectionFormOpen}
         editingSection={editingSection}

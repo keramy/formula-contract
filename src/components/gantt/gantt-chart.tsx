@@ -627,6 +627,7 @@ export function GanttChart({
 
         {/* Dependency dialog */}
         <GanttDependencyDialog
+          key={selectedDep ? `${selectedDep.sourceId}-${selectedDep.targetId}` : "new-dep"}
           open={depDialogOpen}
           onOpenChange={setDepDialogOpen}
           sourceItem={linkSource}

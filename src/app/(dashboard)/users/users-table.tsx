@@ -163,6 +163,7 @@ export function UsersTable({ users }: UsersTableProps) {
           />
         </GlassCard>
         <UserFormDialog
+          key={editUser?.id ?? "new-user"}
           open={dialogOpen}
           onOpenChange={setDialogOpen}
           editUser={editUser}
@@ -434,6 +435,7 @@ export function UsersTable({ users }: UsersTableProps) {
 
       {/* Form Dialog */}
       <UserFormDialog
+        key={editUser?.id ?? "new-user"}
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         editUser={editUser}

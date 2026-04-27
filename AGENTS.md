@@ -1038,3 +1038,64 @@ Agent: Claude Code
 - ~~**Remaining TS errors**~~ — **FIXED**: `e2e/gantt.spec.ts:3` added `Page` type annotation, `scope-items.test.ts:562` removed redundant `id` before spread
 - **TypeScript: 0 errors** — full codebase compiles clean as of Feb 10, 2026
 - **Tests: 289 passing, 0 failures** — all 14 test files pass
+
+---
+
+## React Doctor Sweep (April 27, 2026)
+
+### Score: 75 → 86 (+11)
+Started at 75/100 with 8 errors and 496 warnings; ended at 86/100 with 0 errors and ~458 warnings. The remaining warnings are mostly architectural patterns intentionally chosen by the team (form-dialog state-init, optimistic-UI editors, shadcn public exports).
+
+### Phase Summary
+- **Phase 1 — Critical correctness** (8 errors → 0): Hook-order violation in `materials-overview.tsx` (early return before useMemo + 6 useCallback hooks), `useEffect` state-reset in `notifications/page.tsx:90`, plus quick fixes in `calendar.tsx`, `timeline-form-dialog.tsx`, `chart.tsx`.
+- **Phase 2 — Next.js patterns**: Wrapped `UsersTable` and `ProjectTabs` in `<Suspense>` for `useSearchParams`. Added eslint-disable + comment for blob-URL `<img>` in `batch-photo-upload.tsx`. Several flagged items were false positives (login already wrapped, dashboard staged queries are intentional, invoice-sheet awaits are dependent).
+- **Phase 3 — Accessibility**: Drop zones got `role="button" tabIndex={0} onKeyDown`. Resize handles got `role="separator" aria-orientation="vertical"`. Notification project-name spans got keyboard support. 5 labels got `htmlFor`/`id` associations. Removed 2 `autoFocus` props.
+- **Phase 4 — Performance**: Split 5 chart files into `*-impl.tsx` + `next/dynamic` wrappers (BudgetTrendChart, BudgetBreakdown, ProjectStatusChart, MaterialsStatusChart, ProductionProgressChart). Extracted inline cash-flow chart from `payments-dashboard.tsx` to `cash-flow-chart{,-impl}.tsx`. Sidebar `useMemo` → lazy `useState` pattern.
+- **Phase 5 — Design polish + array keys**: 27 array-index keys converted to stable strings (`skel-${i}`, `${entry.status}`, `${file.name}-${i}`, etc.). Removed gradient text on setup-password. Replaced `animate-bounce` with `animate-pulse`. Renamed `renderExtraAction()` function-prop to `extraAction` ReactNode.
+- **Phase 6 — State & effects (partial)**: Login query-param `useEffect` → lazy `useState` initializer with `ERROR_PARAM_MESSAGES` map. Deferred 18 form-dialog `useEffect` form-init refactors (would require parent-level `key`-prop remount across ~12 dialogs — high risk of regression for marginal score).
+- **Phase 7 — Dead code audit**: All 11 "unused" files have legitimate uses (k6 load-tests run manually, scripts/* manual utilities, `e2e/*.setup.ts` matched by playwright `testMatch` pattern, `src/test/utils.tsx` documented in TESTING-GUIDE.md, shannon_auditfiles excluded by tsconfig). 162+99 unused exports/types include shadcn public surface and types-defined-for-completeness — kept.
+- **Phase 8 — useReducer (deferred)**: 42 components flagged. Status editors (installation/production/shipped/procurement) need `useState(prop)` for **optimistic UI** — local state IS the source of truth for in-flight edits, prop is the on-error revert target. Form dialogs are independent-state cases where useReducer is anti-pattern.
+- **Phase 9 — Giant components (deferred)**: 43 components flagged. Top targets (`scope-items-table.tsx` 944 lines, `ProjectsListClient` 428 lines) are page-scope components where extracting helpers adds indirection without clear benefit. Defer to feature-driven refactor.
+
+### Files Touched
+~50 files modified, 12 new files created (5 chart-impl + 5 chart-wrapper + cash-flow-chart-impl + cash-flow-chart). No tests modified, no migrations.
+
+### What's Next
+- Form-dialog form-init refactor pass: convert `useEffect(() => { setX(item.x); ... }, [item])` patterns to `key={item?.id}` + `useState(() => item?.x ?? "")`. Affects ~12 dialogs. Should be done as one focused PR.
+- Recharts dynamic imports: 8 of 8 chart files now lazy-load. Verify in production bundle analyzer that initial JS dropped meaningfully.
+
+
+### React Doctor Sweep — Round 2 (April 27, 2026 cont.)
+After the initial sweep that landed at 86/100 with 458 warnings, a second round addressed the "fixable but deferred" items.
+
+**Round A — Array keys + PDF fonts:**
+- 15 more skeleton files: `key={i}` → `key={`skel-${i}`}` (CRM tables, payments tables, notifications, payments-dashboard aging buckets)
+- `lib/pdf/executive-summary/index.tsx` — bumped 5 instances of `fontSize: 7.5` → `fontSize: 8`
+
+**Round B — change-password redirect to server-side:**
+- Split `change-password/page.tsx` into a server component (auth check + `redirect()`) and a `change-password-form.tsx` client component
+- Removed the `router.push()` in `useEffect` anti-pattern; auth check now happens server-side before form renders
+- Auth check uses `supabase.auth.getUser()` directly — no separate server action call
+
+**Round C — Form-dialog `key={item?.id}` refactor (7 dialogs):**
+- `UserFormDialog` — parent (`users-table.tsx` 2 sites) passes `key={editUser?.id ?? "new-user"}`; component now uses lazy `useState(() => editUser?.x ?? "")` initializers and removed the form-init `useEffect`
+- `MilestoneFormDialog` — same pattern, parents `milestones-overview.tsx` and `milestone-cards.tsx`
+- `SnaggingFormDialog` — same pattern, parent `snagging-overview.tsx`
+- `MaterialSheet` — same pattern, parent `materials-overview.tsx` (already conditionally mounted, now also keyed)
+- `SectionFormDialog` — same pattern, two parents `report-creation-modal.tsx` and `report-edit-modal.tsx`
+- `DrawingUploadSheet` — keyed by `preselectedItemId`
+- `GanttDependencyDialog` — keyed by `${selectedDep.sourceId}-${selectedDep.targetId}` or `"new-dep"`
+- `ReportEditModal` — keyed by `editReport.id`; the form-init `useEffect` was split: state init moved to lazy `useState`, the `logReportActivity` side-effect remains in a focused effect
+- **Skipped:** `MaterialFormDialog` (dead code per knip), `TimelineFormDialog` (form init depends on `itemById` Map computed in component body — lazy init can't access it), CRM sheets (use react-hook-form's `reset()` pattern which is RHF idiom, not a refactor target), `excel-import.tsx` / `team-overview.tsx` / `finance-access-manager.tsx` / `scope-item-sheet.tsx` (legitimate async data-fetch effects, not form-init)
+
+**Result:** 458 → 442 warnings (-16). Score still 86 (bucket is wide). Codebase quality improved meaningfully — 7 form dialogs no longer rely on the cascading-setState-in-useEffect anti-pattern. New rendered dialog state is now derived from props at mount time, with parent-controlled remounts via `key`.
+
+**Pattern documented for future dialogs:**
+```tsx
+// Parent
+{open && <Dialog key={editItem?.id ?? "new"} editItem={editItem} ... />}
+
+// Dialog (no useEffect form init)
+const [name, setName] = useState(() => editItem?.name ?? "");
+const [other, setOther] = useState(() => editItem?.other ?? "");
+```

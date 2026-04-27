@@ -14,7 +14,7 @@
  * Used in both report creation and editing modals.
  */
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useCallback } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,10 +59,12 @@ export function SectionFormDialog({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const nativeCameraRef = useRef<HTMLInputElement>(null);
 
-  // Form state
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [photos, setPhotos] = useState<string[]>([]);
+  // Form state — initialized from editingSection. Parent passes `key={editingSection?.id ?? "new-section"}`.
+  const [title, setTitle] = useState(() => editingSection?.title ?? "");
+  const [description, setDescription] = useState(() => editingSection?.description ?? "");
+  const [photos, setPhotos] = useState<string[]>(() =>
+    editingSection ? [...editingSection.photos] : []
+  );
 
   // Loading/error state
   const [isUploading, setIsUploading] = useState(false);
@@ -78,25 +80,6 @@ export function SectionFormDialog({
   );
   const photosBeforeCameraRef = useRef(0);
   const [cameraCaptureCount, setCameraCaptureCount] = useState(0);
-
-  // Reset form when opening or when editing section changes
-  useEffect(() => {
-    if (open) {
-      if (editingSection) {
-        setTitle(editingSection.title);
-        setDescription(editingSection.description);
-        setPhotos([...editingSection.photos]);
-      } else {
-        setTitle("");
-        setDescription("");
-        setPhotos([]);
-      }
-      setError(null);
-      setCameraMode("off");
-      setUploadProgress(null);
-      setCameraCaptureCount(0);
-    }
-  }, [open, editingSection]);
 
   // -------------------------------------------------------------------
   // Shared upload helper
@@ -404,7 +387,7 @@ export function SectionFormDialog({
               <div className="flex flex-wrap gap-3">
                 {photos.map((url, idx) => (
                   <div
-                    key={idx}
+                    key={`${url}-${idx}`}
                     className="relative w-28 h-20 rounded-lg overflow-hidden bg-slate-100 group border"
                   >
                     <Image

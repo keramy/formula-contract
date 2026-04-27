@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useTransition } from "react";
+import { useState, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { materialKeys } from "@/lib/react-query/materials";
@@ -198,22 +198,6 @@ export function MaterialSheet({
     });
   };
 
-  // Sync form when editMaterial changes or sheet opens
-  useEffect(() => {
-    if (open) {
-      if (editMaterial) {
-        setMaterialCode(editMaterial.material_code);
-        setName(editMaterial.name);
-        setSpecification(editMaterial.specification || "");
-        setSupplier(editMaterial.supplier || "");
-        setImages(editMaterial.images || []);
-        setSelectedItemIds(new Set(editMaterial.assignedItemIds));
-      } else {
-        resetForm();
-      }
-    }
-  }, [open, editMaterial]);
-
   return (
     <Sheet open={open} onOpenChange={handleClose}>
       <SheetContent className="w-full sm:max-w-lg flex flex-col p-0">
@@ -401,7 +385,6 @@ export function MaterialSheet({
                           onChange={(e) => setScopeItemsSearch(e.target.value)}
                           placeholder="Search by code or name..."
                           className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                          autoFocus
                         />
                         {scopeItemsSearch && (
                           <button

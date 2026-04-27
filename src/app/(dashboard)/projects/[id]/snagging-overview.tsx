@@ -362,6 +362,7 @@ export function SnaggingOverview({
 
       {/* Form Dialog */}
       <SnaggingFormDialog
+        key={editItem?.id ?? "new-snagging"}
         projectId={projectId}
         scopeItems={scopeItems}
         open={formDialogOpen}

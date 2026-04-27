@@ -56,13 +56,6 @@ export function GanttDependencyDialog({
     existingDependency?.lagDays?.toString() ?? "0"
   );
 
-  React.useEffect(() => {
-    if (open) {
-      setDependencyType(existingDependency?.type ?? 0);
-      setLagDays(existingDependency?.lagDays?.toString() ?? "0");
-    }
-  }, [open, existingDependency]);
-
   const sourceName =
     sourceItem?.name ??
     (existingDependency && getItemName

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { projectTabKeys } from "@/lib/react-query/project-tabs";
@@ -55,30 +55,16 @@ export function MilestoneFormDialog({
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
 
-  // Form state
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [dueDate, setDueDate] = useState("");
-  const [alertDays, setAlertDays] = useState("7");
+  // Form state — initialized from editItem. Parent passes `key={editItem?.id ?? "new-milestone"}`
+  // so component remounts when switching create/edit targets.
+  const [name, setName] = useState(() => editItem?.name ?? "");
+  const [description, setDescription] = useState(() => editItem?.description ?? "");
+  const [dueDate, setDueDate] = useState(() =>
+    editItem ? format(new Date(editItem.due_date), "yyyy-MM-dd") : ""
+  );
+  const [alertDays, setAlertDays] = useState(() => String(editItem?.alert_days_before ?? 7));
 
   const isEditing = !!editItem;
-
-  // Sync form with editItem
-  useEffect(() => {
-    if (open) {
-      if (editItem) {
-        setName(editItem.name);
-        setDescription(editItem.description || "");
-        setDueDate(format(new Date(editItem.due_date), "yyyy-MM-dd"));
-        setAlertDays(String(editItem.alert_days_before || 7));
-      } else {
-        setName("");
-        setDescription("");
-        setDueDate("");
-        setAlertDays("7");
-      }
-    }
-  }, [open, editItem]);
 
   const handleClose = () => {
     onOpenChange(false);

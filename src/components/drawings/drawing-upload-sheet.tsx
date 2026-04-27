@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { projectTabKeys } from "@/lib/react-query/project-tabs";
@@ -75,20 +75,14 @@ export function DrawingUploadSheet({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cadFileInputRef = useRef<HTMLInputElement>(null);
 
-  const [selectedItemId, setSelectedItemId] = useState(preselectedItemId || "");
+  // Form state — initialized from preselectedItemId. Parent passes `key={preselectedItemId ?? "no-preselect"}`.
+  const [selectedItemId, setSelectedItemId] = useState(() => preselectedItemId ?? "");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [cadFile, setCadFile] = useState<File | null>(null);
   const [notes, setNotes] = useState("");
-
-  // Sync selectedItemId when sheet opens or preselectedItemId changes
-  useEffect(() => {
-    if (open) {
-      setSelectedItemId(preselectedItemId || "");
-    }
-  }, [open, preselectedItemId]);
 
   const selectedItem = scopeItems.find((item) => item.id === selectedItemId);
   const hasDrawing = selectedItem?.hasDrawing || false;

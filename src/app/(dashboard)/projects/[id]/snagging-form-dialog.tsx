@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
@@ -61,30 +61,13 @@ export function SnaggingFormDialog({
   const [isLoading, setIsLoading] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
 
-  // Form state
-  const [description, setDescription] = useState("");
-  const [itemId, setItemId] = useState<string>("none");
-  const [photos, setPhotos] = useState<string[]>([]);
-  const [resolutionNotes, setResolutionNotes] = useState("");
+  // Form state — initialized from editItem. Parent passes `key={editItem?.id ?? "new-snagging"}`.
+  const [description, setDescription] = useState(() => editItem?.description ?? "");
+  const [itemId, setItemId] = useState<string>(() => editItem?.item_id ?? "none");
+  const [photos, setPhotos] = useState<string[]>(() => editItem?.photos ?? []);
+  const [resolutionNotes, setResolutionNotes] = useState(() => editItem?.resolution_notes ?? "");
 
   const isEditing = !!editItem;
-
-  // Sync form with editItem
-  useEffect(() => {
-    if (open) {
-      if (editItem) {
-        setDescription(editItem.description);
-        setItemId(editItem.item_id || "none");
-        setPhotos(editItem.photos || []);
-        setResolutionNotes(editItem.resolution_notes || "");
-      } else {
-        setDescription("");
-        setItemId("none");
-        setPhotos([]);
-        setResolutionNotes("");
-      }
-    }
-  }, [open, editItem]);
 
   const handleClose = () => {
     onOpenChange(false);
