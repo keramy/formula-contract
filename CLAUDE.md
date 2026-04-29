@@ -87,7 +87,7 @@ docs/                 # Extended documentation (see "Documentation Map" below)
 
 **Supporting:** `project_assignments`, `item_materials`, `milestones`, `snagging`, `notifications`, `activity_log`, `drafts`, `report_shares`
 
-**CRM (Sales):** `crm_brands`, `crm_architecture_firms`, `crm_contacts`, `crm_opportunities`, `crm_activities`, `crm_brand_firm_links`
+**CRM (Sales) — UI REMOVED, tables retained:** `crm_brands`, `crm_architecture_firms`, `crm_contacts`, `crm_opportunities`, `crm_activities`, `crm_brand_firm_links`. The CRM module's UI, server actions, validations, types, and tests were removed. The DB tables, views, RLS policies, and seed data are intentionally retained so the data isn't lost. **Do not add new code that depends on these tables** — if CRM functionality is needed again, decide whether to restore from git history or rebuild differently.
 
 ### Admin Views (for Supabase Studio browsing)
 Instead of browsing raw tables with UUID foreign keys, use these `v_*` views to see human-readable project/item context:
@@ -105,9 +105,8 @@ Instead of browsing raw tables with UUID foreign keys, use these `v_*` views to 
 | `v_project_assignments` | Assignments + names | `project_code`, `employee_code`, `user_role` |
 | `v_clients` | Clients + project count | `client_code`, `company_name`, `project_count` |
 | `v_users` | Users + assignment count | `employee_code`, `role`, `assigned_projects` |
-| `v_crm_brands` | Brands + opportunity/activity counts | `brand_code`, `name`, `tier`, `opportunity_count` |
-| `v_crm_opportunities` | Opportunities + brand/firm/user names | `opportunity_code`, `brand_name`, `firm_name`, `stage` |
-| `v_crm_activities` | Activities + all relation names | `activity_type`, `brand_name`, `firm_name`, `contact_name` |
+
+(CRM admin views `v_crm_brands`, `v_crm_opportunities`, `v_crm_activities` still exist but are no longer surfaced in the app — UI removed.)
 
 ### Key Enums
 ```
@@ -232,8 +231,7 @@ scope-items/{project_id}/{item_id}/image_1.jpg
 13. **Timeline migration 045 applied** - `045_gantt_rewrite.sql` has been run on Supabase
     **Admin views migration 047 applied** - `047_admin_views_scope_drawings_materials.sql` has been run on Supabase
     **PM assignment RLS fix migration 048** - `048_fix_pm_assignment_privilege_escalation.sql` — PMs can only manage assignments for projects they're already assigned to
-    **CRM module migration 049 applied** - `049_crm_module.sql` — 6 tables, sequences, auto-code triggers, RLS, indexes, 3 admin views
-    **CRM seed data migration 050 applied** - `050_crm_seed_data.sql` — 37 brands, 12 firms, 18 links, 5 opportunities
+    **CRM migrations 049, 050 applied but UI removed** - tables and seed data still in DB; do NOT add code that depends on `crm_*` tables (see Database Schema section above)
     **RLS InitPlan fix migration 058 applied** - `058_fix_rls_initplan_notifications_users.sql` — notifications + users policies use (SELECT auth.uid())
     **RLS recursion fix migration 059 applied** - `059_fix_rls_recursion_security_definer.sql` — get_user_role() and is_assigned_to_project() set to SECURITY DEFINER to prevent infinite recursion
     **Auto-assign creator migration 060 applied** - `060_auto_assign_project_creator.sql` — SECURITY DEFINER trigger on projects INSERT auto-assigns creator to project_assignments. Bypasses RLS chicken-and-egg (PM can't assign to project they're not on yet)
@@ -248,9 +246,6 @@ scope-items/{project_id}/{item_id}/image_1.jpg
 18. **Views need `security_invoker`** - Always use `DROP VIEW + CREATE VIEW WITH (security_invoker = true)`, not `CREATE OR REPLACE VIEW` (defaults to SECURITY DEFINER, bypasses RLS)
 19. **Browse `v_*` views, not raw tables** - In Supabase Studio, use `v_scope_items` instead of `scope_items` to see `project_code`/`project_name` next to each record
 20. **PM override uses server action** - `overrideDrawingApproval()` in `lib/actions/drawings.ts` enforces reason validation server-side; never bypass with inline Supabase calls
-27. **CRM auto-code inserts need `as any`** - `brand_code`, `firm_code`, `contact_code`, `opportunity_code` are NOT NULL without DEFAULT (trigger fills them), so TypeScript types require them on insert. Use `as any` on the insert payload.
-28. **CRM form types use `z.input<>` not `z.infer<>`** - When a Zod schema uses `.default()`, `z.infer` marks the field as required (output) but `zodResolver` works with the input type where defaults are optional. All CRM `FormData` types use `z.input<typeof schema>`.
-29. **CRM access roles** - admin = read/write, management = read-only, others (including pm) = no access. Server actions use `requireCrmAccess(["admin"])` for writes, default `["admin", "management"]` for reads.
 30. **Supabase email templates must use `token_hash` not `ConfirmationURL`** - Custom SMTP (Resend) email templates must link to `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=recovery&next=/reset-password`. Never use `{{ .ConfirmationURL }}` — it routes through Supabase's `/verify` which uses hash fragments that server-side handlers can't read.
 31. **Auth callback handles both `code` and `token_hash`** - `/auth/callback/route.ts` supports PKCE code exchange AND token_hash OTP verification. `/auth/confirm/route.ts` is a secondary handler for the confirm path.
 42. **RLS helper functions MUST be SECURITY DEFINER** - `get_user_role()`, `is_assigned_to_project()`, `is_client_for_project()` must all be `SECURITY DEFINER`. Without it, they trigger RLS on the tables they query, causing `stack depth limit exceeded` (infinite recursion). This caused a production outage. See migration 059.
@@ -258,7 +253,7 @@ scope-items/{project_id}/{item_id}/image_1.jpg
 44. **JWT metadata must include `name`** - Layout reads user name from `user.user_metadata.name`. When creating/updating users, always sync name to JWT metadata via `auth.admin.updateUserById()`. If missing, sidebar shows email prefix instead of full name.
 45. **`authenticated` role timeout is 8s by default** - Supabase sets `statement_timeout=8s` for the `authenticated` role. All app queries through PostgREST run under this timeout. Currently set to 30s (changed Apr 3, 2026). Monitor and consider reverting to 8s once query performance is optimized.
 46. **Shared request context pattern** - Use `getRequestContext()` from `server.ts` to resolve auth once per request. All server actions accept optional `ctx?: RequestContext` as last parameter. Dashboard creates context once, passes to all helpers. Server-rendered hot paths should always pass `ctx`; client-triggered server actions may omit it (they create their own). No new hot-path helper should call `auth.getUser()` if `ctx` is available.
-47. **No revalidatePath on project mutations** - Removed from scope-items, materials, reports, drawings, milestones, project-assignments. UI updates via `queryClient.invalidateQueries()` in components. Only CRM, Finance, Users still use revalidatePath.
+47. **No revalidatePath on project mutations** - Removed from scope-items, materials, reports, drawings, milestones, project-assignments. UI updates via `queryClient.invalidateQueries()` in components. Only Finance and Users still use revalidatePath.
 48. **Link prefetch={false} on dashboard** - All Link components in sidebar, dashboard page, and dashboard widgets must have `prefetch={false}` to prevent hidden route storms that overwhelm the DB.
 49. **Project creator is auto-assigned** - Migration 060 adds an `AFTER INSERT` trigger on `projects` that auto-inserts the creator into `project_assignments` (SECURITY DEFINER, bypasses RLS). The wizard passes `created_by: authUser.id` in the insert payload. Other team members are assigned separately via `assignUserToProject()` which now passes RLS because the creator is already assigned.
 50. **Online presence uses Supabase Realtime Presence** — `PresenceProvider` in dashboard layout joins `presence:online` channel. `useOnlineUsers()` hook reads state. Zero DB writes for presence — DB only touched by `touchLastActive()` every 5 min for "last seen" fallback.
@@ -335,6 +330,7 @@ npm run version:major   # 1.0.0 → 2.0.0 (breaking changes)
 - Gantt Chart Rewrite (Apr 1, 2026): Complete clean rewrite — 13 new files, single ganttRows array with absolute Y positioning, table view, dependency arrows, baselines, critical path. Migrations 056-057. Drag/resize removed for DB safety — edit via dialogs.
 - Executive Summary PDF (Mar 28, 2026): React-PDF based executive summary with design options dialog.
 - Payments Module (Mar 17-23, 2026): Full AP/AR payment tracking under `/payments`. 8 DB tables (migrations 052-055), whitelist-based access, invoices with VAT/installments, Excel export, notification system.
+- CRM Module Removed (Apr 28, 2026): UI, server actions, validations, types, and tests removed. DB tables, views, RLS, and seed data retained — restorable from git history if needed.
 - CRM Module (Feb 27, 2026): Full sales CRM — 6 tables, 37 brands, 12 firms, pipeline kanban, contacts, activities timeline.
 
 ### In Progress

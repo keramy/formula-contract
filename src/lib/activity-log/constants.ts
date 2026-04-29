@@ -61,20 +61,6 @@ export const ACTIVITY_ACTIONS = {
   // Bulk actions
   ITEMS_IMPORTED: "items_imported",
   DRAWINGS_BULK_SENT_TO_CLIENT: "drawings_bulk_sent_to_client",
-
-  // CRM actions
-  CRM_BRAND_CREATED: "crm_brand_created",
-  CRM_BRAND_UPDATED: "crm_brand_updated",
-  CRM_BRAND_DELETED: "crm_brand_deleted",
-  CRM_FIRM_CREATED: "crm_firm_created",
-  CRM_FIRM_UPDATED: "crm_firm_updated",
-  CRM_VENDOR_STATUS_UPDATED: "crm_vendor_status_updated",
-  CRM_CONTACT_CREATED: "crm_contact_created",
-  CRM_CONTACT_UPDATED: "crm_contact_updated",
-  CRM_OPPORTUNITY_CREATED: "crm_opportunity_created",
-  CRM_OPPORTUNITY_UPDATED: "crm_opportunity_updated",
-  CRM_OPPORTUNITY_STAGE_CHANGED: "crm_opportunity_stage_changed",
-  CRM_ACTIVITY_LOGGED: "crm_activity_logged",
 } as const;
 
 export type ActivityAction = (typeof ACTIVITY_ACTIONS)[keyof typeof ACTIVITY_ACTIONS];

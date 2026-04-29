@@ -12,7 +12,6 @@ import {
   FileTextIcon,
   SettingsIcon,
   WalletIcon,
-  TargetIcon,
   BanknoteIcon,
   GanttChartIcon,
 } from "lucide-react";
@@ -47,7 +46,6 @@ const routePermissions: Record<string, string[]> = {
   "/projects": ["admin", "pm", "production", "procurement", "management", "client"], // Clients see assigned projects
   "/timeline": ["admin", "pm", "production", "procurement", "management"], // Hidden for clients
   "/clients": ["admin", "pm"],
-  "/crm": ["admin", "management"],
   "/finance": ["admin", "management"],
   "/payments": ["admin", "pm", "management"], // PM access controlled by finance_access whitelist on the page
   "/users": ["admin"],
@@ -61,7 +59,6 @@ const navItemColors: Record<string, string> = {
   "/projects": "teal",
   "/timeline": "teal",
   "/clients": "slate",
-  "/crm": "amber",
   "/finance": "teal",
   "/payments": "amber",
   "/users": "coral",
@@ -89,11 +86,6 @@ const mainNavItems = [
     title: "Clients",
     href: "/clients",
     icon: BuildingIcon,
-  },
-  {
-    title: "CRM",
-    href: "/crm",
-    icon: TargetIcon,
   },
   {
     title: "Finance",
