@@ -12,7 +12,8 @@ export async function GET(request: NextRequest) {
   const error_description = requestUrl.searchParams.get("error_description");
   const origin = requestUrl.origin;
 
-  // Log all params for debugging
+  // Log only redacted shape — `code`, `token_hash`, and the raw URL contain
+  // single-use auth material that must not land in log aggregators.
   console.log("Auth callback received:", {
     code: code ? "present" : "missing",
     token_hash: token_hash ? "present" : "missing",
@@ -20,7 +21,6 @@ export async function GET(request: NextRequest) {
     next,
     error_param,
     error_description,
-    fullUrl: request.url,
   });
 
   // If Supabase returned an error directly

@@ -11,7 +11,10 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
-import { createClient as createServerClient } from "@/lib/supabase/server";
+import {
+  createClient as createServerClient,
+  getUserRoleFromJWT,
+} from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { Resend } from "resend";
 import { randomBytes } from "crypto";
@@ -56,6 +59,29 @@ function createAdminClient() {
       persistSession: false,
     },
   });
+}
+
+/**
+ * Server-side admin guard. Resolves the calling user, checks role from JWT
+ * (with DB fallback), and returns an error if the caller is not an admin.
+ *
+ * Every privileged user-management action MUST start with this — UI gating
+ * provides zero security against direct server-action invocation.
+ */
+async function requireAdmin(): Promise<{ error: string | null; userId?: string }> {
+  const supabase = await createServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Not authenticated" };
+  }
+
+  const role = await getUserRoleFromJWT(user, supabase);
+  if (role !== "admin") {
+    return { error: "Not authorized" };
+  }
+
+  return { error: null, userId: user.id };
 }
 
 /**
@@ -109,7 +135,14 @@ async function sendWelcomeEmail(
  *
  * IMPORTANT: Call this whenever role or is_active changes!
  */
-export async function syncUserAuthMetadata(
+/**
+ * Internal implementation. Skips the admin guard so the bulk loop and
+ * already-guarded callers (updateUser, updateUserRole) don't pay the
+ * per-iteration auth cost. Never export this directly — exposing it as a
+ * "use server" entry point would let any logged-in user elevate their own
+ * JWT role to admin.
+ */
+async function _syncUserAuthMetadata(
   userId: string,
   data: { role?: string; is_active?: boolean }
 ): Promise<ActionResult> {
@@ -152,6 +185,17 @@ export async function syncUserAuthMetadata(
   }
 }
 
+export async function syncUserAuthMetadata(
+  userId: string,
+  data: { role?: string; is_active?: boolean }
+): Promise<ActionResult> {
+  const guard = await requireAdmin();
+  if (guard.error) {
+    return { success: false, error: guard.error };
+  }
+  return _syncUserAuthMetadata(userId, data);
+}
+
 /**
  * Bulk sync all users' metadata to JWT claims
  * Run this once to migrate existing users, or periodically as a safety net
@@ -162,8 +206,14 @@ export async function syncAllUsersMetadata(): Promise<{
   failed: number;
   errors: string[];
 }> {
-  const supabase = createAdminClient();
   const results = { success: true, synced: 0, failed: 0, errors: [] as string[] };
+
+  const guard = await requireAdmin();
+  if (guard.error) {
+    return { ...results, success: false, errors: [guard.error] };
+  }
+
+  const supabase = createAdminClient();
 
   try {
     // Get all users from the users table
@@ -175,9 +225,11 @@ export async function syncAllUsersMetadata(): Promise<{
       return { ...results, success: false, errors: [error?.message || "Failed to fetch users"] };
     }
 
-    // Sync each user's metadata
+    // Sync each user's metadata. Use the unguarded helper — we already
+    // verified the caller is admin once above, so re-checking per row would
+    // just add latency without changing the security outcome.
     for (const user of users) {
-      const syncResult = await syncUserAuthMetadata(user.id, {
+      const syncResult = await _syncUserAuthMetadata(user.id, {
         role: user.role,
         is_active: user.is_active,
       });
@@ -216,16 +268,15 @@ export async function inviteUser(data: {
   role: string;
 }): Promise<InviteUserResult> {
   try {
-    // Get current user (admin) for rate limiting
-    const serverSupabase = await createServerClient();
-    const { data: { user: currentUser } } = await serverSupabase.auth.getUser();
-
-    if (!currentUser) {
-      return { success: false, error: "You must be logged in to create users" };
+    // Trust boundary: only admins may invite users. UI gating is not enough
+    // because server actions are publicly callable POST endpoints.
+    const guard = await requireAdmin();
+    if (guard.error) {
+      return { success: false, error: guard.error };
     }
 
     // Check rate limit for user creation (10 per hour per admin)
-    const rateLimit = checkUserCreationRateLimit(currentUser.id);
+    const rateLimit = checkUserCreationRateLimit(guard.userId!);
     if (!rateLimit.success) {
       return { success: false, error: rateLimit.error };
     }
@@ -326,6 +377,11 @@ export async function updateUser(
   }
 ): Promise<ActionResult> {
   try {
+    const guard = await requireAdmin();
+    if (guard.error) {
+      return { success: false, error: guard.error };
+    }
+
     // Sanitize user inputs
     const sanitizedName = sanitizeText(data.name);
     const sanitizedPhone = data.phone ? sanitizeText(data.phone) : null;
@@ -348,7 +404,7 @@ export async function updateUser(
     }
 
     // Sync role to JWT metadata (allows middleware to skip DB query)
-    const syncResult = await syncUserAuthMetadata(userId, { role: data.role });
+    const syncResult = await _syncUserAuthMetadata(userId, { role: data.role });
     if (!syncResult.success) {
       console.warn("Failed to sync user metadata, middleware will fall back to DB:", syncResult.error);
       // Don't fail the update if metadata sync fails - middleware has fallback
@@ -374,6 +430,11 @@ export async function updateUserRole(
   role: string
 ): Promise<ActionResult> {
   try {
+    const guard = await requireAdmin();
+    if (guard.error) {
+      return { success: false, error: guard.error };
+    }
+
     // Validate role
     const validRoles = ["admin", "pm", "production", "procurement", "management", "client"];
     if (!validRoles.includes(role)) {
@@ -394,7 +455,7 @@ export async function updateUserRole(
     }
 
     // Sync role to JWT metadata (allows middleware to skip DB query)
-    const syncResult = await syncUserAuthMetadata(userId, { role });
+    const syncResult = await _syncUserAuthMetadata(userId, { role });
     if (!syncResult.success) {
       console.warn("Failed to sync user metadata, middleware will fall back to DB:", syncResult.error);
     }
@@ -451,6 +512,11 @@ export async function toggleUserActive(
   isActive: boolean
 ): Promise<ActionResult> {
   try {
+    const guard = await requireAdmin();
+    if (guard.error) {
+      return { success: false, error: guard.error };
+    }
+
     const supabase = createAdminClient();
 
     // Update users table

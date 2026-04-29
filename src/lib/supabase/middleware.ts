@@ -1,7 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-// Route permissions - which roles can access which routes
+// Route permissions - which roles can access which routes.
+// Keep this map covering EVERY top-level dashboard route group. New routes
+// must be classified explicitly here, not inherited via the catch-all.
 const routePermissions: Record<string, string[]> = {
   "/dashboard": ["admin", "pm", "production", "procurement", "management", "client"],
   "/projects": ["admin", "pm", "production", "procurement", "management", "client"], // Clients see assigned projects
@@ -9,6 +11,9 @@ const routePermissions: Record<string, string[]> = {
   "/clients": ["admin", "pm"],
   "/users": ["admin"],
   "/reports": ["admin", "pm", "management", "client"], // Clients see their project reports
+  "/finance": ["admin", "management"], // Legacy project budgets dashboard (page also re-checks)
+  "/payments": ["admin", "pm", "production", "procurement", "management"], // Whitelist-gated by finance_access RLS — block clients here
+  "/timeline": ["admin", "pm", "production", "procurement", "management"], // Project-scoped Gantt — RLS gates per-project access
   "/settings": ["admin"],
   "/profile": ["admin", "pm", "production", "procurement", "management", "client"], // All users can access their profile
   "/notifications": ["admin", "pm", "production", "procurement", "management", "client"], // All users see their notifications

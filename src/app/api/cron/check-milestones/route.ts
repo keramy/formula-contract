@@ -48,9 +48,19 @@ interface TeamMember {
 }
 
 export async function GET(request: Request) {
-  // Verify cron secret to prevent unauthorized access
+  // Verify cron secret. Fail closed when CRON_SECRET is unset so a
+  // misconfigured deployment can't accidentally accept anonymous calls.
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    console.error("[check-milestones] CRON_SECRET is not configured");
+    return NextResponse.json(
+      { error: "Server misconfigured" },
+      { status: 500 },
+    );
+  }
+
   const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
