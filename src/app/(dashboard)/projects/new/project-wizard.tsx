@@ -194,17 +194,45 @@ export function ProjectWizard({ clients, users, userRole, currentUserId }: Proje
       // Note: The creator is already assigned by the DB trigger (migration 060),
       // so we only need to assign OTHER selected team members here.
       const otherMembers = selectedUserIds.filter((id) => id !== currentUserId);
+      const failedUserIds: string[] = [];
       if (otherMembers.length > 0) {
-        await Promise.all(
-          otherMembers.map((userId) =>
-            assignUserToProject(newProject.id, userId).catch((err) =>
-              console.error(`Failed to assign user ${userId}:`, err)
-            )
-          )
+        const results = await Promise.all(
+          otherMembers.map(async (userId) => {
+            try {
+              const result = await assignUserToProject(newProject.id, userId);
+              if (!result.success) {
+                console.error(`Assignment failed for ${userId}: ${result.error}`);
+                return { userId, ok: false };
+              }
+              return { userId, ok: true };
+            } catch (err) {
+              console.error(`Failed to assign user ${userId}:`, err);
+              return { userId, ok: false };
+            }
+          })
         );
+        for (const r of results) {
+          if (!r.ok) failedUserIds.push(r.userId);
+        }
       }
 
-      toast.success("Project created successfully!");
+      // Surface partial success: the project exists and the creator is
+      // assigned via DB trigger, so navigation is correct — but the user
+      // needs to know which teammates didn't get added so they can retry
+      // from the project detail page.
+      if (failedUserIds.length > 0) {
+        const failedNames = users
+          .filter((u) => failedUserIds.includes(u.id))
+          .map((u) => u.name || u.email);
+        const failedLabel =
+          failedNames.length > 0 ? failedNames.join(", ") : `${failedUserIds.length} member(s)`;
+        toast.warning(
+          `Project created, but failed to assign: ${failedLabel}. Add them from the project page.`,
+          { duration: 8000 }
+        );
+      } else {
+        toast.success("Project created successfully!");
+      }
       router.push(`/projects/${newProject.id}`);
     } catch (err) {
       console.error("Project creation error:", err);

@@ -13,8 +13,9 @@
 import { createClient, type RequestContext } from "@/lib/supabase/server";
 import { logActivity } from "@/lib/activity-log/actions";
 import { ACTIVITY_ACTIONS } from "@/lib/activity-log/constants";
-import { Resend } from "resend";
 import { ProjectAssignmentEmail } from "@/emails/project-assignment-email";
+import { getSiteUrl } from "@/lib/platform/env";
+import { getResendClient } from "@/lib/platform/mail";
 
 // ============================================================================
 // Types
@@ -278,17 +279,13 @@ async function sendAssignmentEmail(
 ) {
   if (!email) return;
 
-  const resendApiKey = process.env.RESEND_API_KEY;
-  if (!resendApiKey) {
-    console.warn("RESEND_API_KEY not configured, skipping assignment email");
-    return;
-  }
+  const resend = getResendClient();
+  if (!resend) return;
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://formula-contract.vercel.app";
+  const siteUrl = getSiteUrl();
   const projectUrl = `${siteUrl}/projects/${projectId}`;
 
   try {
-    const resend = new Resend(resendApiKey);
     await resend.emails.send({
       from: "Formula Contract <noreply@formulacontractpm.com>",
       to: email,

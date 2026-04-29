@@ -12,8 +12,9 @@ import { createClient, type RequestContext } from "@/lib/supabase/server";
 import { logActivity } from "@/lib/activity-log/actions";
 import { ACTIVITY_ACTIONS } from "@/lib/activity-log/constants";
 import { notifyProjectPMs } from "@/lib/notifications/actions";
-import { Resend } from "resend";
 import { DrawingSentToClientEmail } from "@/emails/drawing-sent-to-client-email";
+import { getSiteUrl } from "@/lib/platform/env";
+import { getResendClient } from "@/lib/platform/mail";
 
 interface SendDrawingsResult {
   success: boolean;
@@ -153,9 +154,9 @@ export async function sendDrawingsToClient(
       }
 
       // 7. Send email notifications via Resend batch API
-      const apiKey = process.env.RESEND_API_KEY;
-      if (apiKey) {
-        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+      const resend = getResendClient();
+      if (resend) {
+        const siteUrl = getSiteUrl();
         const drawingsPageUrl = `${siteUrl}/projects/${projectId}?tab=drawings`;
 
         const usersWithEmail = clients.filter((c) => c.email);
@@ -178,7 +179,6 @@ export async function sendDrawingsToClient(
           }));
 
           try {
-            const resend = new Resend(apiKey);
             const { error: batchError } = await resend.batch.send(emailRequests);
 
             if (batchError) {

@@ -8,9 +8,10 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
-import { Resend } from "resend";
 import { MilestoneAlertEmail } from "@/emails/milestone-alert-email";
 import { NextResponse } from "next/server";
+import { getSiteUrl } from "@/lib/platform/env";
+import { getResendClient } from "@/lib/platform/mail";
 
 // Use service role key for cron jobs (bypasses RLS)
 const supabase = createClient(
@@ -18,12 +19,8 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const resend = process.env.RESEND_API_KEY
-  ? new Resend(process.env.RESEND_API_KEY)
-  : null;
-
-const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL || "https://formula-contract.vercel.app";
+const resend = getResendClient();
+const siteUrl = getSiteUrl();
 
 interface MilestoneWithProject {
   id: string;
@@ -68,12 +65,53 @@ export async function GET(request: Request) {
     const today = new Date();
     const todayStr = today.toISOString().split("T")[0];
 
-    // Find milestones that need alerts:
-    // 1. Not completed
-    // 2. Due date - alert_days_before <= today (within alert window)
-    // 3. Alert not already sent today
-    const { data: milestones, error: milestonesError } = await supabase
+    // Find candidate milestones: not completed, alert not already sent today.
+    // The alert-window check is per-row (uses alert_days_before) so we
+    // filter that in JS, then atomically claim only the rows in window.
+    const { data: candidates, error: candidatesError } = await supabase
       .from("milestones")
+      .select("id, due_date, alert_days_before")
+      .eq("is_completed", false)
+      .or(`alert_sent_at.is.null,alert_sent_at.lt.${todayStr}`);
+
+    if (candidatesError) {
+      console.error("Error fetching milestone candidates:", candidatesError);
+      return NextResponse.json(
+        { error: "Failed to fetch milestones" },
+        { status: 500 }
+      );
+    }
+
+    const candidateIds = (candidates || [])
+      .filter((m) => {
+        const dueDate = new Date(m.due_date);
+        const alertDays = m.alert_days_before || 7;
+        const alertStartDate = new Date(dueDate);
+        alertStartDate.setDate(alertStartDate.getDate() - alertDays);
+        return today >= alertStartDate;
+      })
+      .map((m) => m.id);
+
+    if (candidateIds.length === 0) {
+      return NextResponse.json({
+        success: true,
+        message: "No milestones need alerts",
+        processed: 0,
+      });
+    }
+
+    // Atomically claim the rows: an UPDATE with the same idempotency
+    // predicate, scoped to our candidate IDs. Postgres serializes
+    // concurrent UPDATEs on the same row and re-evaluates the WHERE
+    // clause after acquiring the row lock — so if a parallel cron run
+    // already claimed a row, our UPDATE skips it and RETURNING omits it.
+    // This guarantees each milestone is processed by exactly one run.
+    const claimedAt = new Date().toISOString();
+    const { data: claimed, error: claimError } = await supabase
+      .from("milestones")
+      .update({ alert_sent_at: claimedAt })
+      .in("id", candidateIds)
+      .or(`alert_sent_at.is.null,alert_sent_at.lt.${todayStr}`)
       .select(
         `
         id,
@@ -81,35 +119,24 @@ export async function GET(request: Request) {
         due_date,
         alert_days_before,
         project_id,
-        alert_sent_at,
         project:projects!inner(name, project_code)
       `
-      )
-      .eq("is_completed", false)
-      .or(`alert_sent_at.is.null,alert_sent_at.lt.${todayStr}`);
+      );
 
-    if (milestonesError) {
-      console.error("Error fetching milestones:", milestonesError);
+    if (claimError) {
+      console.error("Error claiming milestones:", claimError);
       return NextResponse.json(
-        { error: "Failed to fetch milestones" },
+        { error: "Failed to claim milestones" },
         { status: 500 }
       );
     }
 
-    // Filter milestones within alert window
-    const milestonesToAlert = (milestones || []).filter((m) => {
-      const dueDate = new Date(m.due_date);
-      const alertDays = m.alert_days_before || 7;
-      const alertStartDate = new Date(dueDate);
-      alertStartDate.setDate(alertStartDate.getDate() - alertDays);
-
-      return today >= alertStartDate;
-    }) as unknown as MilestoneWithProject[];
+    const milestonesToAlert = (claimed || []) as unknown as MilestoneWithProject[];
 
     if (milestonesToAlert.length === 0) {
       return NextResponse.json({
         success: true,
-        message: "No milestones need alerts",
+        message: "All candidate milestones were claimed by another run",
         processed: 0,
       });
     }
@@ -207,11 +234,10 @@ export async function GET(request: Request) {
         }
       }
 
-      // Mark milestone as alerted
-      await supabase
-        .from("milestones")
-        .update({ alert_sent_at: new Date().toISOString() })
-        .eq("id", milestone.id);
+      // No per-row mark needed — the row was already claimed atomically
+      // before this loop started. If notification/email delivery failed
+      // partway through, the row is still marked alerted: we accept a
+      // possible missed notification over a duplicate one.
     }
 
     return NextResponse.json({
