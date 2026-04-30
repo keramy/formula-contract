@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { generateRequestId } from "@/lib/platform/request-context";
 
 // Route permissions - which roles can access which routes.
 // Keep this map covering EVERY top-level dashboard route group. New routes
@@ -38,9 +39,18 @@ function canAccessRoute(pathname: string, role: string): boolean {
 }
 
 export async function updateSession(request: NextRequest) {
+  // Request correlation: reuse incoming x-request-id if a caller already set
+  // one (rare — useful for cron / synthetic requests), otherwise generate.
+  // Forward to downstream handlers via request headers, and echo on the
+  // response so users can quote the ID in support requests.
+  const incomingId = request.headers.get("x-request-id");
+  const requestId = incomingId || generateRequestId();
+  request.headers.set("x-request-id", requestId);
+
   let supabaseResponse = NextResponse.next({
     request,
   });
+  supabaseResponse.headers.set("x-request-id", requestId);
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -57,6 +67,7 @@ export async function updateSession(request: NextRequest) {
           supabaseResponse = NextResponse.next({
             request,
           });
+          supabaseResponse.headers.set("x-request-id", requestId);
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
           );
@@ -94,14 +105,14 @@ export async function updateSession(request: NextRequest) {
     // No user, redirect to login
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    return NextResponse.redirect(url);
+    return withRequestId(NextResponse.redirect(url), requestId);
   }
 
   if (user && (pathname === "/login" || pathname === "/forgot-password")) {
     // User is logged in, redirect to dashboard (but allow reset-password and setup-password)
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
-    return NextResponse.redirect(url);
+    return withRequestId(NextResponse.redirect(url), requestId);
   }
 
   // Allow authenticated users to access setup-password (for new invited users)
@@ -120,7 +131,7 @@ export async function updateSession(request: NextRequest) {
     if (mustChangePassword) {
       const url = request.nextUrl.clone();
       url.pathname = "/change-password";
-      return NextResponse.redirect(url);
+      return withRequestId(NextResponse.redirect(url), requestId);
     }
   }
 
@@ -168,7 +179,7 @@ export async function updateSession(request: NextRequest) {
       const url = request.nextUrl.clone();
       url.pathname = "/login";
       url.searchParams.set("error", "account_deactivated");
-      return NextResponse.redirect(url);
+      return withRequestId(NextResponse.redirect(url), requestId);
     }
 
     // Check role-based access
@@ -176,9 +187,14 @@ export async function updateSession(request: NextRequest) {
       const url = request.nextUrl.clone();
       url.pathname = "/dashboard";
       url.searchParams.set("error", "unauthorized");
-      return NextResponse.redirect(url);
+      return withRequestId(NextResponse.redirect(url), requestId);
     }
   }
 
   return supabaseResponse;
+}
+
+function withRequestId(resp: NextResponse, requestId: string): NextResponse {
+  resp.headers.set("x-request-id", requestId);
+  return resp;
 }

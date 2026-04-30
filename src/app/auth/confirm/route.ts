@@ -1,6 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { logger } from "@/lib/platform/logger";
+
+const AREA = "auth";
 
 /**
  * Auth Confirm Route (Server-Side)
@@ -19,40 +22,58 @@ export async function GET(request: NextRequest) {
   const error_description = requestUrl.searchParams.get("error_description");
   const origin = requestUrl.origin;
 
-  // Log only redacted shape — the PKCE `code` is single-use auth material
-  // and must not be persisted to log aggregators via request.url.
-  console.log("Auth confirm received:", {
-    code: code ? "present" : "missing",
+  // Log only redacted shape — the PKCE `code` is single-use auth material.
+  logger.info("Auth confirm received", {
+    area: AREA,
+    action: "confirm_received",
+    event: "auth.confirm.received",
+    route: "/auth/confirm",
+    hasCode: !!code,
     error_param,
     error_description,
   });
 
-  // If Supabase returned an error directly
   if (error_param) {
-    console.error("Supabase auth error:", error_param, error_description);
-    return NextResponse.redirect(
-      `${origin}/login?error=auth_link_expired`
-    );
+    logger.warn("Supabase returned auth error to confirm", {
+      area: AREA,
+      event: "auth.confirm.failure",
+      route: "/auth/confirm",
+      error_param,
+      error_description,
+      errorClass: "authentication_error",
+    });
+    return NextResponse.redirect(`${origin}/login?error=auth_link_expired`);
   }
 
-  // Handle PKCE flow (code parameter from Supabase /verify redirect)
   if (code) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
-      // Code exchanged successfully — session cookies are set
-      // Redirect to reset-password page
+      logger.info("Auth confirm code exchange succeeded", {
+        area: AREA,
+        action: "code_exchange",
+        event: "auth.confirm.success",
+        route: "/auth/confirm",
+      });
       return NextResponse.redirect(`${origin}/reset-password`);
     }
 
-    console.error("Auth confirm code exchange error:", error);
-    return NextResponse.redirect(
-      `${origin}/login?error=auth_link_expired`
-    );
+    logger.error("Auth confirm code exchange failed", {
+      area: AREA,
+      action: "code_exchange",
+      event: "auth.confirm.failure",
+      route: "/auth/confirm",
+      err: error,
+      errorClass: "authentication_error",
+    });
+    return NextResponse.redirect(`${origin}/login?error=auth_link_expired`);
   }
 
-  // No valid params — redirect to forgot-password to try again
-  console.error("Auth confirm: no code or error params received");
+  logger.warn("Auth confirm received no params", {
+    area: AREA,
+    event: "auth.confirm.no_params",
+    route: "/auth/confirm",
+  });
   return NextResponse.redirect(`${origin}/forgot-password`);
 }

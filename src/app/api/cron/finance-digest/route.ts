@@ -15,38 +15,82 @@
  */
 
 import { sendWeeklyDigestEmails } from "@/lib/actions/finance";
+import { logger } from "@/lib/platform/logger";
+
+const JOB_NAME = "finance_digest";
+const AREA = "cron";
 
 export async function GET(request: Request) {
-  // Verify cron secret. Fail closed: a missing CRON_SECRET is a server
-  // configuration error, not a free pass to invoke the digest publicly.
+  const startedAt = Date.now();
+
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) {
-    console.error("[finance-digest] CRON_SECRET is not configured");
-    return Response.json(
-      { error: "Server misconfigured" },
-      { status: 500 },
-    );
+    logger.error("Cron secret not configured", {
+      area: AREA,
+      jobName: JOB_NAME,
+      event: "cron.finance_digest.misconfigured",
+      errorClass: "logic_error",
+    });
+    return Response.json({ error: "Server misconfigured" }, { status: 500 });
   }
 
   const authHeader = request.headers.get("authorization");
   if (authHeader !== `Bearer ${cronSecret}`) {
+    logger.warn("Cron unauthorized invocation", {
+      area: AREA,
+      jobName: JOB_NAME,
+      event: "cron.finance_digest.unauthorized",
+      status: 401,
+    });
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  logger.info("Cron job started", {
+    area: AREA,
+    jobName: JOB_NAME,
+    event: "cron.finance_digest.started",
+  });
+
   try {
     const result = await sendWeeklyDigestEmails();
+    const durationMs = Date.now() - startedAt;
 
     if (!result.success) {
+      logger.error("Cron job failed", {
+        area: AREA,
+        jobName: JOB_NAME,
+        event: "cron.finance_digest.failed",
+        durationMs,
+        errorMessage: result.error,
+        errorClass: "job_error",
+      });
       return Response.json({ error: result.error }, { status: 500 });
     }
 
+    const sent = result.data?.sent || 0;
+    logger.info("Cron job completed", {
+      area: AREA,
+      jobName: JOB_NAME,
+      event: "cron.finance_digest.completed",
+      durationMs,
+      sent,
+    });
+
     return Response.json({
       success: true,
-      sent: result.data?.sent || 0,
+      sent,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("[finance-digest cron] Error:", error);
+    const durationMs = Date.now() - startedAt;
+    logger.error("Cron job threw exception", {
+      area: AREA,
+      jobName: JOB_NAME,
+      event: "cron.finance_digest.failed",
+      durationMs,
+      err: error,
+      errorClass: "job_error",
+    });
     return Response.json({ error: "Internal error" }, { status: 500 });
   }
 }

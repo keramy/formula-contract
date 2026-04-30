@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { execSync } from "child_process";
+import { withSentryConfig } from "@sentry/nextjs";
 
 // Get version info at build time
 const packageVersion = process.env.npm_package_version || "0.1.0";
@@ -55,4 +56,21 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// Sentry build-time wrapper.
+// - Auto-instruments server/edge for performance.
+// - Uploads sourcemaps when SENTRY_AUTH_TOKEN is set; skips silently otherwise.
+// - With NEXT_PUBLIC_SENTRY_DSN unset, runtime is a complete no-op (see
+//   src/instrumentation.ts and src/instrumentation-client.ts).
+export default withSentryConfig(nextConfig, {
+  silent: !process.env.CI,
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  widenClientFileUpload: true,
+  reactComponentAnnotation: { enabled: true },
+  // tunnelRoute: "/monitoring",  // Disabled: Turbopack + Next 16 + Sentry 10
+  // returns 500 on the auto-generated tunnel route. Direct ingestion to
+  // de.sentry.io works fine. Re-enable once the upstream regression is fixed.
+  disableLogger: true,
+  automaticVercelMonitors: true,
+});

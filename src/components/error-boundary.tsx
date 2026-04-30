@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import * as Sentry from "@sentry/nextjs";
 import { Button } from "@/components/ui/button";
 import { AlertTriangleIcon, RefreshCwIcon } from "lucide-react";
 
@@ -49,14 +50,14 @@ export class ErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    // Log error to console in development
-    console.error("[ErrorBoundary] Caught error:", error);
-    console.error("[ErrorBoundary] Component stack:", errorInfo.componentStack);
-
-    // TODO: Send to error tracking service (e.g., Sentry) in production
-    // if (process.env.NODE_ENV === 'production') {
-    //   Sentry.captureException(error, { extra: errorInfo });
-    // }
+    Sentry.captureException(error, {
+      tags: { errorClass: "ui_error", source: "ErrorBoundary" },
+      extra: { componentStack: errorInfo.componentStack },
+    });
+    if (process.env.NODE_ENV !== "production") {
+      console.error("[ErrorBoundary] Caught error:", error);
+      console.error("[ErrorBoundary] Component stack:", errorInfo.componentStack);
+    }
   }
 
   handleRetry = () => {

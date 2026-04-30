@@ -12,6 +12,10 @@ import { MilestoneAlertEmail } from "@/emails/milestone-alert-email";
 import { NextResponse } from "next/server";
 import { getSiteUrl } from "@/lib/platform/env";
 import { getResendClient } from "@/lib/platform/mail";
+import { logger } from "@/lib/platform/logger";
+
+const JOB_NAME = "milestone_check";
+const AREA = "cron";
 
 // Use service role key for cron jobs (bypasses RLS)
 const supabase = createClient(
@@ -45,11 +49,16 @@ interface TeamMember {
 }
 
 export async function GET(request: Request) {
-  // Verify cron secret. Fail closed when CRON_SECRET is unset so a
-  // misconfigured deployment can't accidentally accept anonymous calls.
+  const startedAt = Date.now();
+
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) {
-    console.error("[check-milestones] CRON_SECRET is not configured");
+    logger.error("Cron secret not configured", {
+      area: AREA,
+      jobName: JOB_NAME,
+      event: "cron.milestone_check.misconfigured",
+      errorClass: "logic_error",
+    });
     return NextResponse.json(
       { error: "Server misconfigured" },
       { status: 500 },
@@ -58,8 +67,20 @@ export async function GET(request: Request) {
 
   const authHeader = request.headers.get("authorization");
   if (authHeader !== `Bearer ${cronSecret}`) {
+    logger.warn("Cron unauthorized invocation", {
+      area: AREA,
+      jobName: JOB_NAME,
+      event: "cron.milestone_check.unauthorized",
+      status: 401,
+    });
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  logger.info("Cron job started", {
+    area: AREA,
+    jobName: JOB_NAME,
+    event: "cron.milestone_check.started",
+  });
 
   try {
     const today = new Date();
@@ -75,7 +96,14 @@ export async function GET(request: Request) {
       .or(`alert_sent_at.is.null,alert_sent_at.lt.${todayStr}`);
 
     if (candidatesError) {
-      console.error("Error fetching milestone candidates:", candidatesError);
+      logger.error("Failed to fetch milestone candidates", {
+        area: AREA,
+        jobName: JOB_NAME,
+        event: "cron.milestone_check.failed",
+        durationMs: Date.now() - startedAt,
+        err: candidatesError,
+        errorClass: "database_error",
+      });
       return NextResponse.json(
         { error: "Failed to fetch milestones" },
         { status: 500 }
@@ -93,6 +121,13 @@ export async function GET(request: Request) {
       .map((m) => m.id);
 
     if (candidateIds.length === 0) {
+      logger.info("Cron job completed (no work)", {
+        area: AREA,
+        jobName: JOB_NAME,
+        event: "cron.milestone_check.completed",
+        durationMs: Date.now() - startedAt,
+        processed: 0,
+      });
       return NextResponse.json({
         success: true,
         message: "No milestones need alerts",
@@ -124,7 +159,14 @@ export async function GET(request: Request) {
       );
 
     if (claimError) {
-      console.error("Error claiming milestones:", claimError);
+      logger.error("Failed to claim milestones", {
+        area: AREA,
+        jobName: JOB_NAME,
+        event: "cron.milestone_check.failed",
+        durationMs: Date.now() - startedAt,
+        err: claimError,
+        errorClass: "database_error",
+      });
       return NextResponse.json(
         { error: "Failed to claim milestones" },
         { status: 500 }
@@ -163,7 +205,16 @@ export async function GET(request: Request) {
         .eq("project_id", milestone.project_id);
 
       if (teamError) {
-        console.error("Error fetching team members:", teamError);
+        logger.warn("Failed to fetch team members for milestone alert", {
+          area: AREA,
+          jobName: JOB_NAME,
+          event: "cron.milestone_check.team_fetch_failed",
+          projectId: milestone.project_id,
+          entityType: "milestone",
+          entityId: milestone.id,
+          err: teamError,
+          errorClass: "database_error",
+        });
         continue;
       }
 
@@ -192,7 +243,16 @@ export async function GET(request: Request) {
         .insert(notifications);
 
       if (notifError) {
-        console.error("Error creating notifications:", notifError);
+        logger.warn("Failed to create milestone notifications", {
+          area: AREA,
+          jobName: JOB_NAME,
+          event: "cron.milestone_check.notification_insert_failed",
+          projectId: milestone.project_id,
+          entityType: "milestone",
+          entityId: milestone.id,
+          err: notifError,
+          errorClass: "database_error",
+        });
       } else {
         notificationsCreated += notifications.length;
       }
@@ -226,10 +286,17 @@ export async function GET(request: Request) {
             });
             emailsSent++;
           } catch (emailError) {
-            console.error(
-              `Failed to send email to ${tm.user.email}:`,
-              emailError
-            );
+            logger.warn("Failed to send milestone alert email", {
+              area: AREA,
+              jobName: JOB_NAME,
+              event: "cron.milestone_check.email_send_failed",
+              projectId: milestone.project_id,
+              entityType: "milestone",
+              entityId: milestone.id,
+              userId: tm.user.id,
+              err: emailError,
+              errorClass: "integration_error",
+            });
           }
         }
       }
@@ -240,6 +307,17 @@ export async function GET(request: Request) {
       // possible missed notification over a duplicate one.
     }
 
+    const durationMs = Date.now() - startedAt;
+    logger.info("Cron job completed", {
+      area: AREA,
+      jobName: JOB_NAME,
+      event: "cron.milestone_check.completed",
+      durationMs,
+      processed: milestonesToAlert.length,
+      emailsSent,
+      notificationsCreated,
+    });
+
     return NextResponse.json({
       success: true,
       message: `Processed ${milestonesToAlert.length} milestones`,
@@ -248,7 +326,14 @@ export async function GET(request: Request) {
       notificationsCreated,
     });
   } catch (error) {
-    console.error("Cron job error:", error);
+    logger.error("Cron job threw exception", {
+      area: AREA,
+      jobName: JOB_NAME,
+      event: "cron.milestone_check.failed",
+      durationMs: Date.now() - startedAt,
+      err: error,
+      errorClass: "job_error",
+    });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

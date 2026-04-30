@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
 import { Button } from "@/components/ui/button";
 import { AlertTriangleIcon, RefreshCwIcon, HomeIcon } from "lucide-react";
 
@@ -20,8 +21,13 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Log error to console in development
-    console.error("Global error:", error);
+    Sentry.captureException(error, {
+      tags: { errorClass: "ui_error", source: "GlobalError" },
+      extra: { digest: error.digest },
+    });
+    if (process.env.NODE_ENV !== "production") {
+      console.error("Global error:", error);
+    }
   }, [error]);
 
   return (
